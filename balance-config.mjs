@@ -101,6 +101,17 @@ export const BALANCE_CONFIG = Object.freeze({
   // R8 — Permanent nutrition uses its own small capacity (3-5% power budget).
   nutrition: Object.freeze({ capacity: 20 }),
 
+  // R8 / R16 — Food & Care policy (values that gate item effects, not content).
+  care: Object.freeze({
+    overfullThreshold: 90, // Feeding past this yields reduced benefit.
+    overfullEfficiency: 0.3,
+    preferenceMultiplier: 1.5, // Favorite food (species or instance) hits harder.
+    favoriteBondBonus: 4,
+    rest: Object.freeze({ energy: 35, stress: -15 }),
+    play: Object.freeze({ mood: 10, bond: 5, trust: 3, energy: -8 }),
+    trainingFoodMaxMultiplier: 1.5, // Training-food buffs never stack past this.
+  }),
+
   // R14 — Capture chance. hpFactor is interpolated across the target-HP table.
   capture: Object.freeze({
     minChance: 0.01,
