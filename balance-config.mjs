@@ -128,6 +128,24 @@ export const BALANCE_CONFIG = Object.freeze({
     ]),
   }),
 
+  // R7 — Skill progression: mastery thresholds, slot power budgets, mutation rule.
+  skill: Object.freeze({
+    // Cumulative skill EXP required to REACH each mastery rank.
+    masteryThresholds: Object.freeze({ familiar: 100, skilled: 300, expert: 700, master: 1500 }),
+    // Expected share of sustained output per slot (R7).
+    slotBudget: Object.freeze({
+      basicAI: Object.freeze({ min: 0.4, max: 0.5 }),
+      s1: Object.freeze({ min: 0.2, max: 0.25 }),
+      s2: Object.freeze({ min: 0.1, max: 0.2 }),
+      s3: Object.freeze({ min: 0.2, max: 0.3 }),
+    }),
+    // Novelty decay per repeated identical skill use within an encounter.
+    noveltyDecay: 0.7,
+    // A mutation must NOT raise raw power beyond base by more than this; it must
+    // pay for any gain with a measurable trade-off (R7 Mutation Rule).
+    mutationMaxPowerDelta: 0.1,
+  }),
+
   // D1 / R26 — Target Power Budget shares (fractions) each source may contribute.
   // Used by the CR simulator to flag builds whose sources drift out of budget.
   powerBudget: Object.freeze({
