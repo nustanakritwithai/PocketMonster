@@ -79,6 +79,25 @@ export const BALANCE_CONFIG = Object.freeze({
     elementResist: Object.freeze({ base: 0.0, hard: 0.5 }),
   }),
 
+  // R4 — Battle Growth reward matrix. Battle converts behavior into Growth EXP +
+  // Training EXP (shared pool) + career, under per-encounter caps and anti-grind.
+  battle: Object.freeze({
+    // Baseline Growth EXP by encounter tier (R4 ranges).
+    growthBaseByTier: Object.freeze({ normal: 30, strong: 40, elite: 90, boss: 220, trial: 60 }),
+    // Threat weight per tier, folded into the per-encounter training cap.
+    threatByTier: Object.freeze({ normal: 1, strong: 2, elite: 4, boss: 7, trial: 3 }),
+    loseGrowthMultiplier: 0.0, // Losing grants no victory Growth EXP (R4).
+    // Encounter training cap per category: max(floor, round(base + threat×coeff)).
+    encounterCap: Object.freeze({ floor: 4, base: 2, threatCoeff: 0.6 }),
+    // Repeated meaningful actions in one category diminish (unique-action rule).
+    noveltyDecay: 0.65,
+    // Inactive/party members share only a fraction of Growth EXP and no training
+    // (Anti Power-level rule — can't drag a Lv.1 into a boss and instantly grow).
+    partyGrowthShare: 0.35,
+    // A monster with no meaningful contribution earns reduced growth, no training.
+    noContributionGrowthShare: 0.25,
+  }),
+
   // R8 — Permanent nutrition uses its own small capacity (3-5% power budget).
   nutrition: Object.freeze({ capacity: 20 }),
 
