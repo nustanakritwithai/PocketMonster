@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+assert.ok(html.includes('id="floatingTextLayer"'),'floating damage layer missing');
+assert.ok(js.includes('function spawnDamageNumber('),'damage number function missing');
+assert.ok(js.includes('function updateFloatingTexts('),'damage update missing');
+assert.ok(js.includes('function triggerCameraShake('),'camera shake missing');
+assert.ok(js.includes('function spawnGroundDecal('),'ground decal system missing');
+assert.ok(js.includes('function updateGroundDecals('),'ground decal update missing');
+assert.ok(js.includes('updateFloatingTexts(dt)'),'loop must update floating damage');
+assert.ok(js.includes('updateGroundDecals(dt)'),'loop must update ground decals');
+assert.ok(css.includes('.damage-pop'),'damage number CSS missing');
+console.log('Active combat feedback regression: PASS');

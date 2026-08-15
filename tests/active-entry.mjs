@@ -1,0 +1,28 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import { APP_VERSION, ASSET_REVISION } from '../save-schema.mjs';
+import {
+  activeCssName,
+  activeCssRef,
+  activeHtml,
+  activeJs,
+  activeJsName,
+  activeJsRef,
+  rootUrl,
+} from './active-assets.mjs';
+
+const packageJson = JSON.parse(fs.readFileSync(new URL('package.json', rootUrl), 'utf8'));
+assert.equal(packageJson.version, APP_VERSION);
+assert.equal(activeJsName, 'game-v707.js');
+assert.equal(activeCssName, 'style-v707.css');
+assert.ok(activeJsRef.endsWith(`?v=${ASSET_REVISION}`));
+assert.ok(activeCssRef.endsWith(`?v=${ASSET_REVISION}`));
+assert.ok(activeHtml.includes(`Monster Life RPG Prototype V${APP_VERSION}`));
+assert.ok(activeHtml.includes(`>V${APP_VERSION}</div>`));
+assert.ok(activeJs.includes(`Monster Life RPG V${APP_VERSION}`));
+assert.ok(!activeHtml.includes('game.js'));
+assert.ok(!activeHtml.includes('game-v705.js'));
+assert.ok(!activeHtml.includes('game-v706.js'));
+const versionedHtml = fs.readFileSync(new URL('v707.html', rootUrl), 'utf8');
+assert.equal(activeHtml, versionedHtml, 'index.html and v707.html must be byte-identical active entries');
+console.log('P0 active entry/version regression: PASS');

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Monster Life RPG Prototype V7.0.7</title>
+  <link rel="stylesheet" href="./style-v707.css?v=707" />
+</head>
+<body>
+  <div id="startupStatus" class="startup-status">กำลังเริ่มเกม…</div>
+  <div id="immersiveGate" class="immersive-gate hidden">
+    <div class="immersive-card">
+      <div class="immersive-title">Monster Life RPG</div>
+      <div class="immersive-sub">เวอร์ชัน V7.0.7 • CACHE BYPASS • เข้าเกมทันที</div>
+      <div class="immersive-steps">1) กดปุ่มด้านล่าง<br>2) อนุญาต Full Screen<br>3) หากยังไม่เป็นแนวนอน ให้หมุนเครื่อง</div>
+      <button id="enterImmersiveBtn" class="immersive-btn">เข้าเกมแบบเต็มจอแนวนอน</button>
+    </div>
+  </div>
+  <div id="rotateNotice" class="rotate-notice hidden">
+    <div class="rotate-card">
+      <div class="rotate-icon">⤾</div>
+      <div class="rotate-title">กรุณาหมุนเป็นแนวนอน</div>
+      <div class="rotate-sub">เกมนี้ออกแบบสำหรับ Full Screen แนวนอน</div>
+      <button id="retryImmersiveBtn" class="immersive-btn small-alt">ลองเปิดเต็มจออีกครั้ง</button>
+    </div>
+  </div>
+  <div id="game"></div>
+
+  <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#dc2626;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V7.0.7</div>
+
+  <div id="hud">
+    <div class="topbar compact-topbar" role="group" aria-label="สถานะผู้เล่นและการออกล่า">
+      <div class="pill combat-pill"><b>HP</b> <span id="playerHp">100/100</span></div>
+      <div class="pill ball-pill"><b>บอล</b> <span id="captureBallCount">0</span></div>
+      <div class="pill active-pill"><b>คู่หู</b> <span id="activeMonsterStatus">ยังไม่เรียก</span></div>
+      <div class="pill zone-pill"><span id="zoneLabel">Ranch Hub</span></div>
+      <button id="menuBtn" class="small icon-btn" aria-label="เมนู">☰</button>
+      <button id="fullscreenBtn" class="small icon-btn" aria-label="เต็มจอ">⛶</button>
+    </div>
+
+    <div id="utilityMenu" class="utility-menu hidden">
+      <div class="utility-stats">
+        <div><b>มอนทั้งหมด</b><span id="collectionCount">0</span></div>
+        <div><b>EXP</b><span id="playerExp">0</span></div>
+        <div><b>Ranch</b><span id="ranchCount">0/6</span></div>
+        <div><b>Wild</b><span id="wildCount">0</span></div>
+      </div>
+      <button id="saveBtn" class="utility-btn">บันทึกเกม</button>
+      <button id="resetBtn" class="utility-btn danger">เริ่มใหม่</button>
+    </div>
+
+    <div id="zoneTravel" class="zone-travel">
+      <button data-zone="hub">Ranch</button>
+      <button data-zone="grassland">ทุ่ง • Wild</button>
+      <button data-zone="cave">ถ้ำ • Wild</button>
+    </div>
+
+    <button id="huntBtn" class="hunt-btn">ออกล่า → ทุ่ง • Wild 6</button>
+
+    <div id="message" class="message">Ranch เป็นพื้นที่ปลอดภัย • กด “ออกล่า” หรือเลือก ทุ่ง/ถ้ำ เพื่อเจอ Wild Monster</div>
+
+    <div id="targetCard" class="target-card hidden">
+      <div class="target-row"><b id="targetName">เป้าหมาย</b> <span id="targetLevel"></span></div>
+      <div id="targetTypes" class="type-row"></div>
+      <div class="bar"><div id="targetHpBar" class="bar-fill"></div></div>
+      <div class="target-bottom"><span id="targetHpText" class="tiny"></span><span id="typeHint" class="tiny effect"></span></div>
+    </div>
+
+    <div id="worldLabels" class="world-labels"></div>
+    <div id="floatingTextLayer" class="floating-text-layer"></div>
+    <div id="aimReticle" class="aim-reticle"><span></span></div>
+    <div id="party" class="party"></div>
+
+    <div class="controls-left">
+      <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
+    </div>
+
+    <div id="cameraPad" class="camera-pad" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
+
+    <div class="controls-right">
+      <button id="skill1Btn" class="action skill skill1"><span>S1</span><small>สกิล 1</small></button>
+      <button id="skill2Btn" class="action skill skill2"><span>S2</span><small>สกิล 2</small></button>
+      <button id="skill3Btn" class="action skill skill3"><span>S3</span><small>สกิล 3</small></button>
+      <button id="captureBtn" class="action capture">ปาจับ</button>
+      <button id="summonBtn" class="action summon">ปาเรียก</button>
+      <button id="recallBtn" class="action recall">Recall</button>
+    </div>
+    <div id="actionReason" class="action-reason" role="status" aria-live="polite">อยู่ Ranch • ออกไป Wild Zone ก่อน</div>
+
+
+    <button id="npcBtn" class="npc-btn hidden">คุย</button>
+
+    <div id="monsterManager" class="manager hidden">
+      <div class="manager-card">
+        <div class="manager-head">
+          <div>
+            <b>Monster Ranch & Breeding Center</b>
+            <div class="manager-sub">Party • Storage • Ranch Active • Heal • Training • Breeding • Evolution</div>
+          </div>
+          <button id="closeManager">✕</button>
+        </div>
+
+        <div class="manager-note">กติกา V6: ลงสนามได้ 1 ตัว • Fainted ไม่ตายและ Auto Recall • Heal ที่ Ranch ฟรี • Ranch แสดงมอนได้สูงสุด 6 ตัว • Breeding ต้อง Adult + Group + Gender + Bond ≥ 50</div>
+
+        <div class="manager-toolbar">
+          <div class="food-inventory">
+            <span>ไอเทม:</span>
+            <b>Capture Ball <span id="managerBallCount">0</span></b>
+            <b>โปรตีน <span id="foodProtein">0</span></b>
+            <b>สุขภาพ <span id="foodHealthy">0</span></b>
+            <b>ของโปรด <span id="foodFavorite">0</span></b>
+          </div>
+          <div class="toolbar-actions">
+            <button id="healAllBtn" class="secondary-btn heal-btn">Heal ฟรี</button>
+            <button id="refillBallsBtn" class="secondary-btn">รับบอลทดสอบ +5</button>
+            <button id="refillFoodBtn" class="secondary-btn">อาหารทดสอบ +3</button>
+          </div>
+        </div>
+
+        <div class="manager-tabs">
+          <button class="manager-tab active" data-manager-tab="collection">จัดการมอน</button>
+          <button class="manager-tab" data-manager-tab="evolution">Evolution</button>
+          <button class="manager-tab" data-manager-tab="breeding">Breeding / Egg</button>
+        </div>
+
+        <div class="manager-grid manager-tab-pane active" data-tab-pane="collection">
+          <section class="manager-section">
+            <h3>Party <span id="partyCountLabel" class="section-count"></span></h3>
+            <div id="managerParty"></div>
+          </section>
+
+          <section class="manager-section">
+            <h3>Storage / Ranch <span id="storageCountLabel" class="section-count"></span> • Active <span id="ranchActiveCountLabel" class="section-count"></span></h3>
+            <div id="managerStorage"></div>
+          </section>
+        </div>
+
+        <section class="evolution-panel manager-tab-pane" data-tab-pane="evolution">
+          <div class="breeding-head">
+            <div>
+              <h3>Evolution Preview</h3>
+              <div class="tiny">วิวัฒนาการย้อนกลับไม่ได้ • Preview รูปร่าง / Type / Stats / Skills / เงื่อนไขก่อนยืนยัน</div>
+            </div>
+          </div>
+          <div id="evolutionPreview" class="evolution-preview">เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง</div>
+        </section>
+
+        <section class="breeding-panel manager-tab-pane" data-tab-pane="breeding">
+          <div class="breeding-head">
+            <div>
+              <h3>Breeding Lab</h3>
+              <div class="tiny">ลูกพื้นฐานตามแม่/ผู้ถือไข่ • Hybrid ในอนาคตใช้ BreedingRecipe</div>
+            </div>
+            <div id="compatibilityText" class="compatibility">ยังไม่ได้เลือกคู่</div>
+          </div>
+          <div class="breed-controls custom-breed-controls">
+            <div class="parent-slot">
+              <span class="parent-label">Parent A</span>
+              <button id="parentABtn" class="parent-picker-btn">เลือกมอน</button>
+            </div>
+            <span class="breed-plus">＋</span>
+            <div class="parent-slot">
+              <span class="parent-label">Parent B</span>
+              <button id="parentBBtn" class="parent-picker-btn">เลือกมอน</button>
+            </div>
+            <button id="breedBtn" class="breed-btn">สร้างไข่</button>
+          </div>
+          <div id="inheritPreview" class="inherit-preview">เลือกพ่อแม่เพื่อดูแนวโน้ม Gene ที่ส่งต่อ</div>
+          <div class="egg-title">Incubator / ไข่</div>
+          <div id="eggList" class="egg-list"></div>
+        </section>
+      </div>
+    </div>
+
+
+
+    <div id="monsterPicker" class="monster-picker hidden">
+      <div class="monster-picker-card">
+        <div class="picker-head">
+          <div>
+            <b id="pickerTitle">เลือกมอน</b>
+            <div class="tiny">แตะการ์ดเพื่อเลือก • แสดงเฉพาะมอน Adult/Mature ใน Storage</div>
+          </div>
+          <button id="closePicker" class="picker-close">✕</button>
+        </div>
+        <div id="monsterPickerList" class="monster-picker-list"></div>
+      </div>
+    </div>
+
+    <div class="help">ซ้ายเดิน • ลากขวาหมุนกล้อง • Skill 1–3 ผู้เล่นกด • Recall ก่อนปาจับ</div>
+  </div>
+
+  <script>
+    window.addEventListener('error', e => {
+      const x=document.getElementById('startupStatus');
+      if(x){x.textContent='เกิดข้อผิดพลาด: '+(e.message||'ไม่ทราบสาเหตุ');x.className='startup-status error';}
+    });
+    window.addEventListener('unhandledrejection', e => {
+      const x=document.getElementById('startupStatus');
+      if(x){x.textContent='เริ่มเกมไม่สำเร็จ: '+(e.reason?.message||e.reason||'ไม่ทราบสาเหตุ');x.className='startup-status error';}
+    });
+  </script>
+  <script type="module" src="./game-v707.js?v=707"></script>
+</body>
+</html>
