@@ -79,8 +79,53 @@ export const BALANCE_CONFIG = Object.freeze({
     elementResist: Object.freeze({ base: 0.0, hard: 0.5 }),
   }),
 
+  // R4 — Battle Growth reward matrix. Battle converts behavior into Growth EXP +
+  // Training EXP (shared pool) + career, under per-encounter caps and anti-grind.
+  battle: Object.freeze({
+    // Baseline Growth EXP by encounter tier (R4 ranges).
+    growthBaseByTier: Object.freeze({ normal: 30, strong: 40, elite: 90, boss: 220, trial: 60 }),
+    // Threat weight per tier, folded into the per-encounter training cap.
+    threatByTier: Object.freeze({ normal: 1, strong: 2, elite: 4, boss: 7, trial: 3 }),
+    loseGrowthMultiplier: 0.0, // Losing grants no victory Growth EXP (R4).
+    // Encounter training cap per category: max(floor, round(base + threat×coeff)).
+    encounterCap: Object.freeze({ floor: 4, base: 2, threatCoeff: 0.6 }),
+    // Repeated meaningful actions in one category diminish (unique-action rule).
+    noveltyDecay: 0.65,
+    // Inactive/party members share only a fraction of Growth EXP and no training
+    // (Anti Power-level rule — can't drag a Lv.1 into a boss and instantly grow).
+    partyGrowthShare: 0.35,
+    // A monster with no meaningful contribution earns reduced growth, no training.
+    noContributionGrowthShare: 0.25,
+  }),
+
   // R8 — Permanent nutrition uses its own small capacity (3-5% power budget).
   nutrition: Object.freeze({ capacity: 20 }),
+
+  // R10 — Evolution is Specialization: each step adds only ~5-8% total power but
+  // significantly changes the stat distribution, skill pool and passives.
+  evolution: Object.freeze({
+    budget: Object.freeze({ min: 0.05, max: 0.08 }),
+    minSkillCarry: 0.7, // Evolution carries 70-100% of skill mastery (R10).
+    maxSkillCarry: 1.0,
+  }),
+
+  // R9 — Equipment is Reversible Power: the full 3-slot loadout should add roughly
+  // 8-12% Expected Combat Power vs an unequipped monster of the same level.
+  equipment: Object.freeze({
+    slots: Object.freeze(['gear', 'charm', 'utility']),
+    budget: Object.freeze({ min: 0.08, max: 0.12 }),
+  }),
+
+  // R8 / R16 — Food & Care policy (values that gate item effects, not content).
+  care: Object.freeze({
+    overfullThreshold: 90, // Feeding past this yields reduced benefit.
+    overfullEfficiency: 0.3,
+    preferenceMultiplier: 1.5, // Favorite food (species or instance) hits harder.
+    favoriteBondBonus: 4,
+    rest: Object.freeze({ energy: 35, stress: -15 }),
+    play: Object.freeze({ mood: 10, bond: 5, trust: 3, energy: -8 }),
+    trainingFoodMaxMultiplier: 1.5, // Training-food buffs never stack past this.
+  }),
 
   // R14 — Capture chance. hpFactor is interpolated across the target-HP table.
   capture: Object.freeze({
@@ -96,6 +141,24 @@ export const BALANCE_CONFIG = Object.freeze({
       Object.freeze({ hpRatio: 0.1, factor: 1.45 }),
       Object.freeze({ hpRatio: 0.01, factor: 1.5 }),
     ]),
+  }),
+
+  // R7 — Skill progression: mastery thresholds, slot power budgets, mutation rule.
+  skill: Object.freeze({
+    // Cumulative skill EXP required to REACH each mastery rank.
+    masteryThresholds: Object.freeze({ familiar: 100, skilled: 300, expert: 700, master: 1500 }),
+    // Expected share of sustained output per slot (R7).
+    slotBudget: Object.freeze({
+      basicAI: Object.freeze({ min: 0.4, max: 0.5 }),
+      s1: Object.freeze({ min: 0.2, max: 0.25 }),
+      s2: Object.freeze({ min: 0.1, max: 0.2 }),
+      s3: Object.freeze({ min: 0.2, max: 0.3 }),
+    }),
+    // Novelty decay per repeated identical skill use within an encounter.
+    noveltyDecay: 0.7,
+    // A mutation must NOT raise raw power beyond base by more than this; it must
+    // pay for any gain with a measurable trade-off (R7 Mutation Rule).
+    mutationMaxPowerDelta: 0.1,
   }),
 
   // D1 / R26 — Target Power Budget shares (fractions) each source may contribute.
