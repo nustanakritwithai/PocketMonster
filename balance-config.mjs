@@ -101,6 +101,14 @@ export const BALANCE_CONFIG = Object.freeze({
   // R8 — Permanent nutrition uses its own small capacity (3-5% power budget).
   nutrition: Object.freeze({ capacity: 20 }),
 
+  // R10 — Evolution is Specialization: each step adds only ~5-8% total power but
+  // significantly changes the stat distribution, skill pool and passives.
+  evolution: Object.freeze({
+    budget: Object.freeze({ min: 0.05, max: 0.08 }),
+    minSkillCarry: 0.7, // Evolution carries 70-100% of skill mastery (R10).
+    maxSkillCarry: 1.0,
+  }),
+
   // R9 — Equipment is Reversible Power: the full 3-slot loadout should add roughly
   // 8-12% Expected Combat Power vs an unequipped monster of the same level.
   equipment: Object.freeze({
