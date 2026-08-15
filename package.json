@@ -1,6 +1,6 @@
 {
   "name": "monster-life-rpg-prototype",
-  "version": "7.0.7",
+  "version": "7.1.0",
   "type": "module",
   "scripts": {
     "check": "node tests/check-active-syntax.mjs",
@@ -9,5 +9,5 @@
     "test": "node tests/active-entry.mjs && node tests/boot-contract.mjs && node tests/regression.mjs && node tests/v65-ui.mjs && node tests/v70-feedback.mjs && node tests/v703-input-boot.mjs && node tests/p0-multitouch-input.mjs && node tests/v706-clone-guard.mjs && node tests/p0-cooldown.mjs && node tests/p0-encounter-reset.mjs && node tests/p0-resource-lifecycle.mjs && node tests/p0-save-identity.mjs && node tests/p0-performance-runtime.mjs && node tests/p0-performance-mutation.mjs && node tests/p0-ux1-combat-hud.mjs && node tests/p0-ux1-dom-stability.mjs && node tests/p0-ux1-short-height.mjs && node tests/p0-ux1-mutation.mjs && node tests/balance-exp.mjs && node tests/balance-training.mjs && node tests/balance-stats.mjs && node tests/balance-defense.mjs && node tests/balance-capture.mjs && node tests/balance-cr.mjs",
     "ci": "npm run check && npm test"
   },
-  "description": "Monster Life RPG V7.0.7 - P0 stability fixes"
+  "description": "Monster Life RPG V7.1.0 - Balance Foundation (data-driven balance config, formulas, CR simulator)"
 }

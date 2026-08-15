@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
-const v707Html = fs.readFileSync(new URL('../v707.html', import.meta.url), 'utf8');
-assert.doesNotMatch(v707Html, /maximum-scale\s*=\s*1|user-scalable\s*=\s*no/i, 'static viewport must preserve browser zoom when runtime boot fails');
+const versionedHtml = fs.readFileSync(new URL('../v710.html', import.meta.url), 'utf8');
+assert.doesNotMatch(versionedHtml, /maximum-scale\s*=\s*1|user-scalable\s*=\s*no/i, 'static viewport must preserve browser zoom when runtime boot fails');
 assert.doesNotMatch(js, /const viewport=document\.querySelector\('meta\[name="viewport"\]'\)/, 'runtime must not repair an unsafe static viewport');
 assert.ok(html.includes('id="worldLabels"'),'world labels overlay missing');
 assert.ok(js.includes('function createWildLabel(w)'),'wild HP labels missing');

@@ -16,8 +16,8 @@ class MemoryStorage {
   setItem(key, value) { this.#values.set(key, String(value)); }
 }
 
-assert.equal(APP_VERSION, '7.0.7');
-assert.equal(ASSET_REVISION, '707');
+assert.equal(APP_VERSION, '7.1.0');
+assert.equal(ASSET_REVISION, '710');
 assert.equal(SAVE_SCHEMA_VERSION, 7);
 assert.equal(SAVE_KEY, 'monster-life-rpg-proto-v6', 'release must preserve the established save key');
 

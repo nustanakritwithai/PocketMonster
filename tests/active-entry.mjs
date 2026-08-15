@@ -13,8 +13,8 @@ import {
 
 const packageJson = JSON.parse(fs.readFileSync(new URL('package.json', rootUrl), 'utf8'));
 assert.equal(packageJson.version, APP_VERSION);
-assert.equal(activeJsName, 'game-v707.js');
-assert.equal(activeCssName, 'style-v707.css');
+assert.equal(activeJsName, 'game-v710.js');
+assert.equal(activeCssName, 'style-v710.css');
 assert.ok(activeJsRef.endsWith(`?v=${ASSET_REVISION}`));
 assert.ok(activeCssRef.endsWith(`?v=${ASSET_REVISION}`));
 assert.ok(activeHtml.includes(`Monster Life RPG Prototype V${APP_VERSION}`));
@@ -23,6 +23,7 @@ assert.ok(activeJs.includes(`Monster Life RPG V${APP_VERSION}`));
 assert.ok(!activeHtml.includes('game.js'));
 assert.ok(!activeHtml.includes('game-v705.js'));
 assert.ok(!activeHtml.includes('game-v706.js'));
-const versionedHtml = fs.readFileSync(new URL('v707.html', rootUrl), 'utf8');
-assert.equal(activeHtml, versionedHtml, 'index.html and v707.html must be byte-identical active entries');
+assert.ok(!activeHtml.includes('game-v707.js'));
+const versionedHtml = fs.readFileSync(new URL('v710.html', rootUrl), 'utf8');
+assert.equal(activeHtml, versionedHtml, 'index.html and v710.html must be byte-identical active entries');
 console.log('P0 active entry/version regression: PASS');
