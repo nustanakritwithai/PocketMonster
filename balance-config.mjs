@@ -101,6 +101,13 @@ export const BALANCE_CONFIG = Object.freeze({
   // R8 — Permanent nutrition uses its own small capacity (3-5% power budget).
   nutrition: Object.freeze({ capacity: 20 }),
 
+  // R9 — Equipment is Reversible Power: the full 3-slot loadout should add roughly
+  // 8-12% Expected Combat Power vs an unequipped monster of the same level.
+  equipment: Object.freeze({
+    slots: Object.freeze(['gear', 'charm', 'utility']),
+    budget: Object.freeze({ min: 0.08, max: 0.12 }),
+  }),
+
   // R8 / R16 — Food & Care policy (values that gate item effects, not content).
   care: Object.freeze({
     overfullThreshold: 90, // Feeding past this yields reduced benefit.
