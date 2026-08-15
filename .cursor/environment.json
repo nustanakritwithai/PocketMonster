@@ -1,0 +1,11 @@
+{
+  "name": "Monster Life RPG",
+  "install": "npm install --no-audit --no-fund",
+  "terminals": [
+    {
+      "name": "static-server",
+      "command": "python3 -m http.server 8081 --bind 0.0.0.0"
+    }
+  ],
+  "ports": [8081]
+}
