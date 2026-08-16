@@ -326,16 +326,27 @@ function populateWorld(zone='hub'){
   }
 }
 populateWorld('hub');
-function makePad(x,z,r,color,opacity=.2){
-  const disk=new THREE.Mesh(circleGeometry(r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide})); disk.rotation.x=-Math.PI/2; disk.position.set(x,.025,z); scene.add(disk);
-  const ring=new THREE.Mesh(ringGeometry(r-.12,r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.copy(disk.position); scene.add(ring); return {disk,ring};
+function makePad(x,z,halfSize,color,opacity=.2){
+  const disk=new THREE.Mesh(boxGeometry(halfSize*2,.02,halfSize*2),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide}));
+  disk.position.set(x,.025,z); scene.add(disk);
+  const ring=new THREE.Group(); ring.position.set(x,0,z);
+  const edgeMat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85});
+  for(const [w,d,ox,oz] of [[halfSize*2,.04,0,-halfSize],[halfSize*2,.04,0,halfSize],[.04,halfSize*2,-halfSize,0],[.04,halfSize*2,halfSize,0]]){
+    const edge=new THREE.Mesh(boxGeometry(w,.04,d),edgeMat);
+    edge.position.set(ox,.03,oz); ring.add(edge);
+  }
+  for(const [ex,ez] of [[-halfSize,-halfSize],[halfSize,-halfSize],[-halfSize,halfSize],[halfSize,halfSize]]){
+    const post=new THREE.Mesh(boxGeometry(.08,.08,.08),edgeMat);
+    post.position.set(ex,.04,ez); ring.add(post);
+  }
+  scene.add(ring); return {disk,ring};
 }
 const ranchCenter=new THREE.Vector3(7,0,3);
 const ranchPad=makePad(7,3,3.4,0x22c55e,.17);
 const breedingPad=makePad(5.2,8.2,1.6,0xec4899,.15);
 const incubator=new THREE.Group();
-const baseInc=new THREE.Mesh(cylinderGeometry(.62,.75,.35,16),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; incubator.add(baseInc);
-const eggVisual=new THREE.Mesh(sphereGeometry(.34,18,14),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.12})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; incubator.add(eggVisual);
+const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; incubator.add(baseInc);
+const eggVisual=new THREE.Mesh(boxGeometry(.5,.65,.45),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.12})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; incubator.add(eggVisual);
 incubator.position.set(5.2,0,8.2); scene.add(incubator);
 
 // ---------- Monster species, skills, evolution ----------
@@ -2854,8 +2865,8 @@ function loop(now){
       const aiDt=distanceTickScheduler.advance(w.id,distance,dt,engagedWildIds.has(w.id));
       if(aiDt>0)updateWild(w,aiDt,engagedWildIds.has(w.id));
     }
-    ranchPad.ring.rotation.z+=dt*.2;
-    breedingPad.ring.rotation.z-=dt*.16;
+    ranchPad.ring.rotation.y+=dt*.2;
+    breedingPad.ring.rotation.y-=dt*.16;
     incubator.rotation.y+=dt*.12;
     targetTick-=dt;
     lifeTick-=dt;

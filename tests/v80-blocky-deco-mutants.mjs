@@ -17,8 +17,6 @@ const tree = extractFn('makeTree');
 const grass = extractFn('makeGrassTuft');
 const stalagmite = extractFn('makeStalagmite');
 const flower = extractFn('makeFlower');
-const pad = extractFn('makePad');
-
 assert.doesNotMatch(rock, /dodecahedronGeometry/, 'mutant 2: rocks must not fall back to dodecahedrons');
 assert.doesNotMatch(tree, /cylinderGeometry|coneGeometry|sphereGeometry/, 'mutant 3: trees must not keep cylinder/cone/sphere parts');
 assert.doesNotMatch(grass, /coneGeometry/, 'mutant 4: grass must not keep cone blades');
@@ -46,9 +44,9 @@ assert.match(
   'mutant 10: meadow grass coordinates stay',
 );
 
-assert.match(pad, /circleGeometry\(r,40\)/, 'mutant 11: Phase 2 does not convert pads');
-assert.match(js, /sphereGeometry\(\.34,18,14\)/, 'mutant 12: Phase 2 does not convert the incubator egg');
-assert.match(js, /cylinderGeometry\(\.62,\.75,\.35,16\)/, 'mutant 13: Phase 2 does not convert the incubator base');
+assert.match(js, /circleGeometry\(radius,36\)/, 'mutant 11: Phase 2/3 does not convert ground decals');
+assert.match(js, /function spawnRingPulse\([\s\S]*?torusGeometry/, 'mutant 12: Phase 2/3 does not convert ring pulses');
+assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'mutant 13: breeding pad stays at (5.2,8.2) size 1.6');
 assert.match(extractFn('makeFencePost'), /boxGeometry\(\.1,\.7,\.1\)/, 'mutant 14: fence posts stay the original box');
 assert.doesNotMatch(rock + tree + grass + stalagmite + flower, /Math\.random\(/, 'mutant 15: decoration builders stay deterministic');
 
