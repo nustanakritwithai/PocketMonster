@@ -1,5 +1,5 @@
 export const APP_VERSION = '8.0.0';
-export const ASSET_REVISION = '710';
+export const ASSET_REVISION = '800';
 export const SAVE_SCHEMA_VERSION = 8;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
@@ -71,6 +71,13 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now() } = 
       protein: source.inventory?.protein ?? 6,
       healthy: source.inventory?.healthy ?? 6,
       favorite: source.inventory?.favorite ?? 6,
+      trainingChow: source.inventory?.trainingChow ?? 3,
+      mineralBite: source.inventory?.mineralBite ?? 3,
+      emberFruit: source.inventory?.emberFruit ?? 2,
+      moonFruit: source.inventory?.moonFruit ?? 2,
+      stash: Array.isArray(source.inventory?.stash)
+        ? source.inventory.stash.filter(id => typeof id === 'string')
+        : ['ranch_band', 'guard_charm', 'swift_lens', 'flame_claw', 'guard_band', 'focus_lens'],
     },
     saveVersion: SAVE_SCHEMA_VERSION,
   };

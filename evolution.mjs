@@ -22,6 +22,7 @@ export function evolutionContext(instance) {
   return {
     level: instance.level,
     training: instance.training,
+    trainingFocus: instance.trainingFocus,
     aptitude: instance.aptitude,
     bond: instance.mind?.bond,
     trust: instance.mind?.trust,
@@ -31,6 +32,7 @@ export function evolutionContext(instance) {
     career: instance.career,
     zoneTime: instance.zoneTime ?? {},
     foodHistory: instance.foodHistory ?? {},
+    eventFlags: instance.eventFlags ?? [],
     currentZone: instance.currentZone ?? null,
     weather: instance.weather ?? null,
     formId: instance.formId,
