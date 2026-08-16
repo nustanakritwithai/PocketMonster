@@ -77,8 +77,8 @@ function scatter(img, count, w, h, rgb, alpha, seed) {
 
 export function paintGroundGrid(zoneColor, zoneType = 'grass') {
   const img = makeImage(GROUND_TILE, GROUND_TILE, hexToRgb(zoneColor));
-  strokeGrid(img, GROUND_GRID, 1, 0.10);
-  strokeGrid(img, GROUND_COARSE, 2, 0.18);
+  strokeGrid(img, GROUND_GRID, 1, 0.14);
+  strokeGrid(img, GROUND_COARSE, 2, 0.24);
   const seed = ((Number(zoneColor) >>> 0) ^ (zoneType === 'cave' ? 0xca7e0001 : 0x9a55)) >>> 0;
   scatter(img, 40, 2, 2, [255, 255, 255], 0.05, seed);
   if (zoneType === 'cave') {

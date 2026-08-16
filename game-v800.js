@@ -239,12 +239,23 @@ renderer.shadowMap.enabled=qualityProfile.shadows;
 el('game').appendChild(renderer.domElement);
 
 const hemi=new THREE.HemisphereLight(0xffffff,0x42643d,1.55); scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows; scene.add(sun);
+const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows;
+if(qualityProfile.shadows){
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.camera.near=.5; sun.shadow.camera.far=64;
+  sun.shadow.camera.left=-28; sun.shadow.camera.right=28;
+  sun.shadow.camera.top=28; sun.shadow.camera.bottom=-28;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+}
+scene.add(sun);
 const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({map:makeGroundTexture(0x62c96b,'grass'),color:0xffffff,roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
 const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.add(decorations);
-function addDeco(mesh){ mesh.castShadow=true; mesh.receiveShadow=true; decorations.add(mesh); return mesh; }
+function addDeco(mesh){
+  mesh.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
+  decorations.add(mesh); return mesh;
+}
 function makeRock(x,z,s=1,tone=0x945a38){
   const cluster=new THREE.Group();
   const main=new THREE.Mesh(boxGeometry(s,s*.8,s*.9),mat(tone,.95,.04));
@@ -265,11 +276,11 @@ function makeTree(x,z,s=1,{trunk=0x754428,leaf=0x18753a,fruit=null}={}){
   top.position.y=2.35*s; g.add(top);
   if(fruit){
     for(const [fx,fy,fz] of [[.35,1.5,.2],[-.28,1.7,-.15],[.1,1.95,.32]]){
-      const berry=new THREE.Mesh(boxGeometry(.1*s,.1*s,.1*s),mat(fruit,.55,.08));
+      const berry=new THREE.Mesh(boxGeometry(.1*s,.1*s,.1*s),glowMat(fruit,fruit,.06,.55,.08));
       berry.position.set(fx*s,fy*s,fz*s); g.add(berry);
     }
   }
-  g.position.set(x,0,z); addDeco(g); return g;
+  g.position.set(x,0,z); g.rotation.y=(x*1.3+z)*.08; addDeco(g); return g;
 }
 function makeGrassTuft(x,z,s=1,color=0x3f9d4a){
   const g=new THREE.Group();
@@ -285,7 +296,7 @@ function makeStalagmite(x,z,s=1){
   base.position.y=.25*s; g.add(base);
   const mid=new THREE.Mesh(boxGeometry(.35*s,.5*s,.35*s),mat(0x94a3b8,.85,.1));
   mid.position.y=.75*s; g.add(mid);
-  const tip=new THREE.Mesh(boxGeometry(.15*s,.4*s,.15*s),mat(0x94a3b8,.78,.12));
+  const tip=new THREE.Mesh(boxGeometry(.15*s,.4*s,.15*s),glowMat(0x94a3b8,0x4a90d9,.04,.78,.12));
   tip.position.y=1.2*s; g.add(tip);
   g.position.set(x,0,z); addDeco(g); return g;
 }
@@ -297,9 +308,9 @@ function makeFlower(x,z,color=0xf472b6){
   const g=new THREE.Group();
   const stem=new THREE.Mesh(boxGeometry(.03,.22,.03),mat(0x4ade80,.8,0));
   stem.position.y=.11; g.add(stem);
-  const bloom=new THREE.Mesh(boxGeometry(.1,.1,.1),mat(color,.5,.04));
+  const bloom=new THREE.Mesh(boxGeometry(.12,.1,.12),glowMat(color,color,.08,.5,.04));
   bloom.position.y=.24; g.add(bloom);
-  g.position.set(x,0,z); addDeco(g); return g;
+  g.position.set(x,0,z); g.rotation.y=(x*2.1+z)*.31; addDeco(g); return g;
 }
 function clearDecorations(){
   while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
@@ -342,11 +353,11 @@ function makePad(x,z,halfSize,color,opacity=.2){
   scene.add(ring); return {disk,ring};
 }
 const ranchCenter=new THREE.Vector3(7,0,3);
-const ranchPad=makePad(7,3,3.4,0x22c55e,.17);
+const ranchPad=makePad(7,3,3.4,0x22c55e,.28);
 const breedingPad=makePad(5.2,8.2,1.6,0xec4899,.15);
 const incubator=new THREE.Group();
-const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; incubator.add(baseInc);
-const eggVisual=new THREE.Mesh(boxGeometry(.5,.65,.45),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.12})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; incubator.add(eggVisual);
+const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
+const eggVisual=new THREE.Mesh(boxGeometry(.5,.65,.45),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.15})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; eggVisual.castShadow=true; incubator.add(eggVisual);
 incubator.position.set(5.2,0,8.2); scene.add(incubator);
 
 // ---------- Monster species, skills, evolution ----------
@@ -549,6 +560,10 @@ function ensureInstanceShape(inst){
 function mat(color,rough=.72,metal=.08){
   const key=`standard:${color}:${rough}:${metal}`;
   return sharedResources.material(key,()=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal}));
+}
+function glowMat(color,emissive,intensity,rough=.5,metal=0){
+  const key=`glow:${color}:${emissive}:${intensity}:${rough}:${metal}`;
+  return sharedResources.material(key,()=>new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:intensity,roughness:rough,metalness:metal}));
 }
 function basicMat(color){return sharedResources.material(`basic:${color}`,()=>new THREE.MeshBasicMaterial({color}));}
 function orb(color,r=0.1,seg=10){ return new THREE.Mesh(sphereGeometry(r,seg,seg),mat(color,.58,.12)); }

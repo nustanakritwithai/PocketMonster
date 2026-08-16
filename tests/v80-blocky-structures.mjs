@@ -47,7 +47,7 @@ assert.match(
 );
 assert.match(pad, /return \{disk,ring\}/, 'pads still return disk + ring for hub visibility');
 
-assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.17\)/, 'ranch pad stays at (7,3) half-size 3.4');
+assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.28\)/, 'ranch pad stays at (7,3) half-size 3.4');
 assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'breeding pad stays at (5.2,8.2) half-size 1.6');
 assert.match(js, /const ranchCenter=new THREE\.Vector3\(7,0,3\)/, 'ranch center stays');
 
