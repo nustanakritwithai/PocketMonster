@@ -21,5 +21,6 @@ assert.match(js, /userData\.assetForm='magma_bear'/, 'Magma Bear mesh is tagged'
 assert.match(js, /evolutionPath:'flame_wolf'/, 'cave showcase must spawn a Flame Wolf form');
 assert.match(js, /evolutionPath:'magma_bear'/, 'cave showcase must spawn a Magma Bear form');
 assert.match(js, /spiritAura/, 'spirit training must add a visible aura');
+assert.match(js, /createWild\(spById\[id\],x,z,level,\{boss,elite,evolutionPath\}\)/, 'respawn must keep the showcase evolution form');
 
 console.log('V8.0 assets evo-form meshes: PASS');

@@ -1426,10 +1426,10 @@ function aimedWild(maxRange=10,radius=1.35){
   const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
 }
 function respawnWild(w,delay=6000){
-  const generation=zoneGeneration,zone=w.zone,id=w.speciesId,level=w.level,boss=w.boss,elite=w.elite,x=w.home.x,z=w.home.z;
+  const generation=zoneGeneration,zone=w.zone,id=w.speciesId,level=w.level,boss=w.boss,elite=w.elite,x=w.home.x,z=w.home.z,evolutionPath=w.evolutionPath;
   setTimeout(()=>{
     if(zoneGeneration!==generation||state.currentZone!==zone||!ZONES[zone])return;
-    createWild(spById[id],x,z,level,{boss,elite});
+    createWild(spById[id],x,z,level,{boss,elite,evolutionPath});
   },delay);
 }
 function clearProjectiles(){ while(projectiles.length){ const p=projectiles.pop(); removeAndDispose(scene, p.mesh); } pendingSummon=null; }
