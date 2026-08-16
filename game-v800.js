@@ -663,12 +663,68 @@ function makeSlimeMesh(color,scale=1,type='Normal'){
   }
   return g;
 }
+function applyVisualGrowth(g,inst){
+  if(!g||!inst?.training)return g;
+  const t=inst.training;
+  const power=Math.min(1,(t.power||0)/80);
+  const defense=Math.min(1,(t.defense||0)/80);
+  const speed=Math.min(1,(t.speed||0)/80);
+  const spirit=Math.min(1,(t.spirit||0)/80);
+  g.scale.x*=1+power*.10+defense*.08;
+  g.scale.y*=1+power*.06+defense*.10-speed*.05;
+  g.scale.z*=1+speed*.12-defense*.04;
+  if(spirit>.12){
+    const aura=new THREE.Mesh(torusGeometry(.44+spirit*.14,.016,8,22),new THREE.MeshBasicMaterial({color:0xfde68a,transparent:true,opacity:.18+spirit*.28}));
+    aura.rotation.x=Math.PI/2;aura.position.y=.07;aura.name='spiritAura';g.add(aura);
+  }
+  g.userData.visualGrowth={power,defense,speed,spirit};
+  return g;
+}
+function makeFlameWolfMesh(color,scale=1){
+  const g=makeAnimalBase(color,scale,{kind:'quadruped',accent:0xff8a3d});
+  g.scale.set(.88,1.06,1.24);
+  addEarPair(g,0x7c2d12,{scale,height:.48,width:.08,y:1.38,z:-.16,innerColor:0xff6a1a,tilt:.4});
+  addEyeSet(g,{y:1.08*scale,z:-.48*scale,spread:.09*scale,size:.036*scale,browColor:0x431407,browTilt:.3});
+  addMuzzle(g,0xffd6a5,{scale,y:.94,z:-.64,w:.15,h:.1,d:.26,noseColor:0x3b0a06});
+  for(const [x,y,z,h] of [[-.18,1.14,.0,.24],[.18,1.14,.0,.24],[0,1.26,.1,.3],[-.12,1.08,.14,.2],[.12,1.08,.14,.2]]){
+    const tuft=new THREE.Mesh(coneGeometry(.07*scale,h*scale,6),mat(0xff4d1a,.42,.1));
+    tuft.position.set(x*scale,y*scale,z*scale);tuft.rotation.x=.42;tuft.castShadow=true;g.add(tuft);
+  }
+  addTail(g,0x7c2d12,{scale,length:.66,thick:.07,pos:[0,.76,.54],rot:[-1.02,0,0],tipColor:0xffc857});
+  const flame=new THREE.Mesh(coneGeometry(.1*scale,.3*scale,6),new THREE.MeshStandardMaterial({color:0xff7a1a,emissive:0xff4d1a,emissiveIntensity:.5,roughness:.38}));
+  flame.position.set(0,.98*scale,.76*scale);flame.rotation.x=Math.PI;flame.castShadow=true;g.add(flame);
+  addCheeks(g,0xff7a3a,{scale,y:.9,z:-.42,x:.14,r:.04});
+  addPawSet(g,0xff9f1c,{count:4,scale,r:.065,spreadX:.17,frontZ:.26,backZ:-.02,y:.08});
+  g.userData.assetForm='flame_wolf';
+  return g;
+}
+function makeMagmaBearMesh(color,scale=1){
+  const g=makeAnimalBase(color,scale,{kind:'quadruped',accent:0xd97706});
+  g.scale.set(1.28,.92,1.08);
+  addEarPair(g,0x78350f,{scale,height:.16,width:.14,y:1.18,z:-.06,innerColor:0xfbbf24,tilt:.12});
+  addEyeSet(g,{y:.98*scale,z:-.4*scale,spread:.12*scale,size:.042*scale,browColor:0x431407,browTilt:.06});
+  addMuzzle(g,0xfbbf24,{scale,y:.88,z:-.5,w:.22,h:.14,d:.16,noseColor:0x3b1f0a});
+  addBackSpikes(g,0x78716c,{scale:1.08,count:3,startY:.88,startZ:.08,gap:.14});
+  const plate=new THREE.Mesh(boxGeometry(.44*scale,.1*scale,.3*scale),mat(0x57534e,.86,.16));
+  plate.position.set(0,.82*scale,.06*scale);plate.rotation.x=.18;plate.castShadow=true;g.add(plate);
+  for(const [x,y,z] of [[-.12,.7,.18],[.14,.78,.02],[0,.9,-.08]]){
+    const crack=new THREE.Mesh(boxGeometry(.04*scale,.16*scale,.03*scale),new THREE.MeshStandardMaterial({color:0xff6b1a,emissive:0xea580c,emissiveIntensity:.72,roughness:.28}));
+    crack.position.set(x*scale,y*scale,z*scale);g.add(crack);
+  }
+  addTail(g,0x78350f,{scale,length:.22,thick:.12,pos:[0,.62,.4],rot:[-1.4,0,0]});
+  addPaw(g,0x44403c,{x:-.28,y:.16,z:.22,scale,r:.12});
+  addPaw(g,0x44403c,{x:.28,y:.16,z:.22,scale,r:.12});
+  addPaw(g,0x44403c,{x:-.26,y:.16,z:-.06,scale,r:.11});
+  addPaw(g,0x44403c,{x:.26,y:.16,z:-.06,scale,r:.11});
+  g.userData.assetForm='magma_bear';
+  return g;
+}
 function makeSpeciesMesh(sp,inst=null){
   const path=inst?getEvolutionPath(inst):null;
   const scaleBase=(inst?.lifeStage==='Baby')?.72:1;
   const scale=(path?.scale||1)*scaleBase;
   const color=path?.color??sp.color;
-  if(!path) return makeSlimeMesh(color,scaleBase,sp.types[0]);
+  if(!path) return applyVisualGrowth(makeSlimeMesh(color,scaleBase,sp.types[0]),inst);
   let g;
   switch(path.form){
     case 'plainpup': {
@@ -823,11 +879,19 @@ function makeSpeciesMesh(sp,inst=null){
       addMuzzle(g,0xffeff8,{scale,y:.95,z:-.5,w:.16,h:.11,d:.14,noseColor:0x8a4d70});
       break;
     }
+    case 'flame_wolf': {
+      g=makeFlameWolfMesh(color,scale);
+      break;
+    }
+    case 'magma_bear': {
+      g=makeMagmaBearMesh(color,scale);
+      break;
+    }
     default: {
       g=makeAnimalBase(color,scale,{kind:'quadruped'}); addEarPair(g,color,{scale}); addEyeSet(g,{});
     }
   }
-  return g;
+  return applyVisualGrowth(g,inst);
 }
 function monsterMesh(sp,owned=false,inst=null,eliteOverride=false,boss=false){
   const path=inst?getEvolutionPath(inst):null;
@@ -1326,7 +1390,8 @@ const ZONES={
   ]},
   cave:{label:'Echo Cave',bg:0x334155,ground:0x57606f,spawn:[
     ['frostowl',-3,-1,2,{}],['ironbug',4,-5,2,{}],['rockhorn',7,1,2,{}],['ghostpurr',-7,1,2,{}],['sandmole',1,-9,2,{}],
-    ['mindcoon',-2,-13,2,{}],['buglet',10,-2,2,{}],['voidhorn',-11,-10,3,{elite:true}],['emberdrake',8,8,3,{}],['emberdrake',-2,11,4,{boss:true}]
+    ['mindcoon',-2,-13,2,{}],['buglet',10,-2,2,{}],['voidhorn',-11,-10,3,{elite:true}],['emberdrake',8,8,3,{}],['emberdrake',-2,11,4,{boss:true}],
+    ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
   ]}
 };
 function createWild(sp,x,z,level=1,opts={}){
