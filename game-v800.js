@@ -1921,7 +1921,7 @@ function wildDamage(w,inst){
     atkBuff:1
   });
 }
-function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(sphereGeometry(.16,12,10),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
+function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
 function captureChance(w){
   if(w.capturePolicy==='disabled')return 0;
   const sp=spById[w.speciesId];
@@ -2124,7 +2124,7 @@ function updateWild(w,dt,canEngage=false){
   animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
   animateMonster(w.mesh,dt,moving);
 }
-function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
+function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
 
 // ---------- V8.0.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}

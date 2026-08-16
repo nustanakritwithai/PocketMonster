@@ -41,7 +41,7 @@ assert.match(burst, /m\.rotation\.set\(Math\.random\(\)\*6\.28/, 'each burst box
 assert.match(release, /sparkPool\.release\(effect\.mesh\)/, 'expired pooled sparks go back to the pool');
 assert.match(js, /while\(effects\.length\) releaseTransientEffect\(effects\.pop\(\)\)/, 'zone clear still drains sparks through the pool');
 
-assert.match(js, /sphereGeometry\(\.16,12,10\)/, 'throw projectiles stay spheres until Phase 2');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere until a later VFX phase');
 assert.match(js, /case 'halo': return torusGeometry/, 'fxGeom halo stays a torus until Phase 3');
 assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/, 'map Phase 4 ring pulses stay box wireframes');
 
