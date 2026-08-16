@@ -136,8 +136,8 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
     function makeLeg() {
       const leg = new THREE.Mesh(box(0.12, 0.50, 0.12), material(palette.pants, 0.78, 0.04));
-      const boot = new THREE.Mesh(box(0.16, 0.14, 0.22), material(palette.boot, 0.8, 0.02));
-      boot.position.set(0, -0.30, -0.06);
+      const boot = new THREE.Mesh(box(0.16, 0.12, 0.28), material(palette.boot, 0.8, 0.02));
+      boot.position.set(0, -0.31, -0.10);
       boot.userData.limbForward = 'front';
       return { leg, boot };
     }

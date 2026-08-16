@@ -46,7 +46,7 @@ function findBy(node, pred, acc = []) {
 }
 const boots = findBy(player.root, n => n.userData?.limbForward === 'front');
 assert.equal(boots.length, 2, 'both boots are tagged as front-facing');
-assert.ok(boots.every(b => b.position.z < 0), 'toes point toward Front -Z, not the backpack');
+assert.ok(boots.every(b => b.position.z <= -0.08), 'toes point toward Front -Z, not the backpack');
 const backpack = findBy(player.root, n => n.position?.z === 0.22 && n.geometry?.d === 0.12);
 assert.equal(backpack.length, 1, 'backpack stays on +Z (back)');
 assert.ok(backpack[0].position.z > 0, 'backpack is opposite the face');
