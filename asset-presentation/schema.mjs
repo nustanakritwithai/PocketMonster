@@ -7,7 +7,14 @@ export const REQUIRED_ASSET_FIELDS = Object.freeze([
   'id', 'kind', 'provider', 'style', 'surfaceStyle', 'rig', 'metrics', 'roles',
 ]);
 
-export const ALLOWED_ROLES = Object.freeze(['player', 'keeper']);
+export const ALLOWED_KINDS = Object.freeze(['character', 'monster']);
+export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy', 'monster']);
+export const CHARACTER_ROLES = Object.freeze(['player', 'keeper']);
+export const MONSTER_ROLES = Object.freeze(['wild', 'owned', 'companion', 'ranch', 'battle']);
+export const ALLOWED_ROLES = Object.freeze([...CHARACTER_ROLES, ...MONSTER_ROLES]);
+export const ALLOWED_LIFE_STAGES = Object.freeze(['Baby', 'Juvenile', 'Adult', 'Mature']);
+export const MONSTER_ID_RE = /^monster\.[a-z0-9_]+\.[a-z0-9_]+\.v1$/;
+export const CHARACTER_ID_RE = /^character\./;
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -38,15 +45,22 @@ export function validateAssetDefinition(def) {
   for (const field of REQUIRED_ASSET_FIELDS) {
     if (def[field] == null) errors.push(`missing ${field}`);
   }
-  if (def.kind && def.kind !== 'character') errors.push('kind must be character in this phase');
-  if (def.provider && !['procedural', 'gltf', 'legacy'].includes(def.provider)) {
+  if (def.kind && !ALLOWED_KINDS.includes(def.kind)) errors.push('kind must be character or monster');
+  if (def.provider && !ALLOWED_PROVIDERS.includes(def.provider)) {
     errors.push(`unsupported provider ${def.provider}`);
+  }
+  if (def.kind === 'monster' && def.id && !MONSTER_ID_RE.test(def.id)) {
+    errors.push('monster id must match monster.{species}.{form}.v1');
+  }
+  if (def.kind === 'character' && def.id && !CHARACTER_ID_RE.test(def.id)) {
+    errors.push('character id must start with character.');
   }
   if (!isPlainObject(def.metrics)) errors.push('metrics must be an object');
   if (!isPlainObject(def.roles)) errors.push('roles must be an object');
   else {
+    const rolesForKind = def.kind === 'monster' ? MONSTER_ROLES : CHARACTER_ROLES;
     for (const role of Object.keys(def.roles)) {
-      if (!ALLOWED_ROLES.includes(role)) errors.push(`unsupported role ${role}`);
+      if (!rolesForKind.includes(role)) errors.push(`unsupported role ${role} for ${def.kind || 'character'}`);
     }
   }
   errors.push(...findGameplayFields(def).map(path => `gameplay field not allowed: ${path}`));
