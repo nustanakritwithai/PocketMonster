@@ -6,7 +6,7 @@ import { createBigheadProvider } from '../asset-presentation/providers/procedura
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 assert.match(js, /blocky-bighead\.v1',\{role:'player'/, 'Player must spawn as blocky-bighead');
-assert.match(js, /legacy-capsule\.v1',\{role:'keeper'/, 'BH1 keeps Keeper on the legacy adapter');
+assert.match(js, /blocky-bighead\.v1',\{role:'keeper'/, 'Keeper also consumes the Bighead asset via role');
 assert.match(js, /playerThrowOrigin\(\)/, 'throw still uses the shared origin helper');
 
 function vec() {

@@ -898,7 +898,7 @@ assets.registerProvider('procedural',createBigheadProvider({
 }));
 // ---------- Player / NPC ----------
 const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
-const keeperVisual=assets.spawn('character.human.legacy-capsule.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
+const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
 const playerData={hp:100,maxHp:100,speed:5.7,invuln:0};
 const npc=keeperVisual.root; npc.position.set(4,0,3); scene.add(npc);
