@@ -2012,7 +2012,34 @@ function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.species
   inst.evolutionProfile=def.profile;
   if(path.secondaryType&&sp.allowedSecondary.includes(path.secondaryType))inst.secondaryType=path.secondaryType;
   refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
-function renderEvolution(){const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate);if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}const sp=spById[inst.speciesId],paths=availableEvolutionPaths(inst);if(!paths.length){const p=getEvolutionPath(inst);box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div></div>`;return;}box.innerHTML='';for(const p of paths){const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');d.className='evo-card';d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>`;d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);box.appendChild(d);}}
+function evoHistoryHTML(inst){
+  const hist=inst.evolutionHistory||[];
+  if(!hist.length)return '';
+  return `<div class="evo-history"><div class="evo-history-title">ประวัติ Evolution</div>${hist.map(h=>`<div class="evo-history-item">${h.from||'base'} → ${h.to} • ${new Date(h.at||Date.now()).toLocaleDateString('th-TH',{year:'2-digit',month:'short',day:'numeric'})}</div>`).join('')}</div>`;
+}
+function renderEvolution(){
+  const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate);
+  if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}
+  const sp=spById[inst.speciesId],paths=availableEvolutionPaths(inst);
+  const identity=`<div class="evo-identity-lock">🔒 Gene / Parents / Generation ไม่เปลี่ยน (Identity Lock)</div>`;
+  const carry=`<div class="evo-skill-carry">Skill Carry: 70-100% mastery EXP ส่งต่อ</div>`;
+  const budgetMin=Math.round((BALANCE_CONFIG.powerBudget?.evolution?.min??0.05)*100);
+  const budgetMax=Math.round((BALANCE_CONFIG.powerBudget?.evolution?.max??0.1)*100);
+  const budget=`<span class="evo-budget-badge ok">Power Budget ${budgetMin}-${budgetMax}%</span>`;
+  if(!paths.length){
+    const p=getEvolutionPath(inst);
+    box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div>${identity}${evoHistoryHTML(inst)}</div>`;
+    return;
+  }
+  box.innerHTML='';
+  for(const p of paths){
+    const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');
+    d.className='evo-card';
+    d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div>${carry}${identity}<div style="margin-top:6px">${budget}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>${evoHistoryHTML(inst)}`;
+    d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);
+    box.appendChild(d);
+  }
+}
 
 // ---------- NPC manager ----------
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
@@ -2148,7 +2175,16 @@ function renderBreeding(){
   el('breedBtn').disabled=!compat.ok;
   if(a&&b){
     const holder=eggHolder(a,b);
-    el('inheritPreview').innerHTML=`ผู้ถือไข่: <b>${holder?displayName(holder):'ไม่พบ'}</b> → Species ตามผู้ถือไข่ • Gene จากทั้งสองตัว • Trait <b>${a.genes.trait}</b> / <b>${b.genes.trait}</b>`;
+    const genePreview=CORE_GENES.map(g=>{
+      const ga=a.genes?.[g]||'B',gb=b.genes?.[g]||'B';
+      return `<div class="gene-inherit-cell"><span class="gene-label">${g.toUpperCase()}</span><span class="gene-pred">${ga}/${gb}</span><span class="gene-pct">45%/45%/10%</span></div>`;
+    }).join('');
+    const relative=isCloseRelative(a,b);
+    const relativeHTML=relative?'<div class="close-relative-warn">⚠ ญาติสนิท — ไม่สามารถผสมพันธุ์ได้</div>':'<div class="close-relative-ok">✓ ไม่ใช่ญาติสนิท — ผสมพันธุ์ได้</div>';
+    const childGen=Math.max(a.generation||1,b.generation||1)+1;
+    const births=(state.collection||[]).filter(m=>m.origin==='bred'||(m.lifeHistory||[]).some(h=>h.type==='birth'));
+    const birthHTML=births.length?`<div class="birth-history">${births.slice(-6).map(m=>`<div class="birth-history-item">ฟัก ${displayName(m)} • Gen ${m.generation}</div>`).join('')}</div>`:'';
+    el('inheritPreview').innerHTML=`ผู้ถือไข่: <b>${holder?displayName(holder):'ไม่พบ'}</b> • Species ตามผู้ถือไข่<br><div class="gen-counter">ลูกรุ่น Gen ${childGen}</div>${relativeHTML}<div class="gene-inherit-preview">${genePreview}</div><div style="font-size:8px;color:#64748b;margin-top:4px">45% จาก A • 45% จาก B • 10% mutation (70%เหมือน / 15%ดีขึ้น / 15%แย่ลง)</div>${birthHTML}`;
   }else el('inheritPreview').textContent='เลือกพ่อแม่เพื่อดูแนวโน้ม Gene ที่ส่งต่อ';
   const list=el('eggList');
   list.innerHTML='';

@@ -340,3 +340,24 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .equip-btn:active{transform:scale(.97)}
 .equip-help{font-size:9px;color:#64748b;margin-top:12px;padding:8px;background:#0b1220;border-radius:8px;line-height:1.5}
 .equip-help b{color:#94a3b8}
+
+/* V8.0 UX Phase 5 — Evolution + Breeding display */
+.evo-history{font-size:9px;color:#94a3b8;margin-top:8px;padding:8px;background:#0b1220;border-radius:8px;border:1px solid #ffffff08}
+.evo-history-title{font-weight:700;color:#cbd5e1;margin-bottom:4px}
+.evo-history-item{padding:3px 0;border-bottom:1px solid #ffffff08}
+.evo-history-item:last-child{border-bottom:0}
+.evo-identity-lock{font-size:9px;color:#86efac;margin-top:5px;padding:5px 7px;background:#0b1220;border-radius:7px;border:1px solid #22c55e22}
+.evo-budget-badge{display:inline-block;font-size:9px;padding:2px 7px;border-radius:999px;font-weight:700}
+.evo-budget-badge.ok{background:#166534;color:#dcfce7}
+.evo-budget-badge.warn{background:#78350f;color:#fde68a}
+.evo-skill-carry{font-size:9px;color:#c4b5fd;margin-top:4px}
+.gene-inherit-preview{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.gene-inherit-cell{background:#0b1220;border-radius:8px;padding:6px;text-align:center}
+.gene-inherit-cell .gene-label{color:#94a3b8;font-size:8px;display:block;margin-bottom:2px}
+.gene-inherit-cell .gene-pred{color:#c4b5fd;font-weight:700;font-size:11px}
+.gene-inherit-cell .gene-pct{color:#64748b;font-size:7px;margin-top:1px}
+.close-relative-warn{background:#7f1d1d;color:#fee2e2;border-radius:8px;padding:6px 8px;font-size:10px;margin-top:6px;font-weight:600}
+.close-relative-ok{background:#166534;color:#dcfce7;border-radius:8px;padding:6px 8px;font-size:10px;margin-top:6px;font-weight:600}
+.gen-counter{display:inline-block;font-size:10px;font-weight:700;background:#1e1b4b;color:#c4b5fd;border-radius:999px;padding:3px 8px;margin-top:6px}
+.birth-history{font-size:9px;color:#94a3b8;margin-top:8px;padding:8px;background:#0b1220;border-radius:8px;border:1px solid #ffffff08}
+.birth-history-item{padding:3px 0;border-bottom:1px solid #ffffff08}
