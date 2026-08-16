@@ -11,12 +11,12 @@ assert.doesNotMatch(js, /head\.front\.png/, 'gameplay source must not name appea
 const playerPack = JSON.parse(fs.readFileSync(new URL('../assets/appearances/player-orange/appearance.json', import.meta.url), 'utf8'));
 const keeperPack = JSON.parse(fs.readFileSync(new URL('../assets/appearances/keeper-green/appearance.json', import.meta.url), 'utf8'));
 assert.equal(playerPack.style, 'four-side-block-v1');
-assert.equal(keeperPack.parts.head.back, '#FACC15');
+assert.equal(keeperPack.parts.head.back, 'assets/appearances/keeper-green/head.back.png');
 
 resetCatalog();
 loadCatalog(JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8')));
 upsertAppearance(playerPack);
-assert.equal(getAppearance('appearance.human.player-orange.v1').parts.head.front, '#1F2937');
+assert.equal(getAppearance('appearance.human.player-orange.v1').parts.head.front, 'assets/appearances/player-orange/head.front.png');
 
 function vec() {
   return { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } };
