@@ -168,6 +168,13 @@ export function drawMonsterFront(img, type) {
   drawTypePattern(img, type, size);
 }
 
+export function drawMonsterBodyFront(img, type) {
+  const size = img.width;
+  const base = [img.rgba[0], img.rgba[1], img.rgba[2]];
+  fillRect(img, size * 0.18, size * 0.28, size * 0.64, size * 0.46, mixRgb(base, 1.10));
+  drawTypePattern(img, type, size);
+}
+
 export function drawMonsterBack(img, type) {
   const size = img.width;
   drawTypePattern(img, type, size, { back: true });
@@ -180,41 +187,43 @@ export function drawMonsterSide(img, type) {
   drawTypePattern(img, type, size, { side: true });
 }
 
-export function paintMonsterFace(face, type, color, size = MONSTER_FACE_SIZE) {
+export function paintMonsterFace(face, type, color, size = MONSTER_FACE_SIZE, { facial = true } = {}) {
   const rgb = parseHex(toMonsterHex(color));
   const img = makeFace(size, rgb);
-  if (face === 'front') drawMonsterFront(img, type);
-  else if (face === 'back') drawMonsterBack(img, type);
+  if (face === 'front') {
+    if (facial) drawMonsterFront(img, type);
+    else drawMonsterBodyFront(img, type);
+  } else if (face === 'back') drawMonsterBack(img, type);
   else if (face === 'left' || face === 'right') drawMonsterSide(img, type);
   else if (face === 'top') fillRect(img, 0, 0, size, size, mixRgb(rgb, 1.12));
   else if (face === 'bottom') fillRect(img, 0, 0, size, size, mixRgb(rgb, 0.82));
   return img;
 }
 
-export function compileMonsterFourSideAtlas(type, color, layout = atlasLayout()) {
-  const key = `${type}:${toMonsterHex(color)}:${layout.atlas}:${layout.tile}`;
+export function compileMonsterFourSideAtlas(type, color, layout = atlasLayout(), { facial = true } = {}) {
+  const key = `${type}:${toMonsterHex(color)}:${layout.atlas}:${layout.tile}:f${facial ? 1 : 0}`;
   const cached = atlasCache.get(key);
   if (cached) return cached;
   const facePixels = {};
   for (const face of FACE_ORDER) {
-    facePixels[face] = paintMonsterFace(face, type, color, layout.tile);
+    facePixels[face] = paintMonsterFace(face, type, color, layout.tile, { facial });
   }
   const atlas = stampAtlasRgba(facePixels, layout);
   atlasCache.set(key, atlas);
   return atlas;
 }
 
-export function getMonsterFourSideTexture(type, color, THREE = null) {
-  const atlas = compileMonsterFourSideAtlas(type, color);
+export function getMonsterFourSideTexture(type, color, THREE = null, { facial = true } = {}) {
+  const atlas = compileMonsterFourSideAtlas(type, color, atlasLayout(), { facial });
   if (!THREE) return atlas;
   return createAtlasTexture(THREE, atlas);
 }
 
-export function applyMonsterFourSide(mesh, type, color, THREE, { roughness = 0.62, metalness = 0.04 } = {}) {
+export function applyMonsterFourSide(mesh, type, color, THREE, { roughness = 0.62, metalness = 0.04, facial = true } = {}) {
   if (!mesh) return mesh;
   detachSharedGeometry(mesh);
   applyBoxAtlasUVs(mesh.geometry, atlasLayout());
-  const painted = getMonsterFourSideTexture(type, color, THREE);
+  const painted = getMonsterFourSideTexture(type, color, THREE, { facial });
   const prev = mesh.material;
   mesh.material = painted;
   if (painted && typeof painted === 'object') {
@@ -223,6 +232,7 @@ export function applyMonsterFourSide(mesh, type, color, THREE, { roughness = 0.6
   }
   mesh.userData.atlasApplied = true;
   mesh.userData.atlasType = type;
+  mesh.userData.atlasFacial = !!facial;
   if (prev && prev !== painted && typeof prev.dispose === 'function') {
     prev.map?.dispose?.();
     prev.dispose();

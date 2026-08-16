@@ -72,8 +72,8 @@ export function createBigheadMonsterProvider({
     return tag(mesh, part, extra);
   }
 
-  function paintBody(mesh, type, color, rough, metal) {
-    applyMonsterFourSide(mesh, type, color, THREE, { roughness: rough, metalness: metal });
+  function paintBody(mesh, type, color, rough, metal, { facial = true } = {}) {
+    applyMonsterFourSide(mesh, type, color, THREE, { roughness: rough, metalness: metal, facial });
     return mesh;
   }
 
@@ -481,11 +481,11 @@ export function createBigheadMonsterProvider({
     if (kind === 'bird') {
       const body = boxMesh(0.70 * scale, 0.80 * scale, 0.70 * scale, color, 0.72, 0.06, 'body');
       body.position.y = 0.66 * scale;
-      paintBody(body, type, color, 0.72, 0.06);
+      paintBody(body, type, color, 0.72, 0.06, { facial: false });
       g.add(body);
       const head = boxMesh(0.55 * scale, 0.50 * scale, 0.50 * scale, headColor, 0.70, 0.06, 'head');
       head.position.set(0, 1.10 * scale, -0.10 * scale);
-      paintBody(head, type, headColor, 0.70, 0.06);
+      paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const sx of [-0.42, 0.42]) {
         const wing = boxMesh(0.06 * scale, 0.40 * scale, 0.50 * scale, color, 0.72, 0.06, 'wing');
@@ -505,11 +505,11 @@ export function createBigheadMonsterProvider({
     } else if (kind === 'serpent') {
       const body = boxMesh(0.90 * scale, 0.40 * scale, 0.45 * scale, color, 0.72, 0.08, 'body');
       body.position.set(0, 0.50 * scale, 0);
-      paintBody(body, type, color, 0.72, 0.08);
+      paintBody(body, type, color, 0.72, 0.08, { facial: false });
       g.add(body);
       const head = boxMesh(0.50 * scale, 0.45 * scale, 0.45 * scale, headColor, 0.70, 0.06, 'head');
       head.position.set(0, 0.70 * scale, -0.40 * scale);
-      paintBody(head, type, headColor, 0.70, 0.06);
+      paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const sx of [-0.35, 0.35]) {
         const fin = boxMesh(0.04 * scale, 0.18 * scale, 0.25 * scale, color, 0.72, 0.08, 'fin');
@@ -520,11 +520,11 @@ export function createBigheadMonsterProvider({
     } else {
       const body = boxMesh(0.65 * scale, 0.45 * scale, 0.85 * scale, color, 0.72, 0.06, 'body');
       body.position.set(0, 0.55 * scale, 0.05 * scale);
-      paintBody(body, type, color, 0.72, 0.06);
+      paintBody(body, type, color, 0.72, 0.06, { facial: false });
       g.add(body);
       const head = boxMesh(0.55 * scale, 0.50 * scale, 0.48 * scale, headColor, 0.70, 0.06, 'head');
       head.position.set(0, 0.90 * scale, -0.30 * scale);
-      paintBody(head, type, headColor, 0.70, 0.06);
+      paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const [sx, sz] of [[-0.20, 0.25], [0.20, 0.25], [-0.20, -0.15], [0.20, -0.15]]) {
         const leg = boxMesh(0.12 * scale, 0.35 * scale, 0.12 * scale, color, 0.78, 0.04, 'leg');

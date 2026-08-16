@@ -49,6 +49,9 @@ assert.equal(fireFront.width, 256);
 assert.ok(countHex(fireFront, EYE_COLOR) > 80, 'front has painted eyes');
 assert.equal(countHex(fireBack, EYE_COLOR), 0, 'back must not copy the face');
 assert.equal(countHex(fireSide, EYE_COLOR), 0, 'side must not copy the face');
+const fireBodyFront = paintMonsterFace('front', 'Fire', 0xef6c32, MONSTER_FACE_SIZE, { facial: false });
+assert.equal(countHex(fireBodyFront, EYE_COLOR), 0, 'animal body/head tiles must not stamp eyes');
+assert.equal(countHex(paintMonsterFace('left', 'Fire', 0xef6c32, MONSTER_FACE_SIZE, { facial: false }), EYE_COLOR), 0);
 assert.ok(pixelDiffRatio(fireFront, fireBack) > 0.04, 'front and back are different drawings');
 assert.ok(pixelDiffRatio(fireFront, fireSide) > 0.04, 'front and side are different drawings');
 assert.ok(pixelDiffRatio(fireFront, waterFront) > 0.04, 'Fire and Water fronts differ');
@@ -155,6 +158,19 @@ const bird = provider({
 });
 assert.equal(findBy(bird.root, n => n.userData.part === 'body')[0].userData.atlasApplied, true);
 assert.equal(findBy(bird.root, n => n.userData.part === 'head')[0].userData.atlasApplied, true);
+assert.equal(findBy(bird.root, n => n.userData.part === 'body')[0].userData.atlasFacial, false, 'animal body has no painted face');
+assert.equal(findBy(bird.root, n => n.userData.part === 'head')[0].userData.atlasFacial, false, 'animal head uses 3D eyes, not stamped eyes');
+assert.equal(body.userData.atlasFacial, true, 'slime cube keeps the painted front face');
+
+const pup = provider({
+  def: { form: 'plainpup', type: 'Normal', color: 0xd9ceb8, metrics: { silhouette: 'quadruped' } },
+  request: { role: 'owned' },
+});
+assert.equal(findBy(pup.root, n => n.userData.part === 'body')[0].userData.atlasFacial, false);
+assert.equal(findBy(pup.root, n => n.userData.part === 'head')[0].userData.atlasFacial, false);
+assert.equal(findBy(pup.root, n => n.userData.part === 'eye').length, 2, 'animals still have box eyes on the front');
+assert.ok(findBy(pup.root, n => n.userData.part === 'eye').every(e => e.position.z < 0), 'box eyes stay on Front -Z');
+pup.dispose();
 
 slime.dispose();
 bird.dispose();

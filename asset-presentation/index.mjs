@@ -61,6 +61,7 @@ export {
   applyMonsterFourSide,
   compileMonsterFourSideAtlas,
   drawMonsterBack,
+  drawMonsterBodyFront,
   drawMonsterFront,
   drawMonsterSide,
   getMonsterFourSideTexture,
