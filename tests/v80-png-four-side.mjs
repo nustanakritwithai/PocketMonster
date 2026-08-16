@@ -73,8 +73,32 @@ const eyeWhite = '#FFF7ED';
 assert.ok(countHex(playerHead.front, eyeWhite) > 80, 'front face keeps painted eyes');
 assert.equal(countHex(playerHead.right, eyeWhite), 0, 'player right profile has no eye white');
 assert.equal(countHex(playerHead.left, eyeWhite), 0, 'player left profile has no eye white');
+assert.equal(countHex(playerHead.back, eyeWhite), 0, 'player back of head has no eye white');
 assert.equal(countHex(keeperHead.right, eyeWhite), 0, 'keeper right profile has no eye white');
 assert.equal(countHex(keeperHead.left, eyeWhite), 0, 'keeper left profile has no eye white');
+assert.equal(countHex(keeperHead.back, eyeWhite), 0, 'keeper back of head has no eye white');
+assert.equal(countHex(playerHead.back, '#FFC4A3'), 0, 'player back is hair, not a skin face');
+
+function cellDarkRatio(png, gx, gy, gw, gh, hexes) {
+  const set = new Set(hexes.map(hex => hex.replace('#', '').toUpperCase()));
+  let dark = 0;
+  const x0 = gx * 8, y0 = gy * 8, x1 = x0 + gw * 8, y1 = y0 + gh * 8;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = (y * png.width + x) * 4;
+      const hex = [png.rgba[i], png.rgba[i + 1], png.rgba[i + 2]]
+        .map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+      if (set.has(hex)) dark += 1;
+    }
+  }
+  return dark / ((x1 - x0) * (y1 - y0));
+}
+const faceDark = ['#1F2937', '#FFF7ED', '#9A3412'];
+assert.ok(cellDarkRatio(playerHead.front, 4, 14, 7, 7, faceDark) > 0.4, 'front left eye socket is a face');
+assert.ok(cellDarkRatio(playerHead.front, 21, 14, 7, 7, faceDark) > 0.4, 'front right eye socket is a face');
+assert.ok(cellDarkRatio(playerHead.back, 4, 14, 7, 7, faceDark) < 0.12, 'back must not keep a left eye socket');
+assert.ok(cellDarkRatio(playerHead.back, 21, 14, 7, 7, faceDark) < 0.12, 'back must not keep a right eye socket');
+assert.ok(cellDarkRatio(playerHead.back, 11, 25, 10, 3, ['#9A3412']) < 0.2, 'back must not keep a mouth bar');
 
 resetCatalog();
 loadCatalog(JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8')));

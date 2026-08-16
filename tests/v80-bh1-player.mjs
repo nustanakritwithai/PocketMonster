@@ -39,6 +39,18 @@ engine.registerProvider('procedural', createBigheadProvider({
 }));
 const player = engine.spawn('character.human.blocky-bighead.v1', { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
 const { headPivot, torsoPivot, hairRoot, rightHandAnchor } = player.rig.pivots;
+function findBy(node, pred, acc = []) {
+  if (pred(node)) acc.push(node);
+  for (const child of node.children || []) findBy(child, pred, acc);
+  return acc;
+}
+const boots = findBy(player.root, n => n.userData?.limbForward === 'front');
+assert.equal(boots.length, 2, 'both boots are tagged as front-facing');
+assert.ok(boots.every(b => b.position.z <= -0.08), 'toes point toward Front -Z, not the backpack');
+const backpack = findBy(player.root, n => n.position?.z === 0.22 && n.geometry?.d === 0.12);
+assert.equal(backpack.length, 1, 'backpack stays on +Z (back)');
+assert.ok(backpack[0].position.z > 0, 'backpack is opposite the face');
+assert.ok(rightHandAnchor.children.some(c => c.position.z < 0), 'held ball sits on the front / -Z side');
 assert.equal(headPivot.parent, torsoPivot.parent, 'head and torso are siblings — no double transform');
 assert.equal(headPivot.position.y, 1.44);
 assert.equal(hairRoot.parent, headPivot, 'hair is a headPivot descendant');

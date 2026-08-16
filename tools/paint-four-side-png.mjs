@@ -164,15 +164,11 @@ function playerHeadBack() {
   fill(c, C.hair);
   plot(c, [
     [0, 0, 32, 6, C.hairDark],
-    [4, 2, 8, 3, C.hairLight],
-    [20, 3, 6, 2, C.hairLight],
-    [6, 8, 5, 10, C.hairDark],
-    [18, 10, 4, 8, C.hairDeep],
-    [12, 6, 3, 4, C.hairLight],
-    [24, 14, 6, 9, C.hairDark],
-    [2, 18, 4, 6, C.hairDeep],
-    [10, 20, 12, 4, C.hairDark],
-    [0, 26, 32, 6, C.hairDeep],
+    [0, 6, 32, 4, C.hairLight],
+    [0, 10, 32, 6, C.hair],
+    [0, 16, 32, 6, C.hairDark],
+    [0, 22, 32, 6, C.hair],
+    [0, 28, 32, 4, C.hairDark],
   ]);
   return c;
 }
@@ -332,12 +328,14 @@ function keeperHeadBack() {
   const c = makeCanvas();
   fill(c, C.hat);
   plot(c, [
-    [0, 0, 32, 8, C.hatDark],
-    [6, 3, 8, 4, C.hatLight],
-    [18, 4, 6, 3, C.hatLight],
-    [0, 14, 32, 4, C.hatDark],
-    [8, 18, 16, 6, C.hatDark],
+    [0, 0, 32, 7, C.hatDark],
+    [0, 7, 32, 3, C.hatLight],
+    [0, 10, 32, 4, C.hat],
+    [0, 14, 32, 3, C.hatDark],
+    [0, 17, 32, 7, C.hat],
     [0, 24, 32, 8, C.hatDark],
+    [0, 18, 2, 6, C.hatDark],
+    [30, 18, 2, 6, C.hatDark],
   ]);
   return c;
 }

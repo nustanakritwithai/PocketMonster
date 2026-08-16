@@ -78,10 +78,10 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
     const hipsPivot = new THREE.Group(); hipsPivot.position.set(0, 0.60, 0); visualRoot.add(hipsPivot);
     const torsoPivot = new THREE.Group(); torsoPivot.position.set(0, 0.88, 0); visualRoot.add(torsoPivot);
     const headPivot = new THREE.Group(); headPivot.position.set(0, headY, 0); visualRoot.add(headPivot);
-    const leftArmRoot = new THREE.Group(); leftArmRoot.position.set(-0.25, 1.02, 0.02); visualRoot.add(leftArmRoot);
-    const rightArmRoot = new THREE.Group(); rightArmRoot.position.set(0.25, 1.02, 0.02); visualRoot.add(rightArmRoot);
-    const leftLegRoot = new THREE.Group(); leftLegRoot.position.set(-0.11, 0.31, 0.02); visualRoot.add(leftLegRoot);
-    const rightLegRoot = new THREE.Group(); rightLegRoot.position.set(0.11, 0.31, 0.02); visualRoot.add(rightLegRoot);
+    const leftArmRoot = new THREE.Group(); leftArmRoot.position.set(-0.25, 1.02, -0.02); visualRoot.add(leftArmRoot);
+    const rightArmRoot = new THREE.Group(); rightArmRoot.position.set(0.25, 1.02, -0.02); visualRoot.add(rightArmRoot);
+    const leftLegRoot = new THREE.Group(); leftLegRoot.position.set(-0.11, 0.31, -0.02); visualRoot.add(leftLegRoot);
+    const rightLegRoot = new THREE.Group(); rightLegRoot.position.set(0.11, 0.31, -0.02); visualRoot.add(rightLegRoot);
 
     const hips = new THREE.Mesh(box(0.38, 0.22, 0.28), material(palette.pants, 0.8, 0.04));
     hips.castShadow = true; hipsPivot.add(hips);
@@ -136,8 +136,9 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
     function makeLeg() {
       const leg = new THREE.Mesh(box(0.12, 0.50, 0.12), material(palette.pants, 0.78, 0.04));
-      const boot = new THREE.Mesh(box(0.16, 0.14, 0.22), material(palette.boot, 0.8, 0.02));
-      boot.position.set(0, -0.30, 0.03);
+      const boot = new THREE.Mesh(box(0.16, 0.12, 0.28), material(palette.boot, 0.8, 0.02));
+      boot.position.set(0, -0.31, -0.10);
+      boot.userData.limbForward = 'front';
       return { leg, boot };
     }
     const leftLeg = makeLeg(); leftLegRoot.add(leftLeg.leg); leftLegRoot.add(leftLeg.boot);
@@ -223,10 +224,10 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
         if (moving) {
           torsoPivot.position.y = 0.88 + Math.abs(walk) * 0.03;
           headPivot.rotation.z = -walk * 0.03;
-          leftLegRoot.rotation.x = walk * 0.45;
-          rightLegRoot.rotation.x = -walk * 0.45;
-          leftArmRoot.rotation.x = -walk * 0.25;
-          rightArmRoot.rotation.x = walk * 0.25;
+          leftLegRoot.rotation.x = -walk * 0.45;
+          rightLegRoot.rotation.x = walk * 0.45;
+          leftArmRoot.rotation.x = walk * 0.25;
+          rightArmRoot.rotation.x = -walk * 0.25;
         } else {
           headPivot.position.y = headY + Math.sin(phase * 0.5) * 0.006;
         }
