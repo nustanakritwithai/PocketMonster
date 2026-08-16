@@ -8,6 +8,7 @@ import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
+import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -1543,7 +1544,39 @@ function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLas
   const applied=addTrainingExp(inst,focus,trainGain);
   inst.trainingExp=(inst.trainingExp||0)+applied;
   while(inst.trainingExp>=trainingNeed(inst.level)){inst.trainingExp-=trainingNeed(inst.level);levelUpInstance(inst);levelUps++;}}if(show&&levelUps>0)msg(`Ranch Training • Level Up รวม ${levelUps} ครั้ง`);}
-function feedMonster(id,food){const inst=getInst(id);if(!inst)return;if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}state.inventory[food]--;if(food==='protein'){inst.hunger=clamp(inst.hunger+24);inst.fitness=clamp(inst.fitness+8);inst.bond=clamp(inst.bond+2);}if(food==='healthy'){inst.hunger=clamp(inst.hunger+30);inst.energy=clamp(inst.energy+10);inst.hp=inst.maxHp;inst.fainted=false;inst.bond=clamp(inst.bond+2);}if(food==='favorite'){inst.hunger=clamp(inst.hunger+20);inst.mood=clamp(inst.mood+22);inst.bond=clamp(inst.bond+5);}msg(`ให้อาหาร ${displayName(inst)} • Bond ${Math.round(inst.bond)}`);renderManager();renderParty();saveGame(false);}
+// V7.4: Food definitions mapped to resolveFeed categories
+const FOOD_DEFS={
+  protein:{id:'protein',category:'daily',effects:{hunger:24,fitness:8,bond:2}},
+  healthy:{id:'healthy',category:'daily',effects:{hunger:30,energy:10,health:20,bond:2}},
+  favorite:{id:'favorite',category:'favorite',effects:{hunger:20,mood:22,bond:5}}
+};
+function feedMonster(id,food){
+  const inst=getInst(id);if(!inst)return;
+  if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
+  state.inventory[food]--;
+  // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
+  syncToBodyMind(inst);
+  const def=FOOD_DEFS[food]||{id:food,category:'daily',effects:{}};
+  const sp=spById[inst.speciesId]||{};
+  const result=resolveFeed(inst,def,{species:sp,now:Date.now()});
+  syncFromBodyMind(inst);
+  // Legacy: healthy food full-heals
+  if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
+  const favText=result.favorite?' (Favorite!)':'';
+  const overText=result.overfull?' (Overfull -70%)':'';
+  msg(`ให้อาหาร ${displayName(inst)} • Bond ${Math.round(inst.bond)}${favText}${overText}`);
+  renderManager();renderParty();saveGame(false);
+}
+// V7.4: Care actions (rest/play) from food-care.mjs
+function careAction(id,action){
+  const inst=getInst(id);if(!inst)return;
+  syncToBodyMind(inst);
+  const result=action==='rest'?careRest(inst,{now:Date.now()}):carePlay(inst,{now:Date.now()});
+  syncFromBodyMind(inst);
+  const label=action==='rest'?'พักผ่อน':'เล่นด้วย';
+  msg(`${displayName(inst)} • ${label} • ${action==='rest'?`พลัง ${Math.round(inst.energy)} ลดเครียด`:`อารมณ์ ${Math.round(inst.mood)} Bond ${Math.round(inst.bond)}`}`);
+  renderManager();renderParty();saveGame(false);
+}
 function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;
   // V7.2: Apply a training session via the shared pool (addTrainingExp clamps to capacity)
   const gain=Math.round(trainingNeed(inst.level)*0.15);
