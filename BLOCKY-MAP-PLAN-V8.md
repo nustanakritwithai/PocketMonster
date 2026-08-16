@@ -855,7 +855,249 @@ const boxGeometry = (w, h, d) => cachedGeometry('box', [w, h, d], THREE.BoxGeome
 ---
 ```
 
-### 3.2 Triangle Count เปรียบเทียบ
+### 3.0 ภาพรวมโครงสร้าง Blocky World
+
+โครงสร้าง Blocky World แบ่งเป็น 5 ชั้น:
+
+```
+ชั้น 1: Sky Dome (ท้องฟ้า)
+  └─ gradient texture (canvas 2×128) — สีต่างกันตาม zone
+  └─ Fog — กลืนวัตถุไกล ระยะต่างกันตาม zone
+
+ชั้น 2: Ground Plane (พื้นดิน)
+  └─ Plane 90×90 หน่วย — คลุมทั้งแผนที่
+  └─ Grid texture (canvas 128×128 repeat 20×) — กระเบืดีๆ
+  └─ receiveShadow — รับเงาจากทุกชิ้นบน
+
+ชั้น 3: Decorations Layer (ของตกแต่ง)
+  └─ Group "worldDecorations" — ลบ/สร้างใหม่ตอนเปลี่ยน zone
+  └─ หิน (box ซ้อน) / ต้นไม้ (box) / หญ้า (box บาง)
+  └─ ดอกไม้ (box) / หินย้อย (box ซ้อนเรียว) / รั้ว (box)
+  └─ ทุกชิ้น: castShadow=true
+
+ชั้น 4: Structures Layer (โครงสร้าง)
+  └─ แท่น Ranch (box สี่เหลี่ยม + ขอบ)
+  └─ แท่น Breeding (box สี่เหลี่ยม + ขอบ)
+  └─ Incubator (box ฐาน + box ไข่)
+  └─ NPC (Bighead แล้ว) / Player (Bighead แล้ว)
+  └─ มอนใน Ranch (Bighead ตามแผน)
+
+ชั้น 5: Effects Layer (VFX)
+  └─ VFX พื้น (box + wireframe) — สีตาม type
+  └─ VFX วงแหวน (box wireframe) — สีตามเหตุการณ์
+  └─ Damage numbers / Floating text
+  └─ Particle sparks (sphere เล็ก หรือ sprite)
+```
+
+### 3.1 แผนที่จากมุมมองโครงสร้าง
+
+```
+                    ┌─── ชั้น 1: Sky + Fog ───┐
+                    │  gradient + fog color    │
+                    │  (zone-specific)         │
+                    └──────────────────────────┘
+                    
+     ┌──┐                        ┌──┐
+     │🌳│  ชั้น 3: Decorations   │🪨│
+     │  │  (worldDecorations)    │  │
+     └──┘                        └──┘
+          ┌─┐    ┌───┐    ┌─┐
+          │🌿│    │🥚│    │🌸│  ชั้น 4: Structures
+          └─┘    └───┘    └─┘  (pads/incubator/NPC)
+     ═══════════════════════════════════════
+     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ชั้น 2: Ground
+     ░░░░░░ grid texture 128² repeat 20× ░░░  (plane 90×90)
+     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+                    ↓                        ชั้น 5: VFX
+              ┌──────────┐                    (box wireframe
+              │ VFX box  │                     สีตาม type)
+              └──────────┘
+```
+
+### 3.2 ระบบพิกัด (Coordinate System)
+
+```
+แกน X: -32 ถึง +32 (ซ้าย-ขวา) — ผู้เล่นติดขอบที่ ±32
+แกน Z: -32 ถึง +32 (หน้า-หลัง) — ผู้เล่นติดขอบที่ ±32
+แกน Y: 0 = พื้น — ทุกชิ้นวางบน Y=0 ยกเว้นลอย (ghost)
+
+จุดสำคัญ:
+  (0,0) = จุดเริ่มต้นผู้เล่น
+  (4,3) = NPC (Keeper)
+  (7,3) = ลาน Ranch (ranchCenter)
+  (5.2,8.2) = ลาน Breeding + Incubator
+
+ขอบเขต:
+  พื้น: 90×90 (ใหญ่กว่าขอบเขตผู้เล่น ±32)
+  ขอบเขตผู้เล่น: ±32 (ติดขอบไม่ออก)
+  Decorations: กระจายใน ±21 (ไม่เกินขอบ)
+  Wild Monster: กระจายใน ±15
+```
+
+### 3.3 ระบบ Scene Graph
+
+```js
+// โครงสร้าง Three.js Scene ปัจจุบัน:
+scene
+├── HemisphereLight      // แสงจากทุกทิศ
+├── DirectionalLight     // แสงดวงอาทิตย์ (sun)
+├── Mesh (ground)        // พื้น 90×90
+├── Group (decorations)  // worldDecorations — ลบ/สร้างตอนเปลี่ยน zone
+│   ├── Group (rock1)    // หินก้อนที่ 1
+│   │   ├── Mesh (main)  // ก้อนใหญ่
+│   │   ├── Mesh (side)  // ก้อนข้าง
+│   │   └── Mesh (pebble)// ก้อนเล็ก
+│   ├── Group (tree1)    // ต้นไม้ต้นที่ 1
+│   │   ├── Mesh (bole)  // ต้น
+│   │   ├── Mesh (mid)   // พุ่มล่าง
+│   │   ├── Mesh (top)   // พุ่มบน
+│   │   └── Mesh×3 (fruit)// ผลไม้ (ถ้ามี)
+│   ├── Mesh (fence1)    // เสารั้ว
+│   ├── Mesh (fence2)
+│   └── ... 
+├── Mesh (ranchPad disk) // แท่น Ranch
+├── Mesh (breedingPad)   // แท่น Breeding
+├── Group (incubator)    // Incubator
+│   ├── Mesh (baseInc)   // ฐาน
+│   └── Mesh (eggVisual) // ไข่
+├── Group (player)       // ผู้เล่น (Bighead)
+├── Group (npc)          // NPC (Bighead)
+├── Group (wild monsters)// มอนป่า
+├── Group (ranch visuals)// มอนในลาน
+└── effects[]            // VFX ชั่วคราว
+```
+
+### 3.4 ระบบเปลี่ยน Zone (Zone Switching)
+
+```js
+// populateWorld(zone) — สลับ decorations ตาม zone
+function populateWorld(zone) {
+  // 1. ลบ decorations เก่าทั้งหมด
+  clearDecorations(); // dispose geometry + material
+  
+  // 2. สร้าง decorations ใหม่ตาม zone
+  if (zone === 'hub') {
+    // หิน 6 + ต้นไม้ 6 + รั้ว 10 + ดอก 4 + หญ้า 4
+  } else if (zone === 'grassland') {
+    // หิน 6 + ต้นไม้ 7 + หญ้า 8 + ดอก 3
+  } else if (zone === 'cave') {
+    // หิน 6 + หินย้อย 7
+  }
+  
+  // 3. เปลี่ยนพื้น texture + ท้องฟ้า + fog + แสง
+  setZoneGround(zone);
+  setZoneLighting(zone);
+}
+
+// ความเร็ว: box สร้าง ~30 ชิ้น ใน <16ms (1 frame)
+// เพราะ: cachedGeometry + shared material + น้อย triangle
+```
+
+### 3.5 ระบบ Cache ที่เกี่ยวข้อง
+
+| Cache | ฟังก์ชัน | ขนาด | ใช้ซ้ำ |
+|-------|----------|------|--------|
+| Geometry Cache | `cachedGeometry()` | ~20 entries | ทุก box ขนาดเดียวกัน |
+| Material Cache | `sharedResources.material()` | ~10 entries | สีเดียวกัน = material เดียวกัน |
+| Texture Cache | `groundTexCache{}` | 3 entries (3 zones) | พื้น texture ต่อ zone |
+| Sky Cache | `skyTexCache{}` | 3 entries | gradient ต่อ zone |
+| Rock Texture | `rockTexCache{}` | ~5 entries | ต่อโทนสี |
+| Bark Texture | `barkTexCache{}` | ~3 entries | ต่อสีต้น |
+| Leaf Texture | `leafTexCache{}` | ~5 entries | ต่อสีใบ |
+
+### 3.6 ระบบ Shadow
+
+```
+แสงดวงอาทิตย์ (DirectionalLight):
+  - ตำแหน่ง: (9, 18, 8) — สูงเฉียง
+  - castShadow: true (ถ้า qualityProfile.shadows)
+  - สร้างเงา: ทุกชิ้นที่ castShadow=true
+
+พื้น (ground):
+  - receiveShadow: true — รับเงาจากทุกชิ้น
+
+Decorations:
+  - หิน: castShadow=true (เงาเหลี่ยมชัด)
+  - ต้นไม้: castShadow=true (เงายาว)
+  - หญ้า: castShadow=true (เงาเล็ก)
+  - ดอกไม้: castShadow=true (เงาจุด)
+  - หินย้อย: castShadow=true (เงาแหลม)
+
+Box shadow vs Sphere shadow:
+  - Box: เงาเหลี่ยมชัดเจน — ดูเป็น blocky
+  - Sphere: เงากลมเลือน — ดูนุ่ม
+  - Blocky shadow เข้ากับ theme
+
+Cave:
+  - แสงน้อย → เงาสั้น + มืด
+  - แสงเย็น (0xb0c4de) → เงาเย็น
+```
+
+### 3.7 ระบบ LOD (Level of Detail)
+
+ไม่มี LOD ในปัจจุบัน แต่ box ไม่จำเป็นเพราะ:
+- 12 triangle/box — น้อยมาก ไม่กระทบแม้ไกล
+- Fog กลืนวัตถุไกลอยู่แล้ว
+- sharedResourceCache ลด draw calls
+
+ถ้าอนาคตต้องการ LOD:
+```
+ใกล้ (0-20):  box เต็ม (3 ก้อน)
+กลาง (20-50): box 2 ก้อน (ตัด pebble)
+ไกล (50+):   box 1 ก้อน (ตัด side+pebble)
+→ แต่ไม่จำเป็นตอนนี้ เพราะ 12 tri ไม่กระทบ
+```
+
+### 3.8 ระบบ Dispose (การทำลาย resource)
+
+```js
+// ตอนเปลี่ยน zone: ลบ decorations เก่า
+function clearDecorations() {
+  while (decorations.children.length) {
+    const child = decorations.children[0];
+    // dispose geometry (ไม่ dispose cache แชร์!)
+    // dispose material (ไม่ dispose cache แชร์!)
+    // dispose texture (ไม่ dispose cache แชร์!)
+    removeAndDispose(decorations, child);
+  }
+}
+
+// สำคัญ: ใช้ cachedGeometry + sharedResources.material
+// → ไม่ dispose cache เพราะใช้ซ้ำได้
+// → dispose เฉพาะที่ไม่ได้ cache
+```
+
+### 3.9 ขนาดแผนที่ (World Bounds)
+
+```
+พื้น: 90×90 หน่วย (ใหญ่กว่าขอบเขตผู้เล่น)
+ขอบเขตผู้เล่น: ±32 = 64×64 หน่วย
+Decorations: กระจายใน ±21 = 42×42 หน่วย
+Wild: กระจายใน ±15 = 30×30 หน่วย
+Ranch: ศูนย์กลาง (7,3) รัศมี 3.55
+Breeding: (5.2, 8.2) รัศมี 1.6
+Incubator: (5.2, 0, 8.2)
+
+กล้อง: ระยะ 7.4 สูง 1.15 มองไกล 1.5
+  → ผู้เล่นเห็นรอบตัว ~15 หน่วย
+  → ขอบเขตมองเห็น ~30 หน่วย
+  → Fog 30-76 กลืนขอบ
+  → Cave fog 15-50 กลืนใกล้กว่า
+```
+
+### 3.10 Performance Budget ต่อ Frame
+
+| งาน | เวลาต่อ frame | หมายเหตุ |
+|-----|---------------|---------|
+| Render scene | ~3-5ms | ~500-1000 triangles + shadows |
+| Update wilds AI | ~1-2ms | distance tick scheduler |
+| Update effects | ~0.5ms | effects + groundDecals |
+| Update animations | ~0.5ms | animateMonster + animateHumanoid |
+| Update camera | ~0.1ms | lerp + shake |
+| **รวม** | **~5-8ms** | **60 FPS = 16ms budget** |
+
+Blocky ช่วย: ลด triangle 94% → render เร็วขึ้น → เหลือเวลาสำหรับ AI/effect
+
 
 | ชิ้น | Legacy triangles | Blocky triangles | ลดลง |
 |-----|------------------|------------------|------|
@@ -1534,7 +1776,17 @@ function makeSkyTexture(zoneColor) {
 - ท้องฟ้า: สีทึบ → gradient (canvas 2×128)
 - แท่น/Incubator: กลม → เหลี่ยม
 - VFX: circle/ring/torus → box + wireframe
-- **รายละเอียด Asset Model:**
+- **โครงสร้าง Blocky World:**
+  - 5 ชั้น: Sky → Ground → Decorations → Structures → Effects
+  - ระบบพิกัด: X/Z ±32, Y=0 พื้น, จุดสำคัญ 4 จุด
+  - Scene Graph: scene → lights → ground → decorations → structures → player/npc → wilds → effects
+  - Zone Switching: clearDecorations → populateWorld → setZoneGround/Lighting (<16ms)
+  - Cache: 7 ระบบ (geometry/material/texture/ground/sky/rock/bark/leaf)
+  - Shadow: DirectionalLight + castShadow ทุกชิ้น (box shadow เหลี่ยมชัด)
+  - LOD: ไม่จำเป็น (12 tri/box ไม่กระทบ) + Fog กลืนไกล
+  - Dispose: ใช้ cache ไม่ dispose แชร์
+  - World Bounds: พื้น 90×90, ผู้เล่น ±32, มองเห็น ~30, Fog กลืนขอบ
+  - Performance: ~5-8ms/frame (60 FPS = 16ms budget)
   - 10 model specs (Rock/Tree/Grass/Flower/Stalagmite/Fence/Pad/Incubator/VFX Decal/VFX Ring)
   - แต่ละ model: geometry + position + scale + rotation + material + texture + shadow + emissive
   - ตารางสรุป: ชิ้นย่อย/triangle/texture/memory/shadow/emissive
