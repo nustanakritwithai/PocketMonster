@@ -2,9 +2,9 @@
 ## แผนพัฒนาแผนที่ Theme เหลี่ยม (Blocky World) — เน้นเปลี่ยนแผนที่เก่า
 
 > สร้าง: 2026-08-16
-> เวอร์ชัน: 2.0 (ปรับปรุงรายละเอียดเชิงลึก)
-> เป้าหมาย: แปลงแผนที่เกมจาก Legacy (sphere/cone/cylinder โค้งมน) เป็น Blocky (box เหลี่ยม) ให้เข้ากับ theme Bighead Blocky ของมอนและ humanoid
-> หลัก: เปลี่ยนของเก่า ไม่ทำเพิ่มใหม่ — คงพิกัดเดิม เปลี่ยนเฉพาะรูปทรง
+> เวอร์ชัน: 3.0 (เพิ่มรายละเอียดความสวยงาม)
+> เป้าหมาย: แปลงแผนที่เกมจาก Legacy (sphere/cone/cylinder โค้งมน) เป็น Blocky (box เหลี่ยม) ให้เข้ากับ theme Bighead Blocky ของมอนและ humanoid — **เน้นความสวยงาม**
+> หลัก: เปลี่ยนของเก่า ไม่ทำเพิ่มใหม่ — คงพิกัดเดิม เปลี่ยนเฉพาะรูปทรง + เพิ่มความสวย
 
 ---
 
@@ -12,6 +12,7 @@
 
 1. สถานะปัจจุบัน — แผนที่ที่มี (พร้อมพิกัดและบรรทัดโค้ด)
 2. หลักการแปลง
+2.5. หลักความสวยงาม (Aesthetic Principles)
 3. โครงสร้าง Blocky World
 4. แผนที่ทั้ง 3 Zone — พิกัดเดิมทั้งหมด
 5. Blocky Ground + Grid Texture
@@ -109,7 +110,243 @@ NPC + Player = Bighead แล้ว | มอน = มีแผนแปลง (P
 
 ---
 
-## 3. โครงสร้าง Blocky World
+## 2.5 หลักความสวยงาม (Aesthetic Principles)
+
+### 2.5.1 Color Palette per Zone
+
+แต่ละ zone ต้องมี mood สีชัดเจน:
+
+#### Ranch Hub — อบอุ่น สดใส คล้ายบ้าน
+```
+พื้นหลัก:    #62c96b (เขียวหญ้าสด)
+พื้นเข้ม:    #4ade80 → #3f9d4a (เขียวเข้ม กระเบืดี)
+พื้นแก้ม:    #86efac (เขียวอ่อน จุด noise)
+ท้องฟ้าบน:  #72c7ef (ฟ้าสด)
+ท้องฟ้าล่าง: #bfefff (ฟ้าอ่อน)
+Fog:        #65c9f5 (ฟ้า)
+หิน:        #945a38 → #b67d52 (น้ำตาลอบอุ่น)
+ต้นไม้ใบ:    #18753a → #22c55e (เขียวเข้ม → สด)
+ต้นไม้ผล:    #ef4444 (แดง) / #facc15 (เหลือง)
+ดอกไม้:     #f472b6 (ชมพู) / #facc15 (เหลือง) / #a78bfa (ม่วง)
+```
+
+#### Green Meadow — ผจญภัย สดใส กว้าง
+```
+พื้นหลัก:    #56d364 (เขียวสดกว่า hub)
+พื้นเข้ม:    #22c55e → #16a34a (เขียวเข้ม)
+ท้องฟ้าบน:  #68d2f5 (ฟ้าอ่อน)
+ท้องฟ้าล่าง: #c8eeff (ฟ้าจาง)
+Fog:        #68d2f5
+หิน:        #945a38 (น้ำตาล)
+ต้นไม้ใบ:    #22c55e / #16a34a / #15803d (3 โทนเขียว)
+ต้นไม้ผล:    #f97316 (ส้ม) / #ef4444 (แดง)
+ดอกไม้:     #facc15 (เหลือง) / #fb7185 (ชมพู) / #a78bfa (ม่วง)
+```
+
+#### Echo Cave — ลึกลับ มืด อันตราย
+```
+พื้นหลัก:    #57606f (เทาเข้ม)
+พื้นเข้ม:    #334155 → #1e293b (เทาดำ กระเบืดี)
+พื้นจุด:     #00000015 (จุดดำ หิน)
+ท้องฟ้าบน:  #1a1a2e (ดำเข้ม)
+ท้องฟ้าล่าง: #334155 (เทาเข้ม)
+Fog:        #1e293b (เข้ม) ระยะ 15-50 (สั้น อึดอัด)
+หิน:        5 โทนเทา (#57534e, #44403c, #78716c, #3f3f46, #52525b)
+หินย้อย:    #64748b → #94a3b8 (เทา → เทาอ่อน)
+แสง:        Hemisphere ลด 0.8, Directional ลด 1.5 (มืดลง)
+```
+
+### 2.5.2 Variation — ไม่จำเลียง
+
+ทุกชิ้นต้องมีความแตกต่างเล็กๆ ไม่เหมือนกันหมด:
+
+```js
+// หิน: หมุนสุ่ม + สีเข้ม/อ่อนสุ่ม
+function makeRock(x, z, s = 1, tone = 0x945a38) {
+  const toneVar = tone + (Math.random() - 0.5) * 0x101010; // สีสุ่ม ±10%
+  const rotVar = (x * 1.7 + z) * 0.15 + (Math.random() - 0.5) * 0.3;
+  // ... ใช้ toneVar + rotVar
+}
+
+// ต้นไม้: พุ่มไม่เท่ากัน + เอียงเล็กน้อย
+function makeTree(x, z, s = 1, opts = {}) {
+  const leafScale = 0.9 + Math.random() * 0.2; // 0.9-1.1x
+  const tilt = (Math.random() - 0.5) * 0.05; // เอียงนิดหน่อย
+  // ...
+}
+
+// หญ้า: สูงไม่เท่ากัน + สีสุ่ม
+function makeGrassTuft(x, z, s = 1, color = 0x3f9d4a) {
+  const colorVar = color + (Math.random() - 0.5) * 0x080808;
+  // ...
+}
+```
+
+### 2.5.3 Bevel — ขอบเฉียบเล็กน้อย (ไม่กลม ไม่แหลม)
+
+box เหลี่ยมจะดูแข็งเกินไป — เพิ่มความสวยด้วย:
+
+1. **Scale ไม่เท่ากัน** — ไม่ใช่ลูกบาศก์สมบูรณ์ แต่ยาว/กว้าง/สูงต่างกัน
+2. **Rotation เล็กน้อย** — หมุน 1-3 องศา ไม่ตั้งตรงเป๊ะ
+3. **Material roughness ต่างกัน** — ก้อนใหญ่ rough กว่าก้อนเล็ก
+4. **Color gradient บน texture** — ไม่ใช่สีทึบ มี gradient เข้ม/อ่อน
+
+```js
+// หิน: ก้อนใหญ่ rough กว่า ก้อนเล็ก
+const mainMat = mat(tone, 0.95, 0.04);  // หยาบ
+const pebbleMat = mat(tone, 0.99, 0);   // เรียบ
+
+// ต้นไม้: พุ่มล่าง rough กว่า พุ่มบน
+const midMat = mat(leaf, 0.78, 0.03);   // หยาบ
+const topMat = mat(leaf, 0.7, 0.04);    // เรียบกว่า
+```
+
+### 2.5.4 Texture Detail — พื้นผิวละเอียด
+
+ใช้ procedural canvas texture สำหรับ decorations ด้วย ไม่ใช่แค่พื้น:
+
+```js
+// หิน: texture มีรอยร้าว
+function makeRockTexture(tone) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const hex = '#' + tone.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex; ctx.fillRect(0, 0, 64, 64);
+  // รอยร้าว
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * 64, 0);
+    ctx.lineTo(Math.random() * 64, 64);
+    ctx.stroke();
+  }
+  // จุด
+  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ต้นไม้: texture มีลายเปลือก
+function makeBarkTexture(trunkColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const hex = '#' + trunkColor.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex; ctx.fillRect(0, 0, 32, 64);
+  // ลายเปลือกแนวตั้ง
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  for (let x = 4; x < 32; x += 8) {
+    ctx.beginPath();
+    ctx.moveTo(x + Math.random() * 2, 0);
+    ctx.lineTo(x + Math.random() * 2, 64);
+    ctx.stroke();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ใบไม้: texture มีลายใบ
+function makeLeafTexture(leafColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const hex = '#' + leafColor.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex; ctx.fillRect(0, 0, 64, 64);
+  // ลายใบเล็กๆ
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  for (let i = 0; i < 15; i++) {
+    ctx.fillRect(Math.random() * 64, Math.random() * 64, 3, 5);
+  }
+  // จุดสว่าง
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 0; i < 10; i++) {
+    ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+```
+
+### 2.5.5 Lighting Atmosphere
+
+แสงต่อ zone ต้องต่างกัน:
+
+```js
+function setZoneLighting(zone) {
+  if (zone === 'cave') {
+    // ถ้ำ: มืด แสงน้อย อบอุ่นนิดหน่อย
+    scene.children.find(c => c.isHemisphereLight).intensity = 0.6;
+    sun.intensity = 0.8;
+    sun.color.setHex(0xb0c4de); // แสงเย็น
+  } else if (zone === 'grassland') {
+    // ทุ่ง: สดใส แสงเย็น
+    scene.children.find(c => c.isHemisphereLight).intensity = 1.55;
+    sun.intensity = 2.15;
+    sun.color.setHex(0xffffff);
+  } else {
+    // hub: อบอุ่น แสงทอง
+    scene.children.find(c => c.isHemisphereLight).intensity = 1.55;
+    sun.intensity = 2.15;
+    sun.color.setHex(0xfff4e0); // แสงอบอุ่น
+  }
+}
+```
+
+### 2.5.6 Emissive Glow — ความสว่างเล็กๆ
+
+บางชิ้นควรมี glow เล็กๆ ให้ดูมีชีวิต:
+
+```js
+// ดอกไม้: bloom มี emissive เล็กน้อย
+const bloomMat = new THREE.MeshStandardMaterial({
+  color, emissive: color, emissiveIntensity: 0.08, roughness: 0.5
+});
+
+// ผลไม้: emissive เล็ก
+const fruitMat = new THREE.MeshStandardMaterial({
+  color: fruit, emissive: fruit, emissiveIntensity: 0.06, roughness: 0.55
+});
+
+// ไข่ Incubator: emissive อบอุ่น
+const eggMat = new THREE.MeshStandardMaterial({
+  color: 0xfde68a, emissive: 0x7c2d12, emissiveIntensity: 0.15
+});
+
+// หินย้อยถ้ำ: emissive เย็น (แร่)
+const stalagmiteTipMat = new THREE.MeshStandardMaterial({
+  color: 0x94a3b8, emissive: 0x4a90d9, emissiveIntensity: 0.04, roughness: 0.78
+});
+```
+
+### 2.5.7 โครงสร้างความสวยโดยรวม
+
+```
+                 ┌──── ท้องฟ้า gradient ────┐
+                 │  (สว่างบน → จางล่าง)      │
+                 │                          │
+           ┌──┐  │                          │  ┌──┐
+           │🌳│  │                          │  │🪨│
+           │  │  │       Fog (กลืนไกล)       │  │  │
+           └──┘  │                          │  └──┘
+                 │                          │
+          ┌─┐    │                          │    ┌─┐
+          │🌸│   │                          │    │🌿│
+          └─┘    │                          │    └─┘
+                 │                          │
+   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+   ░░░░░░ พื้น grid texture + noise ░░░░░░░
+   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+   
+   ← แสงอบอุ่น (hub) / เย็น (grassland) / มืด (cave)
+   ← Shadow ทุกชิ้น
+   ← Variation: สุ่มสี/หมุน/สเกล
+   ← Emissive: ดอกไม้/ผลไม้/ไข่/หินย้อย
+   ← Texture: ลายเปลือก/ลายใบ/รอยร้าว
+```
+
+---
 
 ### 3.1 เปรียบเทียบ Legacy vs Blocky
 
@@ -805,10 +1042,18 @@ function makeSkyTexture(zoneColor) {
 - เป้าหมาย: แปลงแผนที่เก่า 3 zone จาก Legacy → Blocky
 - **เน้นเปลี่ยนของเก่า ไม่ทำใหม่** — คงพิกัด คงจำนวน คง zone
 - ทุก decoration: sphere/cone/cylinder/dodecahedron → box
-- พื้น: สีทึบ → grid texture (procedural canvas 128×128)
+- พื้น: สีทึบ → grid texture (procedural canvas 128×128 + 2 ชั้น grid + noise)
 - ท้องฟ้า: สีทึบ → gradient (canvas 2×128)
 - แท่น/Incubator: กลม → เหลี่ยม
 - VFX: circle/ring/torus → box + wireframe
+- **ความสวยงาม:**
+  - Color palette 3 zone ชัดเจน (hub=อบอุ่น, meadow=สดใส, cave=มืด)
+  - Variation: สุ่มสี/หมุน/สเกล ทุกชิ้นไม่จำเลียง
+  - Bevel: scale ไม่เท่ากัน + rotation เล็กน้อย + roughness ต่างกัน
+  - Texture: ลายเปลือกไม้/ลายใบ/รอยร้าวหิน (procedural canvas)
+  - Lighting: 3 zone ต่างแสง (อบอุ่น/เย็น/มืด)
+  - Emissive glow: ดอกไม้/ผลไม้/ไข่/หินย้อย มี glow เล็กๆ
+  - Fog ต่างระยะ: cave สั้นอึดอัด, hub/meadow กว้าง
 - 6 Phase = 6 PR
 - Performance: ลด triangle ~94% (box vs sphere/cone)
 - ทุกฟังก์ชันมีโค้ดเต็มพร้อมบรรทัดที่จะแก้
