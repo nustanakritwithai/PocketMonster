@@ -25,15 +25,42 @@
       <option value="strip">strip</option>
     </select>
     <p><button id="compile">Compile</button></p>
+    <div id="faces" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0"></div>
     <pre id="out">รอ compile…</pre>
   </main>
   <script type="module">
     import { compileLabAppearance, exportAppearancePacket } from './compiler.mjs';
     import { previewMatrix } from './preview.mjs';
     const out = document.getElementById('out');
+    const packs = {
+      'appearance.human.player-orange.v1': 'player-orange',
+      'appearance.human.keeper-green.v1': 'keeper-green',
+    };
+    function showFaces(id) {
+      const pack = packs[id];
+      const box = document.getElementById('faces');
+      box.innerHTML = '';
+      if (!pack) return;
+      for (const face of ['front', 'right', 'back', 'left']) {
+        const fig = document.createElement('figure');
+        fig.style.margin = '0';
+        const img = document.createElement('img');
+        img.src = `../assets/appearances/${pack}/head.${face}.png`;
+        img.alt = `${pack} head ${face}`;
+        img.width = 128;
+        img.height = 128;
+        img.style.imageRendering = 'pixelated';
+        img.style.background = '#0b1220';
+        const cap = document.createElement('figcaption');
+        cap.textContent = face;
+        fig.append(img, cap);
+        box.append(fig);
+      }
+    }
     document.getElementById('compile').onclick = () => {
+      const id = document.getElementById('id').value;
       const compiled = compileLabAppearance({
-        id: document.getElementById('id').value,
+        id,
         mode: document.getElementById('mode').value,
         front: 'head.front.png',
         right: 'head.right.png',
@@ -42,11 +69,13 @@
         topColor: '#F97316',
         bottomColor: '#FFC4A3',
       });
+      showFaces(id);
       out.textContent = JSON.stringify({
         packet: exportAppearancePacket(compiled),
         shots: previewMatrix(compiled).length,
       }, null, 2);
     };
+    showFaces(document.getElementById('id').value);
   </script>
 </body>
 </html>

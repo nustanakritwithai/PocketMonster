@@ -1,8 +1,24 @@
 import { GAMEPLAY_LOCKS } from '../anchors.mjs';
 import { getAppearance } from '../catalog.mjs';
 import { compileAppearance } from '../four-side/atlas.mjs';
+import { applyBoxAtlasUVs, compilePartAtlas, createAtlasTexture, detachSharedGeometry } from '../four-side/apply.mjs';
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { registerOwned } from '../ownership.mjs';
+
+async function browserLoadFace(source) {
+  if (typeof document === 'undefined') throw new Error('browser face loader needs document');
+  const url = new URL(source, document.baseURI).href;
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, img.width, img.height);
+  return { width: img.width, height: img.height, rgba: new Uint8Array(data.data) };
+}
 
 export const PLAYER_PALETTE = Object.freeze({
   skin: 0xffc4a3, hair: 0xf97316, shirt: 0x20324a, pants: 0x0f172a, bag: 0x7c3aed, boot: 0x111827, ball: 0x3b82f6,
@@ -43,7 +59,7 @@ function worldPos(node, target) {
   return out;
 }
 
-export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
+export function createBigheadProvider({ THREE, box, cylinder, material, loadFace } = {}) {
   if (!THREE?.Group || typeof box !== 'function' || typeof material !== 'function') {
     throw new Error('bighead provider needs THREE, box(), and material()');
   }
@@ -78,9 +94,6 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
     headMesh.castShadow = true;
     headMesh.userData.assetForm = 'blocky-bighead';
     headPivot.add(headMesh);
-    const faceSurface = new THREE.Mesh(box(headW * 0.72, headH * 0.42, 0.02), material(0x1f2937, 0.7, 0.02));
-    faceSurface.position.set(0, 0.04, -(headD / 2 + 0.002));
-    headPivot.add(faceSurface);
 
     const hairRoot = new THREE.Group(); headPivot.add(hairRoot);
     const hatRoot = new THREE.Group(); headPivot.add(hatRoot);
@@ -95,12 +108,9 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
       apron.position.set(0, -0.04, -0.16);
       torsoPivot.add(apron);
     } else {
-      const hairCap = new THREE.Mesh(box(headW * 1.02, 0.16, headD * 1.02), material(palette.hair, 0.74, 0.02));
-      hairCap.position.y = headH / 2 - 0.02;
+      const hairCap = new THREE.Mesh(box(headW * 1.02, 0.14, headD * 1.02), material(palette.hair, 0.74, 0.02));
+      hairCap.position.y = headH / 2 + 0.01;
       hairRoot.add(hairCap);
-      const bang = new THREE.Mesh(box(0.22, 0.10, 0.08), material(palette.hair, 0.74, 0.02));
-      bang.position.set(0, headH * 0.18, -(headD / 2 + 0.01));
-      hairRoot.add(bang);
       const tuft = new THREE.Mesh(box(0.10, 0.12, 0.10), material(palette.hair, 0.74, 0.02));
       tuft.position.set(0.16, headH * 0.28, -0.08);
       hairRoot.add(tuft);
@@ -163,6 +173,36 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
     let actionDuration = 0.32;
     let phase = 0;
     let currentAppearance = compileAppearance(getAppearance(request.appearanceId) || { id: request.appearanceId, parts: {} });
+
+    async function paintPart(mesh, part) {
+      if (!mesh || !part) return;
+      const loader = loadFace || (typeof document !== 'undefined' ? browserLoadFace : null);
+      if (!loader) return;
+      try {
+        const atlas = await compilePartAtlas(part, currentAppearance.layout, loader);
+        detachSharedGeometry(mesh);
+        applyBoxAtlasUVs(mesh.geometry, currentAppearance.layout);
+        const next = createAtlasTexture(THREE, atlas);
+        const prev = mesh.material;
+        mesh.material = next;
+        mesh.userData.atlasApplied = true;
+        if (prev && prev !== next && typeof prev.dispose === 'function') {
+          prev.map?.dispose?.();
+          prev.dispose();
+        }
+      } catch (err) {
+        console.warn('four-side atlas apply failed', currentAppearance.id, err);
+      }
+    }
+
+    async function applyAppearanceSurfaces() {
+      const parts = getAppearance(currentAppearance.id)?.parts || {};
+      await Promise.all([
+        paintPart(headMesh, parts.head),
+        paintPart(torso, parts.torso),
+      ]);
+      return handle;
+    }
 
     const handle = {
       root,
@@ -245,6 +285,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
         currentAppearance = compileAppearance(def);
         root.userData.appearanceId = currentAppearance.id;
         root.userData.appearanceHash = currentAppearance.contentHash;
+        handle.ready = applyAppearanceSurfaces();
         return handle;
       },
       appearance() { return currentAppearance; },
@@ -256,6 +297,9 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
 
     function disposeOwned() {}
     registerOwned(handle, { dispose() {} });
+    root.userData.appearanceId = currentAppearance.id;
+    root.userData.appearanceHash = currentAppearance.contentHash;
+    handle.ready = applyAppearanceSurfaces();
     return assertAssetHandle(handle);
   };
 }

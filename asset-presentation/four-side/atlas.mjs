@@ -1,4 +1,4 @@
-import { atlasLayout, FACE_ORDER } from './uv.mjs';
+import { atlasLayout, DEFAULT_ATLAS, FACE_ORDER } from './uv.mjs';
 import { resolvePartFaces } from './fallback.mjs';
 
 export function appearanceKey({ appearanceId, quality = 'medium', contentHash }) {
@@ -15,7 +15,12 @@ export function hashAppearance(appearance) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-export function compileAppearance(appearance = {}, { tile = 256, gutter = 4, atlas = 512, quality = 'medium' } = {}) {
+export function compileAppearance(appearance = {}, {
+  tile = DEFAULT_ATLAS.tile,
+  gutter = DEFAULT_ATLAS.gutter,
+  atlas = DEFAULT_ATLAS.atlas,
+  quality = 'medium',
+} = {}) {
   const layout = atlasLayout({ tile, gutter, atlas });
   const parts = {};
   for (const [partName, part] of Object.entries(appearance.parts || {})) {

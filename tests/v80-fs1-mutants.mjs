@@ -14,5 +14,6 @@ const compiled = compileAppearance({ id: 'x', parts: { head: { front: 'a.png', r
 assert.equal(compiled.materialCount, 1, 'mutant 6: compiled appearance uses one atlas material');
 
 assert.throws(() => atlasLayout({ gutter: 2 }), /gutter/);
+assert.throws(() => atlasLayout({ atlas: 512 }), /too small/, '2x3 of 256 cannot fit a 512 atlas');
 
 console.log('V8.0 FS1 mutants: PASS');

@@ -45,12 +45,24 @@
       "pack": "./assets/appearances/player-orange/appearance.json",
       "parts": {
         "head": {
-          "front": "#1F2937",
-          "right": "#FFC4A3",
-          "back": "#F97316",
-          "left": "#FFC4A3",
+          "front": "assets/appearances/player-orange/head.front.png",
+          "right": "assets/appearances/player-orange/head.right.png",
+          "back": "assets/appearances/player-orange/head.back.png",
+          "left": "assets/appearances/player-orange/head.left.png",
+          "top": "assets/appearances/player-orange/head.top.png",
+          "bottom": "assets/appearances/player-orange/head.bottom.png",
           "topColor": "#F97316",
           "bottomColor": "#FFC4A3"
+        },
+        "torso": {
+          "front": "assets/appearances/player-orange/torso.front.png",
+          "right": "assets/appearances/player-orange/torso.right.png",
+          "back": "assets/appearances/player-orange/torso.back.png",
+          "left": "assets/appearances/player-orange/torso.left.png",
+          "top": "assets/appearances/player-orange/torso.top.png",
+          "bottom": "assets/appearances/player-orange/torso.bottom.png",
+          "topColor": "#20324A",
+          "bottomColor": "#0F172A"
         }
       }
     },
@@ -61,12 +73,24 @@
       "pack": "./assets/appearances/keeper-green/appearance.json",
       "parts": {
         "head": {
-          "front": "#15803D",
-          "right": "#F0C8A0",
-          "back": "#FACC15",
-          "left": "#F0C8A0",
+          "front": "assets/appearances/keeper-green/head.front.png",
+          "right": "assets/appearances/keeper-green/head.right.png",
+          "back": "assets/appearances/keeper-green/head.back.png",
+          "left": "assets/appearances/keeper-green/head.left.png",
+          "top": "assets/appearances/keeper-green/head.top.png",
+          "bottom": "assets/appearances/keeper-green/head.bottom.png",
           "topColor": "#FACC15",
           "bottomColor": "#F0C8A0"
+        },
+        "torso": {
+          "front": "assets/appearances/keeper-green/torso.front.png",
+          "right": "assets/appearances/keeper-green/torso.right.png",
+          "back": "assets/appearances/keeper-green/torso.back.png",
+          "left": "assets/appearances/keeper-green/torso.left.png",
+          "top": "assets/appearances/keeper-green/torso.top.png",
+          "bottom": "assets/appearances/keeper-green/torso.bottom.png",
+          "topColor": "#15803D",
+          "bottomColor": "#3F3F46"
         }
       }
     }
