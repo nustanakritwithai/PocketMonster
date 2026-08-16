@@ -1098,6 +1098,287 @@ Incubator: (5.2, 0, 8.2)
 
 Blocky ช่วย: ลด triangle 94% → render เร็วขึ้น → เหลือเวลาสำหรับ AI/effect
 
+### 3.11 โครงสร้าง Mesh Hierarchy (Mesh Tree)
+
+แต่ละ decoration มีโครงสร้างภายในที่ซ้อนกัน:
+
+```
+หิน (Rock) — Group
+├── main: Mesh
+│   ├── geometry: BoxGeometry(s, s*0.8, s*0.9) [cached]
+│   ├── material: MeshStandardMaterial [cached by color]
+│   ├── position: (0, s*0.4, 0)
+│   ├── scale: (1, 1.28, 1.08)
+│   ├── rotation: Y = deterministic + random
+│   └── castShadow: true
+├── side: Mesh
+│   ├── geometry: BoxGeometry(s*0.5, s*0.4, s*0.5) [cached]
+│   ├── material: แชร์กับ main [same cache entry]
+│   ├── position: (s*0.55, s*0.2, s*0.18)
+│   └── castShadow: true
+└── pebble: Mesh
+    ├── geometry: BoxGeometry(s*0.25, s*0.2, s*0.25) [cached]
+    ├── material: MeshStandardMaterial (rough=0.99) [cached]
+    ├── position: (-s*0.48, s*0.1, -s*0.22)
+    └── castShadow: true
+
+ต้นไม้ (Tree) — Group
+├── bole: Mesh (ต้น)
+│   ├── geometry: BoxGeometry(0.22*s, 1.55*s, 0.22*s) [cached per scale]
+│   ├── material: MeshStandardMaterial(trunk) [cached by color]
+│   ├── map: barkTexture [cached by trunk color]
+│   └── castShadow: true
+├── mid: Mesh (พุ่มล่าง)
+│   ├── geometry: BoxGeometry(1.05*s, 1.0*s, 1.05*s) [cached per scale]
+│   ├── material: MeshStandardMaterial(leaf) [cached by color]
+│   ├── map: leafTexture [cached by leaf color]
+│   ├── scale: (0.9+rand, 1, 0.9+rand) — ไม่สมมาตร
+│   └── castShadow: true
+├── top: Mesh (พุ่มบน)
+│   ├── geometry: BoxGeometry(0.72*s, 0.7*s, 0.72*s) [cached per scale]
+│   ├── material: mat(leaf, rough=0.7) [cached — เรียบกว่า mid]
+│   └── castShadow: true
+└── fruit×0-3: Mesh (ผลไม้)
+    ├── geometry: BoxGeometry(0.1*s, 0.1*s, 0.1*s) [cached]
+    ├── material: MeshStandardMaterial(fruit, emissive) [cached]
+    └── castShadow: true
+
+Incubator — Group
+├── baseInc: Mesh
+│   ├── geometry: BoxGeometry(0.9, 0.35, 0.9) [cached]
+│   ├── material: MeshStandardMaterial(0x6d28d9) [cached]
+│   └── castShadow: true
+└── eggVisual: Mesh
+    ├── geometry: BoxGeometry(0.5, 0.65, 0.45) [cached]
+    ├── material: MeshStandardMaterial(0xfde68a, emissive) [cached]
+    ├── scale: (1, 1.28, 1)
+    └── castShadow: true
+```
+
+### 3.12 โครงสร้าง Material Pipeline
+
+วิธีที่ material ถูกสร้าง แคช และใช้ซ้ำ:
+
+```
+สร้าง Material
+    │
+    ├─ mat(color, rough, metal)
+    │   └─ key = `${color}:${rough}:${metal}`
+    │   └─ ถ้า cache มี → คืน cache
+    │   └─ ถ้าไม่มี → new MeshStandardMaterial → cache → คืน
+    │
+    ├─ mat(color, rough, metal, texture)
+    │   └─ key = `tex:${color}:${texture.uuid}`
+    │   └─ ถ้า cache มี → คืน cache
+    │   └─ ถ้าไม่มี → new MeshStandardMaterial({map:texture}) → cache → คืน
+    │
+    └─ MeshBasicMaterial (แท่น/VFX)
+        └─ key = `basic:${color}:${opacity}`
+        └─ ถ้า cache มี → คืน cache
+        └─ ถ้าไม่มี → new → cache → คืน
+
+การแชร์:
+  หิน 6 ก้อน สีเดียวกัน → 1 material (แชร์)
+  ต้นไม้ 6 ต้น ใบสีเดียวกัน → 1 material (แชร์)
+  แต่ถ้าสีต่างกัน ±10% → material ต่างกัน (ไม่แชร่)
+  → สุ่ม ±10% ทำให้ material เพิ่ม ~2-3 entries ต่อ type
+```
+
+### 3.13 โครงสร้าง Texture Pipeline
+
+วิธีที่ texture ถูกสร้าง แคช และใช้:
+
+```
+Ground Texture
+    │
+    ├─ makeGroundTexture(zoneColor, zoneType)
+    │   ├─ key = zoneColor + ':' + zoneType
+    │   ├─ ถ้า cache มี → คืน cache
+    │   ├─ ถ้าไม่มี:
+    │   │   ├─ Canvas 128×128
+    │   │   ├─ พื้นหลัง: zoneColor
+    │   │   ├─ Grid ชั้น 1: 16px สีดำโปร่งใส 10%
+    │   │   ├─ Grid ชั้น 2: 64px สีดำโปร่งใส 6% (ใหญ่กว่า)
+    │   │   ├─ Noise: จุดขาว 40 จุด
+    │   │   ├─ Zone-specific:
+    │   │   │   ├─ cave: จุดดำ 20 จุด (หิน)
+    │   │   │   └─ grass: จุดเขียวเข้ม 30 จุด (หญ้า)
+    │   │   ├─ CanvasTexture → cache → คืน
+    │   │   └─ repeat: (20, 20) — กระเบืดีเล็ก
+    │   └─ Dispose: ตอนเปลี่ยน zone (ไม่ใช้แล้ว)
+
+Decoration Texture
+    │
+    ├─ makeRockTexture(tone)
+    │   ├─ key = tone
+    │   ├─ Canvas 64×64
+    │   ├─ พื้นหลัง: tone
+    │   ├─ รอยร้าว: เส้นดำ 4 เส้น
+    │   ├─ จุดดำ: 8 จุด
+    │   └─ cache → คืน (ใช้ซ้ำทุกหินสีเดียวกัน)
+    │
+    ├─ makeBarkTexture(trunkColor)
+    │   ├─ key = trunkColor
+    │   ├─ Canvas 32×64
+    │   ├─ พื้นหลัง: trunkColor
+    │   ├─ ลายเปลือก: เส้นดำแนวตั้ง 4 เส้น
+    │   └─ cache → คืน
+    │
+    └─ makeLeafTexture(leafColor)
+        ├─ key = leafColor
+        ├─ Canvas 64×64
+        ├─ พื้นหลัง: leafColor
+        ├─ จุดใบ: 15 จุดดำ
+        ├─ จุดสว่าง: 10 จุดขาว
+        └─ cache → คืน
+
+Sky Texture
+    │
+    └─ makeSkyTexture(zoneColor)
+        ├─ key = zoneColor
+        ├─ Canvas 2×128 (เล็กมาก)
+        ├─ Gradient:
+        │   ├─ hub/grassland: สีเข้มบน → สีสว่างล่าง
+        │   └─ cave: ดำบน → เทาล่าง (3 stops)
+        └─ cache → คืน
+```
+
+### 3.14 โครงสร้าง Render Pipeline
+
+ลำดับการ render ในแต่ละ frame:
+
+```
+requestAnimationFrame(loop)
+    │
+    ├─ 1. Update dt (delta time)
+    │
+    ├─ 2. Update input
+    │   ├─ joystick / keys / touch
+    │   └─ player movement
+    │
+    ├─ 3. Update game logic
+    │   ├─ updatePlayer(dt)
+    │   ├─ updateWilds(dt) — distance tick scheduler
+    │   ├─ updateOwned(dt) — active summon AI
+    │   ├─ updateProjectiles(dt)
+    │   ├─ updateEffects(dt) — sparks + rings
+    │   ├─ updateGroundDecals(dt)
+    │   ├─ updateFloatingTexts(dt)
+    │   ├─ updateRanchVisuals(dt)
+    │   ├─ updateNpcUI()
+    │   └─ applyLifeSimulation() — if manager open
+    │
+    ├─ 4. Update camera
+    │   ├─ updateCamera(dt) — lerp follow + shake
+    │   └─ updateWorldLabels() — position labels
+    │
+    ├─ 5. Update animations
+    │   ├─ animateHumanoid(player, dt, moving)
+    │   ├─ animateHumanoid(npc, dt, false)
+    │   └─ animateMonster(mesh, dt, moving) — per wild + ranch
+    │
+    ├─ 6. Render
+    │   ├─ renderer.render(scene, camera)
+    │   ├─ Three.js pipeline:
+    │   │   ├─ Frustum cull (ไม่ render ของนอกจอ)
+    │   │   ├─ Opaque pass (ground + decorations + structures)
+    │   │   ├─ Transparent pass (VFX + pads)
+    │   │   └─ Shadow pass (ถ้า shadows enabled)
+    │   └─ ผลลัพธ์: canvas แสดงบนจอ
+    │
+    └─ 7. managerDirty check — re-render UI ถ้าจำเป็น
+```
+
+### 3.15 โครงสร้าง Event System (ในแผนที่)
+
+เหตุการณ์ที่เกิดบนแผนที่และการตอบสนอง:
+
+```
+เหตุการณ์                    → การตอบสนองของแผนที่
+────────────────────────    ────────────────────────────
+ผู้เล่นเดิน                   → grid texture เลื่อน (visual cue)
+ผู้เล่นปาเรียกมอน             → projectile บิน → spawnOwned → mesh + shadow
+มอนโจมตี (useSkill)          → spawnElementalFX → spawnGroundDecal (box)
+มอนถูกตี (damageWild)        → spawnDamageNumber → spawnRingPulse (box wireframe)
+มอนปราบ (defeatWild)        → removeAndDispose mesh → spawnRingPulse → respawn
+ผู้เล่นจับมอน (captureThrow)  → captureAim → projectile → spawnRingPulse → success/fail
+มอน Faint (faintActive)     → spawnBurst → removeAndDispose → summonCooldown
+ผู้เล่นเปลี่ยน zone           → clearDecorations → populateWorld → setZoneGround
+มอนเข้าลาน (toggleRanchActive)→ syncRanchVisuals → monsterMesh → setupMonsterMotion
+เปิด Manager                 → applyLifeSimulation → renderManager (ไม่เกี่ยวแผนที่)
+ฟักไข่ (hatchEgg)            → makeChild → monsterMesh → scene.add
+Evolution (evolveMonster)    → refreshStats → syncRanchVisuals (เปลี่ยนรูป)
+Raising Event                → showEventPopup (ไม่เกี่ยวแผนที่โดยตรง)
+```
+
+### 3.16 โครงสร้างWild Monster Spawn
+
+```
+ZONES[zone].spawn  — array ของ [speciesId, x, z, level, opts]
+    │
+    ├─ populateWorld สร้าง decorations
+    ├─ แล้วสร้าง wild monsters:
+    │   for (const [spId, x, z, level, opts] of ZONES[zone].spawn) {
+    │     const sp = spById[spId];
+    │     const wild = createWild(sp, x, z, level, opts);
+    │     wilds.push(wild);
+    │   }
+    │
+    ├─ createWild:
+    │   ├─ สร้าง mesh: monsterMesh(sp, false, renderInst, elite, boss)
+    │   ├─ ตั้ง position: (x, 0, z)
+    │   ├─ ตั้ง userData: worldRole='wild', speciesId, level, hp, etc.
+    │   ├─ home position: จุดเกิด (สำหรับ leash)
+    │   ├─ respawn timer
+    │   └─ scene.add(mesh)
+    │
+    └─ ตอนเปลี่ยน zone:
+        ├─ ลบ wilds เก่า: removeAndDispose ทุกตัว
+        ├─ สร้าง wilds ใหม่จาก ZONES[zone].spawn
+        └─ wilds = []
+```
+
+### 3.17 โครงสร้าง Ranch Visuals
+
+```
+state.ranchActive — array ของ instanceId (สูงสุด 6)
+    │
+    ├─ syncRanchVisuals():
+    │   ├─ ลบ ranchVisuals เก่าทั้งหมด
+    │   ├─ กรองเฉพาะที่ยังใน storage
+    │   ├─ จำกัด 6 ตัว
+    │   ├─ สำหรับแต่ละตัว:
+    │   │   ├─ สร้าง mesh: monsterMesh(sp, true, inst) — Bighead
+    │   │   ├─ ตั้ง position: วงกลมรอบ ranchCenter (7,0,3) รัศมี 1.8
+    │   │   ├─ ตั้ง userData: worldRole='ranchVisual'
+    │   │   ├─ setupMonsterMotion(mesh, sp, inst)
+    │   │   └─ ranchVisuals.set(id, {mesh, phase, home})
+    │   └─ scene.add ทุก mesh
+    │
+    ├─ updateRanchVisuals(dt):
+    │   ├─ แต่ละมอนเดินวนเป็นวงกลม
+    │   ├─ phase += dt * 0.55
+    │   ├─ position = home + cos/sin * radius
+    │   └─ animateMonster(mesh, dt, moving)
+    │
+    └─ ตอนเปลี่ยน zone:
+        └─ syncRanchVisuals() — สร้างใหม่ถ้าเข้า hub
+```
+
+### 3.18 โครงสร้าง Hub Visibility
+
+```
+setHubVisibility(on):
+    ├─ npc.visible = on            — ซ่อน/แสดง NPC
+    ├─ ranchPad.disk.visible = on  — ซ่อน/แสดงแท่น Ranch
+    ├─ breedingPad.disk.visible = on — ซ่อน/แสดงแท่น Breeding
+    └─ incubator.visible = on      — ซ่อน/แสดง Incubator
+
+เรียกเมื่อ: เปลี่ยน zone
+  hub → on=true (แสดงทุกอย่าง)
+  grassland/cave → on=false (ซ่อน ไม่มีใน zone อื่น)
+```
+
 
 | ชิ้น | Legacy triangles | Blocky triangles | ลดลง |
 |-----|------------------|------------------|------|
