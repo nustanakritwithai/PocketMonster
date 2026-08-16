@@ -39,6 +39,7 @@ import {
   isBigheadMonsterRoot,
   markRingScale,
 } from './asset-presentation/monster-mark.mjs';
+import { paintGroundGrid, paintSkyGradient } from './asset-presentation/blocky-ground.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -193,7 +194,42 @@ function effectLabel(mult){ if(mult===0)return ['ไม่มีผล','none'];
 
 // ---------- Scene ----------
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x65c9f5);
+const groundTexCache=new Map();
+const skyTexCache=new Map();
+function canvasTexFromRgba(img){
+  const canvas=document.createElement('canvas');
+  canvas.width=img.width; canvas.height=img.height;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const data=ctx.createImageData(img.width,img.height);
+  data.data.set(img.rgba);
+  ctx.putImageData(data,0,0);
+  const tex=new THREE.CanvasTexture(canvas);
+  tex.magFilter=THREE.NearestFilter;
+  tex.minFilter=THREE.NearestFilter;
+  tex.generateMipmaps=false;
+  tex.needsUpdate=true;
+  if(THREE.SRGBColorSpace) tex.colorSpace=THREE.SRGBColorSpace;
+  return tex;
+}
+function makeGroundTexture(zoneColor, zoneType='grass'){
+  const key=zoneColor+':'+zoneType;
+  if(groundTexCache.has(key)) return groundTexCache.get(key);
+  const tex=canvasTexFromRgba(paintGroundGrid(zoneColor, zoneType));
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(20,20);
+  groundTexCache.set(key,tex);
+  return tex;
+}
+function makeSkyTexture(zoneColor){
+  if(skyTexCache.has(zoneColor)) return skyTexCache.get(zoneColor);
+  const tex=canvasTexFromRgba(paintSkyGradient(zoneColor));
+  tex.magFilter=THREE.LinearFilter;
+  tex.minFilter=THREE.LinearFilter;
+  tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+  skyTexCache.set(zoneColor,tex);
+  return tex;
+}
+scene.background=makeSkyTexture(0x72c7ef);
 scene.fog=new THREE.Fog(0x65c9f5,30,76);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,130);
 const renderer=new THREE.WebGLRenderer({antialias:qualityProfile.antialias,powerPreference:'high-performance'});
@@ -202,53 +238,66 @@ renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=qualityProfile.shadows;
 el('game').appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xffffff,0x42643d,1.55));
-const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows; scene.add(sun);
-const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({color:0x59cd61,roughness:1}));
+const hemi=new THREE.HemisphereLight(0xffffff,0x42643d,1.55); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows;
+if(qualityProfile.shadows){
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.camera.near=.5; sun.shadow.camera.far=64;
+  sun.shadow.camera.left=-28; sun.shadow.camera.right=28;
+  sun.shadow.camera.top=28; sun.shadow.camera.bottom=-28;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+}
+scene.add(sun);
+const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({map:makeGroundTexture(0x62c96b,'grass'),color:0xffffff,roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
 const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.add(decorations);
-function addDeco(mesh){ mesh.castShadow=true; mesh.receiveShadow=true; decorations.add(mesh); return mesh; }
+function addDeco(mesh){
+  mesh.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
+  decorations.add(mesh); return mesh;
+}
 function makeRock(x,z,s=1,tone=0x945a38){
   const cluster=new THREE.Group();
-  const main=new THREE.Mesh(dodecahedronGeometry(s,0),mat(tone,.95,.04));
-  main.position.y=s*.62; main.scale.set(1,1.28,1.08); cluster.add(main);
-  const side=new THREE.Mesh(dodecahedronGeometry(s*.55,0),mat(tone,.98,.02));
-  side.position.set(s*.55,s*.32,s*.18); side.scale.set(1.1,.8,1); cluster.add(side);
-  const pebble=new THREE.Mesh(dodecahedronGeometry(s*.28,0),mat(tone,.99,0));
-  pebble.position.set(-s*.48,s*.18,-s*.22); cluster.add(pebble);
+  const main=new THREE.Mesh(boxGeometry(s,s*.8,s*.9),mat(tone,.95,.04));
+  main.position.y=s*.4; main.scale.set(1,1.28,1.08); cluster.add(main);
+  const side=new THREE.Mesh(boxGeometry(s*.5,s*.4,s*.5),mat(tone,.98,.02));
+  side.position.set(s*.55,s*.2,s*.18); side.scale.set(1.1,.8,1); cluster.add(side);
+  const pebble=new THREE.Mesh(boxGeometry(s*.25,s*.2,s*.25),mat(tone,.99,0));
+  pebble.position.set(-s*.48,s*.1,-s*.22); cluster.add(pebble);
   cluster.position.set(x,0,z); cluster.rotation.y=(x*1.7+z)*.15; addDeco(cluster); return cluster;
 }
 function makeTree(x,z,s=1,{trunk=0x754428,leaf=0x18753a,fruit=null}={}){
   const g=new THREE.Group();
-  const bole=new THREE.Mesh(cylinderGeometry(.16*s,.28*s,1.55*s,8),mat(trunk,.88,.02));
+  const bole=new THREE.Mesh(boxGeometry(.22*s,1.55*s,.22*s),mat(trunk,.88,.02));
   bole.position.y=.78*s; g.add(bole);
-  const mid=new THREE.Mesh(coneGeometry(1.05*s,1.55*s,8),mat(leaf,.78,.03));
-  mid.position.y=1.85*s; g.add(mid);
-  const top=new THREE.Mesh(coneGeometry(.72*s,1.15*s,8),mat(leaf,.7,.04));
-  top.position.y=2.55*s; g.add(top);
+  const mid=new THREE.Mesh(boxGeometry(1.05*s,1*s,1.05*s),mat(leaf,.78,.03));
+  mid.position.y=1.65*s; g.add(mid);
+  const top=new THREE.Mesh(boxGeometry(.72*s,.7*s,.72*s),mat(leaf,.7,.04));
+  top.position.y=2.35*s; g.add(top);
   if(fruit){
-    for(const [fx,fy,fz] of [[.35,1.7,.2],[-.28,1.9,-.15],[.1,2.15,.32]]){
-      const berry=new THREE.Mesh(sphereGeometry(.07*s,8,6),mat(fruit,.55,.08));
+    for(const [fx,fy,fz] of [[.35,1.5,.2],[-.28,1.7,-.15],[.1,1.95,.32]]){
+      const berry=new THREE.Mesh(boxGeometry(.1*s,.1*s,.1*s),glowMat(fruit,fruit,.06,.55,.08));
       berry.position.set(fx*s,fy*s,fz*s); g.add(berry);
     }
   }
-  g.position.set(x,0,z); addDeco(g); return g;
+  g.position.set(x,0,z); g.rotation.y=(x*1.3+z)*.08; addDeco(g); return g;
 }
 function makeGrassTuft(x,z,s=1,color=0x3f9d4a){
   const g=new THREE.Group();
   for(const [dx,h,tilt] of [[-.06,.28,.18],[.05,.34,-.12],[0,.22,.04]]){
-    const blade=new THREE.Mesh(coneGeometry(.035*s,h*s,4),mat(color,.86,0));
+    const blade=new THREE.Mesh(boxGeometry(.05*s,h*s,.05*s),mat(color,.86,0));
     blade.position.set(dx*s,h*.5*s,0); blade.rotation.z=tilt; g.add(blade);
   }
   g.position.set(x,0,z); addDeco(g); return g;
 }
 function makeStalagmite(x,z,s=1){
   const g=new THREE.Group();
-  const base=new THREE.Mesh(coneGeometry(.42*s,.95*s,7),mat(0x64748b,.92,.08));
-  base.position.y=.42*s; g.add(base);
-  const tip=new THREE.Mesh(coneGeometry(.16*s,.7*s,6),mat(0x94a3b8,.78,.12));
-  tip.position.y=1.05*s; g.add(tip);
+  const base=new THREE.Mesh(boxGeometry(.6*s,.5*s,.6*s),mat(0x64748b,.92,.08));
+  base.position.y=.25*s; g.add(base);
+  const mid=new THREE.Mesh(boxGeometry(.35*s,.5*s,.35*s),mat(0x94a3b8,.85,.1));
+  mid.position.y=.75*s; g.add(mid);
+  const tip=new THREE.Mesh(boxGeometry(.15*s,.4*s,.15*s),glowMat(0x94a3b8,0x4a90d9,.04,.78,.12));
+  tip.position.y=1.2*s; g.add(tip);
   g.position.set(x,0,z); addDeco(g); return g;
 }
 function makeFencePost(x,z){
@@ -257,11 +306,11 @@ function makeFencePost(x,z){
 }
 function makeFlower(x,z,color=0xf472b6){
   const g=new THREE.Group();
-  const stem=new THREE.Mesh(cylinderGeometry(.018,.02,.22,5),mat(0x4ade80,.8,0));
+  const stem=new THREE.Mesh(boxGeometry(.03,.22,.03),mat(0x4ade80,.8,0));
   stem.position.y=.11; g.add(stem);
-  const bloom=new THREE.Mesh(sphereGeometry(.07,8,6),mat(color,.5,.04));
+  const bloom=new THREE.Mesh(boxGeometry(.12,.1,.12),glowMat(color,color,.08,.5,.04));
   bloom.position.y=.24; g.add(bloom);
-  g.position.set(x,0,z); addDeco(g); return g;
+  g.position.set(x,0,z); g.rotation.y=(x*2.1+z)*.31; addDeco(g); return g;
 }
 function clearDecorations(){
   while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
@@ -288,16 +337,27 @@ function populateWorld(zone='hub'){
   }
 }
 populateWorld('hub');
-function makePad(x,z,r,color,opacity=.2){
-  const disk=new THREE.Mesh(circleGeometry(r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide})); disk.rotation.x=-Math.PI/2; disk.position.set(x,.025,z); scene.add(disk);
-  const ring=new THREE.Mesh(ringGeometry(r-.12,r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.copy(disk.position); scene.add(ring); return {disk,ring};
+function makePad(x,z,halfSize,color,opacity=.2){
+  const disk=new THREE.Mesh(boxGeometry(halfSize*2,.02,halfSize*2),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide}));
+  disk.position.set(x,.025,z); scene.add(disk);
+  const ring=new THREE.Group(); ring.position.set(x,0,z);
+  const edgeMat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85});
+  for(const [w,d,ox,oz] of [[halfSize*2,.04,0,-halfSize],[halfSize*2,.04,0,halfSize],[.04,halfSize*2,-halfSize,0],[.04,halfSize*2,halfSize,0]]){
+    const edge=new THREE.Mesh(boxGeometry(w,.04,d),edgeMat);
+    edge.position.set(ox,.03,oz); ring.add(edge);
+  }
+  for(const [ex,ez] of [[-halfSize,-halfSize],[halfSize,-halfSize],[-halfSize,halfSize],[halfSize,halfSize]]){
+    const post=new THREE.Mesh(boxGeometry(.08,.08,.08),edgeMat);
+    post.position.set(ex,.04,ez); ring.add(post);
+  }
+  scene.add(ring); return {disk,ring};
 }
 const ranchCenter=new THREE.Vector3(7,0,3);
-const ranchPad=makePad(7,3,3.4,0x22c55e,.17);
+const ranchPad=makePad(7,3,3.4,0x22c55e,.42);
 const breedingPad=makePad(5.2,8.2,1.6,0xec4899,.15);
 const incubator=new THREE.Group();
-const baseInc=new THREE.Mesh(cylinderGeometry(.62,.75,.35,16),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; incubator.add(baseInc);
-const eggVisual=new THREE.Mesh(sphereGeometry(.34,18,14),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.12})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; incubator.add(eggVisual);
+const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
+const eggVisual=new THREE.Mesh(boxGeometry(.5,.65,.45),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.15})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; eggVisual.castShadow=true; incubator.add(eggVisual);
 incubator.position.set(5.2,0,8.2); scene.add(incubator);
 
 // ---------- Monster species, skills, evolution ----------
@@ -500,6 +560,10 @@ function ensureInstanceShape(inst){
 function mat(color,rough=.72,metal=.08){
   const key=`standard:${color}:${rough}:${metal}`;
   return sharedResources.material(key,()=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal}));
+}
+function glowMat(color,emissive,intensity,rough=.5,metal=0){
+  const key=`glow:${color}:${emissive}:${intensity}:${rough}:${metal}`;
+  return sharedResources.material(key,()=>new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:intensity,roughness:rough,metalness:metal}));
 }
 function basicMat(color){return sharedResources.material(`basic:${color}`,()=>new THREE.MeshBasicMaterial({color}));}
 function orb(color,r=0.1,seg=10){ return new THREE.Mesh(sphereGeometry(r,seg,seg),mat(color,.58,.12)); }
@@ -1168,7 +1232,11 @@ function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
     effects.push({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true});
   }
 }
-function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){ const mesh=new THREE.Mesh(torusGeometry(scale,.03,8,28),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9})); mesh.rotation.x=Math.PI/2; mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'}); }
+function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){
+  const size=scale*1.2;
+  const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
+  mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'});
+}
 function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); } e.mesh.material.opacity=Math.max(0,t*.9); if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
@@ -1335,20 +1403,20 @@ function updateFloatingTexts(dt){
 }
 function spawnGroundDecal(type,pos,{radius=1.1,duration=1.25,intensity=1}={}){
   if(!pos)return;
-  const cfg=typeFx(type),group=new THREE.Group();
-  const disc=new THREE.Mesh(circleGeometry(radius,36),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.13*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  disc.rotation.x=-Math.PI/2; disc.position.y=.032; group.add(disc);
-  const ring=new THREE.Mesh(ringGeometry(radius*.64,radius*.78,40),new THREE.MeshBasicMaterial({color:cfg.accent,transparent:true,opacity:0.42*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  ring.rotation.x=-Math.PI/2; ring.position.y=.038; group.add(ring);
-  const inner=new THREE.Mesh(ringGeometry(radius*.18,radius*.24,28),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.48*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  inner.rotation.x=-Math.PI/2; inner.position.y=.041; group.add(inner);
+  const cfg=typeFx(type),group=new THREE.Group(),size=radius*1.4;
+  const disc=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.13*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+  disc.position.y=.032; group.add(disc);
+  const ring=new THREE.Mesh(boxGeometry(size*.78,.02,size*.78),new THREE.MeshBasicMaterial({color:cfg.accent,transparent:true,opacity:0.42*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,wireframe:true}));
+  ring.position.y=.038; group.add(ring);
+  const inner=new THREE.Mesh(boxGeometry(size*.24,.02,size*.24),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.48*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,wireframe:true}));
+  inner.position.y=.041; group.add(inner);
   group.position.set(pos.x,0,pos.z); scene.add(group);
   groundDecals.push({group,disc,ring,inner,life:duration,maxLife:duration,type,spin:(Math.random()<.5?-1:1)*(.3+Math.random()*.25)});
 }
 function updateGroundDecals(dt){
   for(let i=groundDecals.length-1;i>=0;i--){
     const d=groundDecals[i]; d.life-=dt; const t=Math.max(0,d.life/d.maxLife);
-    d.ring.rotation.z+=dt*d.spin; d.inner.rotation.z-=dt*d.spin*1.4;
+    d.ring.rotation.y+=dt*d.spin; d.inner.rotation.y-=dt*d.spin*1.4;
     d.group.scale.setScalar(1+(1-t)*.12);
     d.disc.material.opacity=.13*t; d.ring.material.opacity=.42*t; d.inner.material.opacity=.48*t;
     if(d.life<=0){removeAndDispose(scene, d.group);groundDecals.splice(i,1);}
@@ -1554,6 +1622,34 @@ const ZONES={
     ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
   ]}
 };
+function setZoneLighting(zone){
+  if(zone==='cave'){
+    hemi.intensity=0.6;
+    sun.intensity=0.8;
+    sun.color.setHex(0xb0c4de);
+  }else if(zone==='grassland'){
+    hemi.intensity=1.55;
+    sun.intensity=2.15;
+    sun.color.setHex(0xffffff);
+  }else{
+    hemi.intensity=1.55;
+    sun.intensity=2.15;
+    sun.color.setHex(0xfff4e0);
+  }
+}
+function setZoneGround(zone){
+  const z=ZONES[zone];
+  if(!z)return;
+  const type=zone==='cave'?'cave':'grass';
+  ground.material.map=makeGroundTexture(z.ground,type);
+  ground.material.color.setHex(0xffffff);
+  ground.material.needsUpdate=true;
+  scene.background=makeSkyTexture(z.bg);
+  scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
+  scene.fog.near=zone==='cave'?15:30;
+  scene.fog.far=zone==='cave'?50:76;
+  setZoneLighting(zone);
+}
 function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp.elite,evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
   mesh.position.set(x,0,z);
@@ -1652,9 +1748,7 @@ function switchZone(zone,silent=false){
   el('monsterManager').classList.add('hidden');
   state.currentZone=zone;
   const cfg=ZONES[zone];
-  scene.background.setHex(cfg.bg);
-  scene.fog.color.setHex(cfg.bg);
-  ground.material.color.setHex(cfg.ground);
+  setZoneGround(zone);
   populateWorld(zone);
   player.position.set(0,0,5);
   playerData.hp=Math.max(1,playerData.hp);
@@ -2808,8 +2902,8 @@ function loop(now){
       const aiDt=distanceTickScheduler.advance(w.id,distance,dt,engagedWildIds.has(w.id));
       if(aiDt>0)updateWild(w,aiDt,engagedWildIds.has(w.id));
     }
-    ranchPad.ring.rotation.z+=dt*.2;
-    breedingPad.ring.rotation.z-=dt*.16;
+    ranchPad.ring.rotation.y+=dt*.2;
+    breedingPad.ring.rotation.y-=dt*.16;
     incubator.rotation.y+=dt*.12;
     targetTick-=dt;
     lifeTick-=dt;

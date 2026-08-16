@@ -67,3 +67,12 @@ export {
   getMonsterFourSideTexture,
   paintMonsterFace,
 } from './monster-texture.mjs';
+export {
+  GROUND_REPEAT,
+  GROUND_TILE,
+  SKY_HEIGHT,
+  SKY_WIDTH,
+  paintGroundGrid,
+  paintSkyGradient,
+  skyStopsFor,
+} from './blocky-ground.mjs';
