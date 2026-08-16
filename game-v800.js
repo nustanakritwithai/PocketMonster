@@ -1526,7 +1526,7 @@ function defeatWild(w){
   const tier=getEnemyTier(w);
   const enemy={level:w.level,tier};
   const events=battleEventLog.splice(0); // consume events for this encounter
-  let monGain=0,ups=0,trainSummary='';
+  let monGain=0,ups=0,trainSummary='',partyShareLine='';
   if(activeSummon){
     const inst=activeSummon.inst;
     // Ensure inst has V7.2 schema fields for applyBattleGrowth
@@ -1541,9 +1541,18 @@ function defeatWild(w){
     // Party share growth (non-active members get 35% of active's growth EXP)
     const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
     for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;addGrowthExp(pm,share);}}}
+    const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
+    if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':'';
-  msg(`${tag}${wildDisplayName(w)} ถูกปราบ +${12*w.level} EXP${activeSummon?` • ${displayName(activeSummon.inst)} +${monGain} EXP${ups?` • Level Up +${ups}`:''}${trainSummary}`:''}`);
+  let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${12*w.level} Player EXP`;
+  if(activeSummon){
+    battleMsg+=`\n  ${displayName(activeSummon.inst)}: +${monGain} Growth EXP`;
+    if(ups)battleMsg+=` • Lv.Up +${ups}!`;
+    if(trainSummary)battleMsg+=trainSummary;
+    if(partyShareLine)battleMsg+=partyShareLine;
+  }
+  msg(battleMsg);
   renderAll();
   saveGame(false);
   respawnWild(w,w.boss?BALANCE.bossRespawnMs:BALANCE.wildRespawnMs);
@@ -1695,7 +1704,7 @@ function useSkill(index){
     a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
     const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
     if(sExp>0){const sResult=addSkillExp(a.inst,move.name,sExp);
-      if(sResult&&sResult.rankedUp)msg(`★ ${displayName(a.inst)} • ${move.name} mastery → ${sResult.toRank.toUpperCase()}!`);}
+      if(sResult&&sResult.rankedUp)showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);}
   }
   renderParty();renderSkillButtons();
 }
@@ -1889,16 +1898,43 @@ function triggerRaisingEvent(inst){
   const choiceText=choices.map((c,i)=>`${i+1}. ${c.label}`).join(' / ');
   msg(`★ ${displayName(inst)}: ${picked.def.id} — เลือก: ${choiceText}`);
   renderRaisingEventBanner();
+  showEventPopup(inst,picked.def);
+}
+function showEventPopup(inst,eventDef){
+  const popup=el('eventPopup');if(!popup)return;
+  const title=el('eventTitle');
+  if(title)title.textContent=`${displayName(inst)}: ${eventDef.id}`;
+  const choices=el('eventChoices');
+  if(!choices)return;
+  choices.innerHTML='';
+  for(const c of getChoices(eventDef)){
+    const btn=document.createElement('button');
+    btn.textContent=c.label;
+    btn.onclick=()=>resolveRaisingEvent(c.id);
+    choices.appendChild(btn);
+  }
+  popup.classList.remove('hidden');
+}
+function showMasteryPopup(monName,skillName,newRank){
+  const popup=document.createElement('div');
+  popup.className='mastery-popup';
+  popup.innerHTML=`★ ${monName} • ${skillName} → <b>${(MASTERY_TH[newRank]||newRank).toUpperCase()}</b>!`;
+  document.body.appendChild(popup);
+  setTimeout(()=>{
+    popup.classList.add('fade');
+    setTimeout(()=>popup.remove(),500);
+  },3000);
 }
 function resolveRaisingEvent(choiceId){
   if(!pendingEvent)return;
-  const inst=getInst(pendingEvent.instId);if(!inst){pendingEvent=null;return;}
+  const inst=getInst(pendingEvent.instId);if(!inst){pendingEvent=null;el('eventPopup')?.classList.add('hidden');return;}
   syncToBodyMind(inst);
   const result=applyChoice(inst,pendingEvent.eventDef,choiceId,{now:Date.now()});
   syncFromBodyMind(inst);
   if(result.ok){refreshStats(inst,false);msg(`${displayName(inst)} • ${pendingEvent.eventDef.id}:${choiceId}`);}
   pendingEvent=null;
   renderRaisingEventBanner();
+  el('eventPopup')?.classList.add('hidden');
   renderManager();saveGame(false);
 }
 function renderRaisingEventBanner(){
@@ -2324,7 +2360,12 @@ function renderParty(){
       detail.textContent=inst.fainted?'FAINTED':`HP ${fmt(inst.hp)}/${inst.maxHp}`;
       stateLabel.className='party-state';
       stateLabel.textContent=presentation.stateText;
-      mini.append(name,hp,detail,stateLabel);
+      syncToBodyMind(inst);
+      const cond=deriveCondition(inst)||'normal';
+      const condDot=document.createElement('span');
+      condDot.className='party-cond-dot '+cond;
+      condDot.title='สภาพ: '+cond;
+      mini.append(name,hp,detail,stateLabel,condDot);
       button.append(portrait,mini);
     }else{
       const portrait=document.createElement('span'),mini=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),stateLabel=document.createElement('span');
