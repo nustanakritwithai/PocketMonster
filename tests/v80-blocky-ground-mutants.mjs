@@ -40,7 +40,7 @@ assert.match(
   /\[\[-8,-4,1\.1\],\[6,-9,1\.3\],\[-12,9,1\.4\],\[11,8,1\.2\],\[0,-12,1\.6\],\[15,-2,1\],\[-6,12,1\.25\]\]/,
   'mutant 9: cave stalagmite coordinates stay',
 );
-assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.28\)/, 'mutant 10: ranch pad stays at (7,3) size 3.4');
+assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'mutant 10: ranch pad stays at (7,3) size 3.4');
 assert.match(js, /incubator\.position\.set\(5\.2,0,8\.2\)/, 'mutant 11: incubator stays at the breeding pad');
 assert.doesNotMatch(js, /ground\.material\.map\.dispose\(\)/, 'mutant 12: cached ground textures are shared, not disposed');
 assert.doesNotMatch(painterSrc, /zoneColor\s*\+\s*0x404040/, 'mutant 13: sky bottoms do not overflow per-channel');

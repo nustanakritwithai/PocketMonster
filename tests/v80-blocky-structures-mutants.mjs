@@ -27,7 +27,7 @@ assert.match(pad, /return \{disk,ring\}/, 'mutant 4: setHubVisibility still rece
 
 const incubatorSrc = js.slice(js.indexOf('const incubator='), js.indexOf('// ---------- Monster species'));
 assert.doesNotMatch(incubatorSrc, /cylinderGeometry|sphereGeometry/, 'mutant 5: incubator must not keep cylinder/sphere parts');
-assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.28\)/, 'mutant 6: ranch pad call stays');
+assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'mutant 6: ranch pad call stays');
 assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'mutant 7: breeding pad call stays');
 assert.match(js, /incubator\.position\.set\(5\.2,0,8\.2\)/, 'mutant 8: incubator world position stays');
 assert.match(extractFn('setHubVisibility'), /ranchPad\.ring\.visible=on/, 'mutant 9: leaving hub still hides the pad frame');

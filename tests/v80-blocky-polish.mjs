@@ -46,7 +46,7 @@ assert.match(js, /renderer\.shadowMap\.enabled=qualityProfile\.shadows/, 'shadow
 assert.match(js, /tier:'medium',maxDpr:1\.25,antialias:true,shadows:false/, 'medium profile keeps shadows off so FPS does not drop');
 assert.match(js, /if\(qualityProfile\.shadows\)/, 'high-tier shadow camera is ready without forcing shadows on medium');
 assert.match(js, /sun\.shadow\.mapSize\.set\(1024,1024\)/, 'shadow map stays 1024 when enabled');
-assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.28\)/, 'ranch pad floor is more visible on green grass');
+assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'ranch pad floor is more visible on green grass');
 assert.match(painterSrc, /strokeGrid\(img, GROUND_GRID, 1, 0\.14\)/, 'fine grid lines are stronger');
 assert.match(painterSrc, /strokeGrid\(img, GROUND_COARSE, 2, 0\.24\)/, 'coarse grid lines are stronger');
 assert.match(tree, /g\.rotation\.y=\(x\*1\.3\+z\)\*\.08/, 'trees get a seeded yaw so they are not identical');

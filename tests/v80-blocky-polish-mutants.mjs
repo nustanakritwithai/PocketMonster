@@ -26,7 +26,7 @@ assert.match(
   /\[\[8,7,1\.35\],\[-11,8,1\.05\],\[16,-10,1\.5\],\[-17,-8,1\.25\],\[3,-19,1\.7\],\[-5,17,1\.15\]\]/,
   'mutant 10: ranch rock coordinates stay',
 );
-assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.28\)/, 'mutant 11: ranch pad world pose stays, only floor opacity was polished');
+assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'mutant 11: ranch pad world pose stays, only floor opacity was polished');
 assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'mutant 12: breeding pad call stays');
 assert.match(js, /incubator\.position\.set\(5\.2,0,8\.2\)/, 'mutant 13: incubator stays on the breeding pad');
 assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/, 'mutant 14: polish does not revert ring pulses');

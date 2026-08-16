@@ -353,7 +353,7 @@ function makePad(x,z,halfSize,color,opacity=.2){
   scene.add(ring); return {disk,ring};
 }
 const ranchCenter=new THREE.Vector3(7,0,3);
-const ranchPad=makePad(7,3,3.4,0x22c55e,.28);
+const ranchPad=makePad(7,3,3.4,0x22c55e,.42);
 const breedingPad=makePad(5.2,8.2,1.6,0xec4899,.15);
 const incubator=new THREE.Group();
 const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
