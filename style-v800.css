@@ -311,3 +311,32 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .skill-req{font-size:9px;color:#fca5a5;margin-top:3px}
 .skill-help{font-size:9px;color:#64748b;margin-top:12px;padding:8px;background:#0b1220;border-radius:8px;line-height:1.5}
 .skill-help b{color:#94a3b8}
+
+/* V8.0 UX Phase 4 — Equipment tab */
+.equipment-panel{padding:4px}
+.equip-summary{background:#0b1220;border:1px solid #ffffff18;border-radius:14px;padding:10px;margin-bottom:12px}
+.equip-summary-stats{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-bottom:8px}
+.equip-summary-stats span{color:#fde68a;font-weight:700}
+.equip-summary-stats span.zero{color:#64748b;font-weight:400}
+.budget-label{font-size:10px;color:#94a3b8;margin-bottom:3px}
+.budget-bar{height:6px;background:#111827;border-radius:999px;overflow:hidden;margin:3px 0}
+.budget-fill{height:100%;transition:width .3s}
+.budget-fill.ok{background:#22c55e}
+.budget-fill.over{background:#ef4444}
+.budget-fill.under{background:#facc15}
+.budget-range{font-size:9px;color:#64748b;margin-top:2px}
+.equip-slot-card{background:#162033;border:1px solid #ffffff14;border-radius:12px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.equip-slot-info{min-width:0;flex:1}
+.equip-slot-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
+.equip-slot-item{font-size:11px;color:#fde68a;font-weight:600}
+.equip-slot-empty{font-size:11px;color:#64748b}
+.equip-slot-desc{font-size:8px;color:#64748b;margin-top:2px}
+.equip-affix{font-size:9px;color:#94a3b8;margin-top:3px}
+.equip-affix .affix-stat{color:#86efac}
+.equip-slot-actions{display:flex;flex-direction:column;gap:4px}
+.equip-btn{border:0;border-radius:10px;padding:8px 14px;font-weight:800;font-size:11px;cursor:pointer;min-height:40px;min-width:50px}
+.equip-btn.equip{background:#0891b2;color:#fff}
+.equip-btn.unequip{background:#991b1b;color:#fff}
+.equip-btn:active{transform:scale(.97)}
+.equip-help{font-size:9px;color:#64748b;margin-top:12px;padding:8px;background:#0b1220;border-radius:8px;line-height:1.5}
+.equip-help b{color:#94a3b8}
