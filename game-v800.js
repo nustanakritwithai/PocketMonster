@@ -1152,6 +1152,7 @@ function setManagerTab(tab='collection'){
   if(tab==='collection')renderManager();
   if(tab==='training')renderTraining();
   if(tab==='skills')renderSkills();
+  if(tab==='equipment')renderEquipment();
   if(tab==='evolution')renderEvolution();
   if(tab==='breeding')renderBreeding();
 }
@@ -1239,6 +1240,41 @@ function renderSkills(){
   panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
+}
+function renderEquipment(){
+  const panel=el('equipmentPanel');
+  if(!panel)return;
+  const allIds=ownedMonsterIds();
+  if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
+  const selectedId=allIds.includes(state.equipSelectedId)?state.equipSelectedId:allIds[0];
+  state.equipSelectedId=selectedId;
+  const inst=getInst(selectedId);
+  if(!inst){panel.innerHTML='<div class="manager-empty">เลือกมอนไม่ถูกต้อง</div>';return;}
+  const flat=getEquipmentFlat(inst);
+  const equippedCount=equippedItems(inst).length;
+  const budgetMin=BALANCE_CONFIG.equipment.budget.min*100;
+  const budgetMax=BALANCE_CONFIG.equipment.budget.max*100;
+  const flatTotal=(flat.hp||0)+(flat.atk||0)+(flat.def||0)+(flat.spd||0);
+  const statTotal=(inst.maxHp||0)+(inst.atk||0)+(inst.def||0)+(inst.spd||0);
+  const budgetPct=statTotal>0?Math.round(flatTotal/statTotal*1000)/10:0;
+  const budgetClass=budgetPct<budgetMin?'under':budgetPct>budgetMax?'over':'ok';
+  const budgetStatus=budgetPct<budgetMin?'น้อยไป':budgetPct>budgetMax?'มากไป':'สมดุล';
+  const slotDesc={gear:'สล็อตอุปกรณ์หลัก — เกราะ/อาวุธ',charm:'สล็อตเสริม — เครื่องราง',utility:'สล็อตอาหารเสริม/ไอเทมใช้แล้วทิ้ง'};
+  const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
+  const slotsHTML=EQUIPMENT_SLOTS.map(slot=>{
+    const item=inst.equipment?.[slot];
+    if(item){
+      const affixes=(item.affixes||[]).map(a=>`<span class="affix-stat">${a.stat||a.derived} +${a.value??0}</span>${a.cap!=null?` (cap ${a.cap})`:''}`).join(', ');
+      return `<div class="equip-slot-card"><div class="equip-slot-info"><div class="equip-slot-name">${slot}</div><div class="equip-slot-item">${item.name||item.id}</div>${affixes?`<div class="equip-affix">${affixes}</div>`:''}</div><button class="equip-btn unequip" data-unequip="${slot}">ถอด</button></div>`;
+    }
+    const options=stash.filter(it=>it.slot===slot).map(it=>`<button class="equip-btn equip" data-equip="${it.id}">ใส่ ${it.name}</button>`).join('');
+    return `<div class="equip-slot-card"><div class="equip-slot-info"><div class="equip-slot-name">${slot}</div><div class="equip-slot-empty">ว่าง</div><div class="equip-slot-desc">${slotDesc[slot]||''}</div></div><div class="equip-slot-actions">${options||'<span class="equip-slot-empty">ไม่มีของในคลัง</span>'}</div></div>`;
+  }).join('');
+  const flatHTML=['hp','atk','def','spd'].map(s=>{const v=flat[s]||0;return `<span class="${v===0?'zero':''}">${s.toUpperCase()} +${v}</span>`;}).join(' • ');
+  panel.innerHTML=`<div class="equipment-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="equip-summary"><div class="equip-summary-stats">${flatHTML}</div>${equippedCount>0?`<div class="budget-label">Power Budget: ${budgetPct}% (ควร ${budgetMin}-${budgetMax}%) — ${budgetStatus}</div><div class="budget-bar"><div class="budget-fill ${budgetClass}" style="width:${Math.min(100,budgetPct*5)}%"></div></div><div class="budget-range">0% — ${budgetMin}% — ${budgetMax}% — 20%</div>`:'<div class="budget-label">ยังไม่ได้ใส่อุปกรณ์</div>'}</div>${slotsHTML}<div class="equip-help"><b>3 สล็อก:</b> Gear / Charm / Utility<br><b>ถอดได้ตลอดเวลา</b> (reversible) — ไม่ทำลายสถิติ<br><b>Affix ประเภทเดียวกัน</b> — รวมกันแล้วไม่เกิน cap<br><b>พลังรวม</b> — ควรอยู่ ${budgetMin}-${budgetMax}% ของ combat power</div></div>`;
+  bindMonsterSelect(panel,'equipSelectedId',renderEquipment);
+  panel.querySelectorAll('[data-unequip]').forEach(b=>b.onclick=()=>{unequipMonster(inst.instanceId,b.dataset.unequip);renderEquipment();});
+  panel.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>{toggleStarterEquip(inst.instanceId,b.dataset.equip);renderEquipment();});
 }
 let immersiveStarted=true;
 function startGameInteraction(){
