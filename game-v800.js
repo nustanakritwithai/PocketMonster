@@ -184,14 +184,87 @@ const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); s
 const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({color:0x59cd61,roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
-const decorations=new THREE.Group(); scene.add(decorations);
-function makeRock(x,z,s=1){ const m=new THREE.Mesh(dodecahedronGeometry(s,0),new THREE.MeshStandardMaterial({color:0x945a38,roughness:1})); m.position.set(x,s*.75,z); m.scale.y=1.35; m.castShadow=m.receiveShadow=true; decorations.add(m); }
-function makeTree(x,z,s=1){
-  const trunk=new THREE.Mesh(cylinderGeometry(.22*s,.34*s,1.7*s,7),new THREE.MeshStandardMaterial({color:0x754428})); trunk.position.set(x,.85*s,z); trunk.castShadow=true; decorations.add(trunk);
-  const crown=new THREE.Mesh(coneGeometry(1.1*s,2.2*s,8),new THREE.MeshStandardMaterial({color:0x18753a})); crown.position.set(x,2.2*s,z); crown.castShadow=true; decorations.add(crown);
+const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.add(decorations);
+function addDeco(mesh){ mesh.castShadow=true; mesh.receiveShadow=true; decorations.add(mesh); return mesh; }
+function makeRock(x,z,s=1,tone=0x945a38){
+  const cluster=new THREE.Group();
+  const main=new THREE.Mesh(dodecahedronGeometry(s,0),mat(tone,.95,.04));
+  main.position.y=s*.62; main.scale.set(1,1.28,1.08); cluster.add(main);
+  const side=new THREE.Mesh(dodecahedronGeometry(s*.55,0),mat(tone,.98,.02));
+  side.position.set(s*.55,s*.32,s*.18); side.scale.set(1.1,.8,1); cluster.add(side);
+  const pebble=new THREE.Mesh(dodecahedronGeometry(s*.28,0),mat(tone,.99,0));
+  pebble.position.set(-s*.48,s*.18,-s*.22); cluster.add(pebble);
+  cluster.position.set(x,0,z); cluster.rotation.y=(x*1.7+z)*.15; addDeco(cluster); return cluster;
 }
-[[8,7,1.4],[-11,8,1.1],[16,-10,1.6],[-17,-8,1.3],[3,-19,1.8],[-5,17,1.2]].forEach(v=>makeRock(...v));
-[[-7,-12,1],[10,-16,1.2],[14,13,.9],[-15,14,1.1],[20,3,1],[-21,-2,1.2]].forEach(v=>makeTree(...v));
+function makeTree(x,z,s=1,{trunk=0x754428,leaf=0x18753a,fruit=null}={}){
+  const g=new THREE.Group();
+  const bole=new THREE.Mesh(cylinderGeometry(.16*s,.28*s,1.55*s,8),mat(trunk,.88,.02));
+  bole.position.y=.78*s; g.add(bole);
+  const mid=new THREE.Mesh(coneGeometry(1.05*s,1.55*s,8),mat(leaf,.78,.03));
+  mid.position.y=1.85*s; g.add(mid);
+  const top=new THREE.Mesh(coneGeometry(.72*s,1.15*s,8),mat(leaf,.7,.04));
+  top.position.y=2.55*s; g.add(top);
+  if(fruit){
+    for(const [fx,fy,fz] of [[.35,1.7,.2],[-.28,1.9,-.15],[.1,2.15,.32]]){
+      const berry=new THREE.Mesh(sphereGeometry(.07*s,8,6),mat(fruit,.55,.08));
+      berry.position.set(fx*s,fy*s,fz*s); g.add(berry);
+    }
+  }
+  g.position.set(x,0,z); addDeco(g); return g;
+}
+function makeGrassTuft(x,z,s=1,color=0x3f9d4a){
+  const g=new THREE.Group();
+  for(const [dx,h,tilt] of [[-.06,.28,.18],[.05,.34,-.12],[0,.22,.04]]){
+    const blade=new THREE.Mesh(coneGeometry(.035*s,h*s,4),mat(color,.86,0));
+    blade.position.set(dx*s,h*.5*s,0); blade.rotation.z=tilt; g.add(blade);
+  }
+  g.position.set(x,0,z); addDeco(g); return g;
+}
+function makeStalagmite(x,z,s=1){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(coneGeometry(.42*s,.95*s,7),mat(0x64748b,.92,.08));
+  base.position.y=.42*s; g.add(base);
+  const tip=new THREE.Mesh(coneGeometry(.16*s,.7*s,6),mat(0x94a3b8,.78,.12));
+  tip.position.y=1.05*s; g.add(tip);
+  g.position.set(x,0,z); addDeco(g); return g;
+}
+function makeFencePost(x,z){
+  const post=new THREE.Mesh(boxGeometry(.1,.7,.1),mat(0x8b5e34,.86,.02));
+  post.position.set(x,.35,z); addDeco(post); return post;
+}
+function makeFlower(x,z,color=0xf472b6){
+  const g=new THREE.Group();
+  const stem=new THREE.Mesh(cylinderGeometry(.018,.02,.22,5),mat(0x4ade80,.8,0));
+  stem.position.y=.11; g.add(stem);
+  const bloom=new THREE.Mesh(sphereGeometry(.07,8,6),mat(color,.5,.04));
+  bloom.position.y=.24; g.add(bloom);
+  g.position.set(x,0,z); addDeco(g); return g;
+}
+function clearDecorations(){
+  while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
+}
+function populateWorld(zone='hub'){
+  clearDecorations();
+  if(zone==='hub'){
+    [[8,7,1.35],[-11,8,1.05],[16,-10,1.5],[-17,-8,1.25],[3,-19,1.7],[-5,17,1.15]].forEach(v=>makeRock(...v));
+    [[-7,-12,1,{fruit:0xef4444}],[10,-16,1.15],[14,13,.95,{fruit:0xfacc15}],[-15,14,1.05],[20,3,1],[-21,-2,1.15]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
+    for(let i=0;i<10;i++){
+      const a=i/10*Math.PI*2;
+      makeFencePost(7+Math.cos(a)*3.55,3+Math.sin(a)*3.55);
+    }
+    [[6.2,1.4],[8.4,4.6],[5.1,4.8],[4.4,7.4]].forEach(([x,z])=>makeFlower(x,z));
+    [[2,2],[9,5],[-3,4],[11,1]].forEach(([x,z])=>makeGrassTuft(x,z,.9));
+  }else if(zone==='grassland'){
+    [[-14,8,1.2],[12,-12,1.4],[18,6,1.1],[-16,-9,1.3],[7,14,1.5],[-6,-16,1.2]].forEach(v=>makeRock(...v));
+    [[-9,-11,1.1,{leaf:0x22c55e}],[11,-15,1.25,{leaf:0x16a34a,fruit:0xf97316}],[15,11,1,{leaf:0x15803d}],[-13,13,1.15],[19,2,1.05],[-20,-3,1.2,{fruit:0xef4444}],[3,-18,1.3]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
+    for(const [x,z] of [[-5,-5],[2,-8],[8,-3],[-8,4],[5,6],[-2,-14],[10,3],[-12,-2]]) makeGrassTuft(x,z,1+((x+z)&1)*.2);
+    makeFlower(-1,-6,0xfacc15); makeFlower(4,-11,0xfb7185); makeFlower(-7,2,0xa78bfa);
+  }else if(zone==='cave'){
+    [[-10,6,1.4,0x57534e],[9,-7,1.6,0x44403c],[14,4,1.2,0x78716c],[-15,-5,1.5,0x57534e],[3,-15,1.8,0x3f3f46],[-4,16,1.3,0x52525b]].forEach(v=>makeRock(...v));
+    [[-8,-4,1.1],[6,-9,1.3],[-12,9,1.4],[11,8,1.2],[0,-12,1.6],[15,-2,1],[-6,12,1.25]].forEach(v=>makeStalagmite(...v));
+  }
+}
+populateWorld('hub');
 function makePad(x,z,r,color,opacity=.2){
   const disk=new THREE.Mesh(circleGeometry(r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide})); disk.rotation.x=-Math.PI/2; disk.position.set(x,.025,z); scene.add(disk);
   const ring=new THREE.Mesh(ringGeometry(r-.12,r,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.copy(disk.position); scene.add(ring); return {disk,ring};
@@ -1495,6 +1568,7 @@ function switchZone(zone,silent=false){
   scene.background.setHex(cfg.bg);
   scene.fog.color.setHex(cfg.bg);
   ground.material.color.setHex(cfg.ground);
+  populateWorld(zone);
   player.position.set(0,0,5);
   playerData.hp=Math.max(1,playerData.hp);
   setHubVisibility(zone==='hub');
