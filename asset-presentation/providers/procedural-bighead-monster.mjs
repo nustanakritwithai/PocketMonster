@@ -1,5 +1,6 @@
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { registerOwned, disposeHandle } from '../ownership.mjs';
+import { applyMonsterFourSide } from '../monster-texture.mjs';
 
 export const SLIME_TYPES = Object.freeze([
   'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison',
@@ -62,6 +63,11 @@ export function createBigheadMonsterProvider({
     const mesh = new THREE.Mesh(box(w, h, d), mat(color, rough, metal));
     mesh.castShadow = true;
     return tag(mesh, part, extra);
+  }
+
+  function paintBody(mesh, type, color, rough, metal) {
+    applyMonsterFourSide(mesh, type, color, THREE, { roughness: rough, metalness: metal });
+    return mesh;
   }
 
   function coneMesh(r, h, color, rough, metal, part, extra) {
@@ -261,6 +267,7 @@ export function createBigheadMonsterProvider({
       color, 0.18, 0, 'body',
     );
     body.position.y = BIGHEAD_SLIME_BODY.y * scale;
+    paintBody(body, type, color, 0.18, 0);
     g.add(body);
     addBoxEyes(g, { y: 0.62 * scale, z: -0.38 * scale, spread: 0.18 * scale, size: 0.08 * scale });
     addBoxMouth(g, { y: 0.42 * scale, z: -0.39 * scale });
@@ -271,16 +278,18 @@ export function createBigheadMonsterProvider({
     return g;
   }
 
-  function makeBigheadAnimal(color, scale, { kind = 'quadruped', accent = null } = {}) {
+  function makeBigheadAnimal(color, scale, { kind = 'quadruped', accent = null, type = 'Normal' } = {}) {
     const g = new THREE.Group();
     const headColor = accent || color;
 
     if (kind === 'bird') {
       const body = boxMesh(0.70 * scale, 0.80 * scale, 0.70 * scale, color, 0.72, 0.06, 'body');
       body.position.y = 0.66 * scale;
+      paintBody(body, type, color, 0.72, 0.06);
       g.add(body);
       const head = boxMesh(0.55 * scale, 0.50 * scale, 0.50 * scale, headColor, 0.70, 0.06, 'head');
       head.position.set(0, 1.10 * scale, -0.10 * scale);
+      paintBody(head, type, headColor, 0.70, 0.06);
       g.add(head);
       for (const sx of [-0.42, 0.42]) {
         const wing = boxMesh(0.06 * scale, 0.40 * scale, 0.50 * scale, color, 0.72, 0.06, 'wing');
@@ -303,9 +312,11 @@ export function createBigheadMonsterProvider({
     if (kind === 'serpent') {
       const body = boxMesh(0.90 * scale, 0.40 * scale, 0.45 * scale, color, 0.72, 0.08, 'body');
       body.position.set(0, 0.50 * scale, 0);
+      paintBody(body, type, color, 0.72, 0.08);
       g.add(body);
       const head = boxMesh(0.50 * scale, 0.45 * scale, 0.45 * scale, headColor, 0.70, 0.06, 'head');
       head.position.set(0, 0.70 * scale, -0.40 * scale);
+      paintBody(head, type, headColor, 0.70, 0.06);
       g.add(head);
       for (const sx of [-0.35, 0.35]) {
         const fin = boxMesh(0.04 * scale, 0.18 * scale, 0.25 * scale, color, 0.72, 0.08, 'fin');
@@ -318,9 +329,11 @@ export function createBigheadMonsterProvider({
 
     const body = boxMesh(0.65 * scale, 0.45 * scale, 0.85 * scale, color, 0.72, 0.06, 'body');
     body.position.set(0, 0.55 * scale, 0.05 * scale);
+    paintBody(body, type, color, 0.72, 0.06);
     g.add(body);
     const head = boxMesh(0.55 * scale, 0.50 * scale, 0.48 * scale, headColor, 0.70, 0.06, 'head');
     head.position.set(0, 0.90 * scale, -0.30 * scale);
+    paintBody(head, type, headColor, 0.70, 0.06);
     g.add(head);
     for (const [sx, sz] of [[-0.20, 0.25], [0.20, 0.25], [-0.20, -0.15], [0.20, -0.15]]) {
       const leg = boxMesh(0.12 * scale, 0.35 * scale, 0.12 * scale, color, 0.78, 0.04, 'leg');
@@ -342,7 +355,7 @@ export function createBigheadMonsterProvider({
     const kind = form === 'slime' ? 'slime' : animalKind(def);
     const visual = form === 'slime'
       ? makeBigheadSlime(color, scale, type)
-      : makeBigheadAnimal(color, scale, { kind, accent: def.metrics?.accent || null });
+      : makeBigheadAnimal(color, scale, { kind, accent: def.metrics?.accent || null, type });
 
     const root = new THREE.Group();
     root.add(visual);
@@ -420,8 +433,11 @@ export function createBigheadMonsterProvider({
       dispose() {
         const walk = (node) => {
           node.geometry?.dispose?.();
-          if (Array.isArray(node.material)) node.material.forEach(m => m.dispose?.());
-          else node.material?.dispose?.();
+          if (Array.isArray(node.material)) node.material.forEach(m => { m.map?.dispose?.(); m.dispose?.(); });
+          else {
+            node.material?.map?.dispose?.();
+            node.material?.dispose?.();
+          }
           for (const child of node.children || []) walk(child);
         };
         walk(root);
