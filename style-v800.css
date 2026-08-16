@@ -361,3 +361,25 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .gen-counter{display:inline-block;font-size:10px;font-weight:700;background:#1e1b4b;color:#c4b5fd;border-radius:999px;padding:3px 8px;margin-top:6px}
 .birth-history{font-size:9px;color:#94a3b8;margin-top:8px;padding:8px;background:#0b1220;border-radius:8px;border:1px solid #ffffff08}
 .birth-history-item{padding:3px 0;border-bottom:1px solid #ffffff08}
+
+/* V8.0 UX Phase 6 — in-game popups */
+.message{white-space:pre-line}
+.event-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;pointer-events:auto}
+.event-popup.hidden{display:none}
+.event-card{background:linear-gradient(180deg,#1e1b4b,#0f172a);border:2px solid #7c3aed;border-radius:20px;padding:18px 22px;min-width:280px;max-width:340px;box-shadow:0 20px 60px #0009,0 0 0 4px #7c3aed22;text-align:center}
+.event-icon{font-size:28px;margin-bottom:6px}
+.event-popup .event-title{font-size:14px;font-weight:900;color:#c4b5fd;margin-bottom:14px;line-height:1.4}
+.event-popup .event-choices{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.event-popup .event-choices button{border:0;border-radius:12px;padding:12px 18px;font-size:12px;font-weight:800;cursor:pointer;background:#2563eb;color:#fff;min-width:100px;min-height:44px}
+.event-popup .event-choices button:active{transform:scale(.96)}
+.mastery-popup{position:fixed;top:60px;right:10px;z-index:150;background:linear-gradient(180deg,#4c1d95,#1e1b4b);color:#ddd6fe;border:1px solid #a855f7;border-radius:14px;padding:10px 14px;font-size:12px;font-weight:800;box-shadow:0 12px 30px #0009;animation:masterySlide .4s ease;max-width:260px}
+@keyframes masterySlide{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+.mastery-popup.fade{animation:masteryFade .5s ease forwards}
+@keyframes masteryFade{to{opacity:0;transform:translateX(30px)}}
+.party-cond-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;margin-left:3px}
+.party-cond-dot.excellent{background:#22c55e;box-shadow:0 0 4px #22c55e88}
+.party-cond-dot.good{background:#3b82f6}
+.party-cond-dot.normal{background:#64748b}
+.party-cond-dot.tired{background:#facc15}
+.party-cond-dot.fatigued{background:#f97316}
+.party-cond-dot.bad{background:#ef4444;box-shadow:0 0 4px #ef444488}
