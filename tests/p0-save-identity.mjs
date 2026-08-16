@@ -17,7 +17,7 @@ class MemoryStorage {
 }
 
 assert.equal(APP_VERSION, '8.0.0');
-assert.equal(ASSET_REVISION, '710');
+assert.equal(ASSET_REVISION, '800');
 assert.equal(SAVE_SCHEMA_VERSION, 8);
 assert.equal(SAVE_KEY, 'monster-life-rpg-proto-v6', 'release must preserve the established save key');
 

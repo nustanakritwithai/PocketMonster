@@ -107,10 +107,17 @@ export function applyChoice(instance, eventDef, choiceId, { now = Date.now() } =
   if (effects.growthExp) addGrowthExp(instance, effects.growthExp);
 
   const mind = instance.mind;
+  const body = instance.body;
   if (effects.mood) mind.mood = clamp100(mind.mood + effects.mood);
   if (effects.stress) mind.stress = clamp100(mind.stress + effects.stress);
   if (effects.bond) mind.bond = clamp100(mind.bond + effects.bond);
   if (effects.trust) mind.trust = clamp100(mind.trust + effects.trust);
+  if (effects.discipline) mind.discipline = clamp100((mind.discipline ?? 20) + effects.discipline);
+  if (body) {
+    if (effects.energy) body.energy = clamp100(body.energy + effects.energy);
+    if (effects.hunger) body.hunger = clamp100(body.hunger + effects.hunger);
+    if (effects.fitness) body.fitness = clamp100(body.fitness + effects.fitness);
+  }
 
   // Record cooldown + history flag (eventId:choiceId) — used to unlock evolution.
   if (!instance.eventCooldowns) instance.eventCooldowns = {};

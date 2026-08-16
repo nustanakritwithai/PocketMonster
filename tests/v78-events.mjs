@@ -52,6 +52,11 @@ assert.ok(actor.mind.bond > 30, 'rest raised bond');
 assert.ok(actor.eventFlags.includes('restless_night:rest'), 'history flag recorded (eventId:choiceId)');
 assert.equal(actor.lifeHistory.at(-1).type, 'event', 'event appended to life history');
 
+const scolded = mk({ mind: { discipline: 20, mood: 70 }, body: { energy: 20 } });
+applyChoice(scolded, { id: 'playful_bond', choices: [{ id: 'scold', effects: { discipline: 5, energy: 8 } }] }, 'scold');
+assert.equal(scolded.mind.discipline, 25, 'event choices can raise discipline');
+assert.equal(scolded.body.energy, 28, 'event choices can restore body energy');
+
 // Cooldown prevents immediate re-trigger of the same event.
 assert.equal(evaluateEventTriggers([stressEvent], actor, { now: Date.now() }).length, 0, 'event on cooldown does not re-trigger');
 assert.equal(evaluateEventTriggers([stressEvent], actor, { now: Date.now() + 25 * 3600 * 1000 }).length, 1, 're-triggers after cooldown elapses');

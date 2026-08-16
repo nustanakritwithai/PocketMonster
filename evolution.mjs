@@ -22,6 +22,7 @@ export function evolutionContext(instance) {
   return {
     level: instance.level,
     training: instance.training,
+    trainingFocus: instance.trainingFocus,
     aptitude: instance.aptitude,
     bond: instance.mind?.bond,
     trust: instance.mind?.trust,
