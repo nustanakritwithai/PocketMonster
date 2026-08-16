@@ -58,6 +58,24 @@ assert.ok(pixelDiffRatio(playerHead.left, flipHorizontal(playerHead.right)) > 0.
 assert.ok(pixelDiffRatio(keeperHead.left, flipHorizontal(keeperHead.right)) > 0.08, 'keeper left is not a mirrored right');
 assert.ok(pixelDiffRatio(playerHead.front, keeperHead.front) > 0.2, 'player and keeper faces are distinct drawings');
 
+function countHex(png, hex) {
+  const raw = hex.replace('#', '');
+  const r = parseInt(raw.slice(0, 2), 16);
+  const g = parseInt(raw.slice(2, 4), 16);
+  const b = parseInt(raw.slice(4, 6), 16);
+  let n = 0;
+  for (let i = 0; i < png.rgba.length; i += 4) {
+    if (png.rgba[i] === r && png.rgba[i + 1] === g && png.rgba[i + 2] === b) n += 1;
+  }
+  return n;
+}
+const eyeWhite = '#FFF7ED';
+assert.ok(countHex(playerHead.front, eyeWhite) > 80, 'front face keeps painted eyes');
+assert.equal(countHex(playerHead.right, eyeWhite), 0, 'player right profile has no eye white');
+assert.equal(countHex(playerHead.left, eyeWhite), 0, 'player left profile has no eye white');
+assert.equal(countHex(keeperHead.right, eyeWhite), 0, 'keeper right profile has no eye white');
+assert.equal(countHex(keeperHead.left, eyeWhite), 0, 'keeper left profile has no eye white');
+
 resetCatalog();
 loadCatalog(JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8')));
 const catalogPlayer = getAppearance('appearance.human.player-orange.v1');
