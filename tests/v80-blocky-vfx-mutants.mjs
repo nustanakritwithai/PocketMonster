@@ -35,7 +35,7 @@ assert.match(js, /groundDecals\.push\(\{group,disc,ring,inner,/, 'mutant 7: upda
 assert.match(js, /spawnGroundDecal\(wildTypes\(w\)\[0\],w\.mesh\.position/, 'mutant 8: capture still stamps a ground decal');
 assert.match(js, /spawnRingPulse\(w\.mesh\.position\.clone\(\),0xffffff/, 'mutant 9: KO still fires a ring pulse');
 assert.match(js, /case 'halo': return torusGeometry/, 'mutant 10: Phase 4 does not convert particle halo shapes');
-assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 11: fog near/far stay until Phase 5');
-assert.match(js, /HemisphereLight\(0xffffff,0x42643d,1\.55\)/, 'mutant 12: cave light intensity stays until Phase 5');
+assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 11: boot Fog constructor stays 0x65c9f5,30,76');
+assert.match(js, /HemisphereLight\(0xffffff,0x42643d,1\.55\)/, 'mutant 12: boot HemisphereLight intensity stays 1.55');
 
 console.log('V8.0 blocky VFX mutants: PASS');

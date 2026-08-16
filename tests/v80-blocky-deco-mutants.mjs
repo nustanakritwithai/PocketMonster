@@ -45,7 +45,7 @@ assert.match(
 );
 
 assert.match(js, /case 'halo': return torusGeometry/, 'mutant 11: Phase 2/4 does not convert particle halo shapes');
-assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 12: fog near/far stay until Phase 5');
+assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 12: boot Fog constructor stays 0x65c9f5,30,76');
 assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'mutant 13: breeding pad stays at (5.2,8.2) size 1.6');
 assert.match(extractFn('makeFencePost'), /boxGeometry\(\.1,\.7,\.1\)/, 'mutant 14: fence posts stay the original box');
 assert.doesNotMatch(rock + tree + grass + stalagmite + flower, /Math\.random\(/, 'mutant 15: decoration builders stay deterministic');

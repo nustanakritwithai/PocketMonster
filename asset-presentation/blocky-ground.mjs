@@ -82,7 +82,7 @@ export function paintGroundGrid(zoneColor, zoneType = 'grass') {
   const seed = ((Number(zoneColor) >>> 0) ^ (zoneType === 'cave' ? 0xca7e0001 : 0x9a55)) >>> 0;
   scatter(img, 40, 2, 2, [255, 255, 255], 0.05, seed);
   if (zoneType === 'cave') {
-    scatter(img, 20, 3, 3, [0, 0, 0], 0.15, seed ^ 0x11111111);
+    scatter(img, 36, 3, 3, [0, 0, 0], 0.18, seed ^ 0x11111111);
   } else {
     scatter(img, 30, 2, 4, [0, 100, 0], 0.08, seed ^ 0x22222222);
   }

@@ -44,7 +44,7 @@ assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.17\)/, 'mutant 10: ranch pad stay
 assert.match(js, /incubator\.position\.set\(5\.2,0,8\.2\)/, 'mutant 11: incubator stays at the breeding pad');
 assert.doesNotMatch(js, /ground\.material\.map\.dispose\(\)/, 'mutant 12: cached ground textures are shared, not disposed');
 assert.doesNotMatch(painterSrc, /zoneColor\s*\+\s*0x404040/, 'mutant 13: sky bottoms do not overflow per-channel');
-assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 14: fog near/far stay until Phase 5');
+assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 14: boot Fog constructor stays 0x65c9f5,30,76');
 
 const a = paintGroundGrid(0x62c96b, 'grass');
 const b = paintGroundGrid(0x62c96b, 'grass');

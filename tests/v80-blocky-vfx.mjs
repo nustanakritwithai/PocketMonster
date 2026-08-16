@@ -51,7 +51,7 @@ assert.match(js, /updateGroundDecals\(dt\)/, 'loop still ticks ground decals');
 assert.match(js, /spawnRingPulse\(activeSummon\.mesh\.position/, 'summon still fires a ring pulse');
 assert.match(js, /spawnGroundDecal\(move\.type,t\.mesh\.position/, 'skills still stamp a ground decal');
 
-assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'fog near/far stay until Phase 5');
+assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'boot Fog constructor stays 0x65c9f5,30,76');
 assert.match(js, /case 'halo': return torusGeometry/, 'particle halo shapes stay toruses');
 
 console.log('V8.0 blocky VFX: PASS');

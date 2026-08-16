@@ -238,7 +238,7 @@ renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=qualityProfile.shadows;
 el('game').appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xffffff,0x42643d,1.55));
+const hemi=new THREE.HemisphereLight(0xffffff,0x42643d,1.55); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows; scene.add(sun);
 const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({map:makeGroundTexture(0x62c96b,'grass'),color:0xffffff,roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
@@ -1607,6 +1607,21 @@ const ZONES={
     ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
   ]}
 };
+function setZoneLighting(zone){
+  if(zone==='cave'){
+    hemi.intensity=0.6;
+    sun.intensity=0.8;
+    sun.color.setHex(0xb0c4de);
+  }else if(zone==='grassland'){
+    hemi.intensity=1.55;
+    sun.intensity=2.15;
+    sun.color.setHex(0xffffff);
+  }else{
+    hemi.intensity=1.55;
+    sun.intensity=2.15;
+    sun.color.setHex(0xfff4e0);
+  }
+}
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
@@ -1615,7 +1630,10 @@ function setZoneGround(zone){
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
   scene.background=makeSkyTexture(z.bg);
-  scene.fog.color.setHex(zone==='cave'?0x1e293b:z.bg);
+  scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
+  scene.fog.near=zone==='cave'?15:30;
+  scene.fog.far=zone==='cave'?50:76;
+  setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp.elite,evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
