@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monster Life RPG — Asset Lab</title>
+  <style>
+    body{margin:0;font:14px/1.45 system-ui;background:#0f172a;color:#e2e8f0;padding:20px}
+    main{max-width:720px;margin:0 auto}
+    code,pre{background:#1e293b;padding:8px 10px;border-radius:8px;display:block;white-space:pre-wrap}
+    label{display:block;margin:.6rem 0 .2rem}
+    button{background:#f97316;border:0;color:#111;font-weight:700;padding:8px 12px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Asset Lab — four-side-block-v1</h1>
+    <p>เครื่องมือคอมไพล์ appearance นอกเกม ไม่แตะ save และไม่โหลดจาก <code>index.html</code> ของเกม</p>
+    <label>Appearance id</label>
+    <input id="id" value="appearance.human.player-orange.v1" style="width:100%" />
+    <label>Mode</label>
+    <select id="mode">
+      <option value="single">single</option>
+      <option value="four" selected>four</option>
+      <option value="strip">strip</option>
+    </select>
+    <p><button id="compile">Compile</button></p>
+    <pre id="out">รอ compile…</pre>
+  </main>
+  <script type="module">
+    import { compileLabAppearance, exportAppearancePacket } from './compiler.mjs';
+    import { previewMatrix } from './preview.mjs';
+    const out = document.getElementById('out');
+    document.getElementById('compile').onclick = () => {
+      const compiled = compileLabAppearance({
+        id: document.getElementById('id').value,
+        mode: document.getElementById('mode').value,
+        front: 'head.front.png',
+        right: 'head.right.png',
+        back: 'head.back.png',
+        left: 'head.left.png',
+        topColor: '#F97316',
+        bottomColor: '#FFC4A3',
+      });
+      out.textContent = JSON.stringify({
+        packet: exportAppearancePacket(compiled),
+        shots: previewMatrix(compiled).length,
+      }, null, 2);
+    };
+  </script>
+</body>
+</html>
