@@ -13,6 +13,10 @@ assert.match(js, /function equipMiniHTML\(inst\)/, 'equipment mini helper missin
 assert.match(js, /trainingPoolHTML\(inst\)/, 'monster card must render the training pool');
 assert.match(js, /skillsMiniHTML\(inst\)/, 'monster card must render skill chips');
 assert.match(js, /equipMiniHTML\(inst\)/, 'monster card must render equipment slots');
+assert.match(js, /CR \$\{cr\?\?'—'\}/, 'monster card must show the Combat Rating');
+assert.match(js, /bindManagerAction\(wrap\.querySelector\('\.cr-btn'\),/, 'ดู CR must bind pointerdown, not a silent off-screen onclick');
+assert.match(js, /scrollIntoView/, 'ดู CR must bring the debug panel on screen');
+assert.match(js, /setManagerTab\('evolution'\)/, 'ดู Evolution must open the Evolution tab');
 assert.match(js, /💤 พักผ่อน/, 'care rest label must match the UX plan');
 assert.match(js, /🎾 เล่นด้วย/, 'care play label must match the UX plan');
 assert.doesNotMatch(js, /training-badge">Training /, 'legacy training badge must be replaced');
@@ -25,8 +29,10 @@ for (const cls of [
   '.line-fill.line-power',
   '.skill-chip.master',
   '.equip-slot.filled',
+  '.cr-debug-panel.open',
 ]) {
   assert.ok(css.includes(cls), `phase 1 CSS missing ${cls}`);
 }
+assert.match(css, /position:sticky/, 'CR debug panel must stay visible while scrolling the manager');
 
 console.log('V8.0 UX phase 1 monster-card display: PASS');
