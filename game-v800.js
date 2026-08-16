@@ -3,7 +3,7 @@ import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mj
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
-import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION } from './balance-config.mjs';
+import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
@@ -1151,6 +1151,7 @@ function setManagerTab(tab='collection'){
   document.querySelectorAll('[data-tab-pane]').forEach(p=>p.classList.toggle('active',p.dataset.tabPane===tab));
   if(tab==='collection')renderManager();
   if(tab==='training')renderTraining();
+  if(tab==='skills')renderSkills();
   if(tab==='evolution')renderEvolution();
   if(tab==='breeding')renderBreeding();
 }
@@ -1201,6 +1202,43 @@ function renderTraining(){
   panel.innerHTML=`<div class="training-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="training-summary"><div class="pool-header"><span>Training Pool (รวม 5 สาย)</span><span class="pool-count">${Math.round(used)} / ${cap}</span></div><div class="pool-bar"><div class="pool-bar-fill" style="width:${poolPct}%"></div></div></div>${linesHTML}<div class="condition-box"><div>สภาพ: <strong class="cond-${cond}">${condTH[cond]||cond}</strong> → ${condMult}x training gain</div><div>Training Food: ${hasBuff?'<span style="color:#fde68a">มี buff ทำงาน</span>':'ไม่มี buff'}</div></div><div class="training-info">Pool = 40 + 8xLevel (รวมทุกสาย) • ค่ามาก = gain ลดลง (diminishing return) • Aptitude ดาวเยอะ = gain เพิ่ม • สภาพดี = gain เพิ่ม</div></div>`;
   bindMonsterSelect(panel,'trainingSelectedId',renderTraining);
   panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
+}
+function renderSkills(){
+  const panel=el('skillsPanel');
+  if(!panel)return;
+  const allIds=ownedMonsterIds();
+  if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
+  const selectedId=allIds.includes(state.skillsSelectedId)?state.skillsSelectedId:allIds[0];
+  state.skillsSelectedId=selectedId;
+  const inst=getInst(selectedId);
+  if(!inst){panel.innerHTML='<div class="manager-empty">เลือกมอนไม่ถูกต้อง</div>';return;}
+  const speciesSkills=getMonsterSkills(inst);
+  const thresholds=BALANCE_CONFIG.skill.masteryThresholds;
+  const thresholdList={novice:0,familiar:thresholds.familiar,skilled:thresholds.skilled,expert:thresholds.expert,master:thresholds.master};
+  const learnedHTML=(inst.skills||[]).map(s=>{
+    const def=speciesSkills.find(d=>d.name===s.skillId)||(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===s.skillId)?.move||{};
+    const rank=s.masteryRank||'novice';
+    const exp=s.masteryExp||0;
+    const orderIdx=MASTERY_ORDER.indexOf(rank);
+    const isMaster=rank==='master';
+    const nextRank=MASTERY_ORDER[orderIdx+1];
+    const nextThresh=nextRank?thresholdList[nextRank]:null;
+    const prevThresh=thresholdList[rank]||0;
+    const expInBand=exp-prevThresh;
+    const bandSize=nextThresh?(nextThresh-prevThresh):1;
+    const pct=isMaster?100:Math.min(100,Math.round(expInBand/Math.max(1,bandSize)*100));
+    const rawPowerPct=Math.round((SKILL_MASTERY[rank]?.rawPower??0)*100);
+    return `<div class="skill-card"><div class="skill-card-header"><b>${def.name||s.skillId} ${typeBadge(def.type||'Normal')}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank} ${MASTERY_DOTS[rank]||''}</span></div><div class="skill-exp-text">EXP: <strong>${exp}</strong>${nextThresh?`/${nextThresh}`:''} ${!isMaster?`→ ${MASTERY_NEXT_TH[rank]}`:' (สูงสุด)'}</div><div class="skill-mastery-bar"><div class="skill-mastery-fill ${rank}" style="width:${pct}%"></div></div><div class="skill-detail">Power: ${def.power??'—'} • CD: ${def.cooldown??'—'}s • ${def.targetType||'enemy'}</div><div class="skill-detail"><span class="power-bonus">Raw Power bonus: +${rawPowerPct}%</span>${s.mutationId?` • Mutation: ${s.mutationId}`:''}</div></div>`;
+  }).join('');
+  const learnedIds=new Set((inst.skills||[]).map(s=>s.skillId));
+  const lockedMoves=speciesSkills.filter(s=>!learnedIds.has(s.name)).map(s=>`<div class="skill-card skill-locked"><div class="skill-card-header"><b>${s.name} ${typeBadge(s.type)}</b></div><div class="skill-detail">Power: ${s.power??'—'} • CD: ${s.cooldown??'—'}s • ${s.targetType||'enemy'}</div><div class="skill-detail">ใช้สกิลในการต่อสู้เพื่อสะสม EXP → เรียนรู้อัตโนมัติ</div></div>`).join('');
+  const candHTML=(SKILL_CANDIDATES[inst.speciesId]||[]).filter(d=>!learnedIds.has(d.id)).map(d=>{
+    const ev=evaluateSkillCandidate(d,inst);
+    return `<div class="skill-card ${ev.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${d.id} ${typeBadge(d.move?.type||'Fire')}</b></div><div class="skill-detail">Power: ${d.move?.power??'—'} • CD: ${d.move?.cooldown??'—'}s</div>${ev.eligible?`<button data-learn="${d.id}">เรียน</button>`:`<div class="skill-req">ล็อก: ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')||'ยังไม่พร้อม'}</div>`}</div>`;
+  }).join('');
+  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
+  panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
 }
 let immersiveStarted=true;
 function startGameInteraction(){
@@ -2042,7 +2080,7 @@ function learnCandidateSkill(id,skillId){
   if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
   learnSkill(inst,{skillId:def.id,slot:def.slot||'s1'});
   msg(`${displayName(inst)} เรียน ${def.id}`);
-  renderManager();saveGame(false);
+  renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
 }
 function mutateOwnedSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;
