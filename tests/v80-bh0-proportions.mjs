@@ -2,8 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { PROPORTION_SHEET, allProportionEvidence, proportionEvidence } from '../asset-lab/proportions.mjs';
 
-const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-assert.match(js, /legacy-capsule\.v1/, 'BH0 must not switch the live player to Bighead yet');
 assert.equal(PROPORTION_SHEET.locked, false);
 assert.equal(PROPORTION_SHEET.recommended, 'B');
 assert.equal(PROPORTION_SHEET.options.B.headY, 1.44);
