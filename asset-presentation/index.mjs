@@ -6,6 +6,7 @@ export {
   CHARACTER_ID_RE,
   CHARACTER_ROLES,
   GAMEPLAY_FORBIDDEN_FIELDS,
+  MONSTER_EXTRA_FIELDS,
   MONSTER_ID_RE,
   MONSTER_ROLES,
   REQUIRED_ASSET_FIELDS,
@@ -46,8 +47,12 @@ export {
   isPresentationAnchor,
 } from './anchors.mjs';
 export { normalizeAssetRequest } from './requests.mjs';
-export { MONSTER_BUNDLE, parseMonsterAssetId, resolveMonsterAssetId } from './monster-ids.mjs';
+export {
+  MONSTER_ANIMAL_BUNDLE,
+  MONSTER_SLIME_BUNDLE,
+  parseMonsterAssetId,
+  resolveMonsterAssetId,
+} from './monster-ids.mjs';
 export { createAssetEngine } from './engine.mjs';
 export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
 export { createBigheadProvider } from './providers/procedural-bighead.mjs';
-export { createProceduralMonsterProvider } from './providers/procedural-monster.mjs';

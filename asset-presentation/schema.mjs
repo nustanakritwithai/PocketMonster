@@ -8,13 +8,14 @@ export const REQUIRED_ASSET_FIELDS = Object.freeze([
 ]);
 
 export const ALLOWED_KINDS = Object.freeze(['character', 'monster']);
-export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy', 'monster']);
+export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy']);
 export const CHARACTER_ROLES = Object.freeze(['player', 'keeper']);
-export const MONSTER_ROLES = Object.freeze(['wild', 'owned', 'companion', 'ranch', 'battle']);
+export const MONSTER_ROLES = Object.freeze(['wild', 'owned', 'boss', 'elite']);
 export const ALLOWED_ROLES = Object.freeze([...CHARACTER_ROLES, ...MONSTER_ROLES]);
 export const ALLOWED_LIFE_STAGES = Object.freeze(['Baby', 'Juvenile', 'Adult', 'Mature']);
-export const MONSTER_ID_RE = /^monster\.[a-z0-9_]+\.[a-z0-9_]+\.v1$/;
+export const MONSTER_ID_RE = /^monster\.[a-z0-9_]+\.[a-z0-9_]+\.bighead\.v1$/;
 export const CHARACTER_ID_RE = /^character\./;
+export const MONSTER_EXTRA_FIELDS = Object.freeze(['speciesId', 'type', 'form', 'color']);
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -50,10 +51,16 @@ export function validateAssetDefinition(def) {
     errors.push(`unsupported provider ${def.provider}`);
   }
   if (def.kind === 'monster' && def.id && !MONSTER_ID_RE.test(def.id)) {
-    errors.push('monster id must match monster.{species}.{form}.v1');
+    errors.push('monster id must match monster.{form}.{species}.bighead.v1');
   }
   if (def.kind === 'character' && def.id && !CHARACTER_ID_RE.test(def.id)) {
     errors.push('character id must start with character.');
+  }
+  if (def.kind === 'monster') {
+    for (const field of MONSTER_EXTRA_FIELDS) {
+      if (def[field] == null) errors.push(`missing ${field}`);
+    }
+    if (def.color != null && typeof def.color !== 'number') errors.push('color must be a number');
   }
   if (!isPlainObject(def.metrics)) errors.push('metrics must be an object');
   if (!isPlainObject(def.roles)) errors.push('roles must be an object');
