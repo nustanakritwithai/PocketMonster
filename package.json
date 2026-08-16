@@ -1,6 +1,6 @@
 {
   "name": "monster-life-rpg-prototype",
-  "version": "7.1.0",
+  "version": "8.0.0",
   "type": "module",
   "scripts": {
     "check": "node tests/check-active-syntax.mjs",

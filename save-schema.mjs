@@ -1,6 +1,6 @@
-export const APP_VERSION = '7.1.0';
+export const APP_VERSION = '8.0.0';
 export const ASSET_REVISION = '710';
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 8;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
