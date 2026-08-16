@@ -65,7 +65,7 @@ assert.match(js, /ranchPad\.ring\.rotation\.y\+=dt\*\.2/, 'square pad frame spin
 assert.match(js, /breedingPad\.ring\.rotation\.y-=dt\*\.16/, 'breeding frame spins on Y the other way');
 assert.match(js, /incubator\.rotation\.y\+=dt\*\.12/, 'incubator still turns');
 
-assert.match(js, /circleGeometry\(radius,36\)/, 'ground decals stay circular until Phase 4');
-assert.match(js, /function spawnRingPulse\([\s\S]*?torusGeometry/, 'ring pulses stay toruses until Phase 4');
+assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'fog near/far stay until Phase 5');
+assert.match(js, /case 'halo': return torusGeometry/, 'particle halo shapes stay toruses');
 
 console.log('V8.0 blocky structures: PASS');

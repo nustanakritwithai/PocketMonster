@@ -1217,7 +1217,11 @@ function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
     effects.push({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true});
   }
 }
-function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){ const mesh=new THREE.Mesh(torusGeometry(scale,.03,8,28),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9})); mesh.rotation.x=Math.PI/2; mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'}); }
+function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){
+  const size=scale*1.2;
+  const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
+  mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'});
+}
 function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); } e.mesh.material.opacity=Math.max(0,t*.9); if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
@@ -1384,20 +1388,20 @@ function updateFloatingTexts(dt){
 }
 function spawnGroundDecal(type,pos,{radius=1.1,duration=1.25,intensity=1}={}){
   if(!pos)return;
-  const cfg=typeFx(type),group=new THREE.Group();
-  const disc=new THREE.Mesh(circleGeometry(radius,36),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.13*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  disc.rotation.x=-Math.PI/2; disc.position.y=.032; group.add(disc);
-  const ring=new THREE.Mesh(ringGeometry(radius*.64,radius*.78,40),new THREE.MeshBasicMaterial({color:cfg.accent,transparent:true,opacity:0.42*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  ring.rotation.x=-Math.PI/2; ring.position.y=.038; group.add(ring);
-  const inner=new THREE.Mesh(ringGeometry(radius*.18,radius*.24,28),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.48*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-  inner.rotation.x=-Math.PI/2; inner.position.y=.041; group.add(inner);
+  const cfg=typeFx(type),group=new THREE.Group(),size=radius*1.4;
+  const disc=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.13*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+  disc.position.y=.032; group.add(disc);
+  const ring=new THREE.Mesh(boxGeometry(size*.78,.02,size*.78),new THREE.MeshBasicMaterial({color:cfg.accent,transparent:true,opacity:0.42*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,wireframe:true}));
+  ring.position.y=.038; group.add(ring);
+  const inner=new THREE.Mesh(boxGeometry(size*.24,.02,size*.24),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.48*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,wireframe:true}));
+  inner.position.y=.041; group.add(inner);
   group.position.set(pos.x,0,pos.z); scene.add(group);
   groundDecals.push({group,disc,ring,inner,life:duration,maxLife:duration,type,spin:(Math.random()<.5?-1:1)*(.3+Math.random()*.25)});
 }
 function updateGroundDecals(dt){
   for(let i=groundDecals.length-1;i>=0;i--){
     const d=groundDecals[i]; d.life-=dt; const t=Math.max(0,d.life/d.maxLife);
-    d.ring.rotation.z+=dt*d.spin; d.inner.rotation.z-=dt*d.spin*1.4;
+    d.ring.rotation.y+=dt*d.spin; d.inner.rotation.y-=dt*d.spin*1.4;
     d.group.scale.setScalar(1+(1-t)*.12);
     d.disc.material.opacity=.13*t; d.ring.material.opacity=.42*t; d.inner.material.opacity=.48*t;
     if(d.life<=0){removeAndDispose(scene, d.group);groundDecals.splice(i,1);}
