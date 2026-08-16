@@ -146,6 +146,26 @@ export async function compilePartAtlas(part, layout, loadFace) {
 }
 
 export function createAtlasTexture(THREE, atlas) {
+  if (typeof document !== 'undefined' && THREE?.CanvasTexture) {
+    const canvas = document.createElement('canvas');
+    canvas.width = atlas.width;
+    canvas.height = atlas.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const imageData = ctx.createImageData(atlas.width, atlas.height);
+    imageData.data.set(atlas.rgba);
+    ctx.putImageData(imageData, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshStandardMaterial({
+      map: tex,
+      roughness: 0.62,
+      metalness: 0.04,
+    });
+  }
   if (!THREE?.DataTexture) {
     return { map: { width: atlas.width, height: atlas.height }, roughness: 0.62 };
   }
@@ -156,12 +176,11 @@ export function createAtlasTexture(THREE, atlas) {
   tex.flipY = true;
   tex.needsUpdate = true;
   if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshStandardMaterial({
+  return new THREE.MeshStandardMaterial({
     map: tex,
     roughness: 0.62,
     metalness: 0.04,
   });
-  return mat;
 }
 
 export { BOX_FACE_INDEX };

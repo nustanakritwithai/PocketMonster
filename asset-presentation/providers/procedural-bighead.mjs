@@ -108,12 +108,9 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
       apron.position.set(0, -0.04, -0.16);
       torsoPivot.add(apron);
     } else {
-      const hairCap = new THREE.Mesh(box(headW * 1.02, 0.16, headD * 1.02), material(palette.hair, 0.74, 0.02));
-      hairCap.position.y = headH / 2 - 0.02;
+      const hairCap = new THREE.Mesh(box(headW * 1.02, 0.14, headD * 1.02), material(palette.hair, 0.74, 0.02));
+      hairCap.position.y = headH / 2 + 0.01;
       hairRoot.add(hairCap);
-      const bang = new THREE.Mesh(box(0.22, 0.10, 0.08), material(palette.hair, 0.74, 0.02));
-      bang.position.set(0, headH * 0.18, -(headD / 2 + 0.01));
-      hairRoot.add(bang);
       const tuft = new THREE.Mesh(box(0.10, 0.12, 0.10), material(palette.hair, 0.74, 0.02));
       tuft.position.set(0.16, headH * 0.28, -0.08);
       hairRoot.add(tuft);
@@ -181,15 +178,20 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
       if (!mesh || !part) return;
       const loader = loadFace || (typeof document !== 'undefined' ? browserLoadFace : null);
       if (!loader) return;
-      const atlas = await compilePartAtlas(part, currentAppearance.layout, loader);
-      detachSharedGeometry(mesh);
-      applyBoxAtlasUVs(mesh.geometry, currentAppearance.layout);
-      const next = createAtlasTexture(THREE, atlas);
-      const prev = mesh.material;
-      mesh.material = next;
-      if (prev && prev !== next && typeof prev.dispose === 'function') {
-        prev.map?.dispose?.();
-        prev.dispose();
+      try {
+        const atlas = await compilePartAtlas(part, currentAppearance.layout, loader);
+        detachSharedGeometry(mesh);
+        applyBoxAtlasUVs(mesh.geometry, currentAppearance.layout);
+        const next = createAtlasTexture(THREE, atlas);
+        const prev = mesh.material;
+        mesh.material = next;
+        mesh.userData.atlasApplied = true;
+        if (prev && prev !== next && typeof prev.dispose === 'function') {
+          prev.map?.dispose?.();
+          prev.dispose();
+        }
+      } catch (err) {
+        console.warn('four-side atlas apply failed', currentAppearance.id, err);
       }
     }
 

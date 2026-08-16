@@ -85,11 +85,11 @@ function plot(canvas, cells, ox = 0, oy = 0) {
   }
 }
 
-function eyeBlock(canvas, gx, gy, { brow, wide = 5 } = {}) {
-  cell(canvas, gx, gy, wide, 5, C.eye);
-  cell(canvas, gx + 1, gy + 1, 3, 3, C.pupil);
-  cell(canvas, gx + 3, gy + 1, 1, 1, C.shine);
-  if (brow) cell(canvas, gx, gy - 1, wide, 1, brow);
+function eyeBlock(canvas, gx, gy, { brow, wide = 7 } = {}) {
+  cell(canvas, gx, gy, wide, 7, C.eye);
+  cell(canvas, gx + 1, gy + 1, wide - 2, 5, C.pupil);
+  cell(canvas, gx + wide - 2, gy + 1, 2, 2, C.shine);
+  if (brow) cell(canvas, gx, gy - 2, wide, 2, brow);
 }
 
 function playerHeadFront() {
@@ -110,14 +110,14 @@ function playerHeadFront() {
     [20, 13, 5, 2, C.hair],
     [0, 28, 32, 4, C.skinPShadow],
     [12, 18, 8, 3, C.skinPShadow],
-    [4, 20, 3, 2, C.blush],
-    [25, 20, 3, 2, C.blush],
-    [14, 19, 4, 2, C.skinPDeep],
-    [13, 23, 6, 2, C.mouth],
-    [14, 24, 4, 1, C.hairDeep],
+    [3, 22, 4, 3, C.blush],
+    [25, 22, 4, 3, C.blush],
+    [13, 20, 6, 3, C.skinPDeep],
+    [11, 25, 10, 3, C.mouth],
+    [13, 27, 6, 1, C.hairDeep],
   ]);
-  eyeBlock(c, 6, 15, { brow: C.hairDark });
-  eyeBlock(c, 21, 15, { brow: C.hairDark });
+  eyeBlock(c, 4, 14, { brow: C.hairDark });
+  eyeBlock(c, 21, 14, { brow: C.hairDark });
   return c;
 }
 
@@ -136,9 +136,9 @@ function playerHeadRight() {
     [15, 17, 3, 4, C.skinPDeep],
     [16, 18, 2, 2, C.blush],
     [0, 28, 22, 4, C.skinPShadow],
-    [4, 22, 5, 2, C.mouth],
+    [3, 24, 7, 3, C.mouth],
   ]);
-  eyeBlock(c, 4, 15, { brow: C.hair, wide: 4 });
+  eyeBlock(c, 2, 14, { brow: C.hair, wide: 6 });
   return c;
 }
 
@@ -155,12 +155,10 @@ function playerHeadLeft() {
     [12, 15, 4, 7, C.skinPShadow],
     [13, 17, 2, 4, C.skinPDeep],
     [0, 27, 24, 5, C.skinPShadow],
-    [5, 23, 4, 1, C.mouth],
-    [18, 20, 2, 2, C.blush],
+    [4, 25, 6, 2, C.mouth],
+    [17, 21, 3, 3, C.blush],
   ]);
-  eyeBlock(c, 5, 16, { brow: C.hairDeep, wide: 4 });
-  cell(c, 6, 17, 2, 2, C.pupil);
-  cell(c, 7, 16, 1, 1, C.shine);
+  eyeBlock(c, 3, 15, { brow: C.hairDeep, wide: 6 });
   return c;
 }
 
@@ -290,13 +288,13 @@ function keeperHeadFront() {
     [0, 27, 32, 5, C.skinKShadow],
     [13, 18, 6, 2, C.skinKShadow],
     [14, 19, 4, 2, C.skinK],
-    [12, 23, 8, 2, C.mouth],
-    [13, 24, 6, 1, C.hatDark],
-    [5, 20, 3, 2, C.blush],
-    [24, 20, 3, 2, C.blush],
+    [11, 24, 10, 3, C.mouth],
+    [13, 26, 6, 1, C.hatDark],
+    [3, 21, 4, 3, C.blush],
+    [25, 21, 4, 3, C.blush],
   ]);
-  eyeBlock(c, 6, 14, { brow: C.hatDark });
-  eyeBlock(c, 21, 14, { brow: C.hatDark });
+  eyeBlock(c, 4, 13, { brow: C.hatDark });
+  eyeBlock(c, 21, 13, { brow: C.hatDark });
   return c;
 }
 
@@ -310,9 +308,9 @@ function keeperHeadRight() {
     [22, 6, 10, 12, C.hatDark],
     [14, 16, 5, 6, C.skinKShadow],
     [0, 27, 24, 5, C.skinKShadow],
-    [4, 22, 5, 2, C.mouth],
+    [3, 24, 7, 3, C.mouth],
   ]);
-  eyeBlock(c, 4, 15, { brow: C.hatDark, wide: 4 });
+  eyeBlock(c, 2, 14, { brow: C.hatDark, wide: 6 });
   return c;
 }
 
@@ -327,9 +325,9 @@ function keeperHeadLeft() {
     [0, 11, 32, 2, C.hatDark],
     [11, 16, 4, 6, C.skinKShadow],
     [0, 27, 26, 5, C.skinKShadow],
-    [6, 22, 4, 1, C.mouth],
+    [4, 24, 6, 2, C.mouth],
   ]);
-  eyeBlock(c, 5, 15, { brow: C.hat, wide: 4 });
+  eyeBlock(c, 3, 14, { brow: C.hat, wide: 6 });
   return c;
 }
 
