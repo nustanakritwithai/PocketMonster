@@ -2202,7 +2202,7 @@ function evoRequirementStatus(inst,path){
   return {ok:result.eligible,text:items.length?items.join(' • '):(result.eligible?'ผ่านเงื่อนไขทั้งหมด':'ยังไม่พร้อม'),result};
 }
 function reqEnvironment(path){return !!path?.requires?.environment;}
-function showEvolution(id){state.evolutionCandidate=id;renderEvolution();}
+function showEvolution(id){state.evolutionCandidate=id;setManagerTab('evolution');}
 function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.speciesId],path=sp?.evolutionPaths?.find(p=>p.id===pathId);if(!inst||!path||inst.formId===path.id||inst.evolutionPath===path.id)return;
   syncToBodyMind(inst);
   const def=evoDefFromPath(path,sp.id);
@@ -2312,11 +2312,26 @@ function skillPanelHTML(inst){
   }
   return rows.length?`<div class="skill-panel">${rows.join('')}</div>`:'';
 }
+function bindManagerAction(node,handler){
+  if(!node)return;
+  node.addEventListener('pointerdown',event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    handler();
+  },{passive:false});
+}
+function monsterCrValue(inst){
+  try{
+    return formatCrReport(inst,spById[inst.speciesId],getEvolutionPath(inst),getEquipmentFlat(inst)).rated.cr;
+  }catch{
+    return null;
+  }
+}
 function monsterCard(inst,where){
-  const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0;
+  const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
   const eq=inst.equipment||{};
   const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));
   wrap.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>careAction(inst.instanceId,b.dataset.care));
   wrap.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>toggleStarterEquip(inst.instanceId,b.dataset.equip));
@@ -2325,8 +2340,8 @@ function monsterCard(inst,where){
   wrap.querySelectorAll('[data-mutate]').forEach(b=>b.onclick=()=>mutateOwnedSkill(inst.instanceId,b.dataset.mutate));
   wrap.querySelector('.move-btn').onclick=()=>where==='storage'?withdrawMonster(inst.instanceId):depositMonster(inst.instanceId);
   const rt=wrap.querySelector('.ranch-toggle');if(rt)rt.onclick=()=>toggleRanchActive(inst.instanceId);
-  const eb=wrap.querySelector('.evo-btn');if(eb)eb.onclick=()=>showEvolution(inst.instanceId);
-  wrap.querySelector('.cr-btn').onclick=()=>showCrDebug(inst.instanceId);
+  const eb=wrap.querySelector('.evo-btn');if(eb)bindManagerAction(eb,()=>showEvolution(inst.instanceId));
+  bindManagerAction(wrap.querySelector('.cr-btn'),()=>showCrDebug(inst.instanceId));
   return wrap;
 }
 function toggleStarterEquip(id,itemId){
@@ -2359,7 +2374,14 @@ function mutateOwnedSkill(id,skillId){
 }
 function showCrDebug(id){
   state.crCandidate=id;
-  renderCrDebug();
+  const rated=renderCrDebug();
+  const box=el('crDebugPanel');
+  if(box){
+    box.classList.add('open');
+    box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  const inst=getInst(id);
+  if(inst&&rated)msg(`${displayName(inst)} • CR ${rated.cr} • DPS ${Math.round(rated.dps)} • EHP ${Math.round(rated.ehp)}`);
 }
 function breedingAdultIds(){return state.storage.filter(id=>{const i=getInst(id);return i&&adultForBreeding(i);});}
 let pickerTarget='parentA';
@@ -2421,12 +2443,24 @@ function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('mana
 function renderCrDebug(){
   const box=el('crDebugPanel');if(!box)return;
   const inst=getInst(state.crCandidate);
-  if(!inst){box.textContent='เลือกมอนแล้วกด “ดู CR” เพื่อแยกแหล่งพลัง Base / Level / Training / Gene / Evolution / Equipment / Condition';return;}
-  const report=formatCrReport(inst,spById[inst.speciesId],getEvolutionPath(inst),getEquipmentFlat(inst));
-  const b=report.breakdown,d=report.derived,r=report.rated;
-  box.innerHTML=`<div class="event-title">CR Debug • ${displayName(inst)} Lv.${inst.level} • CR ${r.cr} • DPS ${Math.round(r.dps)} • EHP ${Math.round(r.ehp)}</div>
+  if(!inst){
+    box.classList.remove('open');
+    box.textContent='เลือกมอนแล้วกด “ดู CR” เพื่อแยกแหล่งพลัง Base / Level / Training / Gene / Evolution / Equipment / Condition';
+    return;
+  }
+  try{
+    const report=formatCrReport(inst,spById[inst.speciesId],getEvolutionPath(inst),getEquipmentFlat(inst));
+    const b=report.breakdown,d=report.derived,r=report.rated;
+    box.classList.add('open');
+    box.innerHTML=`<div class="event-title">CR Debug • ${displayName(inst)} Lv.${inst.level} • CR ${r.cr} • DPS ${Math.round(r.dps)} • EHP ${Math.round(r.ehp)}</div>
     <div class="cr-lines">${['hp','atk','def','spd'].map(stat=>{const s=b[stat];return `${stat.toUpperCase()} ${s.final} = base ${Math.round(s.speciesBase)} + lv ${Math.round(s.levelGrowth)} + train ${Math.round(s.training)} + nut ${Math.round(s.nutritionFlat)} + eq ${Math.round(s.equipmentFlat)} × gene ${s.geneRank}(${s.geneMultiplier}) × evo ${s.evolutionProfile} × cond ${s.conditionModifier.toFixed(2)}`;}).join('<br>')}
     <br>Derived crit ${(d.critRate*100).toFixed(1)}% / ×${d.critDamage.toFixed(2)} • tempo ${(d.attackTempo*100).toFixed(1)}% • CDR ${(d.cooldownReduction*100).toFixed(1)}%</div>`;
+    return r;
+  }catch(err){
+    box.classList.add('open');
+    box.textContent='คำนวณ CR ไม่สำเร็จ: '+(err?.message||err);
+    return null;
+  }
 }
 
 // ---------- HUD / rendering ----------

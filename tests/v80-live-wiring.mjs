@@ -136,6 +136,8 @@ assert.ok(html.includes('game-v800.js?v=800'), 'active HTML loads the v800 runti
 assert.ok(html.includes('style-v800.css?v=800'), 'active HTML loads the v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');
 assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');
+assert.ok(js.includes("scrollIntoView({block:'nearest'"), 'ดู CR must scroll the debug panel into view');
+assert.ok(js.includes("setManagerTab('evolution')"), 'ดู Evolution must switch to the Evolution tab');
 assert.ok(css.includes('.stat-breakdown'), 'breakdown line has styles');
 assert.ok(css.includes('.care-actions'), 'care buttons have styles');
 assert.ok(css.includes('.equip-actions'), 'equipment buttons have styles');
