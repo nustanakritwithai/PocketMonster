@@ -1,0 +1,58 @@
+{
+  "name": "humanoid-core",
+  "version": "1.0.0",
+  "assets": [
+    {
+      "id": "character.human.legacy-capsule.v1",
+      "kind": "character",
+      "provider": "legacy",
+      "style": "legacy-capsule-v1",
+      "surfaceStyle": "untextured-v1",
+      "rig": "humanoid-rig-v1",
+      "metrics": {
+        "height": 1.8,
+        "head": [0.44, 0.44, 0.44],
+        "headY": 1.56
+      },
+      "roles": {
+        "player": { "accessories": ["hair-a", "backpack-a"] },
+        "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] }
+      }
+    },
+    {
+      "id": "character.human.blocky-bighead.v1",
+      "kind": "character",
+      "provider": "procedural",
+      "style": "blocky-bighead-v1",
+      "surfaceStyle": "four-side-block-v1",
+      "rig": "humanoid-rig-v1",
+      "metrics": {
+        "height": 1.8,
+        "head": [0.64, 0.72, 0.56],
+        "headY": 1.44
+      },
+      "roles": {
+        "player": { "accessories": ["hair-a", "backpack-a"] },
+        "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] }
+      }
+    }
+  ],
+  "appearances": [
+    {
+      "id": "appearance.human.player-orange.v1",
+      "style": "four-side-block-v1",
+      "mode": "fallback",
+      "parts": {
+        "head": { "topColor": "#F97316", "bottomColor": "#FFC4A3" }
+      }
+    },
+    {
+      "id": "appearance.human.keeper-green.v1",
+      "style": "four-side-block-v1",
+      "mode": "fallback",
+      "parts": {
+        "head": { "topColor": "#FACC15", "bottomColor": "#F0C8A0" }
+      }
+    }
+  ]
+}
