@@ -19,8 +19,27 @@ class Node {
     this.rotation = vec();
     this.userData = {};
     this.parent = null;
+    this.matrixWorld = { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
   }
   add(child) { this.children.push(child); child.parent = this; }
+  updateWorldMatrix() {
+    let x = this.position.x, y = this.position.y, z = this.position.z;
+    let parent = this.parent;
+    while (parent) {
+      x += parent.position.x;
+      y += parent.position.y;
+      z += parent.position.z;
+      parent = parent.parent;
+    }
+    this.matrixWorld.elements[12] = x;
+    this.matrixWorld.elements[13] = y;
+    this.matrixWorld.elements[14] = z;
+  }
+  getWorldPosition(target) {
+    this.updateWorldMatrix(true, false);
+    target.setFromMatrixPosition(this.matrixWorld);
+    return target;
+  }
 }
 class Group extends Node {}
 class Mesh extends Node {
@@ -55,9 +74,13 @@ assert.equal(headPivot.parent, torsoPivot.parent, 'head and torso are siblings â
 assert.equal(headPivot.position.y, 1.44);
 assert.equal(hairRoot.parent, headPivot, 'hair is a headPivot descendant');
 assert.ok(player.root.userData.assetForm === 'blocky-bighead');
+assert.doesNotThrow(() => player.anchor('throwOrigin'), 'throwOrigin must survive Three.js getWorldPosition');
+assert.doesNotThrow(() => player.anchor('hitText'), 'hitText must survive Three.js getWorldPosition');
 const throwOrigin = player.anchor('throwOrigin');
 assert.ok(Math.abs(throwOrigin.y - 1.15) > 0.2, 'throwOrigin comes from the right hand, not y+1.15');
 assert.equal(throwOrigin.y, rightHandAnchor.position.y + rightHandAnchor.parent.position.y);
+const hitText = player.anchor('hitText');
+assert.ok(hitText.y > throwOrigin.y, 'hitText sits above the throwing hand');
 player.play('hurt', { duration: 0.24 });
 player.update(0.12, { moving: false });
 const hurtX = torsoPivot.rotation.x;
