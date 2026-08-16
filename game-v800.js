@@ -39,6 +39,7 @@ import {
   isBigheadMonsterRoot,
   markRingScale,
 } from './asset-presentation/monster-mark.mjs';
+import { paintGroundGrid, paintSkyGradient } from './asset-presentation/blocky-ground.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -193,7 +194,42 @@ function effectLabel(mult){ if(mult===0)return ['ไม่มีผล','none'];
 
 // ---------- Scene ----------
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x65c9f5);
+const groundTexCache=new Map();
+const skyTexCache=new Map();
+function canvasTexFromRgba(img){
+  const canvas=document.createElement('canvas');
+  canvas.width=img.width; canvas.height=img.height;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const data=ctx.createImageData(img.width,img.height);
+  data.data.set(img.rgba);
+  ctx.putImageData(data,0,0);
+  const tex=new THREE.CanvasTexture(canvas);
+  tex.magFilter=THREE.NearestFilter;
+  tex.minFilter=THREE.NearestFilter;
+  tex.generateMipmaps=false;
+  tex.needsUpdate=true;
+  if(THREE.SRGBColorSpace) tex.colorSpace=THREE.SRGBColorSpace;
+  return tex;
+}
+function makeGroundTexture(zoneColor, zoneType='grass'){
+  const key=zoneColor+':'+zoneType;
+  if(groundTexCache.has(key)) return groundTexCache.get(key);
+  const tex=canvasTexFromRgba(paintGroundGrid(zoneColor, zoneType));
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(20,20);
+  groundTexCache.set(key,tex);
+  return tex;
+}
+function makeSkyTexture(zoneColor){
+  if(skyTexCache.has(zoneColor)) return skyTexCache.get(zoneColor);
+  const tex=canvasTexFromRgba(paintSkyGradient(zoneColor));
+  tex.magFilter=THREE.LinearFilter;
+  tex.minFilter=THREE.LinearFilter;
+  tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+  skyTexCache.set(zoneColor,tex);
+  return tex;
+}
+scene.background=makeSkyTexture(0x72c7ef);
 scene.fog=new THREE.Fog(0x65c9f5,30,76);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,130);
 const renderer=new THREE.WebGLRenderer({antialias:qualityProfile.antialias,powerPreference:'high-performance'});
@@ -204,7 +240,7 @@ el('game').appendChild(renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xffffff,0x42643d,1.55));
 const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows; scene.add(sun);
-const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({color:0x59cd61,roughness:1}));
+const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial({map:makeGroundTexture(0x62c96b,'grass'),color:0xffffff,roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
 const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.add(decorations);
@@ -1554,6 +1590,16 @@ const ZONES={
     ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
   ]}
 };
+function setZoneGround(zone){
+  const z=ZONES[zone];
+  if(!z)return;
+  const type=zone==='cave'?'cave':'grass';
+  ground.material.map=makeGroundTexture(z.ground,type);
+  ground.material.color.setHex(0xffffff);
+  ground.material.needsUpdate=true;
+  scene.background=makeSkyTexture(z.bg);
+  scene.fog.color.setHex(zone==='cave'?0x1e293b:z.bg);
+}
 function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp.elite,evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
   mesh.position.set(x,0,z);
@@ -1652,9 +1698,7 @@ function switchZone(zone,silent=false){
   el('monsterManager').classList.add('hidden');
   state.currentZone=zone;
   const cfg=ZONES[zone];
-  scene.background.setHex(cfg.bg);
-  scene.fog.color.setHex(cfg.bg);
-  ground.material.color.setHex(cfg.ground);
+  setZoneGround(zone);
   populateWorld(zone);
   player.position.set(0,0,5);
   playerData.hp=Math.max(1,playerData.hp);
