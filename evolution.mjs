@@ -32,6 +32,7 @@ export function evolutionContext(instance) {
     career: instance.career,
     zoneTime: instance.zoneTime ?? {},
     foodHistory: instance.foodHistory ?? {},
+    eventFlags: instance.eventFlags ?? [],
     currentZone: instance.currentZone ?? null,
     weather: instance.weather ?? null,
     formId: instance.formId,

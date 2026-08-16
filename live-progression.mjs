@@ -11,30 +11,27 @@ import {
   trainingGain,
   totalTrainingUsed,
 } from './balance-formulas.mjs';
-import { DEFAULT_CONVERSION, finalStats, statBreakdown } from './combat-rating.mjs';
-import { nutritionFlat } from './food-care.mjs';
+import { combatRating, DEFAULT_CONVERSION, derivedStats, finalStats, statBreakdown } from './combat-rating.mjs';
+import { activeTrainingFoodMultiplier, nutritionFlat } from './food-care.mjs';
 import { deriveCondition } from './monster-instance.mjs';
+import { EQUIPMENT_CATALOG, personalityTrainingMultiplier } from './content-catalog.mjs';
 
 export const LEVEL_GROWTH_SCALE = Object.freeze({ hp: 0.14, atk: 0.08, def: 0.08, spd: 0.05 });
-
-export const STARTER_EQUIPMENT = Object.freeze([
-  Object.freeze({ id: 'ranch_band', slot: 'gear', name: 'Ranch Band', affixes: Object.freeze([Object.freeze({ group: 'atk', stat: 'atk', value: 2 })]) }),
-  Object.freeze({ id: 'guard_charm', slot: 'charm', name: 'Guard Charm', affixes: Object.freeze([Object.freeze({ group: 'def', stat: 'def', value: 2 })]) }),
-  Object.freeze({ id: 'swift_lens', slot: 'utility', name: 'Swift Lens', affixes: Object.freeze([Object.freeze({ group: 'spd', stat: 'spd', value: 1 })]) }),
-]);
+export const STARTER_EQUIPMENT = EQUIPMENT_CATALOG.filter(item => ['ranch_band', 'guard_charm', 'swift_lens'].includes(item.id));
 
 export function speciesRatingProfile(sp) {
   const base = sp?.base ?? { hp: 1, atk: 1, def: 1, spd: 1 };
+  const growth = sp?.growthPerLevel ?? {
+    hp: base.hp * LEVEL_GROWTH_SCALE.hp,
+    atk: base.atk * LEVEL_GROWTH_SCALE.atk,
+    def: base.def * LEVEL_GROWTH_SCALE.def,
+    spd: base.spd * LEVEL_GROWTH_SCALE.spd,
+  };
   return {
     id: sp?.id,
     base,
-    growthPerLevel: {
-      hp: base.hp * LEVEL_GROWTH_SCALE.hp,
-      atk: base.atk * LEVEL_GROWTH_SCALE.atk,
-      def: base.def * LEVEL_GROWTH_SCALE.def,
-      spd: base.spd * LEVEL_GROWTH_SCALE.spd,
-    },
-    conversion: DEFAULT_CONVERSION,
+    growthPerLevel: growth,
+    conversion: sp?.conversion ?? DEFAULT_CONVERSION,
   };
 }
 
@@ -96,7 +93,7 @@ export function liveCaptureChance({
   hpRatio,
   elite = false,
   uncapturable = false,
-  eliteModifier = BALANCE_CONFIG.capture.bossTierModifier === 0 ? 0.34 : 0.34,
+  eliteModifier = 0.34,
 } = {}) {
   if (uncapturable) return 0;
   return formulaCaptureChance({
@@ -117,16 +114,20 @@ export function liveMoveDamage({
   atkBuff = 1,
   masteryPower = 0,
   traitBonus = 1,
+  critRate = 0,
+  critDamage = 1.5,
+  critRoll = 1,
 } = {}) {
   const mitigation = defenseMitigation(def, defenderLevel);
   const power = Number.isFinite(movePower) ? movePower : 0;
   const base = (power + atk * 0.75 * atkBuff) * (1 + (Math.max(1, attackerLevel) - 1) * 0.025);
   const mastery = 1 + (Number.isFinite(masteryPower) ? masteryPower : 0);
+  const crit = Number(critRoll) < Number(critRate) ? (Number.isFinite(critDamage) ? critDamage : 1.5) : 1;
   const damage = Math.max(
     effectiveness === 0 ? 0 : 1,
-    Math.round(base * mitigation.damageMultiplier * stab * effectiveness * mastery * traitBonus),
+    Math.round(base * mitigation.damageMultiplier * stab * effectiveness * mastery * traitBonus * crit),
   );
-  return { damage, stab, eff: effectiveness, mitigation };
+  return { damage, stab, eff: effectiveness, mitigation, crit: crit > 1 };
 }
 
 export function evoDefFromPath(path, speciesId) {
@@ -135,22 +136,43 @@ export function evoDefFromPath(path, speciesId) {
   if (req.level) required.push({ field: 'level', op: 'gte', value: req.level });
   if (req.bond) required.push({ field: 'bond', op: 'gte', value: req.bond });
   if (req.trainingFocus) required.push({ field: 'trainingFocus', op: 'eq', value: req.trainingFocus });
+  if (req.training && typeof req.training === 'object') {
+    for (const [line, value] of Object.entries(req.training)) {
+      required.push({ field: `training.${line}`, op: 'gte', value });
+    }
+  }
+  if (req.career && typeof req.career === 'object') {
+    for (const [key, value] of Object.entries(req.career)) {
+      required.push({ field: `career.${key}`, op: 'gte', value });
+    }
+  }
+  if (req.skillMastery && typeof req.skillMastery === 'object') {
+    for (const [skillId, rank] of Object.entries(req.skillMastery)) {
+      required.push({ field: `skillMastery.${skillId}`, op: 'rankGte', value: rank });
+    }
+  }
+  if (Array.isArray(req.eventFlags)) {
+    for (const flag of req.eventFlags) required.push({ field: 'eventFlags', op: 'includes', value: flag });
+  }
   return {
     id: path.id,
-    fromFormId: speciesId,
-    toFormId: path.id,
+    fromFormId: path.fromFormId || speciesId,
+    toFormId: path.toFormId || path.id,
     requirements: { required },
     profile: evolutionProfileFromMods(path.statMods),
-    skillMapping: {},
+    skillMapping: path.skillMapping || {},
     addsSecondaryType: path.secondaryType ?? null,
     name: path.name,
   };
 }
 
-export function ranchTrainingGain(inst, line, baseGain) {
+export function ranchTrainingGain(inst, line, baseGain, now = Date.now()) {
   const training = inst.training ?? {};
+  const personalityId = inst.personalityId || inst.personality;
+  const foodMul = activeTrainingFoodMultiplier(inst, line, now);
+  const personalityMul = personalityTrainingMultiplier(personalityId, line);
   return trainingGain({
-    baseGain,
+    baseGain: baseGain * foodMul * personalityMul,
     currentValue: training[line] ?? 0,
     aptitudeStars: inst.aptitude?.[line] ?? 3,
     condition: deriveCondition(inst),
@@ -161,4 +183,11 @@ export function ranchTrainingGain(inst, line, baseGain) {
 export function explainStat(inst, sp, path, equipmentFlat, stat) {
   const build = instanceCombatBuild(inst, sp, path, equipmentFlat);
   return statBreakdown(build, stat);
+}
+
+export function formatCrReport(inst, sp, path, equipmentFlat = null) {
+  const { stats, breakdown, build } = computeCoreStats(inst, sp, path, equipmentFlat);
+  const rated = combatRating(build);
+  const derived = derivedStats(build);
+  return { stats, breakdown, build, rated, derived };
 }

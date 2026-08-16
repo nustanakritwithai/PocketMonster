@@ -9,12 +9,24 @@ import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
-import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, SKILL_SLOTS } from './skill-progression.mjs';
-import { equipItem, unequip, equippedItems, computeEquipmentContribution, EQUIPMENT_SLOTS } from './equipment.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
+import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { canBreed as canBreedFn, breed as breedFn, createEgg as createEggFn, GENE_RANKS as BREED_GENE_RANKS } from './breeding.mjs';
-import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, growthExpForLevel, liveCaptureChance, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveCaptureChance, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { derivedStats } from './combat-rating.mjs';
+import {
+  applySpeciesProgression,
+  DEFAULT_INVENTORY,
+  EQUIPMENT_CATALOG,
+  FOOD_CATALOG,
+  RAISING_EVENT_CATALOG,
+  SKILL_CANDIDATES,
+  SKILL_MUTATIONS,
+  equipmentById,
+  foodById,
+} from './content-catalog.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -254,6 +266,7 @@ const species=[
     move('Fairy Spark','Fairy',26),move('Star Dust','Fairy',18,'area',{range:3.2,cooldown:6}),move('Blessing','Fairy',0,'self',{effect:'heal',value:.26,cooldown:8})
   ],evo:{id:'fairimp_lv2',name:'Fairimp',form:'fairimp',color:0xf9a8d4,scale:1.10,statMods:{hp:1.08,atk:1.08,def:1.08,spd:1.14},requires:{level:2}}})
 ];
+applySpeciesProgression(species);
 const spById=Object.fromEntries(species.map(s=>[s.id,s]));
 const personalities=['Brave','Calm','Playful','Lazy','Aggressive','Curious'];
 const POTENTIALS=['D','C','B','A','S'];
@@ -269,7 +282,8 @@ const BREEDING_RECIPES=[]; // future explicit Hybrid recipes only
 const BALANCE={eliteCaptureModifier:.34,bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4};
 
 function rollGender(sp){ return sp.genderMode==='genderless'?'Genderless':(Math.random()<.5?'Male':'Female'); }
-function getEvolutionPath(inst){ const sp=spById[inst?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===inst.evolutionPath)||null; }
+function getEvolutionPath(inst){ const sp=spById[inst?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===inst.formId||p.id===inst.evolutionPath)||null; }
+function availableEvolutionPaths(inst){ const sp=spById[inst?.speciesId]; if(!sp)return []; const from=inst.formId||sp.id; return (sp.evolutionPaths||[]).filter(p=>(p.fromFormId||sp.id)===from&&p.id!==inst.formId); }
 function displayName(inst){ return getEvolutionPath(inst)?.name||spById[inst.speciesId]?.name||'Monster'; }
 function monsterTypes(instOrSp){
   if(!instOrSp)return ['Normal'];
@@ -282,7 +296,23 @@ function monsterTypes(instOrSp){
 function wildPath(w){ const sp=spById[w?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===w?.evolutionPath)||null; }
 function wildDisplayName(w){ return wildPath(w)?.name||spById[w?.speciesId]?.name||'Monster'; }
 function wildTypes(w){ const sp=spById[w?.speciesId]; const path=wildPath(w); return [sp?.types?.[0]||'Normal', path?.secondaryType??sp?.types?.[1]].filter(Boolean); }
-function getMonsterSkills(inst){ return spById[inst.speciesId]?.skills||[]; }
+function getMonsterSkills(inst){
+  const sp=spById[inst.speciesId];
+  const moves=(sp?.skills||[]).map(m=>({...m}));
+  for(const rec of inst.skills||[]){
+    const cand=(SKILL_CANDIDATES[inst.speciesId]||[]).find(c=>c.id===rec.skillId);
+    if(cand?.replaces){
+      const idx=moves.findIndex(m=>m.name===cand.replaces);
+      if(idx>=0)moves[idx]={...moves[idx],...cand.move};
+    }
+    const mut=(SKILL_MUTATIONS[rec.skillId]||[]).find(x=>x.id===rec.mutationId);
+    if(mut?.move){
+      const idx=moves.findIndex(m=>m.name===rec.skillId||m.name===cand?.move?.name);
+      if(idx>=0)moves[idx]={...moves[idx],...mut.move,name:mut.name||moves[idx].name};
+    }
+  }
+  return moves;
+}
 function randomGenes(sp){ return {hp:rand(POTENTIALS),atk:rand(POTENTIALS),def:rand(POTENTIALS),spd:rand(POTENTIALS),trait:rand(sp.traitPool),skillGene:sp.skills[0].name,typeAffinity:sp.types[0]}; }
 function lifeStageFor(inst){ if(inst.origin==='bred'&&inst.level<=1)return 'Baby'; if(inst.level<=2)return 'Juvenile'; if(inst.level<6)return 'Adult'; return 'Mature'; }
 function statValue(base,level,pot,scale,bonus=0){ return Math.max(1,Math.round(base*(1+(level-1)*scale)*(POTENTIAL_MOD[pot]||1)+bonus)); }
@@ -313,7 +343,9 @@ function makeInstance(sp,level=1,opts={}){
     personalityId:personality,
     gender:opts.gender||rollGender(sp),
     genes,
-    aptitude:opts.aptitude,
+    aptitude:opts.aptitude||sp.aptitudeBase,
+    speciesTags:sp.types,
+    favoriteTags:sp.favoriteTags||[],
     training:opts.training,
     generation:opts.generation||1,
     parents:{a:opts.parentAId||null,b:opts.parentBId||null},
@@ -1102,7 +1134,7 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{captureBalls:12,protein:6,healthy:6,favorite:6},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
 let currentManagerTab='collection';
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
@@ -1391,8 +1423,9 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1){
   const stab=monsterTypes(attackerInst).includes(move.type)?1.5:1;
   const defTypes=defender?.instanceId?monsterTypes(defender):wildTypes(defender);
   const eff=typeEffectiveness(move.type,defTypes);
-  const skillRec=getSkill(attackerInst,move.name);
+  const skillRec=getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0]);
   const mastery=skillRec?masteryRawPower(skillRec.masteryRank):0;
+  const derived=derivedStats(instanceCombatBuildSafe(attackerInst));
   return liveMoveDamage({
     movePower:move.power||0,
     atk:attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10,
@@ -1403,8 +1436,15 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1){
     effectiveness:eff,
     atkBuff,
     masteryPower:mastery,
-    traitBonus:attackerInst.genes?.trait==='Fierce'?1.08:1
+    traitBonus:attackerInst.genes?.trait==='Fierce'?1.08:1,
+    critRate:derived.critRate,
+    critDamage:derived.critDamage,
+    critRoll:Math.random()
   });
+}
+function instanceCombatBuildSafe(inst){
+  const sp=spById[inst.speciesId];
+  return computeCoreStats(inst,sp,getEvolutionPath(inst),getEquipmentFlat(inst)).build;
 }
 function wildDamage(w,inst){
   const sp=spById[w.speciesId],move={type:sp.types[0],power:w.boss?24:18};
@@ -1655,11 +1695,7 @@ function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLas
   if(!pendingEvent)triggerRaisingEvent(inst);
 }if(show&&trained>0)msg(`Ranch Training • เติม Training Pool ${trained} ตัว`);}
 // V7.4: Food definitions mapped to resolveFeed categories
-const FOOD_DEFS={
-  protein:{id:'protein',category:'daily',effects:{hunger:24,fitness:8,bond:2}},
-  healthy:{id:'healthy',category:'daily',effects:{hunger:30,energy:10,health:20,bond:2}},
-  favorite:{id:'favorite',category:'favorite',effects:{hunger:20,mood:22,bond:5}}
-};
+const FOOD_DEFS=FOOD_CATALOG;
 function feedMonster(id,food){
   const inst=getInst(id);if(!inst)return;
   if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
@@ -1672,9 +1708,11 @@ function feedMonster(id,food){
   syncFromBodyMind(inst);
   refreshStats(inst,false);
   if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
+  if(result.rejected){state.inventory[food]++;msg(`อาหาร: ${result.reason||'ใช้ไม่ได้'}`);renderManager();return;}
   const favText=result.favorite?' (Favorite!)':'';
   const overText=result.overfull?' (Overfull -70%)':'';
-  msg(`ให้อาหาร ${displayName(inst)} • Bond ${Math.round(inst.bond)}${favText}${overText}`);
+  const extra=result.catalyst?' • catalyst':result.category==='nutrition'?` • Nutrition +${result.applied}`:result.category==='training'?` • Training buff ×${result.multiplier}`:'';
+  msg(`ให้อาหาร ${displayName(inst)} • ${def.name||food} • Bond ${Math.round(inst.bond)}${favText}${overText}${extra}`);
   renderManager();renderParty();saveGame(false);
 }
 // V7.4: Care actions (rest/play) from food-care.mjs
@@ -1707,20 +1745,7 @@ function getEquipmentFlat(inst){
   return contrib.flat;
 }
 // V7.8: Raising Events — sample event definitions
-const RAISING_EVENTS=[
-  {id:'curious_find',baseWeight:1.2,trigger:{statRanges:{mood:{min:50}},},choices:[
-    {id:'explore',label:'สำรวจ',effects:{growthExp:8,mood:5,bond:2}},
-    {id:'ignore',label:'ไม่สนใจ',effects:{mood:-3}},
-  ]},
-  {id:'tired_rest',baseWeight:1.0,trigger:{statRanges:{energy:{max:30}},},choices:[
-    {id:'rest',label:'ให้พัก',effects:{energy:15,stress:-5,bond:3}},
-    {id:'push',label:'ฝืนต่อ',effects:{energy:-5,stress:8,mood:-5}},
-  ]},
-  {id:'playful_bond',baseWeight:0.8,trigger:{statRanges:{bond:{min:40},mood:{min:60}},},choices:[
-    {id:'play',label:'เล่นด้วย',effects:{mood:8,bond:5,trust:3}},
-    {id:'scold',label:'ดุ',effects:{mood:-10,bond:-3,discipline:5}},
-  ]},
-];
+const RAISING_EVENTS=RAISING_EVENT_CATALOG;
 let pendingEvent=null;
 function triggerRaisingEvent(inst){
   if(!inst||pendingEvent)return;
@@ -1845,7 +1870,7 @@ function evoRequirementStatus(inst,path){
 }
 function reqEnvironment(path){return !!path?.requires?.environment;}
 function showEvolution(id){state.evolutionCandidate=id;renderEvolution();}
-function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.speciesId],path=sp?.evolutionPaths?.find(p=>p.id===pathId);if(!inst||!path||inst.evolutionPath)return;
+function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.speciesId],path=sp?.evolutionPaths?.find(p=>p.id===pathId);if(!inst||!path||inst.formId===path.id||inst.evolutionPath===path.id)return;
   syncToBodyMind(inst);
   const def=evoDefFromPath(path,sp.id);
   const st=evoRequirementStatus(inst,path);
@@ -1857,7 +1882,7 @@ function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.species
   inst.evolutionProfile=def.profile;
   if(path.secondaryType&&sp.allowedSecondary.includes(path.secondaryType))inst.secondaryType=path.secondaryType;
   refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
-function renderEvolution(){const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate);if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}const sp=spById[inst.speciesId];if(inst.evolutionPath){const p=getEvolutionPath(inst);box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>Evolution Locked</span></div><div class="evo-details">วิวัฒนาการแล้วและย้อนกลับไม่ได้ • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}</div></div>`;return;}if(!sp.evolutionPaths?.length){box.innerHTML=`<div class="evo-card">${sp.name} ยังไม่มี Evolution Path ใน Vertical Slice นี้</div>`;return;}box.innerHTML='';for(const p of sp.evolutionPaths){const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');d.className='evo-card';d.innerHTML=`<div class="evo-title"><b>${sp.name} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>`;d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);box.appendChild(d);}}
+function renderEvolution(){const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate);if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}const sp=spById[inst.speciesId],paths=availableEvolutionPaths(inst);if(!paths.length){const p=getEvolutionPath(inst);box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div></div>`;return;}box.innerHTML='';for(const p of paths){const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');d.className='evo-card';d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>`;d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);box.appendChild(d);}}
 
 // ---------- NPC manager ----------
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
@@ -1874,24 +1899,74 @@ function breakdownHTML(inst){
   if(!atk)return '';
   return `<div class="stat-breakdown">ATK ${atk.final} = base ${Math.round(atk.speciesBase)} + lv ${Math.round(atk.levelGrowth)} + train ${Math.round(atk.training)} + eq ${Math.round(atk.equipmentFlat)} × gene ${atk.geneRank} × evo ${atk.evolutionProfile} × cond ${atk.conditionModifier.toFixed(2)} • DEF ${def?.final??'-'}</div>`;
 }
+function familyHTML(inst){
+  const a=getInst(inst.parents?.a||inst.parentAId),b=getInst(inst.parents?.b||inst.parentBId);
+  if(a||b)return `<div class="family-line">Gen ${inst.generation} • พ่อแม่ ${a?displayName(a):'?'} × ${b?displayName(b):'?'}</div>`;
+  return `<div class="family-line">Gen ${inst.generation} • Origin ${inst.origin||'captured'}</div>`;
+}
+function skillPanelHTML(inst){
+  const defs=SKILL_CANDIDATES[inst.speciesId]||[];
+  const owned=inst.skills||[];
+  const cand=defs.filter(d=>!getSkill(inst,d.id));
+  const rows=[];
+  for(const rec of owned){
+    const muts=SKILL_MUTATIONS[rec.skillId]||[];
+    rows.push(`<div class="skill-line">${rec.skillId} • ${rec.masteryRank}${rec.mutationId?' • '+rec.mutationId:''}${!rec.mutationId&&rec.masteryRank==='master'&&muts.length?` <button data-mutate="${rec.skillId}">Mutation</button>`:''}</div>`);
+  }
+  for(const d of cand){
+    const ev=evaluateSkillCandidate(d,inst);
+    rows.push(`<div class="skill-line">${d.id} ${ev.eligible?`<button data-learn="${d.id}">เรียน</button>`:`<span class="skill-lock">ล็อก: ${(ev.failedRequired||[]).map(r=>r.field).join(', ')||'ยังไม่พร้อม'}</span>`}</div>`);
+  }
+  return rows.length?`<div class="skill-panel">${rows.join('')}</div>`:'';
+}
 function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0;
   const eq=inst.equipment||{};
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?`<div class="training-badge">Training ${TRAIN_FOCUS[inst.trainingFocus]||'Power'} • Pool ${instTrainingUsed(inst)}/${40+8*inst.level}</div>`:''}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button></div><div class="care-actions"><button data-care="rest">พัก</button><button data-care="play">เล่น</button></div><div class="equip-actions">${STARTER_EQUIPMENT.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}</div>`;
+  const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?`<div class="training-badge">Training ${TRAIN_FOCUS[inst.trainingFocus]||'Power'} • Pool ${instTrainingUsed(inst)}/${40+8*inst.level}</div>`:''}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">พัก</button><button data-care="play">เล่น</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));
   wrap.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>careAction(inst.instanceId,b.dataset.care));
   wrap.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>toggleStarterEquip(inst.instanceId,b.dataset.equip));
   wrap.querySelectorAll('[data-train]').forEach(b=>{if(b.dataset.train===inst.trainingFocus)b.classList.add('active');b.onclick=()=>setTraining(inst.instanceId,b.dataset.train);});
+  wrap.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
+  wrap.querySelectorAll('[data-mutate]').forEach(b=>b.onclick=()=>mutateOwnedSkill(inst.instanceId,b.dataset.mutate));
   wrap.querySelector('.move-btn').onclick=()=>where==='storage'?withdrawMonster(inst.instanceId):depositMonster(inst.instanceId);
   const rt=wrap.querySelector('.ranch-toggle');if(rt)rt.onclick=()=>toggleRanchActive(inst.instanceId);
   const eb=wrap.querySelector('.evo-btn');if(eb)eb.onclick=()=>showEvolution(inst.instanceId);
+  wrap.querySelector('.cr-btn').onclick=()=>showCrDebug(inst.instanceId);
   return wrap;
 }
 function toggleStarterEquip(id,itemId){
   const inst=getInst(id);if(!inst)return;
-  const item=STARTER_EQUIPMENT.find(x=>x.id===itemId);if(!item)return;
+  const item=equipmentById(itemId);if(!item)return;
   if(inst.equipment?.[item.slot]?.id===item.id)unequipMonster(id,item.slot);
-  else equipMonsterItem(id,{...item,affixes:item.affixes.map(a=>({...a}))});
+  else{
+    const preview=loadoutPreview(instanceCombatBuildSafe(inst),computeEquipmentContribution([{...item,affixes:item.affixes.map(a=>({...a}))}]));
+    msg(`Preview ${item.name}: CR ${preview.crDelta>=0?'+':''}${Math.round(preview.crDelta)} • DPS ${preview.dpsDelta>=0?'+':''}${Math.round(preview.dpsDelta)} • EHP ${preview.ehpDelta>=0?'+':''}${Math.round(preview.ehpDelta)}`);
+    equipMonsterItem(id,{...item,affixes:item.affixes.map(a=>({...a}))});
+  }
+}
+function learnCandidateSkill(id,skillId){
+  const inst=getInst(id);if(!inst)return;
+  const def=(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===skillId);if(!def)return;
+  const ev=evaluateSkillCandidate(def,inst);
+  if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
+  learnSkill(inst,{skillId:def.id,slot:def.slot||'s1'});
+  msg(`${displayName(inst)} เรียน ${def.id}`);
+  renderManager();saveGame(false);
+}
+function mutateOwnedSkill(id,skillId){
+  const inst=getInst(id);if(!inst)return;
+  const mut=(SKILL_MUTATIONS[skillId]||[])[0];if(!mut)return;
+  const owned=getSkill(inst,skillId);
+  const result=applyMutation(inst,{skillId,baseSkillDef:{id:skillId,damage:100},mutationDef:mut});
+  if(!result.ok){msg(`Mutation ไม่ผ่าน: ${result.reason}`);return;}
+  msg(`${displayName(inst)} • ${skillId} mutate → ${mut.name}`);
+  renderManager();saveGame(false);
+}
+function showCrDebug(id){
+  state.crCandidate=id;
+  renderCrDebug();
 }
 function breedingAdultIds(){return state.storage.filter(id=>{const i=getInst(id);return i&&adultForBreeding(i);});}
 let pickerTarget='parentA';
@@ -1940,7 +2015,17 @@ function updateEggCountdowns(now=Date.now()){
     }
   }
 }
-function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();}
+function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();}
+function renderCrDebug(){
+  const box=el('crDebugPanel');if(!box)return;
+  const inst=getInst(state.crCandidate);
+  if(!inst){box.textContent='เลือกมอนแล้วกด “ดู CR” เพื่อแยกแหล่งพลัง Base / Level / Training / Gene / Evolution / Equipment / Condition';return;}
+  const report=formatCrReport(inst,spById[inst.speciesId],getEvolutionPath(inst),getEquipmentFlat(inst));
+  const b=report.breakdown,d=report.derived,r=report.rated;
+  box.innerHTML=`<div class="event-title">CR Debug • ${displayName(inst)} Lv.${inst.level} • CR ${r.cr} • DPS ${Math.round(r.dps)} • EHP ${Math.round(r.ehp)}</div>
+    <div class="cr-lines">${['hp','atk','def','spd'].map(stat=>{const s=b[stat];return `${stat.toUpperCase()} ${s.final} = base ${Math.round(s.speciesBase)} + lv ${Math.round(s.levelGrowth)} + train ${Math.round(s.training)} + nut ${Math.round(s.nutritionFlat)} + eq ${Math.round(s.equipmentFlat)} × gene ${s.geneRank}(${s.geneMultiplier}) × evo ${s.evolutionProfile} × cond ${s.conditionModifier.toFixed(2)}`;}).join('<br>')}
+    <br>Derived crit ${(d.critRate*100).toFixed(1)}% / ×${d.critDamage.toFixed(2)} • tempo ${(d.attackTempo*100).toFixed(1)}% • CDR ${(d.cooldownReduction*100).toFixed(1)}%</div>`;
+}
 
 // ---------- HUD / rendering ----------
 function combatMonsterPresentation(inst){
@@ -2146,7 +2231,7 @@ el('menuBtn').onclick=()=>el('utilityMenu').classList.toggle('hidden');
 window.addEventListener('resize',syncOrientationLock); window.addEventListener('orientationchange',syncOrientationLock); document.addEventListener('fullscreenchange',syncOrientationLock);
 startGameInteraction(); setTimeout(syncOrientationLock,80);
 el('parentABtn').onclick=()=>openMonsterPicker('parentA');el('parentBBtn').onclick=()=>openMonsterPicker('parentB');el('breedBtn').onclick=createEgg;el('closePicker').onclick=closeMonsterPicker;el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
-el('healAllBtn').onclick=healAll;el('refillBallsBtn').onclick=()=>{state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{state.inventory.protein=(state.inventory.protein||0)+3;state.inventory.healthy=(state.inventory.healthy||0)+3;state.inventory.favorite=(state.inventory.favorite||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
+el('healAllBtn').onclick=healAll;el('refillBallsBtn').onclick=()=>{state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
 function bindActionPress(button,handler){
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();

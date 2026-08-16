@@ -71,6 +71,13 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now() } = 
       protein: source.inventory?.protein ?? 6,
       healthy: source.inventory?.healthy ?? 6,
       favorite: source.inventory?.favorite ?? 6,
+      trainingChow: source.inventory?.trainingChow ?? 3,
+      mineralBite: source.inventory?.mineralBite ?? 3,
+      emberFruit: source.inventory?.emberFruit ?? 2,
+      moonFruit: source.inventory?.moonFruit ?? 2,
+      stash: Array.isArray(source.inventory?.stash)
+        ? source.inventory.stash.filter(id => typeof id === 'string')
+        : ['ranch_band', 'guard_charm', 'swift_lens', 'flame_claw', 'guard_band', 'focus_lens'],
     },
     saveVersion: SAVE_SCHEMA_VERSION,
   };

@@ -6,6 +6,7 @@ assert.doesNotMatch(versionedHtml, /maximum-scale\s*=\s*1|user-scalable\s*=\s*no
 assert.doesNotMatch(js, /const viewport=document\.querySelector\('meta\[name="viewport"\]'\)/, 'runtime must not repair an unsafe static viewport');
 assert.ok(html.includes('id="worldLabels"'),'world labels overlay missing');
 assert.ok(html.includes('id="raisingEventBanner"'),'raising event banner missing');
+assert.ok(html.includes('id="crDebugPanel"'),'CR debug panel missing');
 assert.ok(js.includes('function createWildLabel(w)'),'wild HP labels missing');
 assert.match(js,/function updateWorldLabels\(/,'wild HP label updater missing');
 assert.ok(html.includes('id="monsterPicker"'),'custom monster picker missing');

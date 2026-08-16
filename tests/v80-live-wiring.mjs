@@ -135,6 +135,7 @@ assert.ok(!useSkillSrc.includes('const res=monsterDamage'), 'useSkill must not s
 assert.ok(html.includes('game-v800.js?v=800'), 'active HTML loads the v800 runtime');
 assert.ok(html.includes('style-v800.css?v=800'), 'active HTML loads the v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');
+assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');
 assert.ok(css.includes('.stat-breakdown'), 'breakdown line has styles');
 assert.ok(css.includes('.care-actions'), 'care buttons have styles');
 assert.ok(css.includes('.equip-actions'), 'equipment buttons have styles');
