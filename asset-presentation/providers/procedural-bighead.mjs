@@ -41,10 +41,28 @@ function applyRest(map) {
   }
 }
 
+function createWorldScratch() {
+  return {
+    x: 0, y: 0, z: 0,
+    set(x, y, z) {
+      this.x = x; this.y = y; this.z = z;
+      return this;
+    },
+    setFromMatrixPosition(m) {
+      const e = m?.elements || m;
+      this.x = e[12];
+      this.y = e[13];
+      this.z = e[14];
+      return this;
+    },
+  };
+}
+
 function worldPos(node, target) {
   const out = target || { x: 0, y: 0, z: 0 };
   if (typeof node.getWorldPosition === 'function') {
-    const vec = node.getWorldPosition(node._worldScratch || (node._worldScratch = { set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } }));
+    const scratch = node._worldScratch || (node._worldScratch = createWorldScratch());
+    const vec = node.getWorldPosition(scratch);
     out.x = vec.x; out.y = vec.y; out.z = vec.z;
     return out;
   }
