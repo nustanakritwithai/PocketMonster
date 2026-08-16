@@ -1499,8 +1499,23 @@ function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=
 // ---------- V7.1.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){inst.level++;const f=inst.trainingFocus||'power';const statKey=TRAIN_STAT_MAP[f]||'atk';if(statKey==='hp')inst.trainingBonus.hp+=5;else inst.trainingBonus[statKey]+=1;inst.bond=clamp(inst.bond+2);inst.fitness=clamp(inst.fitness+3);refreshStats(inst,true);}
-function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;const capped=Math.min(elapsed,10*60*60*1000);state.lifeLastAt=now;const hours=capped/3600000,minutes=capped/60000;let levelUps=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;inst.hunger=clamp(inst.hunger-hours*4);inst.energy=clamp(inst.energy+hours*14);inst.mood=clamp(inst.mood+(inst.hunger>35?hours*2:-hours*5));const moodMod=.65+(inst.mood/100)*.35,fitMod=.75+(inst.fitness/100)*.25;const focus=inst.trainingFocus||'power';
-  // V7.2: Apply offline training to the shared pool via addTrainingExp
+// V7.2: simulateLife adapter — syncs flat fields → body/mind, calls simulateLife, syncs back
+function syncToBodyMind(inst){inst.body=inst.body||{};inst.mind=inst.mind||{};
+  inst.body.hunger=inst.hunger??inst.body.hunger??80;inst.body.energy=inst.energy??inst.body.energy??82;
+  inst.body.fitness=inst.fitness??inst.body.fitness??50;inst.body.health=inst.body.health??100;
+  inst.mind.mood=inst.mood??inst.mind.mood??72;inst.mind.stress=inst.mind.stress??10;
+  inst.mind.bond=inst.bond??inst.mind.bond??24;inst.mind.trust=inst.mind.trust??20;inst.mind.discipline=inst.mind.discipline??20;
+  if(!inst.lastSimulationAt)inst.lastSimulationAt=inst.body.lastSimulationAt||Date.now();}
+function syncFromBodyMind(inst){if(!inst.body||!inst.mind)return;
+  inst.hunger=inst.body.hunger;inst.energy=inst.body.energy;inst.fitness=inst.body.fitness;
+  inst.mood=inst.mind.mood;inst.bond=inst.mind.bond??inst.bond;inst.body.health=inst.body.health;}
+function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;state.lifeLastAt=now;const minutes=elapsed/60000;let levelUps=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;
+  // V7.2: Use simulateLife from monster-instance.mjs for Body/Mind simulation
+  syncToBodyMind(inst);
+  const simResult=simulateLife(inst,now);
+  syncFromBodyMind(inst);
+  // Training accumulation via shared pool (addTrainingExp clamps to capacity)
+  const moodMod=.65+(inst.mood/100)*.35,fitMod=.75+(inst.fitness/100)*.25;const focus=inst.trainingFocus||'power';
   const trainGain=minutes*1.8*moodMod*fitMod;
   const applied=addTrainingExp(inst,focus,trainGain);
   inst.trainingExp=(inst.trainingExp||0)+applied;
@@ -1555,7 +1570,7 @@ function openManager(){if(!isNearNpc()){msg('กลับ Ranch Hub และเ
 function closeManager(){el('monsterManager').classList.add('hidden');saveGame(false);renderParty();}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
-function needsHTML(inst){return `<div class="need-row"><div class="need-chip">หิว <strong>${fmt(inst.hunger)}</strong></div><div class="need-chip">พลัง <strong>${fmt(inst.energy)}</strong></div><div class="need-chip">อารมณ์ <strong>${fmt(inst.mood)}</strong></div></div>`;}
+function needsHTML(inst){return `<div class="need-row"><div class="need-chip">หิว <strong>${fmt(inst.hunger)}</strong></div><div class="need-chip">พลัง <strong>${fmt(inst.energy)}</strong></div><div class="need-chip">อารมณ์ <strong>${fmt(inst.mood)}</strong></div><div class="need-chip">สภาพ <strong>${deriveCondition(inst)||'normal'}</strong></div></div>`;}
 function geneHTML(inst){return `Gene HP ${inst.genes.hp} • ATK ${inst.genes.atk} • DEF ${inst.genes.def} • SPD ${inst.genes.spd} • Trait: ${inst.genes.trait}`;}
 function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0;
