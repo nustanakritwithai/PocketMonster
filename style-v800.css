@@ -281,3 +281,33 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .apt-stars{color:#facc15;letter-spacing:2px;font-size:11px}
 .apt-stars .empty{color:#334155}
 .training-info{font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;padding:6px;background:#0b1220;border-radius:8px}
+
+/* V8.0 UX Phase 3 — Skills tab */
+.skills-panel{padding:4px}
+.skills-section-title{font-size:13px;margin:12px 0 6px;color:#fff;font-weight:700;border-bottom:1px solid #ffffff14;padding-bottom:4px}
+.skill-card{background:#162033;border:1px solid #ffffff14;border-radius:12px;padding:10px;margin-bottom:8px}
+.skill-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:6px}
+.skill-card-header b{font-size:12px;color:#fff}
+.skill-card-header .type-badge{font-size:8px;padding:2px 5px;min-width:30px}
+.skill-mastery-label{font-size:10px;color:#c4b5fd;font-weight:700;white-space:nowrap}
+.skill-mastery-label.master{color:#fde68a}
+.skill-mastery-label.expert{color:#ddd6fe}
+.skill-mastery-label.skilled{color:#bfdbfe}
+.skill-mastery-label.familiar{color:#cbd5e1}
+.skill-mastery-label.novice{color:#94a3b8}
+.skill-mastery-bar{height:6px;background:#111827;border-radius:999px;overflow:hidden;margin:4px 0}
+.skill-mastery-fill{height:100%;border-radius:999px;transition:width .3s}
+.skill-mastery-fill.master{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.skill-mastery-fill.expert{background:linear-gradient(90deg,#7c3aed,#a855f7)}
+.skill-mastery-fill.skilled{background:linear-gradient(90deg,#2563eb,#3b82f6)}
+.skill-mastery-fill.familiar{background:linear-gradient(90deg,#475569,#64748b)}
+.skill-mastery-fill.novice{background:linear-gradient(90deg,#334155,#475569)}
+.skill-detail{font-size:9px;color:#94a3b8;margin-top:3px;line-height:1.5}
+.skill-detail .power-bonus{color:#86efac;font-weight:600}
+.skill-exp-text{font-size:9px;color:#94a3b8;margin:2px 0}
+.skill-exp-text strong{color:#fff}
+.skill-locked{opacity:.6}
+.skill-locked .skill-card-header b{color:#94a3b8}
+.skill-req{font-size:9px;color:#fca5a5;margin-top:3px}
+.skill-help{font-size:9px;color:#64748b;margin-top:12px;padding:8px;background:#0b1220;border-radius:8px;line-height:1.5}
+.skill-help b{color:#94a3b8}
