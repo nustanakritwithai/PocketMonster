@@ -125,20 +125,19 @@ function playerHeadRight() {
   const c = makeCanvas();
   fill(c, C.skinP);
   plot(c, [
-    [0, 0, 32, 10, C.hair],
+    [0, 0, 32, 11, C.hair],
     [0, 0, 32, 3, C.hairDark],
-    [18, 3, 14, 16, C.hair],
-    [22, 6, 10, 18, C.hairDark],
-    [26, 10, 6, 14, C.hairDeep],
-    [0, 10, 7, 3, C.hair],
-    [1, 12, 5, 2, C.hairDark],
-    [14, 16, 5, 6, C.skinPShadow],
-    [15, 17, 3, 4, C.skinPDeep],
-    [16, 18, 2, 2, C.blush],
-    [0, 28, 22, 4, C.skinPShadow],
-    [3, 24, 7, 3, C.mouth],
+    [18, 4, 14, 20, C.hair],
+    [22, 8, 10, 18, C.hairDark],
+    [26, 12, 6, 14, C.hairDeep],
+    [0, 10, 8, 3, C.hair],
+    [2, 12, 5, 2, C.hairDark],
+    [0, 16, 2, 5, C.skinPDeep],
+    [13, 15, 6, 8, C.skinPShadow],
+    [14, 16, 4, 6, C.skinPDeep],
+    [15, 18, 2, 3, C.blush],
+    [0, 27, 24, 5, C.skinPShadow],
   ]);
-  eyeBlock(c, 2, 14, { brow: C.hair, wide: 6 });
   return c;
 }
 
@@ -146,19 +145,17 @@ function playerHeadLeft() {
   const c = makeCanvas();
   fill(c, C.skinP);
   plot(c, [
-    [0, 0, 32, 11, C.hair],
-    [4, 1, 10, 3, C.hairLight],
-    [20, 2, 4, 8, C.hairDark],
-    [22, 8, 10, 15, C.hair],
-    [25, 12, 7, 12, C.hairDark],
-    [0, 11, 8, 2, C.hairLight],
-    [12, 15, 4, 7, C.skinPShadow],
-    [13, 17, 2, 4, C.skinPDeep],
-    [0, 27, 24, 5, C.skinPShadow],
-    [4, 25, 6, 2, C.mouth],
-    [17, 21, 3, 3, C.blush],
+    [0, 0, 32, 12, C.hair],
+    [3, 1, 10, 3, C.hairLight],
+    [20, 3, 12, 20, C.hair],
+    [24, 8, 8, 16, C.hairDark],
+    [0, 11, 7, 2, C.hairLight],
+    [0, 17, 2, 4, C.skinPShadow],
+    [11, 14, 5, 9, C.skinPShadow],
+    [12, 16, 3, 6, C.skinPDeep],
+    [0, 27, 26, 5, C.skinPShadow],
+    [18, 20, 3, 3, C.blush],
   ]);
-  eyeBlock(c, 3, 15, { brow: C.hairDeep, wide: 6 });
   return c;
 }
 
@@ -302,15 +299,15 @@ function keeperHeadRight() {
   const c = makeCanvas();
   fill(c, C.skinK);
   plot(c, [
-    [0, 0, 32, 11, C.hat],
-    [0, 9, 32, 3, C.hatDark],
-    [18, 2, 14, 14, C.hat],
-    [22, 6, 10, 12, C.hatDark],
-    [14, 16, 5, 6, C.skinKShadow],
+    [0, 0, 32, 12, C.hat],
+    [0, 10, 32, 3, C.hatDark],
+    [18, 3, 14, 16, C.hat],
+    [22, 7, 10, 14, C.hatDark],
+    [0, 17, 2, 4, C.skinKShadow],
+    [13, 16, 6, 7, C.skinKShadow],
+    [14, 17, 4, 5, C.skinK],
     [0, 27, 24, 5, C.skinKShadow],
-    [3, 24, 7, 3, C.mouth],
   ]);
-  eyeBlock(c, 2, 14, { brow: C.hatDark, wide: 6 });
   return c;
 }
 
@@ -318,16 +315,16 @@ function keeperHeadLeft() {
   const c = makeCanvas();
   fill(c, C.skinK);
   plot(c, [
-    [0, 0, 32, 12, C.hat],
-    [3, 2, 10, 3, C.hatLight],
-    [20, 4, 12, 12, C.hat],
-    [24, 8, 8, 10, C.hatDark],
-    [0, 11, 32, 2, C.hatDark],
-    [11, 16, 4, 6, C.skinKShadow],
+    [0, 0, 32, 13, C.hat],
+    [4, 2, 10, 3, C.hatLight],
+    [20, 4, 12, 16, C.hat],
+    [24, 8, 8, 12, C.hatDark],
+    [0, 12, 32, 2, C.hatDark],
+    [0, 18, 2, 3, C.skinKShadow],
+    [11, 15, 5, 8, C.skinKShadow],
+    [12, 17, 3, 5, C.skinK],
     [0, 27, 26, 5, C.skinKShadow],
-    [4, 24, 6, 2, C.mouth],
   ]);
-  eyeBlock(c, 3, 14, { brow: C.hat, wide: 6 });
   return c;
 }
 
