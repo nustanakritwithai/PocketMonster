@@ -16,6 +16,7 @@ export {
   loadCatalog,
   resetCatalog,
   resolvePublicRef,
+  upsertAppearance,
 } from './catalog.mjs';
 export { HANDLE_FIELDS, HANDLE_METHODS, assertAssetHandle, createNullHandle } from './handle-contract.mjs';
 export {

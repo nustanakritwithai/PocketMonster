@@ -1,4 +1,6 @@
 import { GAMEPLAY_LOCKS } from '../anchors.mjs';
+import { getAppearance } from '../catalog.mjs';
+import { compileAppearance } from '../four-side/atlas.mjs';
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { registerOwned } from '../ownership.mjs';
 
@@ -160,6 +162,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
     let actionTimer = 0;
     let actionDuration = 0.32;
     let phase = 0;
+    let currentAppearance = compileAppearance(getAppearance(request.appearanceId) || { id: request.appearanceId, parts: {} });
 
     const handle = {
       root,
@@ -236,7 +239,15 @@ export function createBigheadProvider({ THREE, box, cylinder, material } = {}) {
         out.maxY = top.y;
         return out;
       },
-      setAppearance() { return handle; },
+      setAppearance(id) {
+        const def = getAppearance(id);
+        if (!def) return handle;
+        currentAppearance = compileAppearance(def);
+        root.userData.appearanceId = currentAppearance.id;
+        root.userData.appearanceHash = currentAppearance.contentHash;
+        return handle;
+      },
+      appearance() { return currentAppearance; },
       dispose() {
         disposeOwned(handle);
         return handle;

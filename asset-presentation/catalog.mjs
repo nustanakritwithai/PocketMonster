@@ -41,6 +41,13 @@ export function listBundle(bundleName = 'humanoid-core') {
   };
 }
 
+export function upsertAppearance(def, bundleName = 'humanoid-core') {
+  const record = catalogs.get(bundleName);
+  if (!record) throw new Error(`catalog ${bundleName} is not loaded`);
+  record.appearances.set(def.id, Object.freeze({ ...def }));
+  return getAppearance(def.id, bundleName);
+}
+
 export function resolvePublicRef(id, bundleName = 'humanoid-core') {
   const asset = getAssetDef(id, bundleName);
   if (asset) return { kind: 'asset', id: asset.id, style: asset.style, provider: asset.provider };

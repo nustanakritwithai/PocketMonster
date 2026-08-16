@@ -1,0 +1,23 @@
+{
+  "id": "appearance.human.keeper-green.v1",
+  "style": "four-side-block-v1",
+  "mode": "four",
+  "parts": {
+    "head": {
+      "front": "#15803D",
+      "right": "#F0C8A0",
+      "back": "#FACC15",
+      "left": "#F0C8A0",
+      "topColor": "#FACC15",
+      "bottomColor": "#F0C8A0"
+    },
+    "torso": {
+      "front": "#F8FAFC",
+      "right": "#15803D",
+      "back": "#15803D",
+      "left": "#15803D",
+      "topColor": "#15803D",
+      "bottomColor": "#3F3F46"
+    }
+  }
+}
