@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monster Life RPG — Asset Lab</title>
+  <style>
+    body{margin:0;font:14px/1.45 system-ui;background:#0f172a;color:#e2e8f0;padding:20px}
+    main{max-width:720px;margin:0 auto}
+    code,pre{background:#1e293b;padding:8px 10px;border-radius:8px;display:block;white-space:pre-wrap}
+    label{display:block;margin:.6rem 0 .2rem}
+    button{background:#f97316;border:0;color:#111;font-weight:700;padding:8px 12px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Asset Lab — four-side-block-v1</h1>
+    <p>เครื่องมือคอมไพล์ appearance นอกเกม ไม่แตะ save และไม่โหลดจาก <code>index.html</code> ของเกม</p>
+    <label>Appearance id</label>
+    <input id="id" value="appearance.human.player-orange.v1" style="width:100%" />
+    <label>Mode</label>
+    <select id="mode">
+      <option value="single">single</option>
+      <option value="four" selected>four</option>
+      <option value="strip">strip</option>
+    </select>
+    <p><button id="compile">Compile</button></p>
+    <div id="faces" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0"></div>
+    <pre id="out">รอ compile…</pre>
+  </main>
+  <script type="module">
+    import { compileLabAppearance, exportAppearancePacket } from './compiler.mjs';
+    import { previewMatrix } from './preview.mjs';
+    const out = document.getElementById('out');
+    const packs = {
+      'appearance.human.player-orange.v1': 'player-orange',
+      'appearance.human.keeper-green.v1': 'keeper-green',
+    };
+    function showFaces(id) {
+      const pack = packs[id];
+      const box = document.getElementById('faces');
+      box.innerHTML = '';
+      if (!pack) return;
+      for (const face of ['front', 'right', 'back', 'left']) {
+        const fig = document.createElement('figure');
+        fig.style.margin = '0';
+        const img = document.createElement('img');
+        img.src = `../assets/appearances/${pack}/head.${face}.png`;
+        img.alt = `${pack} head ${face}`;
+        img.width = 128;
+        img.height = 128;
+        img.style.imageRendering = 'pixelated';
+        img.style.background = '#0b1220';
+        const cap = document.createElement('figcaption');
+        cap.textContent = face;
+        fig.append(img, cap);
+        box.append(fig);
+      }
+    }
+    document.getElementById('compile').onclick = () => {
+      const id = document.getElementById('id').value;
+      const compiled = compileLabAppearance({
+        id,
+        mode: document.getElementById('mode').value,
+        front: 'head.front.png',
+        right: 'head.right.png',
+        back: 'head.back.png',
+        left: 'head.left.png',
+        topColor: '#F97316',
+        bottomColor: '#FFC4A3',
+      });
+      showFaces(id);
+      out.textContent = JSON.stringify({
+        packet: exportAppearancePacket(compiled),
+        shots: previewMatrix(compiled).length,
+      }, null, 2);
+    };
+    showFaces(document.getElementById('id').value);
+  </script>
+</body>
+</html>

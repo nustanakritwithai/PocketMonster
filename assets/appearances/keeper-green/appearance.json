@@ -1,0 +1,27 @@
+{
+  "id": "appearance.human.keeper-green.v1",
+  "style": "four-side-block-v1",
+  "mode": "four",
+  "parts": {
+    "head": {
+      "front": "assets/appearances/keeper-green/head.front.png",
+      "right": "assets/appearances/keeper-green/head.right.png",
+      "back": "assets/appearances/keeper-green/head.back.png",
+      "left": "assets/appearances/keeper-green/head.left.png",
+      "top": "assets/appearances/keeper-green/head.top.png",
+      "bottom": "assets/appearances/keeper-green/head.bottom.png",
+      "topColor": "#FACC15",
+      "bottomColor": "#F0C8A0"
+    },
+    "torso": {
+      "front": "assets/appearances/keeper-green/torso.front.png",
+      "right": "assets/appearances/keeper-green/torso.right.png",
+      "back": "assets/appearances/keeper-green/torso.back.png",
+      "left": "assets/appearances/keeper-green/torso.left.png",
+      "top": "assets/appearances/keeper-green/torso.top.png",
+      "bottom": "assets/appearances/keeper-green/torso.bottom.png",
+      "topColor": "#15803D",
+      "bottomColor": "#3F3F46"
+    }
+  }
+}
