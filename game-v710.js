@@ -9,6 +9,7 @@ import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, SKILL_SLOTS } from './skill-progression.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -1422,7 +1423,19 @@ function useSkill(index){
     if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
     if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
   }
-  a.inst.bond=clamp(a.inst.bond+.3);renderParty();renderSkillButtons();
+  a.inst.bond=clamp(a.inst.bond+.3);
+  // V7.5: Award Skill EXP for skill usage (mastery progression)
+  if(move&&a.inst){
+    if(!Array.isArray(a.inst.skills))a.inst.skills=[];
+    let skillRec=getSkill(a.inst,move.name);
+    if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.name,slot:'s'+(index+1)});
+    const hitQuality=res&&res.eff?res.eff:1;const spamCount=(a._skillSpam=a._skillSpam||{})[move.name]||0;
+    a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
+    const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
+    if(sExp>0){const sResult=addSkillExp(a.inst,move.name,sExp);
+      if(sResult&&sResult.rankedUp)msg(`★ ${displayName(a.inst)} • ${move.name} mastery → ${sResult.toRank.toUpperCase()}!`);}
+  }
+  renderParty();renderSkillButtons();
 }
 function updateOwned(dt){
   const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=Math.max(0,a.attackCd-dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
