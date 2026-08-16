@@ -8,7 +8,7 @@ const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 assert.match(js, /from '\.\/asset-presentation\/engine\.mjs'/, 'game must import the presentation engine');
-assert.match(js, /assets\.spawn\('character\.human\.legacy-capsule\.v1'/, 'live Player/Keeper must spawn through the engine');
+assert.match(js, /assets\.spawn\('character\.human\.(legacy-capsule|blocky-bighead)\.v1'/, 'live Player/Keeper must spawn through the engine');
 assert.match(js, /playerVisual\.play\('throw',\{duration:\.34\}\)/, 'throw action goes through the handle');
 assert.match(js, /playerThrowOrigin\(\)/, 'projectile start uses the presentation anchor helper');
 assert.match(js, /start=playerThrowOrigin\(\)\.clone\(\)/, 'aim line uses the same throwOrigin helper');
