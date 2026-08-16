@@ -56,3 +56,4 @@ export {
 export { createAssetEngine } from './engine.mjs';
 export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
 export { createBigheadProvider } from './providers/procedural-bighead.mjs';
+export { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';

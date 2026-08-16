@@ -25,9 +25,8 @@ import {
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 assert.match(js, /function makeSpeciesMesh\(/, 'legacy makeSpeciesMesh stays as the conversion fallback');
 assert.match(js, /function monsterMesh\(/, 'live monsters still go through monsterMesh');
-assert.doesNotMatch(js, /assets\.spawn\('monster\./, 'Phase 2 must not spawn monsters through the engine yet');
-assert.doesNotMatch(js, /monster-slimes\.json/, 'gameplay must not preload slime catalog yet');
-assert.doesNotMatch(js, /monster-animals\.json/, 'gameplay must not preload animal catalog yet');
+assert.match(js, /monster-slimes\.json/, 'Phase 3 preloads the slime catalog');
+assert.match(js, /monster-animals\.json/, 'Phase 3 preloads the animal catalog');
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/monster-ids.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'monster-ids syntax failed');

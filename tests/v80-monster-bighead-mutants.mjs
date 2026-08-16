@@ -142,7 +142,7 @@ assert.ok(
 );
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-assert.match(js, /const g=makeSpeciesMesh\(sp,inst\)/, 'mutant 8: live mesh path must stay legacy until Phase 3');
-assert.doesNotMatch(js, /createBigheadMonsterProvider/, 'mutant 9: game must not register the bighead monster provider yet');
+assert.match(js, /g=makeSpeciesMesh\(sp,inst\)/, 'mutant 8: legacy makeSpeciesMesh remains the spawn fallback');
+assert.match(js, /createBigheadMonsterProvider/, 'mutant 9: game registers the bighead monster provider');
 
 console.log('V8.0 monster bighead catalog mutants: PASS');

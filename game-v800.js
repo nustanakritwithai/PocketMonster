@@ -29,8 +29,10 @@ import {
 } from './content-catalog.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
+import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
 import { createLegacyHumanoidProvider } from './asset-presentation/providers/legacy-humanoid.mjs';
 import { createBigheadProvider } from './asset-presentation/providers/procedural-bighead.mjs';
+import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -69,6 +71,11 @@ const assets=createAssetEngine({THREE,quality:qualityProfile.tier});
   const catalogRes=await fetch(new URL('./assets/catalog/humanoid-core.json',import.meta.url));
   if(!catalogRes.ok) throw new Error('โหลด humanoid catalog ไม่สำเร็จ: '+catalogRes.status);
   loadCatalog(await catalogRes.json());
+  for(const [name,file] of [['monster-slimes','monster-slimes.json'],['monster-animals','monster-animals.json']]){
+    const res=await fetch(new URL('./assets/catalog/'+file,import.meta.url));
+    if(!res.ok) throw new Error('โหลด '+name+' catalog ไม่สำเร็จ: '+res.status);
+    await assets.preloadBundle(name,await res.json());
+  }
 }
 const sharedResources=createSharedResourceCache();
 function cachedGeometry(kind,args,Factory){
@@ -980,7 +987,21 @@ function monsterMesh(sp,owned=false,inst=null,eliteOverride=false,boss=false){
   const path=inst?getEvolutionPath(inst):null;
   const lifeScale=(inst?.lifeStage==='Baby')?.72:1;
   const ringScale=(boss?1.65:(eliteOverride||sp.elite?1.35:1))*(path?.scale||1)*lifeScale;
-  const g=makeSpeciesMesh(sp,inst);
+  let g;
+  try{
+    const handle=assets.spawn(resolveMonsterAssetId(sp.id,path?.form||'slime'),{
+      role:boss?'boss':(eliteOverride||sp.elite)?'elite':owned?'owned':'wild',
+      quality:qualityProfile.tier,
+      marks:{owned:!!owned,elite:!!(eliteOverride||sp.elite),boss:!!boss},
+      lifeStage:inst?.lifeStage,
+      formId:inst?.formId||path?.form,
+    });
+    g=handle.root;
+    if(lifeScale!==1) g.scale.multiplyScalar(lifeScale);
+    applyVisualGrowth(g,inst);
+  }catch(err){
+    g=makeSpeciesMesh(sp,inst);
+  }
   const ringColor=owned?0x60a5fa:(boss?0xf43f5e:eliteOverride?0xfacc15:0xef4444);
   const ring=new THREE.Mesh(torusGeometry(.58*ringScale,.045,8,28),new THREE.MeshBasicMaterial({color:ringColor}));
   ring.rotation.x=Math.PI/2; ring.position.y=.06; g.add(ring);
@@ -1027,12 +1048,21 @@ assets.registerProvider('legacy',createLegacyHumanoidProvider({
   animate:animateHumanoid,
   setAction:setHumanoidAction,
 }));
-assets.registerProvider('procedural',createBigheadProvider({
+const humanoidProvider=createBigheadProvider({
   THREE,
   box:boxGeometry,
   cylinder:cylinderGeometry,
   material:mat,
-}));
+});
+const monsterProvider=createBigheadMonsterProvider({
+  THREE,
+  box:boxGeometry,
+  cone:coneGeometry,
+  torus:torusGeometry,
+  material:mat,
+  basicMaterial:basicMat,
+});
+assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterProvider(ctx):humanoidProvider(ctx));
 // ---------- Player / NPC ----------
 const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
