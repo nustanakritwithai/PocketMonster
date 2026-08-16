@@ -1169,9 +1169,9 @@ function playerHitText(){ return playerVisual.anchor('hitText',presentationScrat
 if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
 const effects=[];
 const sparkPool=createObjectPool({
-  maxSize:160,
+  maxSize:200,
   create:()=>new THREE.Mesh(
-    sphereGeometry(1,8,8),
+    boxGeometry(1,1,1),
     new THREE.MeshStandardMaterial({color:0xffffff,roughness:.58,metalness:.12,emissive:0xffffff,emissiveIntensity:.18,transparent:true,opacity:.9}),
   ),
   reset:mesh=>{
@@ -1179,6 +1179,7 @@ const sparkPool=createObjectPool({
     mesh.visible=false;
     mesh.position.set(0,0,0);
     mesh.scale.setScalar(1);
+    mesh.rotation.set(0,0,0);
     mesh.material.opacity=0;
   },
   destroy:mesh=>disposeObject3D(mesh),
@@ -1226,6 +1227,7 @@ function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
     m.material.opacity=.9;
     m.position.copy(pos);
     m.scale.setScalar(size);
+    m.rotation.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
     scene.add(m);
     const a=(Math.PI*2*i)/count+Math.random()*.2;
     const speed=.8+Math.random()*1.6;
