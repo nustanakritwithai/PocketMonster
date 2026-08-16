@@ -42,7 +42,7 @@ assert.match(release, /sparkPool\.release\(effect\.mesh\)/, 'expired pooled spar
 assert.match(js, /while\(effects\.length\) releaseTransientEffect\(effects\.pop\(\)\)/, 'zone clear still drains sparks through the pool');
 
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere until a later VFX phase');
-assert.match(js, /case 'halo': return torusGeometry/, 'fxGeom halo stays a torus until Phase 3');
+assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'elemental bursts still go through fxGeom');
 assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/, 'map Phase 4 ring pulses stay box wireframes');
 
 console.log('V8.0 VFX P1 spark pool: PASS');

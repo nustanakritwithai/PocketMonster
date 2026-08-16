@@ -34,7 +34,7 @@ assert.match(update, /rotation\.x\+=dt\*10/, 'mutant 7: flight must tumble the c
 assert.match(update, /rotation\.y\+=dt\*14/, 'mutant 8: flight must tumble the cube on Y');
 assert.match(update, /duration/, 'mutant 9: flight duration path must stay in the updater');
 
-assert.match(js, /case 'halo': return torusGeometry/, 'mutant 10: Phase 2 does not convert fxGeom halo shapes');
+assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'mutant 10: elemental bursts still go through fxGeom');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 11: monster shine stays a sphere');
 assert.match(extractFn('spawnRingPulse'), /wireframe:true/, 'mutant 12: map ring pulses stay wireframe boxes');
 

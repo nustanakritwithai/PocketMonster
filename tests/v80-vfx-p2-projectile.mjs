@@ -45,7 +45,7 @@ assert.match(update, /p\.onHit\?\.\(\)/, 'impact still fires onHit');
 
 assert.match(pulse, /boxGeometry\(size,\.02,size\)/, 'map ring pulses stay thin boxes');
 assert.match(pulse, /wireframe:true/, 'map ring pulses stay wireframe');
-assert.match(js, /case 'halo': return torusGeometry/, 'fxGeom halo stays a torus until Phase 3');
+assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'elemental bursts still go through fxGeom');
 
 const poolStart = js.indexOf('const sparkPool=createObjectPool({');
 const pool = js.slice(poolStart, js.indexOf('function setHumanoidAction', poolStart));

@@ -30,7 +30,7 @@ assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'mutant 11: ranch pad worl
 assert.match(js, /makePad\(5\.2,8\.2,1\.6,0xec4899,\.15\)/, 'mutant 12: breeding pad call stays');
 assert.match(js, /incubator\.position\.set\(5\.2,0,8\.2\)/, 'mutant 13: incubator stays on the breeding pad');
 assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/, 'mutant 14: polish does not revert ring pulses');
-assert.match(js, /case 'halo': return torusGeometry/, 'mutant 15: particle halo shapes stay toruses');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 15: monster shine stays a sphere');
 assert.match(extractFn('switchZone'), /setZoneGround\(zone\)/, 'mutant 16: zone changes still call setZoneGround');
 assert.doesNotMatch(extractFn('makeRock') + extractFn('makeTree') + extractFn('makeFlower'), /Math\.random\(/, 'mutant 17: decoration builders stay deterministic');
 assert.match(js, /sun\.shadow\.mapSize\.set\(1024,1024\)/, 'mutant 18: enabled shadows stay on a 1024 map, not a heavier atlas');

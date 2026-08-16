@@ -34,7 +34,7 @@ assert.doesNotMatch(update, /d\.ring\.rotation\.z/, 'mutant 6: square decal fram
 assert.match(js, /groundDecals\.push\(\{group,disc,ring,inner,/, 'mutant 7: updater still receives disc/ring/inner');
 assert.match(js, /spawnGroundDecal\(wildTypes\(w\)\[0\],w\.mesh\.position/, 'mutant 8: capture still stamps a ground decal');
 assert.match(js, /spawnRingPulse\(w\.mesh\.position\.clone\(\),0xffffff/, 'mutant 9: KO still fires a ring pulse');
-assert.match(js, /case 'halo': return torusGeometry/, 'mutant 10: VFX plan Phase 1 does not convert particle halo shapes');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 10: monster shine stays a sphere');
 assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 11: boot Fog constructor stays 0x65c9f5,30,76');
 assert.match(js, /HemisphereLight\(0xffffff,0x42643d,1\.55\)/, 'mutant 12: boot HemisphereLight intensity stays 1.55');
 

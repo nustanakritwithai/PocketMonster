@@ -1264,24 +1264,24 @@ const ELEMENT_FX={
 function typeFx(type='Normal'){ return ELEMENT_FX[type]||ELEMENT_FX.Normal; }
 function fxGeom(shape='orb',size=0.06){
   switch(shape){
-    case 'flame': return coneGeometry(size*0.7,size*1.8,6);
-    case 'drop': return sphereGeometry(size,10,8);
-    case 'leaf': return octahedronGeometry(size*0.9,0);
-    case 'crystal': return octahedronGeometry(size,0);
+    case 'flame': return boxGeometry(size*0.6,size*1.8,size*0.6);
+    case 'drop': return boxGeometry(size*0.8,size*1.2,size*0.8);
+    case 'leaf': return boxGeometry(size*0.9,size*0.3,size*0.9);
+    case 'crystal': return boxGeometry(size,size*1.4,size);
     case 'impact': return boxGeometry(size*1.5,size*0.45,size*1.2);
-    case 'bubble': return sphereGeometry(size*0.85,10,8);
+    case 'bubble': return boxGeometry(size*0.85,size*0.85,size*0.85);
     case 'dust': return boxGeometry(size*1.2,size*0.55,size*1.2);
-    case 'feather': return coneGeometry(size*0.55,size*1.7,4);
-    case 'halo': return torusGeometry(size*0.82,size*0.18,6,12);
-    case 'spore': return sphereGeometry(size*0.72,8,6);
-    case 'shard': return new THREE.TetrahedronGeometry(size*0.95,0);
-    case 'mist': return sphereGeometry(size*0.95,8,6);
-    case 'arc': return coneGeometry(size*0.65,size*1.9,5);
-    case 'smoke': return sphereGeometry(size,8,6);
+    case 'feather': return boxGeometry(size*0.3,size*1.7,size*0.5);
+    case 'halo': return boxGeometry(size*1.6,size*0.15,size*1.6);
+    case 'spore': return boxGeometry(size*0.72,size*0.72,size*0.72);
+    case 'shard': return boxGeometry(size*0.5,size*1.5,size*0.5);
+    case 'mist': return boxGeometry(size*0.95,size*0.7,size*0.95);
+    case 'arc': return boxGeometry(size*0.5,size*1.9,size*0.5);
+    case 'smoke': return boxGeometry(size,size,size);
     case 'metal': return boxGeometry(size,size*0.52,size*1.45);
-    case 'star': return octahedronGeometry(size*0.9,0);
+    case 'star': return boxGeometry(size*0.9,size*0.9,size*0.9);
     case 'spark': return boxGeometry(size*1.5,size*0.35,size*1.5);
-    default: return sphereGeometry(size,10,8);
+    default: return boxGeometry(size,size,size);
   }
 }
 function spawnElementalFX(type,pos,mode='impact',power=1){

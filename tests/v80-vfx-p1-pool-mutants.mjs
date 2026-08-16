@@ -31,7 +31,7 @@ assert.match(pool, /mesh\.rotation\.set\(0,0,0\)/, 'mutant 5: reset must clear r
 assert.match(extractFn('spawnBurst'), /sparkPool\.acquire\(\)/, 'mutant 6: bursts must keep using the pool');
 assert.match(extractFn('releaseTransientEffect'), /sparkPool\.release\(effect\.mesh\)/, 'mutant 7: pooled sparks must not be disposed as unique meshes');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 8: monster shine stays a sphere until a later VFX phase');
-assert.match(js, /case 'halo': return torusGeometry/, 'mutant 9: Phase 1 does not convert fxGeom halo shapes');
+assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'mutant 9: elemental bursts still go through fxGeom');
 assert.match(js, /function spawnRingPulse[\s\S]*?wireframe:true/, 'mutant 10: map ring pulses stay wireframe boxes');
 
 console.log('V8.0 VFX P1 spark pool mutants: PASS');
