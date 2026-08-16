@@ -14,6 +14,7 @@
 2. หลักการแปลง
 2.5. หลักความสวยงาม (Aesthetic Principles)
 2.6. ประสบการณ์ผู้เล่น (Player Experience)
+2.7. รายละเอียด Asset Model (Model Spec)
 3. โครงสร้าง Blocky World
 4. แผนที่ทั้ง 3 Zone — พิกัดเดิมทั้งหมด
 5. Blocky Ground + Grid Texture
@@ -514,20 +515,344 @@ const stalagmiteTipMat = new THREE.MeshStandardMaterial({
 ---
 
 ```
-Legacy (ปัจจุบัน)              Blocky (เป้าหมาย)
-───────────────────            ──────────────────
-พื้น: plane สีทึบ               พื้น: plane + grid texture
-หิน: dodecahedron 12 หน้า       หิน: box ซ้อน 3 ก้อน
-ต้นไม้: cylinder + cone × 2     ต้นไม้: box ต้น + box พุ่ม × 2 + box ผล
-หญ้า: cone 4 เหลี่ยม × 3        หญ้า: box บาง × 3
-ดอกไม้: cylinder + sphere       ดอกไม้: box ก้าน + box ดอก
-หินย้อย: cone 7 หน้า × 2        หินย้อย: box ซ้อน 3 ชั้นเรียว
-รั้ว: box (เหมือนเดิม)           รั้ว: box (ไม่เปลี่ยน)
-แท่น: circle + ring กลม         แท่น: box สี่เหลี่ยม + ขอบ box
-Incubator: cylinder + sphere   Incubator: box ฐาน + box ไข่
-VFX พื้น: circle + ring × 3     VFX พื้น: box + box ขอบ + box ใน
-VFX วงแหวน: torus              VFX วงแหวน: box wireframe
-ท้องฟ้า: สีทึบ                   ท้องฟ้า: gradient texture
+---
+
+## 2.7 รายละเอียด Asset Model (Model Spec)
+
+### 2.7.1 หินก้อนเหลี่ยม (Rock) — Model Spec
+
+```
+โครงสร้าง: Group 3 ชิ้น (main + side + pebble)
+
+main (ก้อนใหญ่):
+  Geometry: BoxGeometry(s, s*0.8, s*0.9)
+  Position: (0, s*0.4, 0)
+  Scale: (1, 1.28, 1.08) — สูงกว่ากว้าง
+  Rotation: Y = (x*1.7+z)*0.15 + random ±0.3
+  Material: MeshStandardMaterial(tone, rough=0.95, metal=0.04)
+  Texture: makeRockTexture(tone) — รอยร้าว + จุดดำ (canvas 64×64)
+  Shadow: castShadow=true, receiveShadow=true
+
+side (ก้อนข้าง):
+  Geometry: BoxGeometry(s*0.5, s*0.4, s*0.5)
+  Position: (s*0.55, s*0.2, s*0.18)
+  Scale: (1.1, 0.8, 1) — แบนกว่า
+  Material: เดียวกับ main (แชร์)
+  Shadow: castShadow=true
+
+pebble (ก้อนเล็ก):
+  Geometry: BoxGeometry(s*0.25, s*0.2, s*0.25)
+  Position: (-s*0.48, s*0.1, -s*0.22)
+  Material: mat(tone, rough=0.99, metal=0) — เรียบกว่า
+  Shadow: castShadow=true
+
+สีตาม zone:
+  hub/grassland: 0x945a38 (น้ำตาล) ±10% random
+  cave: 5 โทนเทา (0x57534e, 0x44403c, 0x78716c, 0x3f3f46, 0x52525b)
+
+Triangle: 36 (12×3)
+Memory: ~2KB geometry + ~4KB texture (shared)
+```
+
+### 2.7.2 ต้นไม้เหลี่ยม (Tree) — Model Spec
+
+```
+โครงสร้าง: Group 3-6 ชิ้น (bole + mid + top + fruit×0-3)
+
+bole (ต้น):
+  Geometry: BoxGeometry(0.22*s, 1.55*s, 0.22*s) — สี่เหลี่ยมเรียว
+  Position: (0, 0.78*s, 0)
+  Material: MeshStandardMaterial(trunk=0x754428, rough=0.88, metal=0.02)
+  Texture: makeBarkTexture(trunk) — ลายเปลือกแนวตั้ง (canvas 32×64)
+  Shadow: castShadow=true
+
+mid (พุ่มล่าง):
+  Geometry: BoxGeometry(1.05*s, 1.0*s, 1.05*s) — ใหญ่
+  Position: (0, 1.65*s, 0)
+  Scale: (0.9+rand*0.2, 1, 0.9+rand*0.2) — ไม่สมมาตร
+  Rotation: Y = rand*0.1 — หมุนเล็กน้อย
+  Material: MeshStandardMaterial(leaf, rough=0.78, metal=0.03)
+  Texture: makeLeafTexture(leaf) — ลายใบ + จุดสว่าง (canvas 64×64)
+  Shadow: castShadow=true
+
+top (พุ่มบน):
+  Geometry: BoxGeometry(0.72*s, 0.7*s, 0.72*s) — เล็กกว่า
+  Position: (0, 2.35*s, 0)
+  Material: mat(leaf, rough=0.7, metal=0.04) — เรียบกว่า mid
+  Shadow: castShadow=true
+
+fruit (ผลไม้) × 0-3:
+  Geometry: BoxGeometry(0.1*s, 0.1*s, 0.1*s)
+  Position: ตำแหน่งสุ่มในพุ่ม
+  Material: MeshStandardMaterial(fruit, emissive=fruit, emissiveIntensity=0.06, rough=0.55)
+  Shadow: castShadow=true
+
+สีใบตาม zone:
+  hub: 0x18753a → 0x22c55e (เขียวเข้ม → สด)
+  meadow: 0x22c55e, 0x16a34a, 0x15803d (3 โทน)
+  cave: ไม่มีต้นไม้
+
+สีผลไม้: 0xef4444 (แดง), 0xfacc15 (เหลือง), 0xf97316 (ส้ม)
+
+Triangle: 60 (12×5) — ไม่มีผล / 96 (12×8) — มีผล 3
+Memory: ~3KB geometry + ~8KB texture (shared)
+```
+
+### 2.7.3 หญ้าเหลี่ยม (Grass Tuft) — Model Spec
+
+```
+โครงสร้าง: Group 3 ชิ้น (blade × 3)
+
+blade (ใบหญ้า):
+  Geometry: BoxGeometry(0.05*s, h*s, 0.05*s) — บางสูง
+  Position: (dx*s, h*0.5*s, 0) — ต่างกัน 3 ตำแหน่ง
+  Rotation: Z = tilt — เอียงต่างกัน
+  Material: mat(color+rand±0x080808, rough=0.86, metal=0)
+  Shadow: castShadow=true (เล็ก)
+
+ค่าตามใบ:
+  ใบ 1: dx=-0.06, h=0.28, tilt=0.18
+  ใบ 2: dx=0.05, h=0.34, tilt=-0.12
+  ใบ 3: dx=0, h=0.22, tilt=0.04
+
+สี: 0x3f9d4a ±10% random
+
+Triangle: 18 (12×3) — น้อยมาก
+Memory: ~1KB geometry
+```
+
+### 2.7.4 ดอกไม้เหลี่ยม (Flower) — Model Spec
+
+```
+โครงสร้าง: Group 2 ชิ้น (stem + bloom)
+
+stem (ก้าน):
+  Geometry: BoxGeometry(0.03, 0.22, 0.03) — บางเล็ก
+  Position: (0, 0.11, 0)
+  Material: mat(0x4ade80, rough=0.8, metal=0) — เขียว
+
+bloom (ดอก):
+  Geometry: BoxGeometry(0.1, 0.1, 0.1) — เล็ก
+  Position: (0, 0.24, 0)
+  Material: MeshStandardMaterial(color, emissive=color, emissiveIntensity=0.08, rough=0.5)
+  Shadow: castShadow=true
+
+สีดอก: 0xf472b6 (ชมพู), 0xfacc15 (เหลือง), 0xa78bfa (ม่วง), 0xfb7185 (ชมพูแดง)
+
+Triangle: 12 (12×2) — น้อยสุด
+Memory: ~0.5KB geometry
+```
+
+### 2.7.5 หินย้อยเหลี่ยม (Stalagmite) — Model Spec
+
+```
+โครงสร้าง: Group 3 ชิ้น (base + mid + tip)
+
+base (ฐาน):
+  Geometry: BoxGeometry(0.6*s, 0.5*s, 0.6*s) — ใหญ่
+  Position: (0, 0.25*s, 0)
+  Material: mat(0x64748b, rough=0.92, metal=0.08)
+  Shadow: castShadow=true
+
+mid (กลาง):
+  Geometry: BoxGeometry(0.35*s, 0.5*s, 0.35*s) — ปานกลาง
+  Position: (0, 0.75*s, 0)
+  Material: mat(0x94a3b8, rough=0.85, metal=0.1)
+  Shadow: castShadow=true
+
+tip (ยอด):
+  Geometry: BoxGeometry(0.15*s, 0.4*s, 0.15*s) — เล็กเรียว
+  Position: (0, 1.2*s, 0)
+  Material: MeshStandardMaterial(0x94a3b8, emissive=0x4a90d9, emissiveIntensity=0.04, rough=0.78)
+  Shadow: castShadow=true
+
+ใช้เฉพาะ cave
+
+Triangle: 18 (12×3)
+Memory: ~1.5KB geometry
+```
+
+### 2.7.6 เสารั้ว (Fence Post) — Model Spec
+
+```
+โครงสร้าง: Mesh 1 ชิ้น
+
+post:
+  Geometry: BoxGeometry(0.1, 0.7, 0.1) — แท่งเหลี่ยม
+  Position: (x, 0.35, z)
+  Material: mat(0x8b5e34, rough=0.86, metal=0.02) — น้ำตาลไม้
+  Shadow: castShadow=true
+
+คงเดิม — box อยู่แล้ว
+
+Triangle: 12
+Memory: ~0.3KB geometry
+```
+
+### 2.7.7 แท่นเหลี่ยม (Pad) — Model Spec
+
+```
+โครงสร้าง: 9 ชิ้น (disk + ขอบ 4 + เสามุม 4)
+
+disk (พื้นแท่น):
+  Geometry: BoxGeometry(halfSize*2, 0.02, halfSize*2) — บาง
+  Position: (x, 0.025, z)
+  Material: MeshBasicMaterial(color, transparent, opacity=0.2)
+  ไม่มี shadow
+
+ขอบ 4 ด้าน:
+  Geometry: BoxGeometry(ขนาดตามด้าน, 0.04, 0.04) — บาง
+  Position: รอบแท่น 4 ด้าน
+  Material: MeshBasicMaterial(color, transparent, opacity=0.85)
+
+เสามุม 4 จุด:
+  Geometry: BoxGeometry(0.08, 0.08, 0.08) — เล็ก
+  Position: 4 มุม
+  Material: เดียวกับขอบ
+
+ขนาด:
+  Ranch: halfSize=3.4 → box 6.8×0.02×6.8
+  Breeding: halfSize=1.6 → box 3.2×0.02×3.2
+
+สี:
+  Ranch: 0x22c55e (เขียว)
+  Breeding: 0xec4899 (ชมพู)
+
+Triangle: 108 (12×9)
+Memory: ~3KB geometry
+```
+
+### 2.7.8 Incubator เหลี่ยม — Model Spec
+
+```
+โครงสร้าง: Group 2 ชิ้น (base + egg)
+
+base (ฐาน):
+  Geometry: BoxGeometry(0.9, 0.35, 0.9) — สี่เหลี่ยม
+  Position: (0, 0.18, 0) — ใน group
+  Material: MeshStandardMaterial(0x6d28d9, metal=0.2, rough=0.6) — ม่วง
+  Shadow: castShadow=true
+
+egg (ไข่):
+  Geometry: BoxGeometry(0.5, 0.65, 0.45) — สี่เหลี่ยมผืนผ้า
+  Scale: (1, 1.28, 1) — สูงกว่ากว้าง (คล้ายไข่)
+  Position: (0, 0.72, 0) — ใน group
+  Material: MeshStandardMaterial(0xfde68a, emissive=0x7c2d12, emissiveIntensity=0.15)
+  Shadow: castShadow=true
+
+Group Position: (5.2, 0, 8.2)
+Animation: rotation.y += dt*0.12 (หมุนเบาๆ)
+
+Triangle: 24 (12×2)
+Memory: ~1KB geometry
+```
+
+### 2.7.9 VFX Ground Decal — Model Spec
+
+```
+โครงสร้าง: Group 3 ชิ้น (disc + ring + inner)
+
+disc (พื้น):
+  Geometry: BoxGeometry(size, 0.02, size) — สี่เหลี่ยมบาง
+  Position: (0, 0.032, 0) — ใน group
+  Material: MeshBasicMaterial(cfg.core, transparent, opacity=0.13, additive)
+  size = radius * 1.4
+
+ring (ขอบนอก):
+  Geometry: BoxGeometry(ringSize, 0.02, ringSize)
+  Position: (0, 0.038, 0)
+  Material: MeshBasicMaterial(cfg.accent, transparent, opacity=0.42, wireframe=true)
+  ringSize = size * 0.78
+
+inner (ขอบใน):
+  Geometry: BoxGeometry(innerSize, 0.02, innerSize)
+  Position: (0, 0.041, 0)
+  Material: MeshBasicMaterial(cfg.core, transparent, opacity=0.48, wireframe=true)
+  innerSize = size * 0.24
+
+Animation: ring.rotation.z += dt*spin, inner.rotation.z -= dt*spin*1.4
+กลุ่ม: scale เพิ่มขึ้นเล็กน้อยตอน fade
+
+สีตาม type: ดู typeFx() — 18 type แต่ละสี core + accent
+
+Triangle: 36 (12×3) + wireframe lines
+Memory: ~2KB
+```
+
+### 2.7.10 VFX Ring Pulse — Model Spec
+
+```
+โครงสร้าง: Mesh 1 ชิ้น
+
+mesh:
+  Geometry: BoxGeometry(size, 0.02, size) — สี่เหลี่ยมบาง
+  Position: copy(pos) + y offset
+  Material: MeshBasicMaterial(color, transparent, opacity=0.9, wireframe=true)
+  size = scale * 1.2
+
+Animation: scale ขยาย + opacity ลด (ใน update effects)
+
+สี: ดูผู้เรียก (summon=ฟ้า, defeat=ขาว, hurt=แดง, etc.)
+
+Triangle: 12 + wireframe lines (12 edges)
+Memory: ~0.5KB
+```
+
+### 2.7.11 ตารางสรุป Asset Model ทั้งหมด
+
+| Model | ชิ้นย่อย | Triangle | Texture | Memory | Shadow | Emissive |
+|-------|---------|---------|---------|--------|--------|----------|
+| หิน (Rock) | 3 box | 36 | crack 64² | ~6KB | ใช่ | ไม่ |
+| ต้นไม้ (Tree) | 3-6 box | 60-96 | bark+leaf | ~11KB | ใช่ | ผลไม้ |
+| หญ้า (Grass) | 3 box | 18 | ไม่มี | ~1KB | เล็ก | ไม่ |
+| ดอกไม้ (Flower) | 2 box | 12 | ไม่มี | ~0.5KB | เล็ก | ใช่ |
+| หินย้อย (Stalagmite) | 3 box | 18 | ไม่มี | ~1.5KB | ใช่ | ยอด |
+| เสารั้ว (Fence) | 1 box | 12 | ไม่มี | ~0.3KB | ใช่ | ไม่ |
+| แท่น (Pad) | 9 box | 108 | ไม่มี | ~3KB | ไม่ | ไม่ |
+| Incubator | 2 box | 24 | ไม่มี | ~1KB | ใช่ | ไข่ |
+| VFX Decal | 3 box | 36 | ไม่มี | ~2KB | ไม่ | additive |
+| VFX Ring | 1 box | 12 | ไม่มี | ~0.5KB | ไม่ | additive |
+| **พื้น (Ground)** | 1 plane | 2 | grid 128² | ~65KB | receive | ไม่ |
+
+รวมต่อ zone:
+- Hub: 6 rock + 6 tree + 10 fence + 4 flower + 4 grass + 2 pad + incubator = ~530 triangles
+- Meadow: 6 rock + 7 tree + 8 grass + 3 flower = ~420 triangles
+- Cave: 6 rock + 7 stalagmite = ~270 triangles
+
+### 2.7.12 Material ที่ใช้ทั้งหมด
+
+| Material Type | ใช้กับ | Properties |
+|--------------|--------|-----------|
+| MeshStandardMaterial | หิน, ต้นไม้, หินย้อย, Incubator | color, roughness, metalness, map (texture) |
+| MeshBasicMaterial | แท่น, VFX | color, transparent, opacity, wireframe, additive |
+| MeshStandardMaterial + emissive | ดอกไม้, ผลไม้, ไข่, หินย้อยยอด | emissive color + intensity |
+
+### 2.7.13 Texture ทั้งหมด
+
+| Texture | ขนาด | ใช้กับ | เนื้อหา |
+|---------|------|--------|--------|
+| Ground Grid | 128×128 | พื้น | grid 2 ชั้น + noise + zone-specific |
+| Rock Crack | 64×64 | หิน | รอยร้าว + จุดดำ |
+| Tree Bark | 32×64 | ต้นไม้ต้น | ลายเปลือกแนวตั้ง |
+| Leaf Pattern | 64×64 | ต้นไม้พุ่ม | จุดใบ + จุดสว่าง |
+| Sky Gradient | 2×128 | ท้องฟ้า | gradient บน→ล่าง |
+
+รวม: 5 texture ~85KB (กระจาย: ground 65KB + rock 4KB + bark 2KB + leaf 4KB + sky 1KB + cache 9KB)
+
+### 2.7.14 Geometry Cache Strategy
+
+```js
+// ทุก box ใช้ cachedGeometry (มีอยู่แล้วใน game-v800.js)
+const boxGeometry = (w, h, d) => cachedGeometry('box', [w, h, d], THREE.BoxGeometry);
+
+// แต่ละขนาดแคชครั้งเดียว — ใช้ซ้ำได้
+// หิน 6 ก้อน ขนาดต่างกัน → 6 geometry cache entries
+// ต้นไม้ 6 ต้น ขนาดต่างกัน → 6 geometry cache entries
+// แต่ละ entry: BoxGeometry = 24 vertices, 12 triangles ≈ 288 bytes
+// รวม: ~20 entries × 288 bytes ≈ 6KB geometry cache
+```
+
+---
 ```
 
 ### 3.2 Triangle Count เปรียบเทียบ
@@ -1209,7 +1534,14 @@ function makeSkyTexture(zoneColor) {
 - ท้องฟ้า: สีทึบ → gradient (canvas 2×128)
 - แท่น/Incubator: กลม → เหลี่ยม
 - VFX: circle/ring/torus → box + wireframe
-- **ประสบการณ์ผู้เล่น:**
+- **รายละเอียด Asset Model:**
+  - 10 model specs (Rock/Tree/Grass/Flower/Stalagmite/Fence/Pad/Incubator/VFX Decal/VFX Ring)
+  - แต่ละ model: geometry + position + scale + rotation + material + texture + shadow + emissive
+  - ตารางสรุป: ชิ้นย่อย/triangle/texture/memory/shadow/emissive
+  - 5 procedural texture (ground/rock/bark/leaf/sky) ~85KB รวม
+  - 3 material types (Standard/Basic/Standard+emissive)
+  - Geometry cache: ~20 entries ~6KB
+  - Triangle ต่อ zone: hub ~530 / meadow ~420 / cave ~270
   - Player Journey: hub → meadow → cave → กลับ hub (วงจรเต็ม)
   - Zone Feel: hub=ปลอดภัย, meadow=ผจญภัย, cave=อันตราย
   - Visual Landmarks: NPC, Incubator, ลาน, รั้ว, Boss เห็นจากไกล
