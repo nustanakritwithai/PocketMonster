@@ -252,7 +252,9 @@ const POTENTIALS=['D','C','B','A','S'];
 // V7.2 Balance Foundation gene scale: narrow 8% spread (D=0.96 → S=1.04)
 const POTENTIAL_MOD={D:0.96, C:0.98, B:1.00, A:1.02, S:1.04};
 const GENE_RANKS=['D','C','B','A','S'];
-const TRAIN_FOCUS={power:'Power',defense:'Defense',agility:'Agility'};
+const TRAIN_FOCUS={power:'Power',defense:'Defense',speed:'Speed',technique:'Technique',spirit:'Spirit'};
+// V7.2: Training line → stat bonus mapping (applied on levelUp via shared pool)
+const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spirit:'hp'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
 const BREEDING_RECIPES=[]; // future explicit Hybrid recipes only
@@ -290,7 +292,7 @@ function makeInstance(sp,level=1,opts={}){
   const inst={
     instanceId:'m'+Date.now()+'-'+Math.floor(Math.random()*999999),speciesId:sp.id,level,exp:0,origin:opts.origin||'captured',personality:opts.personality||rand(personalities),
     gender:opts.gender||rollGender(sp),bond:opts.bond??24,hunger:opts.hunger??78,energy:opts.energy??82,mood:opts.mood??72,fitness:opts.fitness??50,
-    genes:opts.genes||randomGenes(sp),trainingFocus:opts.trainingFocus||'power',trainingExp:0,trainingBonus:{hp:0,atk:0,def:0,spd:0},generation:opts.generation||1,
+    genes:opts.genes||randomGenes(sp),trainingFocus:opts.trainingFocus||'power',trainingExp:0,trainingBonus:{hp:0,atk:0,def:0,spd:0},training:{power:0,defense:0,speed:0,technique:0,spirit:0},aptitude:{power:3,defense:3,speed:3,technique:3,spirit:3},generation:opts.generation||1,
     parentAId:opts.parentAId||null,parentBId:opts.parentBId||null,motherId:opts.motherId||null,fatherId:opts.fatherId||null,secondaryType:opts.secondaryType??sp.types[1]??null,
     evolutionPath:opts.evolutionPath||null,createdAt:Date.now(),fainted:false
   };
@@ -300,7 +302,12 @@ function ensureInstanceShape(inst){
   const sp=spById[inst.speciesId]; if(!sp)return inst;
   inst.origin=inst.origin||'captured'; inst.personality=inst.personality||rand(personalities); inst.gender=inst.gender||rollGender(sp); inst.bond=inst.bond??24;
   inst.hunger=inst.hunger??75;inst.energy=inst.energy??80;inst.mood=inst.mood??70;inst.fitness=inst.fitness??50;inst.genes=inst.genes||randomGenes(sp);
-  inst.trainingFocus=inst.trainingFocus||'power';inst.trainingExp=inst.trainingExp||0;inst.trainingBonus=inst.trainingBonus||{hp:0,atk:0,def:0,spd:0};inst.generation=inst.generation||1;
+  inst.trainingFocus=inst.trainingFocus||'power';
+  if(inst.trainingFocus==='agility')inst.trainingFocus='speed'; // V7.2: agility→speed migration
+  inst.trainingExp=inst.trainingExp||0;inst.trainingBonus=inst.trainingBonus||{hp:0,atk:0,def:0,spd:0};
+  inst.training=inst.training||{power:0,defense:0,speed:0,technique:0,spirit:0};
+  inst.aptitude=inst.aptitude||{power:3,defense:3,speed:3,technique:3,spirit:3};
+  inst.generation=inst.generation||1;
   inst.parentAId=inst.parentAId||null;inst.parentBId=inst.parentBId||null;inst.motherId=inst.motherId||null;inst.fatherId=inst.fatherId||null;inst.secondaryType=inst.secondaryType??sp.types[1]??null;
   inst.evolutionPath=inst.evolutionPath||null;inst.fainted=!!inst.fainted;refreshStats(inst,false);return inst;
 }
@@ -1491,10 +1498,21 @@ function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=
 
 // ---------- V7.1.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
-function levelUpInstance(inst){inst.level++;const f=inst.trainingFocus||'power';if(f==='power')inst.trainingBonus.atk+=1;if(f==='defense'){inst.trainingBonus.hp+=5;inst.trainingBonus.def+=1;}if(f==='agility')inst.trainingBonus.spd+=1;inst.bond=clamp(inst.bond+2);inst.fitness=clamp(inst.fitness+3);refreshStats(inst,true);}
-function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;const capped=Math.min(elapsed,10*60*60*1000);state.lifeLastAt=now;const hours=capped/3600000,minutes=capped/60000;let levelUps=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;inst.hunger=clamp(inst.hunger-hours*4);inst.energy=clamp(inst.energy+hours*14);inst.mood=clamp(inst.mood+(inst.hunger>35?hours*2:-hours*5));const moodMod=.65+(inst.mood/100)*.35,fitMod=.75+(inst.fitness/100)*.25;inst.trainingExp=(inst.trainingExp||0)+minutes*1.8*moodMod*fitMod;while(inst.trainingExp>=trainingNeed(inst.level)){inst.trainingExp-=trainingNeed(inst.level);levelUpInstance(inst);levelUps++;}}if(show&&levelUps>0)msg(`Ranch Training • Level Up รวม ${levelUps} ครั้ง`);}
+function levelUpInstance(inst){inst.level++;const f=inst.trainingFocus||'power';const statKey=TRAIN_STAT_MAP[f]||'atk';if(statKey==='hp')inst.trainingBonus.hp+=5;else inst.trainingBonus[statKey]+=1;inst.bond=clamp(inst.bond+2);inst.fitness=clamp(inst.fitness+3);refreshStats(inst,true);}
+function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;const capped=Math.min(elapsed,10*60*60*1000);state.lifeLastAt=now;const hours=capped/3600000,minutes=capped/60000;let levelUps=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;inst.hunger=clamp(inst.hunger-hours*4);inst.energy=clamp(inst.energy+hours*14);inst.mood=clamp(inst.mood+(inst.hunger>35?hours*2:-hours*5));const moodMod=.65+(inst.mood/100)*.35,fitMod=.75+(inst.fitness/100)*.25;const focus=inst.trainingFocus||'power';
+  // V7.2: Apply offline training to the shared pool via addTrainingExp
+  const trainGain=minutes*1.8*moodMod*fitMod;
+  const applied=addTrainingExp(inst,focus,trainGain);
+  inst.trainingExp=(inst.trainingExp||0)+applied;
+  while(inst.trainingExp>=trainingNeed(inst.level)){inst.trainingExp-=trainingNeed(inst.level);levelUpInstance(inst);levelUps++;}}if(show&&levelUps>0)msg(`Ranch Training • Level Up รวม ${levelUps} ครั้ง`);}
 function feedMonster(id,food){const inst=getInst(id);if(!inst)return;if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}state.inventory[food]--;if(food==='protein'){inst.hunger=clamp(inst.hunger+24);inst.fitness=clamp(inst.fitness+8);inst.bond=clamp(inst.bond+2);}if(food==='healthy'){inst.hunger=clamp(inst.hunger+30);inst.energy=clamp(inst.energy+10);inst.hp=inst.maxHp;inst.fainted=false;inst.bond=clamp(inst.bond+2);}if(food==='favorite'){inst.hunger=clamp(inst.hunger+20);inst.mood=clamp(inst.mood+22);inst.bond=clamp(inst.bond+5);}msg(`ให้อาหาร ${displayName(inst)} • Bond ${Math.round(inst.bond)}`);renderManager();renderParty();saveGame(false);}
-function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]}`);renderManager();saveGame(false);}
+function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;
+  // V7.2: Apply a training session via the shared pool (addTrainingExp clamps to capacity)
+  const gain=Math.round(trainingNeed(inst.level)*0.15);
+  const applied=addTrainingExp(inst,focus,gain);
+  if(applied>0)inst.trainingExp=(inst.trainingExp||0)+applied;
+  msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${applied}${applied<gain?' (pool full!)':''}`);
+  renderManager();saveGame(false);}
 function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){
@@ -1541,7 +1559,7 @@ function needsHTML(inst){return `<div class="need-row"><div class="need-chip">�
 function geneHTML(inst){return `Gene HP ${inst.genes.hp} • ATK ${inst.genes.atk} • DEF ${inst.genes.def} • SPD ${inst.genes.spd} • Trait: ${inst.genes.trait}`;}
 function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0;
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?`<div class="training-badge">Training ${TRAIN_FOCUS[inst.trainingFocus]} • ${Math.floor(inst.trainingExp)}/${trainingNeed(inst.level)} EXP</div>`:''}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button></div>${where==='storage'?`<div class="train-actions"><button data-train="power">ATK</button><button data-train="defense">DEF</button><button data-train="agility">SPD</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}</div>`;
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?`<div class="training-badge">Training ${TRAIN_FOCUS[inst.trainingFocus]||'Power'} • Pool ${instTrainingUsed(inst)}/${40+8*inst.level} • LvEXP ${Math.floor(inst.trainingExp||0)}/${trainingNeed(inst.level)}</div>`:''}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button></div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}</div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));wrap.querySelectorAll('[data-train]').forEach(b=>{if(b.dataset.train===inst.trainingFocus)b.classList.add('active');b.onclick=()=>setTraining(inst.instanceId,b.dataset.train);});wrap.querySelector('.move-btn').onclick=()=>where==='storage'?withdrawMonster(inst.instanceId):depositMonster(inst.instanceId);const rt=wrap.querySelector('.ranch-toggle');if(rt)rt.onclick=()=>toggleRanchActive(inst.instanceId);const eb=wrap.querySelector('.evo-btn');if(eb)eb.onclick=()=>showEvolution(inst.instanceId);return wrap;
 }
 function breedingAdultIds(){return state.storage.filter(id=>{const i=getInst(id);return i&&adultForBreeding(i);});}
