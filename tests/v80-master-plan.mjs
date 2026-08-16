@@ -104,13 +104,13 @@ for (const needle of [
   'learnCandidateSkill(',
   'mutateOwnedSkill(',
   'FOOD_CATALOG',
-  'flame_wolf',
-  'magma_bear',
+  'SKILL_CANDIDATES',
   'critRate:derived.critRate',
   'loadoutPreview(',
 ]) {
   assert.ok(js.includes(needle), `game-v800.js must wire ${needle}`);
 }
+assert.ok(js.includes("from './content-catalog.mjs'"), 'runtime loads the data-driven catalog');
 assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');
 assert.ok(html.includes('id="foodTraining"') && html.includes('id="foodMineral"') && html.includes('id="foodEmber"') && html.includes('id="foodMoon"'), 'all six food categories appear in the HUD');
 assert.ok(css.includes('.cr-debug-panel'), 'CR debug panel has styles');
