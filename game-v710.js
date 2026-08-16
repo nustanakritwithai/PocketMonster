@@ -10,6 +10,7 @@ import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrain
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, SKILL_SLOTS } from './skill-progression.mjs';
+import { equipItem, unequip, equippedItems, computeEquipmentContribution, EQUIPMENT_SLOTS } from './equipment.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -285,10 +286,10 @@ function refreshStats(inst,heal=false){
   const sp=spById[inst.speciesId]; if(!sp)return;
   inst.trainingBonus=inst.trainingBonus||{hp:0,atk:0,def:0,spd:0};
   const oldMax=inst.maxHp||1,oldHp=inst.hp??oldMax,ratio=oldMax>0?oldHp/oldMax:1,path=getEvolutionPath(inst),mods=path?.statMods||{};
-  inst.maxHp=Math.round(statValue(sp.base.hp,inst.level,inst.genes.hp,.14,inst.trainingBonus.hp)*(mods.hp||1));
-  inst.atk=Math.round(statValue(sp.base.atk,inst.level,inst.genes.atk,.08,inst.trainingBonus.atk)*(mods.atk||1));
-  inst.def=Math.round(statValue(sp.base.def,inst.level,inst.genes.def,.08,inst.trainingBonus.def)*(mods.def||1));
-  inst.spd=Math.round(statValue(sp.base.spd,inst.level,inst.genes.spd,.05,inst.trainingBonus.spd)*(mods.spd||1));
+  inst.maxHp=Math.round((statValue(sp.base.hp,inst.level,inst.genes.hp,.14,inst.trainingBonus.hp)+(inst.equipment?getEquipmentFlat(inst).hp:0))*(mods.hp||1));
+  inst.atk=Math.round((statValue(sp.base.atk,inst.level,inst.genes.atk,.08,inst.trainingBonus.atk)+(inst.equipment?getEquipmentFlat(inst).atk:0))*(mods.atk||1));
+  inst.def=Math.round((statValue(sp.base.def,inst.level,inst.genes.def,.08,inst.trainingBonus.def)+(inst.equipment?getEquipmentFlat(inst).def:0))*(mods.def||1));
+  inst.spd=Math.round((statValue(sp.base.spd,inst.level,inst.genes.spd,.05,inst.trainingBonus.spd)+(inst.equipment?getEquipmentFlat(inst).spd:0))*(mods.spd||1));
   inst.hp=heal?inst.maxHp:clamp(Math.round(inst.maxHp*ratio),0,inst.maxHp); inst.fainted=inst.hp<=0; inst.lifeStage=lifeStageFor(inst);
 }
 function makeInstance(sp,level=1,opts={}){
@@ -1589,6 +1590,24 @@ function careAction(id,action){
   const label=action==='rest'?'พักผ่อน':'เล่นด้วย';
   msg(`${displayName(inst)} • ${label} • ${action==='rest'?`พลัง ${Math.round(inst.energy)} ลดเครียด`:`อารมณ์ ${Math.round(inst.mood)} Bond ${Math.round(inst.bond)}`}`);
   renderManager();renderParty();saveGame(false);
+}
+// V7.6: Equipment functions (3-slot reversible loadout)
+function equipMonsterItem(id,item){
+  const inst=getInst(id);if(!inst)return;
+  const result=equipItem(inst,item);
+  if(result.ok){refreshStats(inst,false);msg(`${displayName(inst)} → Equip ${item.id} [${item.slot}]${result.previous?` (แทนที่ ${result.previous.id})`:''}`);renderManager();saveGame(false);}
+  else msg('Equipment: invalid item/slot');
+}
+function unequipMonster(id,slot){
+  const inst=getInst(id);if(!inst)return;
+  const removed=unequip(inst,slot);
+  if(removed){refreshStats(inst,false);msg(`${displayName(inst)} → Unequip ${slot} (${removed.id})`);renderManager();saveGame(false);}
+}
+function getEquipmentFlat(inst){
+  if(!inst.equipment)return{hp:0,atk:0,def:0,spd:0};
+  const items=equippedItems(inst);
+  const contrib=computeEquipmentContribution(items);
+  return contrib.flat;
 }
 function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;
   // V7.2: Apply a training session via the shared pool (addTrainingExp clamps to capacity)
