@@ -36,3 +36,5 @@ export {
   isPresentationAnchor,
 } from './anchors.mjs';
 export { normalizeAssetRequest } from './requests.mjs';
+export { createAssetEngine } from './engine.mjs';
+export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';

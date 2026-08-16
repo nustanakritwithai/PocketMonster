@@ -26,8 +26,7 @@ import {
 } from '../asset-presentation/index.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-assert.doesNotMatch(js, /from '\.\/asset-presentation/, 'AE0 must not wire the engine into the live game');
-assert.match(js, /function buildHumanoid\(/, 'legacy humanoid builder stays until AE1');
+assert.match(js, /function buildHumanoid\(/, 'legacy humanoid builder stays as the AE1 fallback mesh');
 
 for (const file of [
   'asset-presentation/schema.mjs',
