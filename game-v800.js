@@ -1138,7 +1138,7 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
 let currentManagerTab='collection';
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
@@ -1149,6 +1149,58 @@ function setManagerTab(tab='collection'){
   currentManagerTab=tab;
   document.querySelectorAll('.manager-tab').forEach(b=>b.classList.toggle('active',b.dataset.managerTab===tab));
   document.querySelectorAll('[data-tab-pane]').forEach(p=>p.classList.toggle('active',p.dataset.tabPane===tab));
+  if(tab==='collection')renderManager();
+  if(tab==='training')renderTraining();
+  if(tab==='evolution')renderEvolution();
+  if(tab==='breeding')renderBreeding();
+}
+function ownedMonsterIds(){return [...state.party.filter(Boolean),...state.storage];}
+function monsterSelectHTML(selectedId){
+  return ownedMonsterIds().map(id=>{
+    const m=getInst(id);
+    if(!m)return '';
+    return `<option value="${id}" ${id===selectedId?'selected':''}>${displayName(m)} Lv.${m.level} • ${m.lifeStage}</option>`;
+  }).join('');
+}
+function bindMonsterSelect(panel,stateKey,renderFn){
+  const select=panel.querySelector('select[data-monster-select]');
+  if(select)select.onchange=()=>{state[stateKey]=select.value;renderFn();};
+}
+function renderTraining(){
+  const panel=el('trainingPanel');
+  if(!panel)return;
+  const allIds=ownedMonsterIds();
+  if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
+  const selectedId=allIds.includes(state.trainingSelectedId)?state.trainingSelectedId:allIds[0];
+  state.trainingSelectedId=selectedId;
+  const inst=getInst(selectedId);
+  if(!inst){panel.innerHTML='<div class="manager-empty">เลือกมอนไม่ถูกต้อง</div>';return;}
+  const used=instTrainingUsed(inst);
+  const cap=BALANCE_CONFIG.training.capacity.base+BALANCE_CONFIG.training.capacity.perLevel*inst.level;
+  const poolPct=cap>0?Math.round(used/cap*100):0;
+  const poolFull=used>=cap;
+  syncToBodyMind(inst);
+  const cond=deriveCondition(inst)||'normal';
+  const condMult=BALANCE_CONFIG.condition[cond]?.training??1;
+  const condTH={excellent:'ดีเยี่ยม',good:'ดี',normal:'ปกติ',tired:'เหนื่อย',fatigued:'อ่อนเพลีย',bad:'แย่'};
+  const hasBuff=(inst.activeBuffs||[]).some(b=>b.expiresAt>Date.now());
+  const linesHTML=TRAINING_LINES.map(line=>{
+    const val=inst.training?.[line]||0;
+    const dim=balanceFormulas.diminishingMultiplier(val);
+    const apt=inst.aptitude?.[line]||3;
+    const aptMult=balanceFormulas.aptitudeMultiplier(apt);
+    const stars='★'.repeat(apt)+'<span class="empty">'+'☆'.repeat(5-apt)+'</span>';
+    const bands=BALANCE_CONFIG.training.diminishing;
+    const currentBand=bands.find(b=>val<b.upTo)||{upTo:200,multiplier:0};
+    const bandLabel=currentBand.multiplier===1?'0-50':currentBand.multiplier===0.8?'51-100':currentBand.multiplier===0.6?'101-150':currentBand.multiplier===0.4?'151-200':'200+';
+    const valPct=Math.min(100,Math.round(val/Math.max(1,currentBand.upTo)*100));
+    const isFocus=line===(inst.trainingFocus||'power');
+    const gain=Math.round(ranchTrainingGain(inst,line,15));
+    return `<div class="training-line-card ${isFocus?'focus-active':''}"><div class="training-line-header"><b>${line[0].toUpperCase()+line.slice(1)}</b>${isFocus?'<span class="focus-tag">เลือกอยู่</span>':''}</div><div class="training-line-stats"><span>ค่า: <strong>${Math.round(val)}</strong></span><span class="dim">ลดลง: ${dim}x (${bandLabel})</span><span class="apt">Apt: <span class="apt-stars">${stars}</span> (${aptMult}x)</span></div><div class="line-progress"><div class="line-progress-fill ${line}" style="width:${valPct}%"></div></div><button class="train-btn" data-train-line="${line}" ${poolFull?'disabled':''}>${poolFull?'Pool เต็ม':`ฝึก ${line} +${gain}`}</button></div>`;
+  }).join('');
+  panel.innerHTML=`<div class="training-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="training-summary"><div class="pool-header"><span>Training Pool (รวม 5 สาย)</span><span class="pool-count">${Math.round(used)} / ${cap}</span></div><div class="pool-bar"><div class="pool-bar-fill" style="width:${poolPct}%"></div></div></div>${linesHTML}<div class="condition-box"><div>สภาพ: <strong class="cond-${cond}">${condTH[cond]||cond}</strong> → ${condMult}x training gain</div><div>Training Food: ${hasBuff?'<span style="color:#fde68a">มี buff ทำงาน</span>':'ไม่มี buff'}</div></div><div class="training-info">Pool = 40 + 8xLevel (รวมทุกสาย) • ค่ามาก = gain ลดลง (diminishing return) • Aptitude ดาวเยอะ = gain เพิ่ม • สภาพดี = gain เพิ่ม</div></div>`;
+  bindMonsterSelect(panel,'trainingSelectedId',renderTraining);
+  panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
 }
 let immersiveStarted=true;
 function startGameInteraction(){
@@ -1791,7 +1843,7 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.train
   const applied=addTrainingExp(inst,focus,gain);
   if(applied>0){inst.trainingExp=(inst.trainingExp||0)+applied;refreshStats(inst,false);}
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
-  renderManager();saveGame(false);}
+  renderManager();if(currentManagerTab==='training')renderTraining();saveGame(false);}
 function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){

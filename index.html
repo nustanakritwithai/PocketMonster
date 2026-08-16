@@ -128,9 +128,10 @@
         </div>
 
         <div class="manager-tabs">
-          <button class="manager-tab active" data-manager-tab="collection">จัดการมอน</button>
+          <button class="manager-tab active" data-manager-tab="collection">มอน</button>
+          <button class="manager-tab" data-manager-tab="training">ฝึก</button>
           <button class="manager-tab" data-manager-tab="evolution">Evolution</button>
-          <button class="manager-tab" data-manager-tab="breeding">Breeding / Egg</button>
+          <button class="manager-tab" data-manager-tab="breeding">Breeding</button>
         </div>
 
         <div class="manager-grid manager-tab-pane active" data-tab-pane="collection">
@@ -143,6 +144,10 @@
             <h3>Storage / Ranch <span id="storageCountLabel" class="section-count"></span> • Active <span id="ranchActiveCountLabel" class="section-count"></span></h3>
             <div id="managerStorage"></div>
           </section>
+        </div>
+
+        <div class="manager-tab-pane" data-tab-pane="training">
+          <div id="trainingPanel"></div>
         </div>
 
         <section class="evolution-panel manager-tab-pane" data-tab-pane="evolution">
