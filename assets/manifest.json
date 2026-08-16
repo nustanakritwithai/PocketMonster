@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "generator": "Monster Life RPG Asset Engine",
+  "entries": {
+    "models": {},
+    "textures": {},
+    "audio": {},
+    "portraits": {},
+    "fonts": {},
+    "icons": {},
+    "vfx": {}
+  }
+}

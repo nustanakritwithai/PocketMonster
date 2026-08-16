@@ -27,6 +27,7 @@ import {
   equipmentById,
   foodById,
 } from './content-catalog.mjs';
+import { bindThree, getCacheStats, getManifest, loadManifest } from './asset-engine.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -58,6 +59,9 @@ async function loadThree(){
 let THREE;
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
+bindThree(THREE);
+void loadManifest();
+if (typeof window !== 'undefined') window.MLRPG_ASSETS = { getManifest, getCacheStats };
 startupText('กำลังสร้าง Monster Life RPG V8.0.0…');
 const qualityProfile=Object.freeze({tier:'medium',maxDpr:1.25,antialias:true,shadows:false,nearAiHz:24,midAiHz:12,farAiHz:5,labelHz:10});
 const sharedResources=createSharedResourceCache();
