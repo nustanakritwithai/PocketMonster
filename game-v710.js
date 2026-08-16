@@ -6,10 +6,9 @@ import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
+import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 
-// V7.1 Balance Foundation — expose the data-driven balance engine for tooling,
-// telemetry and the balance debug panel. Gameplay pacing is unchanged in this
-// release; wiring the curves into the live loop is a progressive step (see plan).
+// V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
   schemaVersion: BALANCE_SCHEMA_VERSION,
   config: BALANCE_CONFIG,
@@ -249,8 +248,10 @@ const species=[
 ];
 const spById=Object.fromEntries(species.map(s=>[s.id,s]));
 const personalities=['Brave','Calm','Playful','Lazy','Aggressive','Curious'];
-const POTENTIALS=['C','B','A','S'];
-const POTENTIAL_MOD={C:.92,B:1,A:1.08,S:1.16};
+const POTENTIALS=['D','C','B','A','S'];
+// V7.2 Balance Foundation gene scale: narrow 8% spread (D=0.96 → S=1.04)
+const POTENTIAL_MOD={D:0.96, C:0.98, B:1.00, A:1.02, S:1.04};
+const GENE_RANKS=['D','C','B','A','S'];
 const TRAIN_FOCUS={power:'Power',defense:'Defense',agility:'Agility'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
