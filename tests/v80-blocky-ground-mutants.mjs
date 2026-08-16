@@ -25,11 +25,23 @@ assert.match(
   /\[\[-10,6,1\.4,0x57534e\],\[9,-7,1\.6,0x44403c\],\[14,4,1\.2,0x78716c\],\[-15,-5,1\.5,0x57534e\],\[3,-15,1\.8,0x3f3f46\],\[-4,16,1\.3,0x52525b\]\]/,
   'mutant 6: cave rock coordinates stay',
 );
-assert.match(js, /dodecahedronGeometry\(s,0\)/, 'mutant 7: Phase 1 does not convert rocks to boxes');
-assert.match(js, /cylinderGeometry\(\.16\*s,\.28\*s,1\.55\*s,8\)/, 'mutant 8: Phase 1 does not convert tree trunks');
-assert.match(js, /coneGeometry\(1\.05\*s,1\.55\*s,8\)/, 'mutant 9: Phase 1 does not convert tree canopy');
-assert.match(js, /circleGeometry\(r,40\)/, 'mutant 10: Phase 1 does not convert pads');
-assert.match(js, /sphereGeometry\(\.34,18,14\)/, 'mutant 11: Phase 1 does not convert the incubator egg');
+assert.match(
+  js,
+  /makeFencePost\(7\+Math\.cos\(a\)\*3\.55,3\+Math\.sin\(a\)\*3\.55\)/,
+  'mutant 7: ranch fence ring radius stays',
+);
+assert.match(
+  js,
+  /\[\[6\.2,1\.4\],\[8\.4,4\.6\],\[5\.1,4\.8\],\[4\.4,7\.4\]\]/,
+  'mutant 8: ranch flower coordinates stay',
+);
+assert.match(
+  js,
+  /\[\[-8,-4,1\.1\],\[6,-9,1\.3\],\[-12,9,1\.4\],\[11,8,1\.2\],\[0,-12,1\.6\],\[15,-2,1\],\[-6,12,1\.25\]\]/,
+  'mutant 9: cave stalagmite coordinates stay',
+);
+assert.match(js, /circleGeometry\(r,40\)/, 'mutant 10: Phase 1/2 does not convert pads');
+assert.match(js, /sphereGeometry\(\.34,18,14\)/, 'mutant 11: Phase 1/2 does not convert the incubator egg');
 assert.doesNotMatch(js, /ground\.material\.map\.dispose\(\)/, 'mutant 12: cached ground textures are shared, not disposed');
 assert.doesNotMatch(painterSrc, /zoneColor\s*\+\s*0x404040/, 'mutant 13: sky bottoms do not overflow per-channel');
 assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'mutant 14: fog near/far stay until Phase 5');

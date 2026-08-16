@@ -247,25 +247,25 @@ const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.
 function addDeco(mesh){ mesh.castShadow=true; mesh.receiveShadow=true; decorations.add(mesh); return mesh; }
 function makeRock(x,z,s=1,tone=0x945a38){
   const cluster=new THREE.Group();
-  const main=new THREE.Mesh(dodecahedronGeometry(s,0),mat(tone,.95,.04));
-  main.position.y=s*.62; main.scale.set(1,1.28,1.08); cluster.add(main);
-  const side=new THREE.Mesh(dodecahedronGeometry(s*.55,0),mat(tone,.98,.02));
-  side.position.set(s*.55,s*.32,s*.18); side.scale.set(1.1,.8,1); cluster.add(side);
-  const pebble=new THREE.Mesh(dodecahedronGeometry(s*.28,0),mat(tone,.99,0));
-  pebble.position.set(-s*.48,s*.18,-s*.22); cluster.add(pebble);
+  const main=new THREE.Mesh(boxGeometry(s,s*.8,s*.9),mat(tone,.95,.04));
+  main.position.y=s*.4; main.scale.set(1,1.28,1.08); cluster.add(main);
+  const side=new THREE.Mesh(boxGeometry(s*.5,s*.4,s*.5),mat(tone,.98,.02));
+  side.position.set(s*.55,s*.2,s*.18); side.scale.set(1.1,.8,1); cluster.add(side);
+  const pebble=new THREE.Mesh(boxGeometry(s*.25,s*.2,s*.25),mat(tone,.99,0));
+  pebble.position.set(-s*.48,s*.1,-s*.22); cluster.add(pebble);
   cluster.position.set(x,0,z); cluster.rotation.y=(x*1.7+z)*.15; addDeco(cluster); return cluster;
 }
 function makeTree(x,z,s=1,{trunk=0x754428,leaf=0x18753a,fruit=null}={}){
   const g=new THREE.Group();
-  const bole=new THREE.Mesh(cylinderGeometry(.16*s,.28*s,1.55*s,8),mat(trunk,.88,.02));
+  const bole=new THREE.Mesh(boxGeometry(.22*s,1.55*s,.22*s),mat(trunk,.88,.02));
   bole.position.y=.78*s; g.add(bole);
-  const mid=new THREE.Mesh(coneGeometry(1.05*s,1.55*s,8),mat(leaf,.78,.03));
-  mid.position.y=1.85*s; g.add(mid);
-  const top=new THREE.Mesh(coneGeometry(.72*s,1.15*s,8),mat(leaf,.7,.04));
-  top.position.y=2.55*s; g.add(top);
+  const mid=new THREE.Mesh(boxGeometry(1.05*s,1*s,1.05*s),mat(leaf,.78,.03));
+  mid.position.y=1.65*s; g.add(mid);
+  const top=new THREE.Mesh(boxGeometry(.72*s,.7*s,.72*s),mat(leaf,.7,.04));
+  top.position.y=2.35*s; g.add(top);
   if(fruit){
-    for(const [fx,fy,fz] of [[.35,1.7,.2],[-.28,1.9,-.15],[.1,2.15,.32]]){
-      const berry=new THREE.Mesh(sphereGeometry(.07*s,8,6),mat(fruit,.55,.08));
+    for(const [fx,fy,fz] of [[.35,1.5,.2],[-.28,1.7,-.15],[.1,1.95,.32]]){
+      const berry=new THREE.Mesh(boxGeometry(.1*s,.1*s,.1*s),mat(fruit,.55,.08));
       berry.position.set(fx*s,fy*s,fz*s); g.add(berry);
     }
   }
@@ -274,17 +274,19 @@ function makeTree(x,z,s=1,{trunk=0x754428,leaf=0x18753a,fruit=null}={}){
 function makeGrassTuft(x,z,s=1,color=0x3f9d4a){
   const g=new THREE.Group();
   for(const [dx,h,tilt] of [[-.06,.28,.18],[.05,.34,-.12],[0,.22,.04]]){
-    const blade=new THREE.Mesh(coneGeometry(.035*s,h*s,4),mat(color,.86,0));
+    const blade=new THREE.Mesh(boxGeometry(.05*s,h*s,.05*s),mat(color,.86,0));
     blade.position.set(dx*s,h*.5*s,0); blade.rotation.z=tilt; g.add(blade);
   }
   g.position.set(x,0,z); addDeco(g); return g;
 }
 function makeStalagmite(x,z,s=1){
   const g=new THREE.Group();
-  const base=new THREE.Mesh(coneGeometry(.42*s,.95*s,7),mat(0x64748b,.92,.08));
-  base.position.y=.42*s; g.add(base);
-  const tip=new THREE.Mesh(coneGeometry(.16*s,.7*s,6),mat(0x94a3b8,.78,.12));
-  tip.position.y=1.05*s; g.add(tip);
+  const base=new THREE.Mesh(boxGeometry(.6*s,.5*s,.6*s),mat(0x64748b,.92,.08));
+  base.position.y=.25*s; g.add(base);
+  const mid=new THREE.Mesh(boxGeometry(.35*s,.5*s,.35*s),mat(0x94a3b8,.85,.1));
+  mid.position.y=.75*s; g.add(mid);
+  const tip=new THREE.Mesh(boxGeometry(.15*s,.4*s,.15*s),mat(0x94a3b8,.78,.12));
+  tip.position.y=1.2*s; g.add(tip);
   g.position.set(x,0,z); addDeco(g); return g;
 }
 function makeFencePost(x,z){
@@ -293,9 +295,9 @@ function makeFencePost(x,z){
 }
 function makeFlower(x,z,color=0xf472b6){
   const g=new THREE.Group();
-  const stem=new THREE.Mesh(cylinderGeometry(.018,.02,.22,5),mat(0x4ade80,.8,0));
+  const stem=new THREE.Mesh(boxGeometry(.03,.22,.03),mat(0x4ade80,.8,0));
   stem.position.y=.11; g.add(stem);
-  const bloom=new THREE.Mesh(sphereGeometry(.07,8,6),mat(color,.5,.04));
+  const bloom=new THREE.Mesh(boxGeometry(.1,.1,.1),mat(color,.5,.04));
   bloom.position.y=.24; g.add(bloom);
   g.position.set(x,0,z); addDeco(g); return g;
 }
