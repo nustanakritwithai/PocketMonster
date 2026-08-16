@@ -7,6 +7,7 @@ import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
+import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -1298,15 +1299,37 @@ function updateWorldLabels(dt){
 function damageWild(w,dmg,meta={}){if(w.dead)return;w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
 function monsterExpNeed(level){return 24+level*18;}
 function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+amount;let ups=0;while(inst.exp>=monsterExpNeed(inst.level)){inst.exp-=monsterExpNeed(inst.level);levelUpInstance(inst);ups++;}inst.bond=clamp(inst.bond+Math.min(2,amount*.04));return ups;}
+// V7.3: Battle event tracking for growth/training (per-encounter, cleared on defeat)
+let battleEventLog=[];
+function logBattleEvent(category,amount,meaningful=true){if(TRAINING_LINES.includes(category)&&amount>0)battleEventLog.push({category,amount,meaningful});}
+function getEnemyTier(w){if(w.boss)return'boss';if(w.elite)return'elite';if(w.trial)return'trial';if(w.strong)return'strong';return'normal';}
 function defeatWild(w){
   if(w.dead)return;
   w.dead=true;
   removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
   state.exp+=12*w.level;
-  const monGain=activeSummon?8*w.level:0,ups=activeSummon?grantMonsterExp(activeSummon.inst,monGain):0;
+  // V7.3: Use resolveBattleGrowth + applyBattleGrowth instead of legacy grantMonsterExp
+  const tier=getEnemyTier(w);
+  const enemy={level:w.level,tier};
+  const events=battleEventLog.splice(0); // consume events for this encounter
+  let monGain=0,ups=0,trainSummary='';
+  if(activeSummon){
+    const inst=activeSummon.inst;
+    // Ensure inst has V7.2 schema fields for applyBattleGrowth
+    if(!inst.career)inst.career={battleWins:0,eliteWins:0,bossWins:0,trials:0,milestones:[]};
+    if(!inst.training)inst.training={power:0,defense:0,speed:0,technique:0,spirit:0};
+    const result=resolveBattleGrowth({monster:inst,enemy,events,outcome:'win'});
+    const applied=applyBattleGrowth(inst,result);
+    monGain=result.growthExp;ups=applied.growth.leveledUp?applied.growth.toLevel-applied.growth.fromLevel:0;
+    const trainLines=TRAINING_LINES.filter(l=>result.trainingExp[l]>0);
+    if(trainLines.length)trainSummary=' • Training: '+trainLines.map(l=>`${l[0].toUpperCase()+l.slice(1)} +${result.trainingExp[l]}`).join(' ');
+    // Party share growth (non-active members get 35% of active's growth EXP)
+    const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
+    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;addGrowthExp(pm,share);}}}
+  }
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':'';
-  msg(`${tag}${wildDisplayName(w)} ถูกปราบ +${12*w.level} EXP${activeSummon?` • ${displayName(activeSummon.inst)} +${monGain} EXP${ups?` • Level Up +${ups}`:''}`:''}`);
+  msg(`${tag}${wildDisplayName(w)} ถูกปราบ +${12*w.level} EXP${activeSummon?` • ${displayName(activeSummon.inst)} +${monGain} EXP${ups?` • Level Up +${ups}`:''}${trainSummary}`:''}`);
   renderAll();
   saveGame(false);
   respawnWild(w,w.boss?BALANCE.bossRespawnMs:BALANCE.wildRespawnMs);
@@ -1389,20 +1412,20 @@ function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;
 function useSkill(index){
   if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return;}const a=activeSummon,move=getMonsterSkills(a.inst)[index];if(!move)return;if((a.skillCds[index]||0)>0){msg(`${move.name} คูลดาวน์ ${a.skillCds[index].toFixed(1)}s`);return;}
   if(move.targetType==='enemy'){
-    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}setHumanoidAction(player,'skill',.28);triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);const res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);
+    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}setHumanoidAction(player,'skill',.28);triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);const res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
   }else if(move.targetType==='area'){
     const targets=wilds.filter(w=>!w.dead&&distXZ(a.mesh.position,w.mesh.position)<=move.range);if(!targets.length){msg(`${move.name}: ไม่มีศัตรูในพื้นที่`);return;}setHumanoidAction(player,'skill',.28);triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:Math.min(2.8,move.range*.7),duration:1.45,intensity:1.15});triggerCameraShake(.11,.17);let total=0;for(const t of targets){spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);const res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});damageWild(t,res.damage,{type:move.type,eff:res.eff});total+=res.damage;}a.skillCds[index]=move.cooldown;msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
   }else if(move.targetType==='self'){
     triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
-    if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);}
-    if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);}
-    if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);}a.skillCds[index]=move.cooldown;
+    if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);logBattleEvent('spirit',move.value*10);}
+    if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
+    if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
   }
   a.inst.bond=clamp(a.inst.bond+.3);renderParty();renderSkillButtons();
 }
 function updateOwned(dt){
   const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=Math.max(0,a.attackCd-dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
-  let t=a.target;if(!t||t.dead||distXZ(a.mesh.position,t.mesh.position)>12)t=nearestWild(9,a.mesh.position);a.target=t;let moving=false;if(t){const d=distXZ(a.mesh.position,t.mesh.position);if(d>1.35){moving=true;const dir=t.mesh.position.clone().sub(a.mesh.position);dir.y=0;dir.normalize();a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);}else if(a.attackCd<=0){a.attackCd=.9;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:15};const res=monsterDamage(a.inst,basic,t,a.attackBuff);damageWild(t,res.damage,{type:basic.type,eff:res.eff});}}
+  let t=a.target;if(!t||t.dead||distXZ(a.mesh.position,t.mesh.position)>12)t=nearestWild(9,a.mesh.position);a.target=t;let moving=false;if(t){const d=distXZ(a.mesh.position,t.mesh.position);if(d>1.35){moving=true;const dir=t.mesh.position.clone().sub(a.mesh.position);dir.y=0;dir.normalize();a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);}else if(a.attackCd<=0){a.attackCd=.9;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:15};const res=monsterDamage(a.inst,basic,t,a.attackBuff);damageWild(t,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}}
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
 function selectWildAggressors(){
