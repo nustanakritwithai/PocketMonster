@@ -33,6 +33,12 @@ import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
 import { createLegacyHumanoidProvider } from './asset-presentation/providers/legacy-humanoid.mjs';
 import { createBigheadProvider } from './asset-presentation/providers/procedural-bighead.mjs';
 import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
+import {
+  addBigheadMonsterMarks,
+  applyBigheadVisualGrowth,
+  isBigheadMonsterRoot,
+  markRingScale,
+} from './asset-presentation/monster-mark.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -755,19 +761,24 @@ function makeSlimeMesh(color,scale=1,type='Normal'){
 }
 function applyVisualGrowth(g,inst){
   if(!g||!inst?.training)return g;
-  const t=inst.training;
-  const power=Math.min(1,(t.power||0)/80);
-  const defense=Math.min(1,(t.defense||0)/80);
-  const speed=Math.min(1,(t.speed||0)/80);
-  const spirit=Math.min(1,(t.spirit||0)/80);
-  g.scale.x*=1+power*.10+defense*.08;
-  g.scale.y*=1+power*.06+defense*.10-speed*.05;
-  g.scale.z*=1+speed*.12-defense*.04;
-  if(spirit>.12){
+  if(isBigheadMonsterRoot(g)){
+    applyBigheadVisualGrowth(g,inst);
+  }else{
+    const t=inst.training;
+    const power=Math.min(1,(t.power||0)/80);
+    const defense=Math.min(1,(t.defense||0)/80);
+    const speed=Math.min(1,(t.speed||0)/80);
+    const spirit=Math.min(1,(t.spirit||0)/80);
+    g.scale.x*=1+power*.10+defense*.08;
+    g.scale.y*=1+power*.06+defense*.10-speed*.05;
+    g.scale.z*=1+speed*.12-defense*.04;
+    g.userData.visualGrowth={power,defense,speed,spirit};
+  }
+  const spirit=g.userData.visualGrowth?.spirit||0;
+  if(spirit>.12 && !g.getObjectByName('spiritAura')){
     const aura=new THREE.Mesh(torusGeometry(.44+spirit*.14,.016,8,22),new THREE.MeshBasicMaterial({color:0xfde68a,transparent:true,opacity:.18+spirit*.28}));
     aura.rotation.x=Math.PI/2;aura.position.y=.07;aura.name='spiritAura';g.add(aura);
   }
-  g.userData.visualGrowth={power,defense,speed,spirit};
   return g;
 }
 function makeFlameWolfMesh(color,scale=1){
@@ -983,10 +994,34 @@ function makeSpeciesMesh(sp,inst=null){
   }
   return applyVisualGrowth(g,inst);
 }
+function addMonsterRing(g,{owned=false,eliteOverride=false,boss=false,inst=null,sp}={}){
+  const path=inst?getEvolutionPath(inst):null;
+  const lifeScale=(inst?.lifeStage==='Baby')?.72:1;
+  const elite=!!(eliteOverride||sp?.elite);
+  if(isBigheadMonsterRoot(g)){
+    addBigheadMonsterMarks(g,{
+      THREE,
+      box:boxGeometry,
+      basicMaterial:color=>new THREE.MeshBasicMaterial({color}),
+      material:mat,
+      owned,eliteOverride,speciesElite:!!sp?.elite,boss,
+      formScale:path?.scale||1,
+    });
+    return g;
+  }
+  const ringScale=markRingScale({boss,elite,formScale:path?.scale||1,lifeScale,bighead:false});
+  const ringColor=owned?0x60a5fa:(boss?0xf43f5e:eliteOverride?0xfacc15:0xef4444);
+  const ring=new THREE.Mesh(torusGeometry(.58*ringScale,.045,8,28),new THREE.MeshBasicMaterial({color:ringColor}));
+  ring.rotation.x=Math.PI/2; ring.position.y=.06; g.add(ring);
+  if(elite||boss){
+    const crest=new THREE.Mesh(octahedronGeometry((boss?.18:.13)*ringScale),mat(boss?0xffd166:0xfde047,.4,.15));
+    crest.position.set(0,1.55*ringScale,0); crest.castShadow=true; g.add(crest);
+  }
+  return g;
+}
 function monsterMesh(sp,owned=false,inst=null,eliteOverride=false,boss=false){
   const path=inst?getEvolutionPath(inst):null;
   const lifeScale=(inst?.lifeStage==='Baby')?.72:1;
-  const ringScale=(boss?1.65:(eliteOverride||sp.elite?1.35:1))*(path?.scale||1)*lifeScale;
   let g;
   try{
     const handle=assets.spawn(resolveMonsterAssetId(sp.id,path?.form||'slime'),{
@@ -998,17 +1033,11 @@ function monsterMesh(sp,owned=false,inst=null,eliteOverride=false,boss=false){
     });
     g=handle.root;
     if(lifeScale!==1) g.scale.multiplyScalar(lifeScale);
-    applyVisualGrowth(g,inst);
   }catch(err){
     g=makeSpeciesMesh(sp,inst);
   }
-  const ringColor=owned?0x60a5fa:(boss?0xf43f5e:eliteOverride?0xfacc15:0xef4444);
-  const ring=new THREE.Mesh(torusGeometry(.58*ringScale,.045,8,28),new THREE.MeshBasicMaterial({color:ringColor}));
-  ring.rotation.x=Math.PI/2; ring.position.y=.06; g.add(ring);
-  if(eliteOverride||sp.elite||boss){
-    const crest=new THREE.Mesh(octahedronGeometry((boss?.18:.13)*ringScale),mat(boss?0xffd166:0xfde047,.4,.15));
-    crest.position.set(0,1.55*ringScale,0); crest.castShadow=true; g.add(crest);
-  }
+  addMonsterRing(g,{owned,eliteOverride,boss,inst,sp});
+  if(isBigheadMonsterRoot(g)) applyVisualGrowth(g,inst);
   return g;
 }
 function addBackpack(group,color=0x7c3aed){ const pack=new THREE.Mesh(boxGeometry(.24,.3,.14),mat(color,.74,.04)); pack.position.set(0,1.02,.23); pack.castShadow=true; group.add(pack); }

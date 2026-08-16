@@ -124,7 +124,7 @@ export function createBigheadMonsterProvider({
       case 'Water':
         for (const sx of [-0.40, 0.40]) {
           const fin = boxMesh(0.04 * scale, 0.20 * scale, 0.30 * scale, 0x8ed8ff, 0.4, 0, 'decoration', { decoType: type });
-          fin.position.set(sx * scale, 0.70 * scale, 0.10 * scale);
+          fin.position.set(sx * scale, 0.62 * scale, 0.10 * scale);
           g.add(fin);
         }
         break;
@@ -147,6 +147,11 @@ export function createBigheadMonsterProvider({
           const crystal = coneMesh(0.05 * scale, h * scale, 0xdafdff, 0.08, 0, 'decoration', { decoType: type });
           crystal.position.set(x * scale, 1.08 * scale, -0.02 * scale);
           g.add(crystal);
+        }
+        {
+          const slab = boxMesh(0.22 * scale, 0.05 * scale, 0.16 * scale, 0xbfefff, 0.12, 0, 'decoration', { decoType: type });
+          slab.position.set(0, 0.94 * scale, -0.04 * scale);
+          g.add(slab);
         }
         break;
       case 'Fighting':
@@ -258,6 +263,11 @@ export function createBigheadMonsterProvider({
           const wing = boxMesh(0.06 * scale, 0.28 * scale, 0.35 * scale, 0xffc4e8, 0.4, 0, 'decoration', { decoType: type });
           wing.position.set(sx * scale, 0.72 * scale, 0.05 * scale);
           g.add(wing);
+        }
+        {
+          const gem = coneMesh(0.05 * scale, 0.14 * scale, 0xffe0f2, 0.3, 0, 'decoration', { decoType: type });
+          gem.position.set(0, 1.14 * scale, -0.02 * scale);
+          g.add(gem);
         }
         break;
       default:
