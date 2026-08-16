@@ -12,6 +12,7 @@ import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nut
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
+import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -1609,6 +1610,44 @@ function getEquipmentFlat(inst){
   const items=equippedItems(inst);
   const contrib=computeEquipmentContribution(items);
   return contrib.flat;
+}
+// V7.8: Raising Events — sample event definitions
+const RAISING_EVENTS=[
+  {id:'curious_find',baseWeight:1.2,trigger:{statRanges:{mood:{min:50}},},choices:[
+    {id:'explore',label:'สำรวจ',effects:{growthExp:8,mood:5,bond:2}},
+    {id:'ignore',label:'ไม่สนใจ',effects:{mood:-3}},
+  ]},
+  {id:'tired_rest',baseWeight:1.0,trigger:{statRanges:{energy:{max:30}},},choices:[
+    {id:'rest',label:'ให้พัก',effects:{energy:15,stress:-5,bond:3}},
+    {id:'push',label:'ฝืนต่อ',effects:{energy:-5,stress:8,mood:-5}},
+  ]},
+  {id:'playful_bond',baseWeight:0.8,trigger:{statRanges:{bond:{min:40},mood:{min:60}},},choices:[
+    {id:'play',label:'เล่นด้วย',effects:{mood:8,bond:5,trust:3}},
+    {id:'scold',label:'ดุ',effects:{mood:-10,bond:-3,discipline:5}},
+  ]},
+];
+let pendingEvent=null;
+function triggerRaisingEvent(inst){
+  if(!inst||pendingEvent)return;
+  syncToBodyMind(inst);
+  const eligible=evaluateEventTriggers(RAISING_EVENTS,inst,{now:Date.now()});
+  if(!eligible.length)return;
+  const picked=rollEvent(eligible,Date.now()%10000);
+  if(!picked)return;
+  pendingEvent={instId:inst.instanceId,eventDef:picked.def};
+  const choices=getChoices(picked.def);
+  const choiceText=choices.map((c,i)=>`${i+1}. ${c.label}`).join(' / ');
+  msg(`★ ${displayName(inst)}: ${picked.def.id} — เลือก: ${choiceText}`);
+}
+function resolveRaisingEvent(choiceId){
+  if(!pendingEvent)return;
+  const inst=getInst(pendingEvent.instId);if(!inst){pendingEvent=null;return;}
+  syncToBodyMind(inst);
+  const result=applyChoice(inst,pendingEvent.eventDef,choiceId,{now:Date.now()});
+  syncFromBodyMind(inst);
+  if(result.ok)msg(`${displayName(inst)} • ${pendingEvent.eventDef.id}:${choiceId} → ${JSON.stringify(result.effects)}`);
+  pendingEvent=null;
+  renderManager();saveGame(false);
 }
 function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;
   // V7.2: Apply a training session via the shared pool (addTrainingExp clamps to capacity)
