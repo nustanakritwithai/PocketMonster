@@ -38,3 +38,4 @@ export {
 export { normalizeAssetRequest } from './requests.mjs';
 export { createAssetEngine } from './engine.mjs';
 export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
+export { createBigheadProvider } from './providers/procedural-bighead.mjs';
