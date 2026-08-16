@@ -209,3 +209,40 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .skill-lock{color:#fca5a5}
 .skill-line button,.cr-btn{border:0;border-radius:8px;padding:5px 7px;background:#7c3aed;color:#fff;font-weight:800;font-size:10px;cursor:pointer}
 .cr-btn{background:#b45309!important}
+
+/* V8.0 UX Phase 1 — monster card progression display */
+.need-chip.cond-excellent{background:#166534;color:#dcfce7}
+.need-chip.cond-good{background:#1d4ed8;color:#bfdbfe}
+.need-chip.cond-normal{background:#334155;color:#cbd5e1}
+.need-chip.cond-tired{background:#a16207;color:#fef3c7}
+.need-chip.cond-fatigued{background:#c2410c;color:#fed7aa}
+.need-chip.cond-bad{background:#991b1b;color:#fee2e2}
+.training-pool{margin-top:6px;font-size:9px}
+.pool-header{display:flex;justify-content:space-between;color:#86efac;margin-bottom:3px}
+.pool-header .pool-count{color:#fff;font-weight:700}
+.pool-bar{height:6px;background:#111827;border-radius:999px;overflow:hidden}
+.pool-bar-fill{height:100%;background:linear-gradient(90deg,#22c55e,#84cc16);transition:width .3s}
+.pool-lines{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:5px}
+.pool-line{display:flex;align-items:center;gap:4px;font-size:8px}
+.pool-line.focus .line-name{color:#facc15;font-weight:700}
+.line-name{width:48px;color:#94a3b8;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.line-bar{flex:1;height:4px;background:#111827;border-radius:999px;overflow:hidden;min-width:30px}
+.line-fill{height:100%;transition:width .3s;border-radius:999px}
+.line-fill.line-power{background:#ef4444}
+.line-fill.line-defense{background:#3b82f6}
+.line-fill.line-speed{background:#22c55e}
+.line-fill.line-technique{background:#a855f7}
+.line-fill.line-spirit{background:#f59e0b}
+.line-val{width:24px;text-align:right;color:#cbd5e1;flex-shrink:0;font-weight:600}
+.skill-mini{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.skill-chip{font-size:8px;border-radius:6px;padding:2px 5px;color:#c4b5fd;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.skill-chip.master{background:#422006;color:#fde68a;border:1px solid #f59e0b33}
+.skill-chip.expert{background:#4c1d95;color:#ddd6fe;border:1px solid #7c3aed33}
+.skill-chip.skilled{background:#1e3a8a;color:#bfdbfe;border:1px solid #2563eb33}
+.skill-chip.familiar{background:#334155;color:#cbd5e1}
+.skill-chip.novice{background:#1f2937;color:#94a3b8}
+.equip-mini{display:flex;gap:3px;margin-top:4px;font-size:8px}
+.equip-slot{flex:1;background:#1f2937;border-radius:6px;padding:2px 4px;text-align:center;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.equip-slot.filled{color:#fde68a;background:#422006;border:1px solid #f59e0b22}
+.care-actions button[data-care="rest"]{background:#0891b2}
+.care-actions button[data-care="play"]{background:#db2777}

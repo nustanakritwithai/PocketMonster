@@ -274,6 +274,10 @@ const POTENTIALS=['D','C','B','A','S'];
 const POTENTIAL_MOD={D:0.96, C:0.98, B:1.00, A:1.02, S:1.04};
 const GENE_RANKS=['D','C','B','A','S'];
 const TRAIN_FOCUS={power:'Power',defense:'Defense',speed:'Speed',technique:'Technique',spirit:'Spirit'};
+const MASTERY_DOTS={novice:'●○○○○',familiar:'●●○○○',skilled:'●●●○○',expert:'●●●●○',master:'●●●●●'};
+const MASTERY_TH={novice:'เริ่มต้น',familiar:'คุ้นเคย',skilled:'ชำนาญ',expert:'เชี่ยวชาญ',master:'ระดับปรมาจารย์'};
+const MASTERY_ORDER=['novice','familiar','skilled','expert','master'];
+const MASTERY_NEXT_TH={novice:'คุ้นเคย',familiar:'ชำนาญ',skilled:'เชี่ยวชาญ',expert:'ปรมาจารย์'};
 // V7.2: Training line → stat bonus mapping (applied on levelUp via shared pool)
 const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spirit:'hp'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
@@ -1891,7 +1895,40 @@ function openManager(){if(!isNearNpc()){msg('กลับ Ranch Hub และเ
 function closeManager(){el('monsterManager').classList.add('hidden');saveGame(false);renderParty();}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
-function needsHTML(inst){return `<div class="need-row"><div class="need-chip">หิว <strong>${fmt(inst.hunger)}</strong></div><div class="need-chip">พลัง <strong>${fmt(inst.energy)}</strong></div><div class="need-chip">อารมณ์ <strong>${fmt(inst.mood)}</strong></div><div class="need-chip">สภาพ <strong>${deriveCondition(inst)||'normal'}</strong></div></div>`;}
+function needsHTML(inst){
+  syncToBodyMind(inst);
+  const cond=deriveCondition(inst)||'normal';
+  return `<div class="need-row"><div class="need-chip">หิว <strong>${fmt(inst.hunger)}</strong></div><div class="need-chip">พลัง <strong>${fmt(inst.energy)}</strong></div><div class="need-chip">อารมณ์ <strong>${fmt(inst.mood)}</strong></div><div class="need-chip cond-${cond}">สภาพ <strong>${cond}</strong></div></div>`;
+}
+function trainingPoolHTML(inst){
+  const used=instTrainingUsed(inst);
+  const cap=BALANCE_CONFIG.training.capacity.base+BALANCE_CONFIG.training.capacity.perLevel*inst.level;
+  const pct=cap>0?Math.round(used/cap*100):0;
+  const focus=inst.trainingFocus||'power';
+  const linesHTML=TRAINING_LINES.map(l=>{
+    const val=inst.training?.[l]||0;
+    const maxBand=BALANCE_CONFIG.training.diminishing.find(b=>val<b.upTo)||{upTo:200};
+    const linePct=Math.min(100,Math.round(val/Math.max(1,maxBand.upTo)*100));
+    return `<div class="pool-line ${l===focus?'focus':''}"><span class="line-name">${l[0].toUpperCase()+l.slice(1)}</span><div class="line-bar"><div class="line-fill line-${l}" style="width:${linePct}%"></div></div><span class="line-val">${Math.round(val)}</span></div>`;
+  }).join('');
+  return `<div class="training-pool"><div class="pool-header"><span>Training Pool</span><span class="pool-count">${Math.round(used)} / ${cap}</span></div><div class="pool-bar"><div class="pool-bar-fill" style="width:${pct}%"></div></div><div class="pool-lines">${linesHTML}</div></div>`;
+}
+function skillsMiniHTML(inst){
+  if(!Array.isArray(inst.skills)||!inst.skills.length)return '';
+  return `<div class="skill-mini">${inst.skills.map(s=>{
+    const rank=s.masteryRank||'novice';
+    return `<span class="skill-chip ${rank}" title="${MASTERY_TH[rank]||rank}">${s.skillId} ${MASTERY_DOTS[rank]||''}</span>`;
+  }).join('')}</div>`;
+}
+function equipMiniHTML(inst){
+  if(!inst.equipment)return '';
+  const hasAny=EQUIPMENT_SLOTS.some(s=>inst.equipment[s]);
+  if(!hasAny)return '';
+  return `<div class="equip-mini">${EQUIPMENT_SLOTS.map(s=>{
+    const item=inst.equipment[s];
+    return `<span class="equip-slot ${item?'filled':''}">${item?item.id:'—'}</span>`;
+  }).join('')}</div>`;
+}
 function geneHTML(inst){return `Gene HP ${inst.genes.hp} • ATK ${inst.genes.atk} • DEF ${inst.genes.def} • SPD ${inst.genes.spd} • Trait: ${inst.genes.trait||'-'}`;}
 function breakdownHTML(inst){
   const br=inst.statBreakdown||{};
@@ -1923,7 +1960,7 @@ function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0;
   const eq=inst.equipment||{};
   const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?`<div class="training-badge">Training ${TRAIN_FOCUS[inst.trainingFocus]||'Power'} • Pool ${instTrainingUsed(inst)}/${40+8*inst.level}</div>`:''}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">พัก</button><button data-care="play">เล่น</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));
   wrap.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>careAction(inst.instanceId,b.dataset.care));
   wrap.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>toggleStarterEquip(inst.instanceId,b.dataset.equip));
