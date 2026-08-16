@@ -41,17 +41,33 @@
     {
       "id": "appearance.human.player-orange.v1",
       "style": "four-side-block-v1",
-      "mode": "fallback",
+      "mode": "four",
+      "pack": "./assets/appearances/player-orange/appearance.json",
       "parts": {
-        "head": { "topColor": "#F97316", "bottomColor": "#FFC4A3" }
+        "head": {
+          "front": "#1F2937",
+          "right": "#FFC4A3",
+          "back": "#F97316",
+          "left": "#FFC4A3",
+          "topColor": "#F97316",
+          "bottomColor": "#FFC4A3"
+        }
       }
     },
     {
       "id": "appearance.human.keeper-green.v1",
       "style": "four-side-block-v1",
-      "mode": "fallback",
+      "mode": "four",
+      "pack": "./assets/appearances/keeper-green/appearance.json",
       "parts": {
-        "head": { "topColor": "#FACC15", "bottomColor": "#F0C8A0" }
+        "head": {
+          "front": "#15803D",
+          "right": "#F0C8A0",
+          "back": "#FACC15",
+          "left": "#F0C8A0",
+          "topColor": "#FACC15",
+          "bottomColor": "#F0C8A0"
+        }
       }
     }
   ]

@@ -1,0 +1,23 @@
+{
+  "id": "appearance.human.player-orange.v1",
+  "style": "four-side-block-v1",
+  "mode": "four",
+  "parts": {
+    "head": {
+      "front": "#1F2937",
+      "right": "#FFC4A3",
+      "back": "#F97316",
+      "left": "#FFC4A3",
+      "topColor": "#F97316",
+      "bottomColor": "#FFC4A3"
+    },
+    "torso": {
+      "front": "#20324A",
+      "right": "#20324A",
+      "back": "#7C3AED",
+      "left": "#20324A",
+      "topColor": "#20324A",
+      "bottomColor": "#0F172A"
+    }
+  }
+}
