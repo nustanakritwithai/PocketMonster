@@ -7,7 +7,15 @@ export const REQUIRED_ASSET_FIELDS = Object.freeze([
   'id', 'kind', 'provider', 'style', 'surfaceStyle', 'rig', 'metrics', 'roles',
 ]);
 
-export const ALLOWED_ROLES = Object.freeze(['player', 'keeper']);
+export const ALLOWED_KINDS = Object.freeze(['character', 'monster']);
+export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy']);
+export const CHARACTER_ROLES = Object.freeze(['player', 'keeper']);
+export const MONSTER_ROLES = Object.freeze(['wild', 'owned', 'boss', 'elite']);
+export const ALLOWED_ROLES = Object.freeze([...CHARACTER_ROLES, ...MONSTER_ROLES]);
+export const ALLOWED_LIFE_STAGES = Object.freeze(['Baby', 'Juvenile', 'Adult', 'Mature']);
+export const MONSTER_ID_RE = /^monster\.[a-z0-9_]+\.[a-z0-9_]+\.bighead\.v1$/;
+export const CHARACTER_ID_RE = /^character\./;
+export const MONSTER_EXTRA_FIELDS = Object.freeze(['speciesId', 'type', 'form', 'color']);
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -38,15 +46,35 @@ export function validateAssetDefinition(def) {
   for (const field of REQUIRED_ASSET_FIELDS) {
     if (def[field] == null) errors.push(`missing ${field}`);
   }
-  if (def.kind && def.kind !== 'character') errors.push('kind must be character in this phase');
-  if (def.provider && !['procedural', 'gltf', 'legacy'].includes(def.provider)) {
+  if (def.kind && !ALLOWED_KINDS.includes(def.kind)) errors.push('kind must be character or monster');
+  if (def.provider && !ALLOWED_PROVIDERS.includes(def.provider)) {
     errors.push(`unsupported provider ${def.provider}`);
+  }
+  if (def.kind === 'monster' && def.id && !MONSTER_ID_RE.test(def.id)) {
+    errors.push('monster id must match monster.{form}.{species}.bighead.v1');
+  }
+  if (def.kind === 'character' && def.id && !CHARACTER_ID_RE.test(def.id)) {
+    errors.push('character id must start with character.');
+  }
+  if (def.kind === 'monster') {
+    for (const field of MONSTER_EXTRA_FIELDS) {
+      if (def[field] == null) errors.push(`missing ${field}`);
+    }
+    if (def.color != null && !Number.isInteger(def.color)) errors.push('color must be a number');
+    if (def.style && def.style !== 'blocky-bighead-v1') errors.push('monster style must be blocky-bighead-v1');
+    if (def.surfaceStyle && def.surfaceStyle !== 'four-side-block-v1') {
+      errors.push('monster surfaceStyle must be four-side-block-v1');
+    }
+    if (def.form && def.speciesId && def.id && def.id !== `monster.${def.form}.${def.speciesId}.bighead.v1`) {
+      errors.push('monster id must match monster.{form}.{species}.bighead.v1');
+    }
   }
   if (!isPlainObject(def.metrics)) errors.push('metrics must be an object');
   if (!isPlainObject(def.roles)) errors.push('roles must be an object');
   else {
+    const rolesForKind = def.kind === 'monster' ? MONSTER_ROLES : CHARACTER_ROLES;
     for (const role of Object.keys(def.roles)) {
-      if (!ALLOWED_ROLES.includes(role)) errors.push(`unsupported role ${role}`);
+      if (!rolesForKind.includes(role)) errors.push(`unsupported role ${role} for ${def.kind || 'character'}`);
     }
   }
   errors.push(...findGameplayFields(def).map(path => `gameplay field not allowed: ${path}`));
