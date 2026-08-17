@@ -1616,6 +1616,7 @@ function hpPct(v){return Math.max(0,Math.min(1,v));}
 function msg(t){el('message').textContent=t;}
 function setManagerTab(tab='collection'){
   currentManagerTab=tab;
+  playSFX('sfx_ui_tab');
   document.querySelectorAll('.manager-tab').forEach(b=>b.classList.toggle('active',b.dataset.managerTab===tab));
   document.querySelectorAll('[data-tab-pane]').forEach(p=>p.classList.toggle('active',p.dataset.tabPane===tab));
   if(tab==='collection')renderManager();
@@ -2607,8 +2608,8 @@ function renderEvolution(){
 // ---------- NPC manager ----------
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
 function updateNpcUI(){const b=el('npcBtn');if(isNearNpc()&&state.currentZone==='hub'&&el('monsterManager').classList.contains('hidden')){const p=worldToScreen(npc.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent='คุย';b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;}else b.classList.add('hidden');}else b.classList.add('hidden');}
-function openManager(){if(!isNearNpc()){msg('กลับ Ranch Hub และเข้าใกล้ NPC ก่อน');return;}if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());}
-function closeManager(){el('monsterManager').classList.add('hidden');saveGame(false);renderParty();}
+function openManager(){if(!isNearNpc()){msg('กลับ Ranch Hub และเข้าใกล้ NPC ก่อน');return;}if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');}
+function closeManager(){el('monsterManager').classList.add('hidden');saveGame(false);renderParty();playSFX('sfx_ui_close');}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
 function needsHTML(inst){
