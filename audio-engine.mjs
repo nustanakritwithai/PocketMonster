@@ -168,6 +168,7 @@ function registerCombatSFX() {
 
   registerCaptureSFX();
   registerProgressionSFX();
+  registerUISFX();
 }
 
 // ── Capture SFX (4) ──────────────────────────────────────────
@@ -247,6 +248,29 @@ function registerProgressionSFX() {
     tone(523, 0, 0.12, { type: 'sine', gain: 0.08 });
     tone(659, 0.1, 0.12, { type: 'sine', gain: 0.08 });
     tone(784, 0.2, 0.2, { type: 'sine', gain: 0.08 });
+  };
+}
+
+// ── UI SFX (Phase 4) ──────────────────────────────────────────
+function registerUISFX() {
+  // Click — short tick
+  SFX_HANDLERS['sfx_ui_click'] = () => {
+    tone(800, 0, 0.03, { type: 'sine', gain: 0.06 });
+  };
+
+  // Tab — quick sweep up
+  SFX_HANDLERS['sfx_ui_tab'] = () => {
+    toneSweep(600, 900, 0, 0.05, { type: 'sine', gain: 0.06 });
+  };
+
+  // Open — rising sweep
+  SFX_HANDLERS['sfx_ui_open'] = () => {
+    toneSweep(400, 800, 0, 0.08, { type: 'sine', gain: 0.07 });
+  };
+
+  // Close — falling sweep
+  SFX_HANDLERS['sfx_ui_close'] = () => {
+    toneSweep(800, 400, 0, 0.08, { type: 'sine', gain: 0.07 });
   };
 }
 
