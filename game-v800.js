@@ -8,7 +8,7 @@ import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
-import { initAudio, playSFX, playBGM, stopBGM } from './audio-engine.mjs';
+import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -1926,6 +1926,7 @@ function switchZone(zone,silent=false){
   el('monsterManager').classList.add('hidden');
   state.currentZone=zone;
   playBGM(zone);
+  startAmbient(zone);
   const cfg=ZONES[zone];
   setZoneGround(zone);
   populateWorld(zone);
@@ -3081,6 +3082,9 @@ bindActionPress(el('skill1Btn'),()=>useSkill(0));
 bindActionPress(el('skill2Btn'),()=>useSkill(1));
 bindActionPress(el('skill3Btn'),()=>useSkill(2));
 el('saveBtn').onclick=()=>saveGame(true);
+el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'🔇 เสียงปิด':'🔊 เสียงเปิด';localStorage.setItem('mlr-audio-muted',String(m));};
+{const savedVol=localStorage.getItem('mlr-audio-volume');if(savedVol){setVolume(parseFloat(savedVol));el('volumeSlider').value=Math.round(parseFloat(savedVol)*100);}const savedMute=localStorage.getItem('mlr-audio-muted');if(savedMute==='true'){toggleMute();el('muteBtn').textContent='🔇 เสียงปิด';}}
+el('volumeSlider').oninput=(e)=>{const v=parseFloat(e.target.value)/100;setVolume(v);localStorage.setItem('mlr-audio-volume',String(v));};
 el('resetBtn').onclick=()=>{for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};document.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>switchZone(b.dataset.zone));
 el('huntBtn').onclick=()=>switchZone(state.currentZone==='hub'?'grassland':'hub');
 
