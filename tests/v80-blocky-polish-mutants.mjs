@@ -13,7 +13,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '800'/, 'mutant 2: polish does not bump ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: polish ASSET_REVISION stays 810');
 assert.match(js, /shadows:false/, 'mutant 3: medium quality must not force a shadow pass');
 assert.match(extractFn('addDeco'), /obj\.isMesh/, 'mutant 4: group decorations must flag child meshes, not only the group');
 assert.match(extractFn('makeFlower'), /glowMat\(color,color,\.08/, 'mutant 5: flower glow must not fall back to a flat mat');

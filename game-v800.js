@@ -50,7 +50,7 @@ const MLRPG_BALANCE = Object.freeze({
   compareBuilds,
 });
 if (typeof window !== 'undefined') window.MLRPG_BALANCE = MLRPG_BALANCE;
-console.info(`Monster Life RPG V8.0.0 • Progression Core live loop v${BALANCE_SCHEMA_VERSION} loaded`);
+console.info(`Monster Life RPG V8.1.0 • Progression Core live loop v${BALANCE_SCHEMA_VERSION} loaded`);
 
 const startup = document.getElementById('startupStatus');
 function startupText(text, cls=''){ if(startup){ startup.textContent=text; startup.className='startup-status '+cls; } }
@@ -71,7 +71,7 @@ async function loadThree(){
 let THREE;
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
-startupText('กำลังสร้าง Monster Life RPG V8.0.0…');
+startupText('กำลังสร้าง Monster Life RPG V8.1.0…');
 const qualityProfile=Object.freeze({tier:'medium',maxDpr:1.25,antialias:true,shadows:false,nearAiHz:24,midAiHz:12,farAiHz:5,labelHz:10});
 const assets=createAssetEngine({THREE,quality:qualityProfile.tier});
 {
@@ -1950,8 +1950,8 @@ const keys={};
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){state.selectedSlot=Number(e.code.at(-1))-1;renderParty();renderSkillButtons();}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
-const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.0.0 boot: #joystick not found');
-const stick=el('stick'); if(!stick) throw new Error('V8.0.0 boot: #stick not found');
+const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.1.0 boot: #joystick not found');
+const stick=el('stick'); if(!stick) throw new Error('V8.1.0 boot: #stick not found');
 
 function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
 joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyPoint(e);});joyEl.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.pid)joyPoint(e);});
@@ -2300,7 +2300,7 @@ function updateWild(w,dt,canEngage=false){
 }
 function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
 
-// ---------- V8.0.0 Ranch / life / training core ----------
+// ---------- V8.1.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){
   const need=Math.max(1,growthExpForLevel((inst.level||1)+1)-(inst.growthExp||0));
@@ -2986,7 +2986,7 @@ function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
   state.lifeLastAt=Date.now();
   writeStoredSave(localStorage,{state,playerHp:playerData.hp});
-  if(show)msg('บันทึกเกม V8.0.0 แล้ว');
+  if(show)msg('บันทึกเกม V8.1.0 แล้ว');
 }
 function loadGame(){
   try{
@@ -2997,8 +2997,8 @@ function loadGame(){
     if(saved.source!=='current')state.currentZone='hub';
     applyLifeSimulation(Date.now(),true);
     if(saved.source==='backup')msg('กู้คืน Save สำรองสำเร็จ');
-    else if(saved.source==='current')msg('โหลดข้อมูล V8.0.0 แล้ว');
-    else msg('ย้าย Save เก่า → V8.0.0 สำเร็จ');
+    else if(saved.source==='current')msg('โหลดข้อมูล V8.1.0 แล้ว');
+    else msg('ย้าย Save เก่า → V8.1.0 สำเร็จ');
     if(saved.source!=='current')saveGame(false);
   }catch(error){
     console.warn('load failed',error);

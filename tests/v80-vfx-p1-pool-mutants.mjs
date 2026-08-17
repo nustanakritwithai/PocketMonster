@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '800'/, 'mutant 2: spark pool swap does not bump ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: spark pool swap ASSET_REVISION stays 810');
 
 const poolStart = js.indexOf('const sparkPool=createObjectPool({');
 const pool = js.slice(poolStart, js.indexOf('function setHumanoidAction', poolStart));

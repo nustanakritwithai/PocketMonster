@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '800'/, 'mutant 2: fxGeom swap does not bump ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: fxGeom swap ASSET_REVISION stays 810');
 
 const geom = extractFn('fxGeom');
 assert.doesNotMatch(geom, /sphereGeometry/, 'mutant 3: fxGeom must not keep spheres');
