@@ -833,9 +833,9 @@ function applyVisualGrowth(g,inst){
     const defense=Math.min(1,(t.defense||0)/80);
     const speed=Math.min(1,(t.speed||0)/80);
     const spirit=Math.min(1,(t.spirit||0)/80);
-    g.scale.x*=1+power*.10+defense*.08;
-    g.scale.y*=1+power*.06+defense*.10-speed*.05;
-    g.scale.z*=1+speed*.12-defense*.04;
+    g.scale.x*=1+power*.06+defense*.04;
+    g.scale.y*=1+power*.02+defense*.03+spirit*.01;
+    g.scale.z*=1+speed*.06+spirit*.02;
     g.userData.visualGrowth={power,defense,speed,spirit};
   }
   const spirit=g.userData.visualGrowth?.spirit||0;
