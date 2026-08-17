@@ -1788,12 +1788,12 @@ let hubCompanion=null;
 const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[]},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
-    ['normalooze',-4,-2,1,{}],['flameling',4,-4,1,{}],['aquapuff',8,1,1,{}],['voltkit',-8,1,1,{}],['mossbun',1,-9,1,{}],['fairimp',-2,-13,1,{}],
-    ['galebird',6,-10,2,{}],['toxitoad',-10,-7,2,{}],['punchcub',10,7,2,{}]
+    ['normalooze',-4,-2,1,{}],['normalooze',8,8,1,{}],['flameling',4,-4,1,{}],['flameling',-10,8,1,{}],['aquapuff',8,1,1,{}],['aquapuff',-8,-10,1,{}],['voltkit',-8,1,1,{}],['voltkit',6,10,1,{}],['mossbun',1,-9,1,{}],['mossbun',-11,4,1,{}],['fairimp',-2,-13,1,{}],['fairimp',10,-10,1,{}],
+    ['galebird',6,-12,2,{}],['toxitoad',-12,-7,2,{}],['punchcub',12,7,2,{}],['punchcub',-6,12,2,{}]
   ]},
   cave:{label:'Echo Cave',bg:0x334155,ground:0x57606f,spawn:[
-    ['frostowl',-3,-1,2,{}],['ironbug',4,-5,2,{}],['rockhorn',7,1,2,{}],['ghostpurr',-7,1,2,{}],['sandmole',1,-9,2,{}],
-    ['mindcoon',-2,-13,2,{}],['buglet',10,-2,2,{}],['voidhorn',-11,-10,3,{elite:true}],['emberdrake',8,8,3,{}],['emberdrake',-2,11,4,{boss:true}],
+    ['frostowl',-3,-1,2,{}],['frostowl',10,4,2,{}],['ironbug',4,-5,2,{}],['ironbug',-8,8,2,{}],['rockhorn',7,1,2,{}],['rockhorn',-10,-4,2,{}],['ghostpurr',-7,1,2,{}],['ghostpurr',6,10,2,{}],['sandmole',1,-9,2,{}],['sandmole',-11,6,2,{}],
+    ['mindcoon',-2,-13,2,{}],['buglet',10,-2,2,{}],['buglet',-4,12,2,{}],['voidhorn',-11,-10,3,{elite:true}],['emberdrake',8,8,3,{}],['emberdrake',-2,11,4,{boss:true}],
     ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
   ]}
 };
@@ -2996,6 +2996,8 @@ function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
   state.lifeLastAt=Date.now();
   writeStoredSave(localStorage,{state,playerHp:playerData.hp});
+  const si=el('saveIndicator');
+  if(si){si.style.opacity='1';setTimeout(()=>{si.style.opacity='0';},800);}
   if(show)msg('บันทึกเกม V8.1.0 แล้ว');
 }
 function loadGame(){
@@ -3070,6 +3072,7 @@ el('huntBtn').onclick=()=>switchZone(state.currentZone==='hub'?'grassland':'hub'
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;
+let autoSaveTick=30;
 function ensureWildPopulation(dt){
   if(state.currentZone==='hub'){wildEmptyTimer=0;return;}
   const alive=livingWilds().length;
@@ -3109,6 +3112,8 @@ function loop(now){
     ranchPad.ring.rotation.y+=dt*.2;
     breedingPad.ring.rotation.y-=dt*.16;
     incubator.rotation.y+=dt*.12;
+    autoSaveTick-=dt;
+    if(autoSaveTick<=0){autoSaveTick=30;saveGame(false);}
     targetTick-=dt;
     lifeTick-=dt;
     if(lifeTick<=0){
