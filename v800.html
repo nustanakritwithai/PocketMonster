@@ -59,9 +59,12 @@
     </div>
 
     <div id="zoneTravel" class="zone-travel">
-      <button data-zone="hub">Ranch</button>
-      <button data-zone="grassland">ทุ่ง • Wild</button>
-      <button data-zone="cave">ถ้ำ • Wild</button>
+      <button id="zoneToggleBtn" class="zone-toggle-btn">🗺 ด่าน</button>
+      <div id="zoneDropdown" class="zone-dropdown hidden">
+        <button data-zone="hub">🏠 Ranch Hub</button>
+        <button data-zone="grassland">🌲 ทุ่ง • Wild</button>
+        <button data-zone="cave">🕳 ถ้ำ • Wild</button>
+      </div>
     </div>
 
     <button id="huntBtn" class="hunt-btn">ออกล่า → ทุ่ง • Wild 6</button>

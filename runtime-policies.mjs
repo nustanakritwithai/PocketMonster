@@ -1,8 +1,8 @@
 export const ENCOUNTER_POLICY = Object.freeze({
-  aggroRadius: 14,
+  aggroRadius: 4,
   leashRadius: 18,
   disengageRadius: 20,
-  maxEngaged: 3,
+  maxEngaged: 2,
 });
 
 export function tickCooldown(current, dt) {

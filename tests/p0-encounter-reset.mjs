@@ -15,7 +15,7 @@ const ids = selectEngagedWildIds([
   { id: 'w3', dead: false, targetValid: true, engaged: false, distanceToTarget: 3, distanceFromHome: 3 },
   { id: 'w5', dead: false, targetValid: true, engaged: false, distanceToTarget: 15, distanceFromHome: 2 },
 ], ENCOUNTER_POLICY);
-assert.deepEqual(ids, ['w1', 'w2', 'w3'], 'nearest three eligible wilds must be selected deterministically');
+assert.deepEqual(ids, ['w1', 'w2'], 'nearest two eligible wilds within aggro radius selected deterministically (maxEngaged=2, aggroRadius=4)');
 assert.equal(selectEngagedWildIds([
   { id: 'w1', dead: false, targetValid: true, engaged: true, distanceToTarget: 19, distanceFromHome: 5 },
 ], ENCOUNTER_POLICY)[0], 'w1', 'engaged wild stays active inside disengage radius');
