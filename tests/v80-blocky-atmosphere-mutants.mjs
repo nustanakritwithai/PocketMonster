@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '800'/, 'mutant 2: atmosphere does not bump ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: atmosphere ASSET_REVISION stays 810');
 
 const lighting = extractFn('setZoneLighting');
 const ground = extractFn('setZoneGround');
@@ -46,6 +46,6 @@ assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/,
 assert.match(flower, /glowMat\(color,color,\.08/, 'mutant 15: flower bloom now uses the Phase 6 emissive glow');
 assert.match(painterSrc, /zoneType === 'cave'/, 'mutant 16: cave grid still uses the cave speckle path');
 assert.match(extractFn('switchZone'), /setZoneGround\(zone\)/, 'mutant 17: zone changes still call setZoneGround');
-assert.match(js, /case 'halo': return torusGeometry/, 'mutant 18: particle halo shapes stay toruses');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 18: monster shine stays a sphere');
 
 console.log('V8.0 blocky atmosphere mutants: PASS');

@@ -52,6 +52,6 @@ assert.match(js, /spawnRingPulse\(activeSummon\.mesh\.position/, 'summon still f
 assert.match(js, /spawnGroundDecal\(move\.type,t\.mesh\.position/, 'skills still stamp a ground decal');
 
 assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'boot Fog constructor stays 0x65c9f5,30,76');
-assert.match(js, /case 'halo': return torusGeometry/, 'particle halo shapes stay toruses');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere');
 
 console.log('V8.0 blocky VFX: PASS');

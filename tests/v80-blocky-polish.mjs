@@ -63,6 +63,6 @@ assert.equal(pixelDiffRatio(hubGround, paintGroundGrid(0x62c96b, 'grass')), 0, '
 
 assert.match(js, /setZoneLighting\(zone\)/, 'P5 lighting still runs');
 assert.match(extractFn('setZoneGround'), /scene\.fog\.near=zone==='cave'\?15:30/, 'P5 cave fog still shortens');
-assert.match(js, /case 'halo': return torusGeometry/, 'particle halo shapes stay toruses');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere');
 
 console.log('V8.0 blocky polish: PASS');

@@ -132,8 +132,8 @@ for (let i = useSkillOpen; i < js.length; i += 1) {
 const useSkillSrc = js.slice(useSkillStart, useSkillEnd + 1);
 assert.ok(useSkillSrc.includes('let res=null'), 'useSkill hoists res for mastery EXP');
 assert.ok(!useSkillSrc.includes('const res=monsterDamage'), 'useSkill must not shadow the outer res');
-assert.ok(html.includes('game-v800.js?v=800'), 'active HTML loads the v800 runtime');
-assert.ok(html.includes('style-v800.css?v=800'), 'active HTML loads the v800 stylesheet');
+assert.ok(html.includes('game-v800.js?v=810'), 'active HTML loads the v800 runtime');
+assert.ok(html.includes('style-v800.css?v=810'), 'active HTML loads the v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');
 assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');
 assert.ok(js.includes("scrollIntoView({block:'nearest'"), 'ดู CR must scroll the debug panel into view');

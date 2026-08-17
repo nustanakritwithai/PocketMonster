@@ -50,7 +50,7 @@ const MLRPG_BALANCE = Object.freeze({
   compareBuilds,
 });
 if (typeof window !== 'undefined') window.MLRPG_BALANCE = MLRPG_BALANCE;
-console.info(`Monster Life RPG V8.0.0 • Progression Core live loop v${BALANCE_SCHEMA_VERSION} loaded`);
+console.info(`Monster Life RPG V8.1.0 • Progression Core live loop v${BALANCE_SCHEMA_VERSION} loaded`);
 
 const startup = document.getElementById('startupStatus');
 function startupText(text, cls=''){ if(startup){ startup.textContent=text; startup.className='startup-status '+cls; } }
@@ -71,7 +71,7 @@ async function loadThree(){
 let THREE;
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
-startupText('กำลังสร้าง Monster Life RPG V8.0.0…');
+startupText('กำลังสร้าง Monster Life RPG V8.1.0…');
 const qualityProfile=Object.freeze({tier:'medium',maxDpr:1.25,antialias:true,shadows:false,nearAiHz:24,midAiHz:12,farAiHz:5,labelHz:10});
 const assets=createAssetEngine({THREE,quality:qualityProfile.tier});
 {
@@ -1169,9 +1169,9 @@ function playerHitText(){ return playerVisual.anchor('hitText',presentationScrat
 if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
 const effects=[];
 const sparkPool=createObjectPool({
-  maxSize:160,
+  maxSize:200,
   create:()=>new THREE.Mesh(
-    sphereGeometry(1,8,8),
+    boxGeometry(1,1,1),
     new THREE.MeshStandardMaterial({color:0xffffff,roughness:.58,metalness:.12,emissive:0xffffff,emissiveIntensity:.18,transparent:true,opacity:.9}),
   ),
   reset:mesh=>{
@@ -1179,7 +1179,9 @@ const sparkPool=createObjectPool({
     mesh.visible=false;
     mesh.position.set(0,0,0);
     mesh.scale.setScalar(1);
+    mesh.rotation.set(0,0,0);
     mesh.material.opacity=0;
+    mesh.material.emissiveIntensity=.18;
   },
   destroy:mesh=>disposeObject3D(mesh),
 });
@@ -1218,16 +1220,19 @@ function releaseTransientEffect(effect){
   else removeAndDispose(scene,effect.mesh);
 }
 function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
-  for(let i=0;i<count;i++){
+  const n=Math.min(16,Math.max(0,count|0));
+  for(let i=0;i<n;i++){
     const m=sparkPool.acquire();
     m.visible=true;
     m.material.color.setHex(color);
     m.material.emissive.setHex(color);
+    m.material.emissiveIntensity=clampEmissive(.45);
     m.material.opacity=.9;
     m.position.copy(pos);
     m.scale.setScalar(size);
+    m.rotation.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
     scene.add(m);
-    const a=(Math.PI*2*i)/count+Math.random()*.2;
+    const a=(Math.PI*2*i)/n+Math.random()*.2;
     const speed=.8+Math.random()*1.6;
     effects.push({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true});
   }
@@ -1237,7 +1242,176 @@ function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){
   const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
   mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'});
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); } e.mesh.material.opacity=Math.max(0,t*.9); if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+const TRAIN_FX_COLOR={power:0xef6c32,defense:0x4f87e8,speed:0xe8bd22,technique:0x63b34b,spirit:0xa78bfa};
+const FOOD_FX_COLOR={protein:0xf97316,healthy:0x22c55e,favorite:0xec4899,trainingChow:0xe8bd22,mineralBite:0xaab0c8,emberFruit:0xef6c32,moonFruit:0xc4b5fd};
+function takeSpark(color,emissiveIntensity=.45){
+  const m=sparkPool.acquire();
+  m.visible=true;
+  m.material.color.setHex(color);
+  m.material.emissive.setHex(color);
+  m.material.emissiveIntensity=clampEmissive(emissiveIntensity);
+  m.material.opacity=.9;
+  return m;
+}
+function fxWorldPos(id){
+  const ranch=id!=null?ranchVisuals.get(id):null;
+  if(ranch?.mesh)return ranch.mesh.position.clone();
+  if(id!=null&&activeSummon?.inst?.instanceId===id&&activeSummon.mesh)return activeSummon.mesh.position.clone();
+  if(id!=null&&hubCompanion?.inst?.instanceId===id&&hubCompanion.mesh)return hubCompanion.mesh.position.clone();
+  return ranchCenter.clone();
+}
+function spawnTrainingEffect(pos,focus){
+  if(!pos)return;
+  const color=TRAIN_FX_COLOR[focus]||0xffffff;
+  for(let i=0;i<8;i++){
+    const m=takeSpark(color),angle=(i/8)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.6,pos.y+0.3+Math.random()*0.3,pos.z+Math.sin(angle)*0.6);
+    m.scale.setScalar(0.04+Math.random()*0.03);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.4,maxLife:0.4,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.3,0.8+Math.random()*0.4,Math.sin(angle)*0.3),size:m.scale.x,gravity:0});
+  }
+  spawnRingPulse(pos.clone(),color,{scale:0.5,life:0.3,y:0.08});
+}
+function spawnEvolutionEffect(pos,oldColor,newColor){
+  if(!pos)return;
+  const aura=new THREE.Mesh(boxGeometry(1.2,2.0,1.2),new THREE.MeshBasicMaterial({color:newColor,transparent:true,opacity:0,wireframe:true}));
+  aura.position.copy(pos); aura.position.y+=1.0; scene.add(aura);
+  effects.push({mesh:aura,life:1.2,maxLife:1.2,kind:'evolution-aura',phase:0,newColor});
+  for(let i=0;i<20;i++){
+    const m=takeSpark(i%2?newColor:oldColor),angle=(i/20)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.8,pos.y+0.5+Math.random()*1.5,pos.z+Math.sin(angle)*0.8);
+    m.scale.setScalar(0.06);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.5,1.0,Math.sin(angle)*0.5),size:0.06,gravity:0.5});
+  }
+  spawnRingPulse(pos.clone(),newColor,{scale:1.2,life:0.4,y:0.08});
+  triggerCameraShake(0.12,0.2);
+}
+function spawnBreedingEffect(posA,posB){
+  if(!posA||!posB)return;
+  const mid=posA.clone().add(posB).multiplyScalar(0.5); mid.y+=1.0;
+  for(let i=0;i<6;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(mid.x+(Math.random()-0.5)*0.6,mid.y+i*0.15,mid.z+(Math.random()-0.5)*0.6);
+    m.scale.setScalar(0.08);
+    scene.add(m);
+    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.5+Math.random()*0.3,0),size:0.08,gravity:-0.2});
+  }
+  spawnRingPulse(mid,0xec4899,{scale:0.8,life:0.35,y:0});
+}
+function spawnHatchEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<12;i++){
+    const m=takeSpark(0xfde68a);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.3+Math.random()*0.5,pos.z+(Math.random()-0.5)*0.4);
+    m.scale.setScalar(0.05);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*1.5,0.8+Math.random()*0.5,(Math.random()-0.5)*1.5),size:0.05,gravity:1.0});
+  }
+  spawnRingPulse(pos.clone(),0xfde68a,{scale:0.8,life:0.4,y:0.1});
+  triggerCameraShake(0.08,0.15);
+}
+function spawnFeedEffect(pos,foodColor=0x22c55e){
+  if(!pos)return;
+  for(let i=0;i<5;i++){
+    const m=takeSpark(foodColor);
+    m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+1.5+Math.random()*0.3,pos.z+(Math.random()-0.5)*0.3);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,-1.0,0),size:0.05,gravity:0});
+  }
+  for(let i=0;i<3;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z);
+    m.scale.setScalar(0.04);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.6,0),size:0.04,gravity:-0.1});
+  }
+}
+function spawnRestEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<4;i++){
+    const m=takeSpark(0x60a5fa);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+1.0+i*0.2,pos.z+0.2);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.4,0.1),size:0.05,gravity:-0.05});
+  }
+}
+function spawnPlayEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<8;i++){
+    const m=takeSpark(0xfacc15),angle=(i/8)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.5,pos.y+0.5+Math.random()*0.8,pos.z+Math.sin(angle)*0.5);
+    m.scale.setScalar(0.06);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.8,0.5,Math.sin(angle)*0.8),size:0.06,gravity:0.3});
+  }
+}
+function spawnLevelUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<10;i++){
+    const m=takeSpark(0xfde047);
+    m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+0.1,pos.z+(Math.random()-0.5)*0.3);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,1.5+Math.random()*0.5,0),size:0.05,gravity:-0.2});
+  }
+  spawnRingPulse(pos.clone(),0xfde047,{scale:0.7,life:0.3,y:0.08});
+}
+function spawnBondUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<5;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z+(Math.random()-0.5)*0.4);
+    m.scale.setScalar(0.06);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*0.2,0.8,0),size:0.06,gravity:-0.1});
+  }
+}
+function spawnMasteryUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<12;i++){
+    const m=takeSpark(0xfde047),angle=(i/12)*Math.PI*2;
+    m.position.set(pos.x,pos.y+0.8,pos.z);
+    m.scale.setScalar(0.07);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*1.2,0.5+Math.random()*0.5,Math.sin(angle)*1.2),size:0.07,gravity:0.4});
+  }
+  spawnRingPulse(pos.clone().add(new THREE.Vector3(0,0.8,0)),0xfde047,{scale:0.6,life:0.3,y:0});
+}
+function spawnConditionBadEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<6;i++){
+    const m=takeSpark(0x64748b,0.1);
+    m.position.set(pos.x+(Math.random()-0.5)*0.5,pos.y+0.5+Math.random()*0.5,pos.z+(Math.random()-0.5)*0.5);
+    m.scale.setScalar(0.08);
+    scene.add(m);
+    effects.push({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05});
+  }
+}
+function easeOut(t){t=Math.max(0,Math.min(1,t));return 1-(1-t)*(1-t);}
+function clampEmissive(v){return Math.min(.7,Math.max(.1,v));}
+function fxParticleCount(mode,power,intensity){
+  const base=mode==='burst'?12:mode==='summon'?14:mode==='trail'?3:7;
+  return Math.max(3,Math.min(16,Math.round(base*Math.max(0,power)*intensity)));
+}
+function fxEmissive(mode,intensity){
+  return clampEmissive((mode==='trail'?0.4:0.55)*intensity);
+}
+function updateSparkType(e,dt,t){
+  const cfg=e.typeCfg; if(!cfg)return;
+  if(cfg.speed>1.1)e.vel.y+=dt*0.5;
+  if(cfg.speed<=0.95&&cfg.shape==='drop')e.vel.y-=dt*0.3;
+  if(cfg.speed>1.3){e.mesh.position.x+=Math.sin(e.life*20)*0.02;e.mesh.position.z+=Math.cos(e.life*20)*0.02;}
+  if(cfg.shape==='mist')e.vel.y=Math.max(e.vel.y,0);
+}
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -1262,36 +1436,37 @@ const ELEMENT_FX={
 function typeFx(type='Normal'){ return ELEMENT_FX[type]||ELEMENT_FX.Normal; }
 function fxGeom(shape='orb',size=0.06){
   switch(shape){
-    case 'flame': return coneGeometry(size*0.7,size*1.8,6);
-    case 'drop': return sphereGeometry(size,10,8);
-    case 'leaf': return octahedronGeometry(size*0.9,0);
-    case 'crystal': return octahedronGeometry(size,0);
+    case 'flame': return boxGeometry(size*0.6,size*1.8,size*0.6);
+    case 'drop': return boxGeometry(size*0.8,size*1.2,size*0.8);
+    case 'leaf': return boxGeometry(size*0.9,size*0.3,size*0.9);
+    case 'crystal': return boxGeometry(size,size*1.4,size);
     case 'impact': return boxGeometry(size*1.5,size*0.45,size*1.2);
-    case 'bubble': return sphereGeometry(size*0.85,10,8);
+    case 'bubble': return boxGeometry(size*0.85,size*0.85,size*0.85);
     case 'dust': return boxGeometry(size*1.2,size*0.55,size*1.2);
-    case 'feather': return coneGeometry(size*0.55,size*1.7,4);
-    case 'halo': return torusGeometry(size*0.82,size*0.18,6,12);
-    case 'spore': return sphereGeometry(size*0.72,8,6);
-    case 'shard': return new THREE.TetrahedronGeometry(size*0.95,0);
-    case 'mist': return sphereGeometry(size*0.95,8,6);
-    case 'arc': return coneGeometry(size*0.65,size*1.9,5);
-    case 'smoke': return sphereGeometry(size,8,6);
+    case 'feather': return boxGeometry(size*0.3,size*1.7,size*0.5);
+    case 'halo': return boxGeometry(size*1.6,size*0.15,size*1.6);
+    case 'spore': return boxGeometry(size*0.72,size*0.72,size*0.72);
+    case 'shard': return boxGeometry(size*0.5,size*1.5,size*0.5);
+    case 'mist': return boxGeometry(size*0.95,size*0.7,size*0.95);
+    case 'arc': return boxGeometry(size*0.5,size*1.9,size*0.5);
+    case 'smoke': return boxGeometry(size,size,size);
     case 'metal': return boxGeometry(size,size*0.52,size*1.45);
-    case 'star': return octahedronGeometry(size*0.9,0);
+    case 'star': return boxGeometry(size*0.9,size*0.9,size*0.9);
     case 'spark': return boxGeometry(size*1.5,size*0.35,size*1.5);
-    default: return sphereGeometry(size,10,8);
+    default: return boxGeometry(size,size,size);
   }
 }
 function spawnElementalFX(type,pos,mode='impact',power=1){
   if(!pos)return;
   const cfg=typeFx(type),base=safeVec3(pos);
-  const count=Math.max(3,Math.round((mode==='burst'?12:mode==='summon'?14:mode==='trail'?3:7)*power*cfg.intensity));
+  const count=fxParticleCount(mode,power,cfg.intensity);
   const c=cfg.core,a=cfg.accent;
   if(mode!=='trail') spawnRingPulse(base.clone(),c,{scale:(mode==='summon'?0.68:0.48)*Math.max(0.9,power),life:mode==='aura'?0.45:0.24,y:0.08});
   for(let i=0;i<count;i++){
+    const pSize=(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1);
     const mesh=new THREE.Mesh(
-      fxGeom(cfg.shape,(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1)),
-      new THREE.MeshStandardMaterial({color:i%2?a:c,emissive:i%2?a:c,emissiveIntensity:mode==='trail'?0.45:0.7,transparent:true,opacity:0.92,roughness:0.25,metalness:cfg.shape==='metal'?0.45:0.02})
+      fxGeom(cfg.shape,pSize),
+      new THREE.MeshStandardMaterial({color:i%2?a:c,emissive:i%2?a:c,emissiveIntensity:fxEmissive(mode,cfg.intensity),transparent:true,opacity:0.92,roughness:0.25,metalness:cfg.shape==='metal'?0.45:0.02})
     );
     mesh.position.copy(base); mesh.castShadow=false;
     mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
@@ -1300,7 +1475,7 @@ function spawnElementalFX(type,pos,mode='impact',power=1){
     const vx=(mode==='trail'?0.4:(0.7+Math.random()*1.2))*cfg.speed;
     const vy=mode==='trail'?0.12:(0.35+Math.random())*cfg.speed;
     const vel=new THREE.Vector3(Math.cos(angle)*vx,vy,Math.sin(angle)*vx);
-    effects.push({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8});
+    effects.push({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8,size:pSize,typeCfg:cfg});
   }
 }
 function setTextIfChanged(node,text){const value=String(text);if(node&&node.textContent!==value)node.textContent=value;}
@@ -1775,8 +1950,8 @@ const keys={};
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){state.selectedSlot=Number(e.code.at(-1))-1;renderParty();renderSkillButtons();}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
-const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.0.0 boot: #joystick not found');
-const stick=el('stick'); if(!stick) throw new Error('V8.0.0 boot: #stick not found');
+const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.1.0 boot: #joystick not found');
+const stick=el('stick'); if(!stick) throw new Error('V8.1.0 boot: #stick not found');
 
 function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
 joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyPoint(e);});joyEl.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.pid)joyPoint(e);});
@@ -1856,11 +2031,12 @@ function defeatWild(w){
     const applied=applyBattleGrowth(inst,result);
     monGain=result.growthExp;ups=applied.growth.leveledUp?applied.growth.toLevel-applied.growth.fromLevel:0;
     refreshStats(inst,false);
+    if(ups>0)spawnLevelUpEffect(activeSummon.mesh.position.clone());
     const trainLines=TRAINING_LINES.filter(l=>result.trainingExp[l]>0);
     if(trainLines.length)trainSummary=' • Training: '+trainLines.map(l=>`${l[0].toUpperCase()+l.slice(1)} +${result.trainingExp[l]}`).join(' ');
     // Party share growth (non-active members get 35% of active's growth EXP)
     const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
-    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;addGrowthExp(pm,share);}}}
+    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);if(grown.leveledUp)spawnLevelUpEffect(fxWorldPos(pm.instanceId));}}}
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
@@ -1919,7 +2095,7 @@ function wildDamage(w,inst){
     atkBuff:1
   });
 }
-function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(sphereGeometry(.16,12,10),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
+function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
 function captureChance(w){
   if(w.capturePolicy==='disabled')return 0;
   const sp=spById[w.speciesId];
@@ -2024,7 +2200,7 @@ function useSkill(index){
     a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
     const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
     if(sExp>0){const sResult=addSkillExp(a.inst,move.name,sExp);
-      if(sResult&&sResult.rankedUp)showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);}
+      if(sResult&&sResult.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}}
   }
   renderParty();renderSkillButtons();
 }
@@ -2122,14 +2298,15 @@ function updateWild(w,dt,canEngage=false){
   animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
   animateMonster(w.mesh,dt,moving);
 }
-function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
+function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
 
-// ---------- V8.0.0 Ranch / life / training core ----------
+// ---------- V8.1.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){
   const need=Math.max(1,growthExpForLevel((inst.level||1)+1)-(inst.growthExp||0));
   addGrowthExp(inst,need);
   refreshStats(inst,true);
+  if(inst?.instanceId)spawnLevelUpEffect(fxWorldPos(inst.instanceId));
 }
 // V7.2: simulateLife adapter — syncs flat fields → body/mind, calls simulateLife, syncs back
 function syncToBodyMind(inst){inst.body=inst.body||{};inst.mind=inst.mind||{};
@@ -2143,8 +2320,11 @@ function syncFromBodyMind(inst){if(!inst.body||!inst.mind)return;
   inst.mood=inst.mind.mood;inst.bond=inst.mind.bond??inst.bond;inst.body.health=inst.body.health;}
 function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;state.lifeLastAt=now;const minutes=elapsed/60000;let trained=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;
   syncToBodyMind(inst);
+  const beforeCond=deriveCondition(inst);
   simulateLife(inst,now);
   syncFromBodyMind(inst);
+  const afterCond=deriveCondition(inst);
+  if(['tired','fatigued','bad'].includes(afterCond)&&afterCond!==beforeCond)spawnConditionBadEffect(fxWorldPos(id));
   const focus=inst.trainingFocus||'power';
   const baseGain=minutes*1.8;
   const trainGain=ranchTrainingGain(inst,focus,baseGain);
@@ -2160,6 +2340,7 @@ function feedMonster(id,food){
   if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
   state.inventory[food]--;
   // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
+  const bondBefore=inst.bond||0;
   syncToBodyMind(inst);
   const def=FOOD_DEFS[food]||{id:food,category:'daily',effects:{}};
   const sp=spById[inst.speciesId]||{};
@@ -2168,6 +2349,8 @@ function feedMonster(id,food){
   refreshStats(inst,false);
   if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
   if(result.rejected){state.inventory[food]++;msg(`อาหาร: ${result.reason||'ใช้ไม่ได้'}`);renderManager();return;}
+  spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);
+  if((inst.bond||0)>bondBefore)spawnBondUpEffect(fxWorldPos(id));
   const favText=result.favorite?' (Favorite!)':'';
   const overText=result.overfull?' (Overfull -70%)':'';
   const extra=result.catalyst?' • catalyst':result.category==='nutrition'?` • Nutrition +${result.applied}`:result.category==='training'?` • Training buff ×${result.multiplier}`:'';
@@ -2182,6 +2365,8 @@ function careAction(id,action){
   syncFromBodyMind(inst);
   refreshStats(inst,false);
   const label=action==='rest'?'พักผ่อน':'เล่นด้วย';
+  if(action==='rest')spawnRestEffect(fxWorldPos(id));
+  else{spawnPlayEffect(fxWorldPos(id));spawnBondUpEffect(fxWorldPos(id));}
   msg(`${displayName(inst)} • ${label} • ${action==='rest'?`พลัง ${Math.round(inst.energy)} ลดเครียด`:`อารมณ์ ${Math.round(inst.mood)} Bond ${Math.round(inst.bond)}`}`);
   renderManager();renderParty();saveGame(false);
 }
@@ -2272,6 +2457,7 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.train
   const gain=ranchTrainingGain(inst,focus,15);
   const applied=addTrainingExp(inst,focus,gain);
   if(applied>0){inst.trainingExp=(inst.trainingExp||0)+applied;refreshStats(inst,false);}
+  spawnTrainingEffect(fxWorldPos(id),focus);
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
   renderManager();if(currentManagerTab==='training')renderTraining();saveGame(false);}
 function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
@@ -2331,13 +2517,18 @@ function createEgg(){const a=getInst(state.breeding.parentA),b=getInst(state.bre
   const hatchMs=30000+Math.floor(Math.random()*30001);
   const wrapped=createEggFn({ok:true,child},{hatchMs,now:Date.now()});
   const egg={eggId:'e'+Date.now()+'-'+Math.floor(Math.random()*9999),parentAId:a.instanceId,parentBId:b.instanceId,eggHolderId:holder.instanceId,createdAt:Date.now(),readyAt:wrapped.egg.hatchAt,child:wrapped.egg.child};
-  state.eggs.push(egg);msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
+  state.eggs.push(egg);
+  let posA=fxWorldPos(a.instanceId),posB=fxWorldPos(b.instanceId);
+  if(posA.distanceTo(posB)<.05){posA=incubator.position.clone().add(new THREE.Vector3(-.8,0,0));posB=incubator.position.clone().add(new THREE.Vector3(.8,0,0));}
+  spawnBreedingEffect(posA,posB);
+  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
 function hatchEgg(eggId){const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
   const child=egg.child?ensureInstanceShape({...egg.child,origin:'bred',parentAId:a.instanceId,parentBId:b.instanceId}):makeChild(a,b,holder);
   if(!child){msg('ฟักไข่ไม่สำเร็จ');return;}
   refreshStats(child,true);
   state.collection.push(child);state.storage.push(child.instanceId);state.eggs=state.eggs.filter(e=>e.eggId!==eggId);
   appendHistory(child,{type:'birth',origin:'bred',parentA:a.instanceId,parentB:b.instanceId});
+  spawnHatchEffect(incubator.position.clone());
   msg(`ฟักไข่! ได้ ${displayName(child)} Gen ${child.generation} • Species ตามผู้ถือไข่ ${displayName(holder)}`);renderAll();renderManager();saveGame(false);}
 
 // ---------- Evolution ----------
@@ -2362,11 +2553,14 @@ function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.species
   const st=evoRequirementStatus(inst,path);
   if(!st.ok){msg(st.text||'ยังไม่ผ่านเงื่อนไข Evolution');return;}
   if(!confirm(`Evolution ย้อนกลับไม่ได้\n${displayName(inst)} → ${path.name}\nยืนยันหรือไม่?`))return;
+  const oldColor=colorNum(monsterTypes(inst)[0]);
   const committed=commitEvolution(inst,def,{now:Date.now()});
   if(!committed.ok){msg(committed.reason||'Evolution ไม่สำเร็จ');return;}
   inst.evolutionPath=path.id;
   inst.evolutionProfile=def.profile;
   if(path.secondaryType&&sp.allowedSecondary.includes(path.secondaryType))inst.secondaryType=path.secondaryType;
+  const newColor=colorNum(monsterTypes(inst)[0]);
+  spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
   refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
@@ -2792,7 +2986,7 @@ function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
   state.lifeLastAt=Date.now();
   writeStoredSave(localStorage,{state,playerHp:playerData.hp});
-  if(show)msg('บันทึกเกม V8.0.0 แล้ว');
+  if(show)msg('บันทึกเกม V8.1.0 แล้ว');
 }
 function loadGame(){
   try{
@@ -2803,8 +2997,8 @@ function loadGame(){
     if(saved.source!=='current')state.currentZone='hub';
     applyLifeSimulation(Date.now(),true);
     if(saved.source==='backup')msg('กู้คืน Save สำรองสำเร็จ');
-    else if(saved.source==='current')msg('โหลดข้อมูล V8.0.0 แล้ว');
-    else msg('ย้าย Save เก่า → V8.0.0 สำเร็จ');
+    else if(saved.source==='current')msg('โหลดข้อมูล V8.1.0 แล้ว');
+    else msg('ย้าย Save เก่า → V8.1.0 สำเร็จ');
     if(saved.source!=='current')saveGame(false);
   }catch(error){
     console.warn('load failed',error);

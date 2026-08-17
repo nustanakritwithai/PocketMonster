@@ -1,11 +1,12 @@
-# Monster Life RPG V8.0.0 — Progression Core live loop
+# Monster Life RPG V8.1.0 — Progression Core live loop
 
 เวอร์ชันเล่นได้จริงของแผน V7.1–V8.0: สูตรสเตท, การเลี้ยง, ต่อสู้, อาหาร 6 หมวด, สกิล candidate/mutation, อุปกรณ์คลัง, วิวัฒนาการหลายสาขา, อีเวนต์, ผสมพันธุ์ และ CR Debug Panel
 
+GitHub Pages: https://nustanakritwithai.github.io/PocketMonster/  
 เปิดโดยตรง: `http://127.0.0.1:8081/v800.html`  
 GitHub Pages ใช้ `index.html` ซึ่งต้องเหมือน `v800.html` ทุกไบต์
 
-## สิ่งที่ต่อเข้า live loop ใน V8.0.0
+## สิ่งที่ต่อเข้า live loop ใน V8.1.0
 
 - `content-catalog.mjs` — ข้อมูลอาหาร / ของ / personality / skill / สาขาอีโวล แยกจาก runtime
 - `live-progression.mjs` — อะแดปเตอร์สูตรที่เทสได้ (สเตท, ดาเมจ+crit, จับมอน, EXP, เทรนที่ Ranch)
@@ -23,9 +24,9 @@ GitHub Pages ใช้ `index.html` ซึ่งต้องเหมือน `
 ## ไฟล์เวอร์ชัน
 
 - Active entry: `index.html` = `v800.html`
-- Runtime: `game-v800.js?v=800`
-- Styles: `style-v800.css?v=800`
-- `ASSET_REVISION = '800'` • `APP_VERSION = '8.0.0'` • save schema 8
+- Runtime: `game-v800.js?v=810`
+- Styles: `style-v800.css?v=810`
+- `ASSET_REVISION = '810'` • `APP_VERSION = '8.1.0'` • save schema 8
 
 ## เทสต์
 
