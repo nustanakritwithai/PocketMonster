@@ -1181,6 +1181,7 @@ const sparkPool=createObjectPool({
     mesh.scale.setScalar(1);
     mesh.rotation.set(0,0,0);
     mesh.material.opacity=0;
+    mesh.material.emissiveIntensity=.18;
   },
   destroy:mesh=>disposeObject3D(mesh),
 });
@@ -1239,7 +1240,160 @@ function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){
   const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
   mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'});
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); } e.mesh.material.opacity=Math.max(0,t*.9); if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+const TRAIN_FX_COLOR={power:0xef6c32,defense:0x4f87e8,speed:0xe8bd22,technique:0x63b34b,spirit:0xa78bfa};
+const FOOD_FX_COLOR={protein:0xf97316,healthy:0x22c55e,favorite:0xec4899,trainingChow:0xe8bd22,mineralBite:0xaab0c8,emberFruit:0xef6c32,moonFruit:0xc4b5fd};
+function takeSpark(color,emissiveIntensity=.45){
+  const m=sparkPool.acquire();
+  m.visible=true;
+  m.material.color.setHex(color);
+  m.material.emissive.setHex(color);
+  m.material.emissiveIntensity=emissiveIntensity;
+  m.material.opacity=.9;
+  return m;
+}
+function fxWorldPos(id){
+  const ranch=id!=null?ranchVisuals.get(id):null;
+  if(ranch?.mesh)return ranch.mesh.position.clone();
+  if(id!=null&&activeSummon?.inst?.instanceId===id&&activeSummon.mesh)return activeSummon.mesh.position.clone();
+  if(id!=null&&hubCompanion?.inst?.instanceId===id&&hubCompanion.mesh)return hubCompanion.mesh.position.clone();
+  return ranchCenter.clone();
+}
+function spawnTrainingEffect(pos,focus){
+  if(!pos)return;
+  const color=TRAIN_FX_COLOR[focus]||0xffffff;
+  for(let i=0;i<8;i++){
+    const m=takeSpark(color),angle=(i/8)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.6,pos.y+0.3+Math.random()*0.3,pos.z+Math.sin(angle)*0.6);
+    m.scale.setScalar(0.04+Math.random()*0.03);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.4,maxLife:0.4,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.3,0.8+Math.random()*0.4,Math.sin(angle)*0.3),size:m.scale.x,gravity:0});
+  }
+  spawnRingPulse(pos.clone(),color,{scale:0.5,life:0.3,y:0.08});
+}
+function spawnEvolutionEffect(pos,oldColor,newColor){
+  if(!pos)return;
+  const aura=new THREE.Mesh(boxGeometry(1.2,2.0,1.2),new THREE.MeshBasicMaterial({color:newColor,transparent:true,opacity:0,wireframe:true}));
+  aura.position.copy(pos); aura.position.y+=1.0; scene.add(aura);
+  effects.push({mesh:aura,life:1.2,maxLife:1.2,kind:'evolution-aura',phase:0,newColor});
+  for(let i=0;i<20;i++){
+    const m=takeSpark(i%2?newColor:oldColor),angle=(i/20)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.8,pos.y+0.5+Math.random()*1.5,pos.z+Math.sin(angle)*0.8);
+    m.scale.setScalar(0.06);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.5,1.0,Math.sin(angle)*0.5),size:0.06,gravity:0.5});
+  }
+  spawnRingPulse(pos.clone(),newColor,{scale:1.2,life:0.4,y:0.08});
+  triggerCameraShake(0.12,0.2);
+}
+function spawnBreedingEffect(posA,posB){
+  if(!posA||!posB)return;
+  const mid=posA.clone().add(posB).multiplyScalar(0.5); mid.y+=1.0;
+  for(let i=0;i<6;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(mid.x+(Math.random()-0.5)*0.6,mid.y+i*0.15,mid.z+(Math.random()-0.5)*0.6);
+    m.scale.setScalar(0.08);
+    scene.add(m);
+    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.5+Math.random()*0.3,0),size:0.08,gravity:-0.2});
+  }
+  spawnRingPulse(mid,0xec4899,{scale:0.8,life:0.35,y:0});
+}
+function spawnHatchEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<12;i++){
+    const m=takeSpark(0xfde68a);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.3+Math.random()*0.5,pos.z+(Math.random()-0.5)*0.4);
+    m.scale.setScalar(0.05);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*1.5,0.8+Math.random()*0.5,(Math.random()-0.5)*1.5),size:0.05,gravity:1.0});
+  }
+  spawnRingPulse(pos.clone(),0xfde68a,{scale:0.8,life:0.4,y:0.1});
+  triggerCameraShake(0.08,0.15);
+}
+function spawnFeedEffect(pos,foodColor=0x22c55e){
+  if(!pos)return;
+  for(let i=0;i<5;i++){
+    const m=takeSpark(foodColor);
+    m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+1.5+Math.random()*0.3,pos.z+(Math.random()-0.5)*0.3);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,-1.0,0),size:0.05,gravity:0});
+  }
+  for(let i=0;i<3;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z);
+    m.scale.setScalar(0.04);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.6,0),size:0.04,gravity:-0.1});
+  }
+}
+function spawnRestEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<4;i++){
+    const m=takeSpark(0x60a5fa);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+1.0+i*0.2,pos.z+0.2);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.4,0.1),size:0.05,gravity:-0.05});
+  }
+}
+function spawnPlayEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<8;i++){
+    const m=takeSpark(0xfacc15),angle=(i/8)*Math.PI*2;
+    m.position.set(pos.x+Math.cos(angle)*0.5,pos.y+0.5+Math.random()*0.8,pos.z+Math.sin(angle)*0.5);
+    m.scale.setScalar(0.06);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.8,0.5,Math.sin(angle)*0.8),size:0.06,gravity:0.3});
+  }
+}
+function spawnLevelUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<10;i++){
+    const m=takeSpark(0xfde047);
+    m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+0.1,pos.z+(Math.random()-0.5)*0.3);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,1.5+Math.random()*0.5,0),size:0.05,gravity:-0.2});
+  }
+  spawnRingPulse(pos.clone(),0xfde047,{scale:0.7,life:0.3,y:0.08});
+}
+function spawnBondUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<5;i++){
+    const m=takeSpark(0xec4899);
+    m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z+(Math.random()-0.5)*0.4);
+    m.scale.setScalar(0.06);
+    scene.add(m);
+    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*0.2,0.8,0),size:0.06,gravity:-0.1});
+  }
+}
+function spawnMasteryUpEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<12;i++){
+    const m=takeSpark(0xfde047),angle=(i/12)*Math.PI*2;
+    m.position.set(pos.x,pos.y+0.8,pos.z);
+    m.scale.setScalar(0.07);
+    m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(m);
+    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*1.2,0.5+Math.random()*0.5,Math.sin(angle)*1.2),size:0.07,gravity:0.4});
+  }
+  spawnRingPulse(pos.clone().add(new THREE.Vector3(0,0.8,0)),0xfde047,{scale:0.6,life:0.3,y:0});
+}
+function spawnConditionBadEffect(pos){
+  if(!pos)return;
+  for(let i=0;i<6;i++){
+    const m=takeSpark(0x64748b,0.1);
+    m.position.set(pos.x+(Math.random()-0.5)*0.5,pos.y+0.5+Math.random()*0.5,pos.z+(Math.random()-0.5)*0.5);
+    m.scale.setScalar(0.08);
+    scene.add(m);
+    effects.push({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05});
+  }
+}
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -1858,11 +2012,12 @@ function defeatWild(w){
     const applied=applyBattleGrowth(inst,result);
     monGain=result.growthExp;ups=applied.growth.leveledUp?applied.growth.toLevel-applied.growth.fromLevel:0;
     refreshStats(inst,false);
+    if(ups>0)spawnLevelUpEffect(activeSummon.mesh.position.clone());
     const trainLines=TRAINING_LINES.filter(l=>result.trainingExp[l]>0);
     if(trainLines.length)trainSummary=' • Training: '+trainLines.map(l=>`${l[0].toUpperCase()+l.slice(1)} +${result.trainingExp[l]}`).join(' ');
     // Party share growth (non-active members get 35% of active's growth EXP)
     const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
-    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;addGrowthExp(pm,share);}}}
+    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);if(grown.leveledUp)spawnLevelUpEffect(fxWorldPos(pm.instanceId));}}}
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
@@ -2026,7 +2181,7 @@ function useSkill(index){
     a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
     const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
     if(sExp>0){const sResult=addSkillExp(a.inst,move.name,sExp);
-      if(sResult&&sResult.rankedUp)showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);}
+      if(sResult&&sResult.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}}
   }
   renderParty();renderSkillButtons();
 }
@@ -2132,6 +2287,7 @@ function levelUpInstance(inst){
   const need=Math.max(1,growthExpForLevel((inst.level||1)+1)-(inst.growthExp||0));
   addGrowthExp(inst,need);
   refreshStats(inst,true);
+  if(inst?.instanceId)spawnLevelUpEffect(fxWorldPos(inst.instanceId));
 }
 // V7.2: simulateLife adapter — syncs flat fields → body/mind, calls simulateLife, syncs back
 function syncToBodyMind(inst){inst.body=inst.body||{};inst.mind=inst.mind||{};
@@ -2145,8 +2301,11 @@ function syncFromBodyMind(inst){if(!inst.body||!inst.mind)return;
   inst.mood=inst.mind.mood;inst.bond=inst.mind.bond??inst.bond;inst.body.health=inst.body.health;}
 function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;state.lifeLastAt=now;const minutes=elapsed/60000;let trained=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;
   syncToBodyMind(inst);
+  const beforeCond=deriveCondition(inst);
   simulateLife(inst,now);
   syncFromBodyMind(inst);
+  const afterCond=deriveCondition(inst);
+  if(['tired','fatigued','bad'].includes(afterCond)&&afterCond!==beforeCond)spawnConditionBadEffect(fxWorldPos(id));
   const focus=inst.trainingFocus||'power';
   const baseGain=minutes*1.8;
   const trainGain=ranchTrainingGain(inst,focus,baseGain);
@@ -2162,6 +2321,7 @@ function feedMonster(id,food){
   if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
   state.inventory[food]--;
   // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
+  const bondBefore=inst.bond||0;
   syncToBodyMind(inst);
   const def=FOOD_DEFS[food]||{id:food,category:'daily',effects:{}};
   const sp=spById[inst.speciesId]||{};
@@ -2170,6 +2330,8 @@ function feedMonster(id,food){
   refreshStats(inst,false);
   if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
   if(result.rejected){state.inventory[food]++;msg(`อาหาร: ${result.reason||'ใช้ไม่ได้'}`);renderManager();return;}
+  spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);
+  if((inst.bond||0)>bondBefore)spawnBondUpEffect(fxWorldPos(id));
   const favText=result.favorite?' (Favorite!)':'';
   const overText=result.overfull?' (Overfull -70%)':'';
   const extra=result.catalyst?' • catalyst':result.category==='nutrition'?` • Nutrition +${result.applied}`:result.category==='training'?` • Training buff ×${result.multiplier}`:'';
@@ -2184,6 +2346,8 @@ function careAction(id,action){
   syncFromBodyMind(inst);
   refreshStats(inst,false);
   const label=action==='rest'?'พักผ่อน':'เล่นด้วย';
+  if(action==='rest')spawnRestEffect(fxWorldPos(id));
+  else{spawnPlayEffect(fxWorldPos(id));spawnBondUpEffect(fxWorldPos(id));}
   msg(`${displayName(inst)} • ${label} • ${action==='rest'?`พลัง ${Math.round(inst.energy)} ลดเครียด`:`อารมณ์ ${Math.round(inst.mood)} Bond ${Math.round(inst.bond)}`}`);
   renderManager();renderParty();saveGame(false);
 }
@@ -2274,6 +2438,7 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.train
   const gain=ranchTrainingGain(inst,focus,15);
   const applied=addTrainingExp(inst,focus,gain);
   if(applied>0){inst.trainingExp=(inst.trainingExp||0)+applied;refreshStats(inst,false);}
+  spawnTrainingEffect(fxWorldPos(id),focus);
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
   renderManager();if(currentManagerTab==='training')renderTraining();saveGame(false);}
 function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
@@ -2333,13 +2498,18 @@ function createEgg(){const a=getInst(state.breeding.parentA),b=getInst(state.bre
   const hatchMs=30000+Math.floor(Math.random()*30001);
   const wrapped=createEggFn({ok:true,child},{hatchMs,now:Date.now()});
   const egg={eggId:'e'+Date.now()+'-'+Math.floor(Math.random()*9999),parentAId:a.instanceId,parentBId:b.instanceId,eggHolderId:holder.instanceId,createdAt:Date.now(),readyAt:wrapped.egg.hatchAt,child:wrapped.egg.child};
-  state.eggs.push(egg);msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
+  state.eggs.push(egg);
+  let posA=fxWorldPos(a.instanceId),posB=fxWorldPos(b.instanceId);
+  if(posA.distanceTo(posB)<.05){posA=incubator.position.clone().add(new THREE.Vector3(-.8,0,0));posB=incubator.position.clone().add(new THREE.Vector3(.8,0,0));}
+  spawnBreedingEffect(posA,posB);
+  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
 function hatchEgg(eggId){const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
   const child=egg.child?ensureInstanceShape({...egg.child,origin:'bred',parentAId:a.instanceId,parentBId:b.instanceId}):makeChild(a,b,holder);
   if(!child){msg('ฟักไข่ไม่สำเร็จ');return;}
   refreshStats(child,true);
   state.collection.push(child);state.storage.push(child.instanceId);state.eggs=state.eggs.filter(e=>e.eggId!==eggId);
   appendHistory(child,{type:'birth',origin:'bred',parentA:a.instanceId,parentB:b.instanceId});
+  spawnHatchEffect(incubator.position.clone());
   msg(`ฟักไข่! ได้ ${displayName(child)} Gen ${child.generation} • Species ตามผู้ถือไข่ ${displayName(holder)}`);renderAll();renderManager();saveGame(false);}
 
 // ---------- Evolution ----------
@@ -2364,11 +2534,14 @@ function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.species
   const st=evoRequirementStatus(inst,path);
   if(!st.ok){msg(st.text||'ยังไม่ผ่านเงื่อนไข Evolution');return;}
   if(!confirm(`Evolution ย้อนกลับไม่ได้\n${displayName(inst)} → ${path.name}\nยืนยันหรือไม่?`))return;
+  const oldColor=colorNum(monsterTypes(inst)[0]);
   const committed=commitEvolution(inst,def,{now:Date.now()});
   if(!committed.ok){msg(committed.reason||'Evolution ไม่สำเร็จ');return;}
   inst.evolutionPath=path.id;
   inst.evolutionProfile=def.profile;
   if(path.secondaryType&&sp.allowedSecondary.includes(path.secondaryType))inst.secondaryType=path.secondaryType;
+  const newColor=colorNum(monsterTypes(inst)[0]);
+  spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
   refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
