@@ -1791,13 +1791,13 @@ let hubCompanion=null;
 const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[]},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
-    ['normalooze',-4,-2,1,{}],['normalooze',8,8,1,{}],['flameling',4,-4,1,{}],['flameling',-10,8,1,{}],['aquapuff',8,1,1,{}],['aquapuff',-8,-10,1,{}],['voltkit',-8,1,1,{}],['voltkit',6,10,1,{}],['mossbun',1,-9,1,{}],['mossbun',-11,4,1,{}],['fairimp',-2,-13,1,{}],['fairimp',10,-10,1,{}],
-    ['galebird',6,-12,2,{}],['toxitoad',-12,-7,2,{}],['punchcub',12,7,2,{}],['punchcub',-6,12,2,{}]
+    ['normalooze',-4,-2,1,{}],['normalooze',14,12,1,{}],['flameling',6,-8,1,{}],['flameling',-14,10,1,{}],['aquapuff',12,-2,1,{}],['aquapuff',-12,-12,1,{}],['voltkit',-10,4,1,{}],['voltkit',8,14,1,{}],['mossbun',2,-14,1,{}],['mossbun',-16,2,1,{}],['fairimp',-4,-16,1,{}],['fairimp',14,-12,1,{}],
+    ['galebird',10,-16,2,{}],['toxitoad',-16,-8,2,{}],['punchcub',16,8,2,{}],['punchcub',-8,16,2,{}]
   ]},
   cave:{label:'Echo Cave',bg:0x334155,ground:0x57606f,spawn:[
-    ['frostowl',-3,-1,2,{}],['frostowl',10,4,2,{}],['ironbug',4,-5,2,{}],['ironbug',-8,8,2,{}],['rockhorn',7,1,2,{}],['rockhorn',-10,-4,2,{}],['ghostpurr',-7,1,2,{}],['ghostpurr',6,10,2,{}],['sandmole',1,-9,2,{}],['sandmole',-11,6,2,{}],
-    ['mindcoon',-2,-13,2,{}],['buglet',10,-2,2,{}],['buglet',-4,12,2,{}],['voidhorn',-11,-10,3,{elite:true}],['emberdrake',8,8,3,{}],['emberdrake',-2,11,4,{boss:true}],
-    ['flameling',12,-8,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-12,6,5,{evolutionPath:'magma_bear'}]
+    ['frostowl',-4,-2,2,{}],['frostowl',14,6,2,{}],['ironbug',6,-8,2,{}],['ironbug',-12,10,2,{}],['rockhorn',10,2,2,{}],['rockhorn',-14,-6,2,{}],['ghostpurr',-10,4,2,{}],['ghostpurr',8,14,2,{}],['sandmole',2,-14,2,{}],['sandmole',-16,8,2,{}],
+    ['mindcoon',-4,-16,2,{}],['buglet',14,-4,2,{}],['buglet',-6,16,2,{}],['voidhorn',-16,-12,3,{elite:true}],['emberdrake',12,12,3,{}],['emberdrake',-4,14,4,{boss:true}],
+    ['flameling',16,-10,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-16,10,5,{evolutionPath:'magma_bear'}]
   ]}
 };
 function setZoneLighting(zone){
@@ -2894,11 +2894,18 @@ function renderHUD(){
 }
 function switchPartySlot(index){
   if(index<0||index>=state.party.length)return;
+  const sameSlot=index===state.selectedSlot;
   state.selectedSlot=index;
   const inst=selectedInstance();
-  if(state.currentZone!=='hub'&&activeSummon&&activeSummon.inst.instanceId!==state.party[index]){
-    recall(false,false);
-    if(inst&&!inst.fainted&&inst.hp>0)summonThrow();
+  if(state.currentZone!=='hub'&&inst&&!inst.fainted&&inst.hp>0){
+    if(activeSummon){
+      if(activeSummon.inst.instanceId!==inst.instanceId){
+        recall(false,false);
+        setTimeout(()=>{if(!activeSummon&&!pendingSummon)summonThrow();},200);
+      }
+    }else if(!pendingSummon){
+      summonThrow();
+    }
   }
   syncHubCompanion();renderParty();renderSkillButtons();renderHUD();
 }
