@@ -2957,7 +2957,10 @@ function renderParty(){
       mini.append(name,detail,stateLabel);
       button.append(portrait,mini);
     }
-    button.onclick=()=>{switchPartySlot(index);};
+    button.addEventListener('pointerdown',event=>{
+      event.preventDefault();event.stopPropagation();
+      switchPartySlot(index);
+    },{passive:false});
     party.appendChild(button);
   });
 }
