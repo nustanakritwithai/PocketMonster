@@ -1220,17 +1220,19 @@ function releaseTransientEffect(effect){
   else removeAndDispose(scene,effect.mesh);
 }
 function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
-  for(let i=0;i<count;i++){
+  const n=Math.min(16,Math.max(0,count|0));
+  for(let i=0;i<n;i++){
     const m=sparkPool.acquire();
     m.visible=true;
     m.material.color.setHex(color);
     m.material.emissive.setHex(color);
+    m.material.emissiveIntensity=clampEmissive(.45);
     m.material.opacity=.9;
     m.position.copy(pos);
     m.scale.setScalar(size);
     m.rotation.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
     scene.add(m);
-    const a=(Math.PI*2*i)/count+Math.random()*.2;
+    const a=(Math.PI*2*i)/n+Math.random()*.2;
     const speed=.8+Math.random()*1.6;
     effects.push({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true});
   }
@@ -1247,7 +1249,7 @@ function takeSpark(color,emissiveIntensity=.45){
   m.visible=true;
   m.material.color.setHex(color);
   m.material.emissive.setHex(color);
-  m.material.emissiveIntensity=emissiveIntensity;
+  m.material.emissiveIntensity=clampEmissive(emissiveIntensity);
   m.material.opacity=.9;
   return m;
 }
@@ -1393,6 +1395,15 @@ function spawnConditionBadEffect(pos){
     effects.push({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05});
   }
 }
+function easeOut(t){t=Math.max(0,Math.min(1,t));return 1-(1-t)*(1-t);}
+function clampEmissive(v){return Math.min(.7,Math.max(.1,v));}
+function fxParticleCount(mode,power,intensity){
+  const base=mode==='burst'?12:mode==='summon'?14:mode==='trail'?3:7;
+  return Math.max(3,Math.min(16,Math.round(base*Math.max(0,power)*intensity)));
+}
+function fxEmissive(mode,intensity){
+  return clampEmissive((mode==='trail'?0.4:0.55)*intensity);
+}
 function updateSparkType(e,dt,t){
   const cfg=e.typeCfg; if(!cfg)return;
   if(cfg.speed>1.1)e.vel.y+=dt*0.5;
@@ -1400,7 +1411,7 @@ function updateSparkType(e,dt,t){
   if(cfg.speed>1.3){e.mesh.position.x+=Math.sin(e.life*20)*0.02;e.mesh.position.z+=Math.cos(e.life*20)*0.02;}
   if(cfg.shape==='mist')e.vel.y=Math.max(e.vel.y,0);
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -1448,14 +1459,14 @@ function fxGeom(shape='orb',size=0.06){
 function spawnElementalFX(type,pos,mode='impact',power=1){
   if(!pos)return;
   const cfg=typeFx(type),base=safeVec3(pos);
-  const count=Math.max(3,Math.round((mode==='burst'?12:mode==='summon'?14:mode==='trail'?3:7)*power*cfg.intensity));
+  const count=fxParticleCount(mode,power,cfg.intensity);
   const c=cfg.core,a=cfg.accent;
   if(mode!=='trail') spawnRingPulse(base.clone(),c,{scale:(mode==='summon'?0.68:0.48)*Math.max(0.9,power),life:mode==='aura'?0.45:0.24,y:0.08});
   for(let i=0;i<count;i++){
     const pSize=(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1);
     const mesh=new THREE.Mesh(
       fxGeom(cfg.shape,pSize),
-      new THREE.MeshStandardMaterial({color:i%2?a:c,emissive:i%2?a:c,emissiveIntensity:mode==='trail'?0.45:0.7,transparent:true,opacity:0.92,roughness:0.25,metalness:cfg.shape==='metal'?0.45:0.02})
+      new THREE.MeshStandardMaterial({color:i%2?a:c,emissive:i%2?a:c,emissiveIntensity:fxEmissive(mode,cfg.intensity),transparent:true,opacity:0.92,roughness:0.25,metalness:cfg.shape==='metal'?0.45:0.02})
     );
     mesh.position.copy(base); mesh.castShadow=false;
     mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
