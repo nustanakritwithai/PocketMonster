@@ -141,7 +141,7 @@ assert.ok(partNames(handles[ANIMAL_FORMS.indexOf('magma_bear')].root, 'plate').l
 assert.equal(partNames(handles[ANIMAL_FORMS.indexOf('magma_bear')].root, 'paw').length, 4);
 
 const wolf = handles[ANIMAL_FORMS.indexOf('flame_wolf')];
-assert.deepEqual(wolf.rig.pivots.visual.userData.baseScale, { x: 0.88, y: 1.06, z: 1.24 });
+assert.deepEqual(wolf.rig.pivots.visual.userData.baseScale, { x: 0.88, y: 0.98, z: 1.24 });
 wolf.play('hurt', { duration: 0.22 });
 wolf.update(0.11, { moving: false });
 assert.notEqual(wolf.rig.pivots.visual.scale.x, 0.88, 'hurt pose still squashes the wolf');

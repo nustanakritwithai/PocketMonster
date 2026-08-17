@@ -847,7 +847,7 @@ function applyVisualGrowth(g,inst){
 }
 function makeFlameWolfMesh(color,scale=1){
   const g=makeAnimalBase(color,scale,{kind:'quadruped',accent:0xff8a3d});
-  g.scale.set(.88,1.06,1.24);
+  g.scale.set(.88,0.98,1.24);
   addEarPair(g,0x7c2d12,{scale,height:.48,width:.08,y:1.38,z:-.16,innerColor:0xff6a1a,tilt:.4});
   addEyeSet(g,{y:1.08*scale,z:-.48*scale,spread:.09*scale,size:.036*scale,browColor:0x431407,browTilt:.3});
   addMuzzle(g,0xffd6a5,{scale,y:.94,z:-.64,w:.15,h:.1,d:.26,noseColor:0x3b0a06});
@@ -865,7 +865,7 @@ function makeFlameWolfMesh(color,scale=1){
 }
 function makeMagmaBearMesh(color,scale=1){
   const g=makeAnimalBase(color,scale,{kind:'quadruped',accent:0xd97706});
-  g.scale.set(1.28,.92,1.08);
+  g.scale.set(1.28,1.06,1.08);
   addEarPair(g,0x78350f,{scale,height:.16,width:.14,y:1.18,z:-.06,innerColor:0xfbbf24,tilt:.12});
   addEyeSet(g,{y:.98*scale,z:-.4*scale,spread:.12*scale,size:.042*scale,browColor:0x431407,browTilt:.06});
   addMuzzle(g,0xfbbf24,{scale,y:.88,z:-.5,w:.22,h:.14,d:.16,noseColor:0x3b1f0a});
@@ -994,7 +994,7 @@ function makeSpeciesMesh(sp,inst=null){
       break;
     }
     case 'rockhorn': {
-      g=makeAnimalBase(color,scale,{kind:'quadruped'}); g.scale.set(1.12,1.05,1.16);
+      g=makeAnimalBase(color,scale,{kind:'quadruped'}); g.scale.set(1.12,0.99,1.16);
       addHorn(g,0xf0dfb0,{x:-.16,y:1.16,z:-.3,scale:1.04*scale,length:.26,tilt:.35,rx:-.25}); addHorn(g,0xf0dfb0,{x:.16,y:1.16,z:-.3,scale:1.04*scale,length:.26,tilt:-.35,rx:-.25});
       addEyeSet(g,{y:1.0*scale,z:-.43*scale,spread:.1*scale,size:.04*scale,browColor:0x53411f,browTilt:.06});
       addMuzzle(g,0xe6d3a0,{scale,y:.94,z:-.5,w:.18,h:.12,d:.16,noseColor:0x4b3c21});
@@ -1019,7 +1019,7 @@ function makeSpeciesMesh(sp,inst=null){
       break;
     }
     case 'voidhorn': {
-      g=makeAnimalBase(color,scale,{kind:'quadruped'}); g.scale.set(1.1,1.06,1.18);
+      g=makeAnimalBase(color,scale,{kind:'quadruped'}); g.scale.set(1.1,0.98,1.18);
       addHorn(g,0xe7d9b5,{x:-.16,y:1.14,z:-.36,scale:1.08*scale,length:.34,tilt:.45,rx:-.3});
       addHorn(g,0xe7d9b5,{x:.16,y:1.14,z:-.36,scale:1.08*scale,length:.34,tilt:-.45,rx:-.3});
       addEyeSet(g,{y:1.0*scale,z:-.43*scale,spread:.11*scale,size:.042*scale,browColor:0x111111,browTilt:.03});
