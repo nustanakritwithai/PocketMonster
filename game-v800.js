@@ -8,6 +8,7 @@ import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
+import { initAudio, playSFX } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -1947,6 +1948,8 @@ function endCam(e){if(e.pointerId!==camDrag.pid)return;camDrag.active=false;camD
 cameraPad.addEventListener('pointerup',endCam);
 cameraPad.addEventListener('pointercancel',endCam);
 const keys={};
+addEventListener('pointerdown',()=>initAudio(),{once:true});
+addEventListener('keydown',()=>initAudio(),{once:true});
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
@@ -2004,7 +2007,7 @@ function updateWorldLabels(dt){
 
 
 // ---------- Combat / capture ----------
-function damageWild(w,dmg,meta={}){if(w.dead)return;w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
+function damageWild(w,dmg,meta={}){if(w.dead)return;w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
 function monsterExpNeed(level){return 24+level*18;}
 function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+amount;let ups=0;while(inst.exp>=monsterExpNeed(inst.level)){inst.exp-=monsterExpNeed(inst.level);levelUpInstance(inst);ups++;}inst.bond=clamp(inst.bond+Math.min(2,amount*.04));return ups;}
 // V7.3: Battle event tracking for growth/training (per-encounter, cleared on defeat)
@@ -2176,10 +2179,13 @@ function recall(show=true,setCooldown=true){
   if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
   renderParty();renderSkillButtons();renderHUD();
 }
-function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
+function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
 function useSkill(index){
   if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return;}const a=activeSummon,move=getMonsterSkills(a.inst)[index];if(!move)return;if((a.skillCds[index]||0)>0){msg(`${move.name} คูลดาวน์ ${a.skillCds[index].toFixed(1)}s`);return;}
   let res=null;
+  const skillSfxMap={Fire:'sfx_skill_fire',Water:'sfx_skill_water',Electric:'sfx_skill_electric',Grass:'sfx_skill_grass'};
+  const sfxId=skillSfxMap[move.type];
+  if(sfxId)playSFX(sfxId);
   if(move.targetType==='enemy'){
     const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
   }else if(move.targetType==='area'){
