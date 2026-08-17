@@ -169,6 +169,7 @@ function registerCombatSFX() {
   registerCaptureSFX();
   registerProgressionSFX();
   registerUISFX();
+  registerTypeSFX();
 }
 
 // ── Capture SFX (4) ──────────────────────────────────────────
@@ -249,6 +250,65 @@ function registerProgressionSFX() {
     tone(659, 0.1, 0.12, { type: 'sine', gain: 0.08 });
     tone(784, 0.2, 0.2, { type: 'sine', gain: 0.08 });
   };
+}
+
+// ── Type SFX (Phase 7) — 12 remaining elemental types ─────────
+function registerTypeSFX() {
+  const types = {
+    Ice: () => {
+      tone(2000, 0, 0.15, { type: 'sine', gain: 0.08 });
+      tone(1500, 0.05, 0.1, { type: 'sine', gain: 0.05 });
+      noiseBurst(0, 0.08, { gain: 0.04, filter: 'highpass', freq: 5000 });
+    },
+    Poison: () => {
+      toneSweep(200, 100, 0, 0.2, { type: 'sine', gain: 0.06 });
+      noiseBurst(0.05, 0.1, { gain: 0.04, filter: 'bandpass', freq: 500, q: 2 });
+    },
+    Ground: () => {
+      noiseBurst(0, 0.15, { gain: 0.1, filter: 'lowpass', freq: 150 });
+      tone(80, 0, 0.2, { type: 'sine', gain: 0.08 });
+    },
+    Flying: () => {
+      noiseBurst(0, 0.2, { gain: 0.06, filter: 'bandpass', freq: 2000, q: 0.5 });
+      toneSweep(600, 300, 0, 0.15, { type: 'sine', gain: 0.04 });
+    },
+    Psychic: () => {
+      tone(500, 0, 0.2, { type: 'sine', gain: 0.06, attack: 0.03 });
+      tone(750, 0.08, 0.15, { type: 'sine', gain: 0.04 });
+    },
+    Bug: () => {
+      for (let i = 0; i < 4; i++) tone(1000, i * 0.03, 0.02, { type: 'square', gain: 0.03 });
+    },
+    Rock: () => {
+      noiseBurst(0, 0.1, { gain: 0.1, filter: 'lowpass', freq: 300 });
+      tone(120, 0.02, 0.12, { type: 'square', gain: 0.06 });
+    },
+    Ghost: () => {
+      tone(150, 0, 0.3, { type: 'sine', gain: 0.06, attack: 0.05 });
+      tone(100, 0.1, 0.25, { type: 'sine', gain: 0.04 });
+    },
+    Dragon: () => {
+      tone(80, 0, 0.3, { type: 'sawtooth', gain: 0.08 });
+      tone(120, 0.05, 0.25, { type: 'sawtooth', gain: 0.04 });
+      noiseBurst(0, 0.15, { gain: 0.05, filter: 'lowpass', freq: 400 });
+    },
+    Dark: () => {
+      tone(100, 0, 0.25, { type: 'sine', gain: 0.07, attack: 0.02 });
+      tone(70, 0.08, 0.2, { type: 'sine', gain: 0.04 });
+    },
+    Steel: () => {
+      tone(1500, 0, 0.08, { type: 'square', gain: 0.06 });
+      tone(2000, 0.03, 0.06, { type: 'square', gain: 0.04 });
+      noiseBurst(0, 0.05, { gain: 0.05, filter: 'bandpass', freq: 3000, q: 3 });
+    },
+    Fairy: () => {
+      const notes = [1318, 1568, 1760];
+      notes.forEach((f, i) => tone(f, i * 0.05, 0.1, { type: 'sine', gain: 0.05 }));
+    },
+  };
+  for (const [type, fn] of Object.entries(types)) {
+    SFX_HANDLERS[`sfx_skill_${type.toLowerCase()}`] = fn;
+  }
 }
 
 // ── UI SFX (Phase 4) ──────────────────────────────────────────

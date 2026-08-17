@@ -35,6 +35,6 @@ assert.match(gameSrc, /addEventListener\('keydown'.*initAudio/, 'initAudio on fi
 assert.match(gameSrc, /playSFX\('sfx_hit_normal'\)/, 'damageWild plays sfx_hit_normal');
 assert.match(gameSrc, /playSFX\('sfx_hit_effective'\)/, 'damageWild plays sfx_hit_effective');
 assert.match(gameSrc, /playSFX\('sfx_faint'\)/, 'faintActive plays sfx_faint');
-assert.match(gameSrc, /sfx_skill_fire/, 'useSkill maps fire skill to sfx_skill_fire');
+assert.match(gameSrc, /sfx_skill_.*toLowerCase/, 'useSkill maps skill type to sfx_skill_ dynamically');
 
 console.log('V8.0 audio engine + combat SFX: PASS');
