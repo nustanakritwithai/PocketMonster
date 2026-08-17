@@ -1947,7 +1947,7 @@ function endCam(e){if(e.pointerId!==camDrag.pid)return;camDrag.active=false;camD
 cameraPad.addEventListener('pointerup',endCam);
 cameraPad.addEventListener('pointercancel',endCam);
 const keys={};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){state.selectedSlot=Number(e.code.at(-1))-1;renderParty();renderSkillButtons();}});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
 const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.1.0 boot: #joystick not found');
@@ -2878,6 +2878,16 @@ function renderHUD(){
   setTextIfChanged(wildCount,state.currentZone==='hub'?'0':livingWilds().length);
   renderCombatPresentation();
 }
+function switchPartySlot(index){
+  if(index<0||index>=state.party.length)return;
+  state.selectedSlot=index;
+  const inst=selectedInstance();
+  if(state.currentZone!=='hub'&&activeSummon&&activeSummon.inst.instanceId!==state.party[index]){
+    recall(false,false);
+    if(inst&&!inst.fainted&&inst.hp>0)summonThrow();
+  }
+  syncHubCompanion();renderParty();renderSkillButtons();renderHUD();
+}
 function renderParty(){
   const party=el('party'),activeInstanceId=activeSummon?.inst.instanceId||null;
   party.replaceChildren();
@@ -2927,7 +2937,7 @@ function renderParty(){
       mini.append(name,detail,stateLabel);
       button.append(portrait,mini);
     }
-    button.onclick=()=>{state.selectedSlot=index;syncHubCompanion();renderParty();renderSkillButtons();renderHUD();};
+    button.onclick=()=>{switchPartySlot(index);};
     party.appendChild(button);
   });
 }
