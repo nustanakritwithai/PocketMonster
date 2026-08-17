@@ -10,7 +10,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.08,
+        "scale": 1.02,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -32,7 +32,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.12,
+        "scale": 1.04,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -54,7 +54,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.12,
+        "scale": 1.04,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -76,7 +76,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.12,
+        "scale": 1.04,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -98,7 +98,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -120,7 +120,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "bird"
       },
       "roles": {
@@ -142,7 +142,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.12,
+        "scale": 1.04,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -164,7 +164,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -186,7 +186,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -208,7 +208,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "bird"
       },
       "roles": {
@@ -230,7 +230,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -252,7 +252,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -274,7 +274,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.14,
+        "scale": 1.05,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -296,7 +296,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "serpent"
       },
       "roles": {
@@ -318,7 +318,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.16,
+        "scale": 1.06,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -340,7 +340,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.16,
+        "scale": 1.06,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -362,7 +362,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.12,
+        "scale": 1.04,
         "silhouette": "quadruped"
       },
       "roles": {
@@ -384,7 +384,7 @@
       "surfaceStyle": "four-side-block-v1",
       "rig": "animal-rig-v1",
       "metrics": {
-        "scale": 1.1,
+        "scale": 1.03,
         "silhouette": "quadruped"
       },
       "roles": {

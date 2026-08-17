@@ -369,58 +369,58 @@ function mkSpecies({id,name,color,types,base,capture=.5,group='Field',genderMode
 const species=[
   mkSpecies({id:'normalooze',name:'Plain Slime',color:0xc3b7a1,types:['Normal'],base:{hp:82,atk:11,def:11,spd:10},capture:.62,group:'Field',traits:['Balanced','Friendly','Patient'],skills:[
     move('Tackle','Normal',24),move('Echo Pound','Normal',18,'area',{range:3,cooldown:6}),move('Focus Pose','Normal',0,'self',{effect:'buffAtk',value:1.20,duration:5,cooldown:8})
-  ],evo:{id:'plainpup',name:'Plainpup',form:'plainpup',color:0xd9ceb8,scale:1.08,statMods:{hp:1.10,atk:1.10,def:1.08,spd:1.06},requires:{level:2}}}),
+  ],evo:{id:'plainpup',name:'Plainpup',form:'plainpup',color:0xd9ceb8,scale:1.02,statMods:{hp:1.10,atk:1.10,def:1.08,spd:1.06},requires:{level:2}}}),
   mkSpecies({id:'flameling',name:'Flare Slime',color:0xef6c32,types:['Fire'],base:{hp:74,atk:15,def:9,spd:12},capture:.56,group:'Field',traits:['Fireborn','Quick Learner','Warm Heart'],skills:[
     move('Flame Burst','Fire',28),move('Fire Ring','Fire',20,'area',{range:2.8,cooldown:6}),move('Warm Up','Fire',0,'self',{effect:'buffAtk',value:1.28,duration:5,cooldown:8})
-  ],evo:{id:'flameling_lv2',name:'Flameling',form:'flameling',color:0xff6b35,scale:1.12,statMods:{hp:1.08,atk:1.18,def:1.06,spd:1.10},requires:{level:2}}}),
+  ],evo:{id:'flameling_lv2',name:'Flameling',form:'flameling',color:0xff6b35,scale:1.04,statMods:{hp:1.08,atk:1.18,def:1.06,spd:1.10},requires:{level:2}}}),
   mkSpecies({id:'aquapuff',name:'Aqua Slime',color:0x4f87e8,types:['Water'],base:{hp:84,atk:12,def:12,spd:11},capture:.58,group:'Field',traits:['Water Veil','Calm Mind','Healthy'],skills:[
     move('Bubble Lance','Water',26),move('Tidal Splash','Water',19,'area',{range:3.2,cooldown:6}),move('Water Veil','Water',0,'self',{effect:'shield',value:.45,duration:5,cooldown:8})
-  ],evo:{id:'aquapuff_lv2',name:'Aquapuff',form:'aquapuff',color:0x4ca8ff,scale:1.12,statMods:{hp:1.15,atk:1.10,def:1.12,spd:1.05},requires:{level:2}}}),
+  ],evo:{id:'aquapuff_lv2',name:'Aquapuff',form:'aquapuff',color:0x4ca8ff,scale:1.04,statMods:{hp:1.15,atk:1.10,def:1.12,spd:1.05},requires:{level:2}}}),
   mkSpecies({id:'voltkit',name:'Volt Slime',color:0xe8bd22,types:['Electric'],base:{hp:68,atk:16,def:8,spd:16},capture:.54,group:'Field',traits:['Fast Runner','Static Fur','Curious'],skills:[
     move('Volt Dash','Electric',29),move('Thunder Field','Electric',18,'area',{range:3.4,cooldown:6}),move('Overcharge','Electric',0,'self',{effect:'buffAtk',value:1.22,duration:6,cooldown:8})
-  ],evo:{id:'voltkit_lv2',name:'Voltkit',form:'voltkit',color:0xffd84d,scale:1.12,statMods:{hp:1.07,atk:1.14,def:1.04,spd:1.22},requires:{level:2}}}),
+  ],evo:{id:'voltkit_lv2',name:'Voltkit',form:'voltkit',color:0xffd84d,scale:1.04,statMods:{hp:1.07,atk:1.14,def:1.04,spd:1.22},requires:{level:2}}}),
   mkSpecies({id:'mossbun',name:'Moss Slime',color:0x63b34b,types:['Grass'],base:{hp:92,atk:10,def:14,spd:9},capture:.61,group:'Field',traits:['Tough Skin','Gentle','Regrowth'],skills:[
     move('Leaf Pulse','Grass',24),move('Seed Burst','Grass',17,'area',{range:3.2,cooldown:6}),move('Regrowth','Grass',0,'self',{effect:'heal',value:.28,cooldown:8})
-  ],evo:{id:'mossbun_lv2',name:'Mossbun',form:'mossbun',color:0x65c466,scale:1.10,statMods:{hp:1.16,atk:1.06,def:1.17,spd:1.03},requires:{level:2}}}),
+  ],evo:{id:'mossbun_lv2',name:'Mossbun',form:'mossbun',color:0x65c466,scale:1.03,statMods:{hp:1.16,atk:1.06,def:1.17,spd:1.03},requires:{level:2}}}),
   mkSpecies({id:'frostowl',name:'Frost Slime',color:0x79c9c9,types:['Ice'],base:{hp:76,atk:13,def:10,spd:15},capture:.55,group:'Avian',traits:['Cold Blood','Sharp Eye','Patient'],skills:[
     move('Frost Wing','Ice',30),move('Hail Sweep','Ice',20,'area',{range:3.3,cooldown:6}),move('Ice Guard','Ice',0,'self',{effect:'shield',value:.48,duration:5,cooldown:8})
-  ],evo:{id:'frostowl_lv2',name:'Frostowl',form:'frostowl',color:0xb8edff,scale:1.10,statMods:{hp:1.08,atk:1.10,def:1.08,spd:1.18},requires:{level:2}}}),
+  ],evo:{id:'frostowl_lv2',name:'Frostowl',form:'frostowl',color:0xb8edff,scale:1.03,statMods:{hp:1.08,atk:1.10,def:1.08,spd:1.18},requires:{level:2}}}),
   mkSpecies({id:'punchcub',name:'Brawl Slime',color:0xb9342c,types:['Fighting'],base:{hp:88,atk:16,def:11,spd:11},capture:.57,group:'Field',traits:['Brave','Fierce','Persistent'],skills:[
     move('Combo Punch','Fighting',30),move('Shockwave Kick','Fighting',21,'area',{range:3,cooldown:6}),move('Battle Cry','Fighting',0,'self',{effect:'buffAtk',value:1.24,duration:5,cooldown:8})
-  ],evo:{id:'punchcub_lv2',name:'Punchcub',form:'punchcub',color:0xcc5a50,scale:1.12,statMods:{hp:1.12,atk:1.16,def:1.08,spd:1.05},requires:{level:2}}}),
+  ],evo:{id:'punchcub_lv2',name:'Punchcub',form:'punchcub',color:0xcc5a50,scale:1.04,statMods:{hp:1.12,atk:1.16,def:1.08,spd:1.05},requires:{level:2}}}),
   mkSpecies({id:'toxitoad',name:'Venom Slime',color:0x93489e,types:['Poison'],base:{hp:80,atk:12,def:11,spd:12},capture:.58,group:'Amphibian',traits:['Toxic Skin','Tricky','Calm Mind'],skills:[
     move('Toxic Spit','Poison',25),move('Venom Cloud','Poison',19,'area',{range:3.2,cooldown:6}),move('Acid Skin','Poison',0,'self',{effect:'shield',value:.42,duration:5,cooldown:8})
-  ],evo:{id:'toxitoad_lv2',name:'Toxitoad',form:'toxitoad',color:0xa855b5,scale:1.10,statMods:{hp:1.10,atk:1.08,def:1.12,spd:1.08},requires:{level:2}}}),
+  ],evo:{id:'toxitoad_lv2',name:'Toxitoad',form:'toxitoad',color:0xa855b5,scale:1.03,statMods:{hp:1.10,atk:1.08,def:1.12,spd:1.08},requires:{level:2}}}),
   mkSpecies({id:'sandmole',name:'Terra Slime',color:0xcba94e,types:['Ground'],base:{hp:90,atk:13,def:13,spd:9},capture:.59,group:'Field',traits:['Dig Fast','Sturdy','Patient'],skills:[
     move('Mud Shot','Ground',27),move('Quake Ring','Ground',20,'area',{range:3.2,cooldown:6}),move('Sand Guard','Ground',0,'self',{effect:'shield',value:.50,duration:5,cooldown:8})
-  ],evo:{id:'sandmole_lv2',name:'Sandmole',form:'sandmole',color:0xd8bb73,scale:1.10,statMods:{hp:1.14,atk:1.10,def:1.15,spd:1.02},requires:{level:2}}}),
+  ],evo:{id:'sandmole_lv2',name:'Sandmole',form:'sandmole',color:0xd8bb73,scale:1.03,statMods:{hp:1.14,atk:1.10,def:1.15,spd:1.02},requires:{level:2}}}),
   mkSpecies({id:'galebird',name:'Aero Slime',color:0x8d7cdb,types:['Flying'],base:{hp:72,atk:12,def:9,spd:16},capture:.57,group:'Avian',traits:['Light Step','Sharp Eye','Curious'],skills:[
     move('Gust Peck','Flying',27),move('Feather Storm','Flying',19,'area',{range:3.4,cooldown:6}),move('Wind Focus','Flying',0,'self',{effect:'buffAtk',value:1.18,duration:6,cooldown:8})
-  ],evo:{id:'galebird_lv2',name:'Galebird',form:'galebird',color:0xa78bfa,scale:1.10,statMods:{hp:1.05,atk:1.10,def:1.03,spd:1.22},requires:{level:2}}}),
+  ],evo:{id:'galebird_lv2',name:'Galebird',form:'galebird',color:0xa78bfa,scale:1.03,statMods:{hp:1.05,atk:1.10,def:1.03,spd:1.22},requires:{level:2}}}),
   mkSpecies({id:'mindcoon',name:'Mind Slime',color:0xec4d7f,types:['Psychic'],base:{hp:78,atk:14,def:10,spd:13},capture:.56,group:'Field',traits:['Wise','Focused','Calm Mind'],skills:[
     move('Mind Bolt','Psychic',28),move('Psy Wave','Psychic',20,'area',{range:3.4,cooldown:6}),move('Inner Focus','Psychic',0,'self',{effect:'heal',value:.24,cooldown:8})
-  ],evo:{id:'mindcoon_lv2',name:'Mindcoon',form:'mindcoon',color:0xf472b6,scale:1.10,statMods:{hp:1.08,atk:1.12,def:1.08,spd:1.12},requires:{level:2}}}),
+  ],evo:{id:'mindcoon_lv2',name:'Mindcoon',form:'mindcoon',color:0xf472b6,scale:1.03,statMods:{hp:1.08,atk:1.12,def:1.08,spd:1.12},requires:{level:2}}}),
   mkSpecies({id:'buglet',name:'Bug Slime',color:0x9cab25,types:['Bug'],base:{hp:78,atk:12,def:11,spd:13},capture:.60,group:'Bug',genderMode:'genderless',traits:['Swarm Spirit','Hard Worker','Sturdy'],skills:[
     move('Pin Bite','Bug',26),move('Swarm Spin','Bug',18,'area',{range:3,cooldown:6}),move('Carapace Boost','Bug',0,'self',{effect:'shield',value:.40,duration:5,cooldown:8})
-  ],evo:{id:'buglet_lv2',name:'Beetling',form:'buglet',color:0xb6c833,scale:1.10,statMods:{hp:1.10,atk:1.10,def:1.12,spd:1.08},requires:{level:2}}}),
+  ],evo:{id:'buglet_lv2',name:'Beetling',form:'buglet',color:0xb6c833,scale:1.03,statMods:{hp:1.10,atk:1.10,def:1.12,spd:1.08},requires:{level:2}}}),
   mkSpecies({id:'rockhorn',name:'Rock Slime',color:0xa48e38,types:['Rock'],base:{hp:100,atk:13,def:16,spd:7},capture:.58,group:'Monster',traits:['Tough Skin','Sturdy','Patient'],skills:[
     move('Stone Crash','Rock',29),move('Pebble Burst','Rock',20,'area',{range:3,cooldown:6}),move('Rock Guard','Rock',0,'self',{effect:'shield',value:.55,duration:5,cooldown:8})
-  ],evo:{id:'rockhorn_lv2',name:'Rockhorn',form:'rockhorn',color:0xb89b45,scale:1.14,statMods:{hp:1.16,atk:1.10,def:1.18,spd:1.00},requires:{level:2}}}),
+  ],evo:{id:'rockhorn_lv2',name:'Rockhorn',form:'rockhorn',color:0xb89b45,scale:1.05,statMods:{hp:1.16,atk:1.10,def:1.18,spd:1.00},requires:{level:2}}}),
   mkSpecies({id:'ghostpurr',name:'Spirit Slime',color:0x61568f,types:['Ghost'],base:{hp:70,atk:15,def:9,spd:14},capture:.55,group:'Mystic',genderMode:'genderless',traits:['Night Hunter','Quiet','Tricky'],skills:[
     move('Phantom Paw','Ghost',28),move('Haunt Pulse','Ghost',20,'area',{range:3.2,cooldown:6}),move('Fade Veil','Ghost',0,'self',{effect:'shield',value:.44,duration:5,cooldown:8})
-  ],evo:{id:'ghostpurr_lv2',name:'Ghostpurr',form:'ghostpurr',color:0x8b7ad3,scale:1.10,statMods:{hp:1.06,atk:1.14,def:1.04,spd:1.16},requires:{level:2}}}),
+  ],evo:{id:'ghostpurr_lv2',name:'Ghostpurr',form:'ghostpurr',color:0x8b7ad3,scale:1.03,statMods:{hp:1.06,atk:1.14,def:1.04,spd:1.16},requires:{level:2}}}),
   mkSpecies({id:'emberdrake',name:'Drake Slime',color:0x6a45d3,types:['Dragon'],base:{hp:104,atk:18,def:13,spd:12},capture:.50,group:'Dragon',traits:['Ancient Blood','Fierce','Proud'],skills:[
     move('Dragon Flame','Dragon',34),move('Scale Burst','Dragon',22,'area',{range:3.3,cooldown:6.2}),move('Ancient Rage','Dragon',0,'self',{effect:'buffAtk',value:1.30,duration:5,cooldown:9})
-  ],evo:{id:'emberdrake_lv2',name:'Emberdrake',form:'emberdrake',color:0xe45236,scale:1.16,statMods:{hp:1.14,atk:1.20,def:1.10,spd:1.08},requires:{level:2}}}),
+  ],evo:{id:'emberdrake_lv2',name:'Emberdrake',form:'emberdrake',color:0xe45236,scale:1.06,statMods:{hp:1.14,atk:1.20,def:1.10,spd:1.08},requires:{level:2}}}),
   mkSpecies({id:'voidhorn',name:'Shadow Slime',color:0x584b43,types:['Dark'],base:{hp:96,atk:16,def:12,spd:12},capture:.54,group:'Monster',genderMode:'genderless',traits:['Night Hunter','Fierce','Sharp Eye'],skills:[
     move('Night Crash','Dark',31),move('Shadow Burst','Dark',21,'area',{range:3.2,cooldown:6}),move('Void Guard','Dark',0,'self',{effect:'shield',value:.50,duration:6,cooldown:9})
-  ],evo:{id:'voidhorn_lv2',name:'Voidhorn',form:'voidhorn',color:0x9b5de5,scale:1.16,statMods:{hp:1.14,atk:1.18,def:1.10,spd:1.06},requires:{level:2}}}),
+  ],evo:{id:'voidhorn_lv2',name:'Voidhorn',form:'voidhorn',color:0x9b5de5,scale:1.06,statMods:{hp:1.14,atk:1.18,def:1.10,spd:1.06},requires:{level:2}}}),
   mkSpecies({id:'ironbug',name:'Metal Slime',color:0x8e8eaa,types:['Steel'],base:{hp:102,atk:12,def:18,spd:7},capture:.57,group:'Machine',genderMode:'genderless',traits:['Iron Shell','Hard Worker','Sturdy'],skills:[
     move('Steel Cutter','Steel',31),move('Metal Swarm','Steel',18,'area',{range:3,cooldown:6}),move('Iron Shell','Steel',0,'self',{effect:'shield',value:.58,duration:6,cooldown:8})
-  ],evo:{id:'ironbug_lv2',name:'Ironbug',form:'ironbug',color:0x8ea0ad,scale:1.12,statMods:{hp:1.14,atk:1.08,def:1.22,spd:1.00},requires:{level:2}}}),
+  ],evo:{id:'ironbug_lv2',name:'Ironbug',form:'ironbug',color:0x8ea0ad,scale:1.04,statMods:{hp:1.14,atk:1.08,def:1.22,spd:1.00},requires:{level:2}}}),
   mkSpecies({id:'fairimp',name:'Fairy Slime',color:0xdc87b8,types:['Fairy'],base:{hp:78,atk:12,def:10,spd:13},capture:.60,group:'Mystic',traits:['Gentle','Lucky','Warm Heart'],skills:[
     move('Fairy Spark','Fairy',26),move('Star Dust','Fairy',18,'area',{range:3.2,cooldown:6}),move('Blessing','Fairy',0,'self',{effect:'heal',value:.26,cooldown:8})
-  ],evo:{id:'fairimp_lv2',name:'Fairimp',form:'fairimp',color:0xf9a8d4,scale:1.10,statMods:{hp:1.08,atk:1.08,def:1.08,spd:1.14},requires:{level:2}}})
+  ],evo:{id:'fairimp_lv2',name:'Fairimp',form:'fairimp',color:0xf9a8d4,scale:1.03,statMods:{hp:1.08,atk:1.08,def:1.08,spd:1.14},requires:{level:2}}})
 ];
 applySpeciesProgression(species);
 const spById=Object.fromEntries(species.map(s=>[s.id,s]));
