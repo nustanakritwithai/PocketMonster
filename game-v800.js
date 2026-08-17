@@ -689,18 +689,18 @@ function makeAnimalBase(color,scale=1,{kind='quadruped',accent=null}={}){
   const g=new THREE.Group();
   let body,head;
   if(kind==='bird'){
-    body=new THREE.Mesh(sphereGeometry(.42*scale,16,12),mat(color,.72,.08)); body.scale.set(1,1.08,.98); body.position.y=.66*scale;
-    head=new THREE.Mesh(sphereGeometry(.28*scale,14,12),mat(accent||color,.72,.06)); head.position.set(0,1.08*scale,-.1*scale);
-    addLegs(g,color,scale,2,.08,.34,.1);
+    body=new THREE.Mesh(sphereGeometry(.36*scale,16,12),mat(color,.72,.08)); body.scale.set(1,1.06,.98); body.position.y=.58*scale;
+    head=new THREE.Mesh(sphereGeometry(.24*scale,14,12),mat(accent||color,.72,.06)); head.position.set(0,.92*scale,-.1*scale);
+    addLegs(g,color,scale,2,.07,.28,.1);
     addPawSet(g,0xf6ad31,{count:2,scale,r:.05,spreadX:.12,frontZ:.1,y:.03});
   }else if(kind==='serpent'){
-    body=new THREE.Mesh(capsuleGeometry(.27*scale,.62*scale,6,12),mat(color,.72,.08)); body.rotation.z=Math.PI/2; body.position.set(0,.63*scale,.02*scale);
-    head=new THREE.Mesh(sphereGeometry(.3*scale,14,12),mat(accent||color,.72,.06)); head.position.set(0,1.0*scale,-.26*scale);
-    addFinPair(g,color,{scale,y:.62,z:.06,span:.28,back:.2});
+    body=new THREE.Mesh(capsuleGeometry(.25*scale,.50*scale,6,12),mat(color,.72,.08)); body.rotation.z=Math.PI/2; body.position.set(0,.58*scale,.02*scale);
+    head=new THREE.Mesh(sphereGeometry(.26*scale,14,12),mat(accent||color,.72,.06)); head.position.set(0,.92*scale,-.26*scale);
+    addFinPair(g,color,{scale,y:.56,z:.06,span:.28,back:.2});
   }else{
-    body=new THREE.Mesh(capsuleGeometry(.26*scale,.5*scale,6,12),mat(color,.72,.07)); body.rotation.z=Math.PI/2; body.position.set(0,.62*scale,.06*scale);
-    head=new THREE.Mesh(sphereGeometry(.3*scale,14,12),mat(accent||color,.7,.06)); head.position.set(0,1.0*scale,-.18*scale);
-    addLegs(g,color,scale,4,.09,.32,.2);
+    body=new THREE.Mesh(capsuleGeometry(.24*scale,.42*scale,6,12),mat(color,.72,.07)); body.rotation.z=Math.PI/2; body.position.set(0,.56*scale,.06*scale);
+    head=new THREE.Mesh(sphereGeometry(.26*scale,14,12),mat(accent||color,.7,.06)); head.position.set(0,.88*scale,-.18*scale);
+    addLegs(g,color,scale,4,.08,.28,.2);
     addPawSet(g,color,{count:4,scale,r:.07,spreadX:.18,frontZ:.22,backZ:-.02,y:.08});
   }
   body.castShadow=true; head.castShadow=true; g.add(body); g.add(head); return g;
