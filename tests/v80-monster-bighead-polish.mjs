@@ -75,9 +75,9 @@ assert.equal(markRingScale({ boss: true, formScale: 1.12, lifeScale: 0.72, bighe
 assert.equal(markRingScale({ elite: true, bighead: true, lifeScale: 0.72 }), 1.35);
 
 const factors = visualGrowthFactors({ power: 80, defense: 0, speed: 0, spirit: 40 });
-assert.equal(factors.x, 1.10);
-assert.equal(factors.y, 1.06);
-assert.equal(factors.z, 1);
+assert.equal(factors.x, 1.06);
+assert.equal(factors.y, 1.025);
+assert.equal(factors.z, 1.01);
 assert.ok(factors.spirit > 0.12);
 
 resetAndSpawn();
@@ -100,9 +100,9 @@ function resetAndSpawn() {
   assert.equal(isBigheadMonsterRoot(slime.root), true);
   const grown = applyBigheadVisualGrowth(slime.root, { training: { power: 80, defense: 0, speed: 0, technique: 0, spirit: 40 } });
   assert.equal(grown.userData.visualGrowth.power, 1);
-  assert.equal(slime.rig.pivots.visual.userData.baseScale.x, 1.10);
+  assert.equal(slime.rig.pivots.visual.userData.baseScale.x, 1.06);
   slime.update(0.11, { moving: false });
-  assert.ok(Math.abs(slime.rig.pivots.visual.scale.x - 1) > 0.05, 'idle squash must keep the trained baseScale');
+  assert.ok(Math.abs(slime.rig.pivots.visual.scale.x - 1) > 0.02, 'idle squash must keep the trained baseScale');
   assert.ok(slime.rig.pivots.visual.scale.x > 1.0, 'trained Fire slime stays wider than idle-only squash');
 
   const marks = addBigheadMonsterMarks(slime.root, {

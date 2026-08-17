@@ -23,9 +23,9 @@ export function visualGrowthFactors(training) {
     defense,
     speed,
     spirit,
-    x: 1 + power * 0.10 + defense * 0.08,
-    y: 1 + power * 0.06 + defense * 0.10 - speed * 0.05,
-    z: 1 + speed * 0.12 - defense * 0.04,
+    x: 1 + power * 0.06 + defense * 0.04,
+    y: 1 + power * 0.02 + defense * 0.03 + spirit * 0.01,
+    z: 1 + speed * 0.06 + spirit * 0.02,
   };
 }
 
