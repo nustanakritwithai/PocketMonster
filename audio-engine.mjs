@@ -165,4 +165,344 @@ function registerCombatSFX() {
     toneSweep(400, 60, 0, 0.35, { type: 'sine', gain: 0.12, attack: 0.01 });
     tone(80, 0.25, 0.15, { type: 'sine', gain: 0.06 });
   };
+
+  registerCaptureSFX();
+  registerProgressionSFX();
 }
+
+// ── Capture SFX (4) ──────────────────────────────────────────
+function registerCaptureSFX() {
+  // Throw ball — whip + arc whoosh
+  SFX_HANDLERS['sfx_throw_ball'] = () => {
+    toneSweep(300, 900, 0, 0.12, { type: 'sawtooth', gain: 0.08 });
+    noiseBurst(0.02, 0.1, { gain: 0.05, filter: 'bandpass', freq: 1200, q: 0.7 });
+    tone(700, 0.1, 0.04, { type: 'sine', gain: 0.04 });
+  };
+
+  // Capture tension — wobble ticks during shake checks
+  SFX_HANDLERS['sfx_capture_tension'] = () => {
+    tone(600, 0, 0.05, { type: 'square', gain: 0.06 });
+    tone(600, 0.12, 0.05, { type: 'square', gain: 0.06 });
+    tone(600, 0.24, 0.05, { type: 'square', gain: 0.05 });
+  };
+
+  // Capture success — triumphant rising arpeggio
+  SFX_HANDLERS['sfx_capture_success'] = () => {
+    tone(523, 0, 0.1, { type: 'sine', gain: 0.12 });
+    tone(659, 0.1, 0.1, { type: 'sine', gain: 0.12 });
+    tone(784, 0.2, 0.12, { type: 'sine', gain: 0.12 });
+    tone(1047, 0.32, 0.2, { type: 'sine', gain: 0.1 });
+    noiseBurst(0.3, 0.08, { gain: 0.04, filter: 'highpass', freq: 4000 });
+  };
+
+  // Capture fail — ball break + escape
+  SFX_HANDLERS['sfx_capture_fail'] = () => {
+    noiseBurst(0, 0.08, { gain: 0.08, filter: 'bandpass', freq: 1500, q: 1 });
+    toneSweep(500, 150, 0.05, 0.2, { type: 'sawtooth', gain: 0.07 });
+    tone(120, 0.2, 0.1, { type: 'sine', gain: 0.05 });
+  };
+}
+
+// ── Progression SFX (6) ───────────────────────────────────────
+function registerProgressionSFX() {
+  // Level up — ascending sparkles
+  SFX_HANDLERS['sfx_levelup'] = () => {
+    tone(523, 0, 0.08, { type: 'sine', gain: 0.1 });
+    tone(784, 0.08, 0.08, { type: 'sine', gain: 0.1 });
+    tone(1047, 0.16, 0.12, { type: 'sine', gain: 0.1 });
+    noiseBurst(0.16, 0.06, { gain: 0.04, filter: 'highpass', freq: 5000 });
+  };
+
+  // Evolution — radiant sweep + shimmer
+  SFX_HANDLERS['sfx_evolution'] = () => {
+    toneSweep(400, 1200, 0, 0.5, { type: 'sine', gain: 0.1, attack: 0.02 });
+    tone(1600, 0.3, 0.25, { type: 'sine', gain: 0.05 });
+    noiseBurst(0.4, 0.15, { gain: 0.04, filter: 'bandpass', freq: 3000, q: 2 });
+  };
+
+  // Hatch — shell crack + chirp
+  SFX_HANDLERS['sfx_hatch'] = () => {
+    noiseBurst(0, 0.05, { gain: 0.06, filter: 'highpass', freq: 2500 });
+    noiseBurst(0.08, 0.05, { gain: 0.06, filter: 'highpass', freq: 2500 });
+    tone(880, 0.15, 0.12, { type: 'sine', gain: 0.08 });
+    tone(1320, 0.25, 0.1, { type: 'sine', gain: 0.06 });
+  };
+
+  // Bond — warm heart tone
+  SFX_HANDLERS['sfx_bond'] = () => {
+    tone(440, 0, 0.15, { type: 'sine', gain: 0.08 });
+    tone(554, 0.08, 0.12, { type: 'sine', gain: 0.06 });
+    tone(659, 0.16, 0.15, { type: 'sine', gain: 0.05 });
+  };
+
+  // Feed — munch + swallow
+  SFX_HANDLERS['sfx_feed'] = () => {
+    noiseBurst(0, 0.04, { gain: 0.05, filter: 'lowpass', freq: 800 });
+    noiseBurst(0.06, 0.04, { gain: 0.05, filter: 'lowpass', freq: 800 });
+    tone(300, 0.12, 0.08, { type: 'sine', gain: 0.04 });
+  };
+
+  // Heal — gentle restore chime
+  SFX_HANDLERS['sfx_heal'] = () => {
+    tone(523, 0, 0.12, { type: 'sine', gain: 0.08 });
+    tone(659, 0.1, 0.12, { type: 'sine', gain: 0.08 });
+    tone(784, 0.2, 0.2, { type: 'sine', gain: 0.08 });
+  };
+}
+
+// ── BGM Player (Phase 2) ──────────────────────────────────────
+// Procedural zone music via look-ahead scheduler + 800ms crossfade.
+// 4 zone patterns: ranch (70 BPM), grassland (100 BPM), cave (85 BPM), boss (140 BPM).
+// No external files; all synthesis via Web Audio API.
+
+let bgmBus = null;          // dedicated BGM gain bus → masterGain
+let bgmTimer = null;        // setInterval handle for look-ahead scheduler
+let bgmNextNoteTime = 0;    // Web Audio time of next scheduled note
+let bgmCurrentStep = 0;     // 0..15 step cursor within the pattern
+let bgmPattern = null;      // current zone pattern object
+let bgmActiveZone = null;   // current zone key ('ranch'|'grassland'|'cave'|'boss')
+
+const BGM_LOOK_AHEAD = 0.1;   // schedule notes 100ms ahead
+const BGM_INTERVAL = 25;      // 25ms scheduler tick
+const BGM_CROSSFADE = 0.8;    // 800ms crossfade duration
+const PATTERN_STEPS = 16;
+
+// Map zone keys used by game-v800.js → BGM pattern ids.
+// game-v800 uses 'hub' for the ranch area; we treat 'hub' as 'ranch' BGM.
+const ZONE_TO_BGM = { hub: 'ranch', grassland: 'grassland', cave: 'cave', boss: 'boss' };
+
+// Pentatonic scale degrees → semitone offsets from root.
+const PENTATONIC = [0, 2, 4, 7, 9];
+
+// Zone pattern definitions. Each pattern is 16 steps (16th notes).
+// bass/lead arrays contain scale-degree indices (0-4) or null for rests.
+// pad is a list of sustained chord slots. drum is per-track step hits.
+const BGM_PATTERNS = {
+  ranch: {
+    bpm: 70,
+    rootFreq: 261.63,                  // C4
+    scale: PENTATONIC,                 // C major pentatonic
+    bass: [0, null, null, null, 4, null, null, null, 0, null, null, null, 3, null, null, null],
+    lead: [2, null, 1, null, 2, null, 4, null, 3, null, 2, null, 1, null, 0, null],
+    pad: [{ step: 0, degree: 0, dur: 8 }, { step: 8, degree: 4, dur: 8 }],
+    drum: {
+      kick:  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      snare: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      hihat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+    leadType: 'triangle',
+    bassType: 'sine',
+    leadGain: 0.05,
+    bassGain: 0.07,
+    padGain: 0.03,
+  },
+  grassland: {
+    bpm: 100,
+    rootFreq: 174.61,                 // F3
+    scale: PENTATONIC,                 // F major pentatonic
+    bass: [0, null, null, null, 0, null, null, null, 0, null, null, null, 0, null, null, null],
+    lead: [2, null, 3, null, 4, null, 3, null, 2, null, 1, null, 2, null, 0, null],
+    pad: [{ step: 0, degree: 0, dur: 16 }],
+    drum: {
+      kick:  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hihat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    },
+    leadType: 'sine',
+    bassType: 'triangle',
+    leadGain: 0.06,
+    bassGain: 0.06,
+    padGain: 0.025,
+  },
+  cave: {
+    bpm: 85,
+    rootFreq: 220.00,                  // A3
+    scale: PENTATONIC,                 // A minor pentatonic (same intervals)
+    bass: [0, null, null, null, null, null, null, null, 0, null, null, null, null, null, null, null],
+    lead: [4, null, null, null, 3, null, null, null, 2, null, null, null, 1, null, null, null],
+    pad: [{ step: 0, degree: 0, dur: 16 }],
+    drum: {
+      kick:  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      snare: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hihat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+    leadType: 'sine',
+    bassType: 'sine',
+    leadGain: 0.04,
+    bassGain: 0.08,
+    padGain: 0.03,
+  },
+  boss: {
+    bpm: 140,
+    rootFreq: 146.83,                  // D3
+    scale: PENTATONIC,                 // D minor pentatonic (same intervals)
+    bass: [0, null, 0, null, 4, null, 4, null, 0, null, 0, null, 3, null, 3, null],
+    lead: [2, null, 4, null, 3, null, 2, null, 4, null, 3, null, 2, null, 1, null],
+    pad: [{ step: 0, degree: 0, dur: 16 }],
+    drum: {
+      kick:  [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hihat: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    },
+    leadType: 'square',
+    bassType: 'sawtooth',
+    leadGain: 0.05,
+    bassGain: 0.07,
+    padGain: 0.03,
+  },
+};
+
+// ── BGM bus setup ─────────────────────────────────────────────
+function ensureBgmBus() {
+  if (bgmBus || !ctx) return;
+  bgmBus = ctx.createGain();
+  bgmBus.gain.value = 0;
+  bgmBus.connect(masterGain);
+}
+
+// ── Pitch helper ──────────────────────────────────────────────
+// degreeIndex is 0-4 into the pentatonic scale; octave shifts the root.
+function bgmFreq(pattern, degreeIndex, octave = 0) {
+  const semis = pattern.scale[degreeIndex] + octave * 12;
+  return pattern.rootFreq * Math.pow(2, semis / 12);
+}
+
+// ── Note schedulers (play onto a specific destination node) ───
+function bgmTone(freq, time, dur, { type = 'sine', gain = 0.1, attack = 0.005 } = {}, dest) {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.connect(g);
+  g.connect(dest);
+  g.gain.setValueAtTime(0, time);
+  g.gain.linearRampToValueAtTime(gain, time + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+  osc.start(time);
+  osc.stop(time + dur + 0.05);
+}
+
+function bgmNoise(time, dur, { gain = 0.1, filter = 'highpass', freq = 1000, q = 1 } = {}, dest) {
+  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const f = ctx.createBiquadFilter();
+  f.type = filter;
+  f.frequency.value = freq;
+  f.Q.value = q;
+  const g = ctx.createGain();
+  src.connect(f);
+  f.connect(g);
+  g.connect(dest);
+  g.gain.setValueAtTime(gain, time);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+  src.start(time);
+  src.stop(time + dur + 0.02);
+}
+
+function bgmKick(time, dest) {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, time);
+  osc.frequency.exponentialRampToValueAtTime(40, time + 0.08);
+  osc.connect(g);
+  g.connect(dest);
+  g.gain.setValueAtTime(0.18, time);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+  osc.start(time);
+  osc.stop(time + 0.14);
+}
+
+// ── Step duration (seconds per 16th note at pattern BPM) ─────
+function stepDur(pattern) {
+  return 60 / pattern.bpm / 4;
+}
+
+// ── Schedule one pattern step ─────────────────────────────────
+function scheduleStep(pattern, step, time, dest) {
+  const bDeg = pattern.bass[step];
+  if (bDeg !== null && bDeg !== undefined) {
+    bgmTone(bgmFreq(pattern, bDeg, -1), time, 0.18, { type: pattern.bassType, gain: pattern.bassGain }, dest);
+  }
+  const lDeg = pattern.lead[step];
+  if (lDeg !== null && lDeg !== undefined) {
+    bgmTone(bgmFreq(pattern, lDeg, 1), time, 0.22, { type: pattern.leadType, gain: pattern.leadGain }, dest);
+  }
+  const d = pattern.drum;
+  if (d.kick[step]) bgmKick(time, dest);
+  if (d.snare[step]) bgmNoise(time, 0.12, { gain: 0.08, filter: 'bandpass', freq: 1800, q: 0.8 }, dest);
+  if (d.hihat[step]) bgmNoise(time, 0.04, { gain: 0.04, filter: 'highpass', freq: 6000 }, dest);
+}
+
+// ── Pad scheduling (long sustained notes when slot starts) ───
+function schedulePads(pattern, step, time, dest) {
+  for (const p of pattern.pad) {
+    if (p.step === step) {
+      bgmTone(bgmFreq(pattern, p.degree, 0), time, p.dur * stepDur(pattern), { type: 'sine', gain: pattern.padGain, attack: 0.4 }, dest);
+    }
+  }
+}
+
+// ── Look-ahead scheduler tick ─────────────────────────────────
+function bgmTick() {
+  if (!ctx || !bgmPattern) return;
+  const sd = stepDur(bgmPattern);
+  while (bgmNextNoteTime < ctx.currentTime + BGM_LOOK_AHEAD) {
+    scheduleStep(bgmPattern, bgmCurrentStep, bgmNextNoteTime, bgmBus);
+    schedulePads(bgmPattern, bgmCurrentStep, bgmNextNoteTime, bgmBus);
+    bgmNextNoteTime += sd;
+    bgmCurrentStep = (bgmCurrentStep + 1) % PATTERN_STEPS;
+  }
+}
+
+// ── Export: playBGM(zone) ─────────────────────────────────────
+export function playBGM(zone) {
+  if (!ctx) return;
+  ensureBgmBus();
+  const bgmKey = ZONE_TO_BGM[zone] || zone;
+  const pattern = BGM_PATTERNS[bgmKey];
+  if (!pattern) return;
+  if (bgmActiveZone === bgmKey && bgmTimer) return; // same zone, no-op
+
+  const t = ctx.currentTime;
+  // Fade existing bus out (crossfade overlap), then schedule fade-in.
+  bgmBus.gain.cancelScheduledValues(t);
+  bgmBus.gain.setValueAtTime(bgmBus.gain.value, t);
+  bgmBus.gain.linearRampToValueAtTime(0, t + BGM_CROSSFADE);
+
+  // Start scheduler if not running.
+  if (!bgmTimer) bgmTimer = setInterval(bgmTick, BGM_INTERVAL);
+
+  bgmPattern = pattern;
+  bgmActiveZone = bgmKey;
+  bgmCurrentStep = 0;
+  bgmNextNoteTime = t + 0.05;
+
+  // After the old layer fades out, ramp the bus back up for the new zone.
+  bgmBus.gain.setValueAtTime(0, t + BGM_CROSSFADE);
+  bgmBus.gain.linearRampToValueAtTime(1, t + BGM_CROSSFADE + BGM_CROSSFADE);
+}
+
+// ── Export: stopBGM() ─────────────────────────────────────────
+export function stopBGM() {
+  if (!ctx || !bgmTimer) return;
+  const t = ctx.currentTime;
+  bgmBus.gain.cancelScheduledValues(t);
+  bgmBus.gain.setValueAtTime(bgmBus.gain.value, t);
+  bgmBus.gain.linearRampToValueAtTime(0, t + BGM_CROSSFADE);
+  const fadeMs = (BGM_CROSSFADE + 0.05) * 1000;
+  setTimeout(() => {
+    if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+    bgmPattern = null;
+    bgmActiveZone = null;
+    bgmCurrentStep = 0;
+    bgmNextNoteTime = 0;
+  }, fadeMs);
+}
+
+// ── Export: getCurrentBGM() (for tests/debug) ─────────────────
+export function getCurrentBGM() { return bgmActiveZone; }

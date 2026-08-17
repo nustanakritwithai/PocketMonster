@@ -8,7 +8,7 @@ import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
-import { initAudio, playSFX } from './audio-engine.mjs';
+import { initAudio, playSFX, playBGM, stopBGM } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -1355,6 +1355,7 @@ function spawnPlayEffect(pos){
 }
 function spawnLevelUpEffect(pos){
   if(!pos)return;
+  playSFX('sfx_levelup');
   for(let i=0;i<10;i++){
     const m=takeSpark(0xfde047);
     m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+0.1,pos.z+(Math.random()-0.5)*0.3);
@@ -1923,6 +1924,7 @@ function switchZone(zone,silent=false){
   clearTransientEffects();
   el('monsterManager').classList.add('hidden');
   state.currentZone=zone;
+  playBGM(zone);
   const cfg=ZONES[zone];
   setZoneGround(zone);
   populateWorld(zone);
@@ -2118,7 +2120,7 @@ function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้อง�
 function beginCaptureAim(){if(!capturePrerequisite())return false;captureAimActive=true;captureAimLine.visible=true;el('captureBtn').classList.add('aiming');renderSkillButtons();msg('Capture Aim • ลากด้านขวาหมุนกล้อง แล้วปล่อยปุ่มเพื่อขว้าง');return true;}
 function cancelCaptureAim(){captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');renderSkillButtons();}
 function updateCaptureAimVisual(){if(!captureAimActive)return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),start=playerThrowOrigin().clone(),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0)),pts=[];for(let i=0;i<=18;i++){const u=i/18,p=start.clone().lerp(end,u);p.y+=Math.sin(u*Math.PI)*2.2;pts.push(p);}captureAimGeom.setFromPoints(pts);}
-function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;playerVisual.play('throw',{duration:.34});state.inventory.captureBalls--;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,()=>{if(!t||t.dead){msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}resolveCapture(t);});if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
+function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');state.inventory.captureBalls--;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,()=>{if(!t||t.dead){msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}resolveCapture(t);});if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
 function captureThrow(){if(beginCaptureAim())executeCaptureThrow();}
 function resolveCapture(w){
   if(w.dead)return;
@@ -2126,6 +2128,7 @@ function resolveCapture(w){
   if(w.capturePolicy==='disabled'){msg(`Boss ${name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);return;}
   const chance=captureChance(w);
   if(Math.random()<chance){
+    playSFX('sfx_capture_success');
     spawnBurst(w.mesh.position.clone().add(new THREE.Vector3(0,.7,0)),0x22c55e,{count:14,life:.42,size:.06});
     spawnRingPulse(w.mesh.position.clone(),0x22c55e,{scale:.75,life:.3});
     spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.1,duration:.8,intensity:.75});
@@ -2145,6 +2148,7 @@ function resolveCapture(w){
     respawnWild(w,8000);
     retireWild(w);
   }else{
+    playSFX('sfx_capture_fail');
     msg(`จับ ${name} ไม่สำเร็จ (${Math.round(chance*100)}%) • บอลถูกใช้ไปแล้ว`);
     w.engaged=true;
     w.state='chase';
@@ -2356,7 +2360,8 @@ function feedMonster(id,food){
   if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
   if(result.rejected){state.inventory[food]++;msg(`อาหาร: ${result.reason||'ใช้ไม่ได้'}`);renderManager();return;}
   spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);
-  if((inst.bond||0)>bondBefore)spawnBondUpEffect(fxWorldPos(id));
+  playSFX('sfx_feed');
+  if((inst.bond||0)>bondBefore){spawnBondUpEffect(fxWorldPos(id));playSFX('sfx_bond');}
   const favText=result.favorite?' (Favorite!)':'';
   const overText=result.overfull?' (Overfull -70%)':'';
   const extra=result.catalyst?' • catalyst':result.category==='nutrition'?` • Nutrition +${result.applied}`:result.category==='training'?` • Training buff ×${result.multiplier}`:'';
@@ -2466,7 +2471,7 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.train
   spawnTrainingEffect(fxWorldPos(id),focus);
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
   renderManager();if(currentManagerTab==='training')renderTraining();saveGame(false);}
-function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
+function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){
   for(const [id,obj] of ranchVisuals){removeAndDispose(scene, obj.mesh);ranchVisuals.delete(id);}
@@ -2535,6 +2540,7 @@ function hatchEgg(eggId){const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)r
   state.collection.push(child);state.storage.push(child.instanceId);state.eggs=state.eggs.filter(e=>e.eggId!==eggId);
   appendHistory(child,{type:'birth',origin:'bred',parentA:a.instanceId,parentB:b.instanceId});
   spawnHatchEffect(incubator.position.clone());
+  playSFX('sfx_hatch');
   msg(`ฟักไข่! ได้ ${displayName(child)} Gen ${child.generation} • Species ตามผู้ถือไข่ ${displayName(holder)}`);renderAll();renderManager();saveGame(false);}
 
 // ---------- Evolution ----------
@@ -2567,6 +2573,7 @@ function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.species
   if(path.secondaryType&&sp.allowedSecondary.includes(path.secondaryType))inst.secondaryType=path.secondaryType;
   const newColor=colorNum(monsterTypes(inst)[0]);
   spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
+  playSFX('sfx_evolution');
   refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
