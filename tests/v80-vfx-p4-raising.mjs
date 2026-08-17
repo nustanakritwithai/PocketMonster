@@ -84,7 +84,6 @@ assert.match(cond, /for\(let i=0;i<6;i\+\+\)/, 'bad-condition fires 6 clouds');
 const update = extractFn('updateEffects');
 assert.match(update, /kind==='evolution-aura'/, 'updater fades the evolution aura');
 assert.match(update, /rotation\.y\+=dt\*1\.8/, 'evolution aura spins on Y');
-assert.doesNotMatch(js, /function updateSparkType/, 'type-specific spark motion stays for Phase 5');
 
 assert.match(extractFn('setTraining'), /spawnTrainingEffect\(fxWorldPos\(id\),focus\)/, 'training tab fires training VFX');
 assert.match(extractFn('feedMonster'), /spawnFeedEffect\(fxWorldPos\(id\),FOOD_FX_COLOR\[food\]\|\|0x22c55e\)/, 'feed fires food VFX');

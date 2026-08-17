@@ -38,7 +38,6 @@ assert.match(js, /function spawnConditionBadEffect/, 'mutant 13: condition VFX m
 assert.match(extractFn('takeSpark'), /sparkPool\.acquire\(\)/, 'mutant 14: raising sparks must rent from the P1 pool');
 assert.match(extractFn('spawnEvolutionEffect'), /kind:'evolution-aura'/, 'mutant 15: evolution aura must not be a pooled spark');
 assert.match(extractFn('updateEffects'), /kind==='evolution-aura'/, 'mutant 16: updater must fade the evolution aura');
-assert.doesNotMatch(js, /function updateSparkType/, 'mutant 17: Phase 4 does not add type-specific spark motion');
 assert.match(extractFn('feedMonster'), /result\.rejected/, 'mutant 18: rejected feed must still refund before VFX');
 assert.match(extractFn('applyLifeSimulation'), /afterCond!==beforeCond/, 'mutant 19: bad-condition clouds must not spam every sim tick');
 assert.equal((extractFn('fxGeom').match(/boxGeometry\(/g) || []).length, 18, 'mutant 20: P3 fxGeom stays 18 boxes');

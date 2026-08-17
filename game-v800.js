@@ -1393,7 +1393,14 @@ function spawnConditionBadEffect(pos){
     effects.push({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05});
   }
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+function updateSparkType(e,dt,t){
+  const cfg=e.typeCfg; if(!cfg)return;
+  if(cfg.speed>1.1)e.vel.y+=dt*0.5;
+  if(cfg.speed<=0.95&&cfg.shape==='drop')e.vel.y-=dt*0.3;
+  if(cfg.speed>1.3){e.mesh.position.x+=Math.sin(e.life*20)*0.02;e.mesh.position.z+=Math.cos(e.life*20)*0.02;}
+  if(cfg.shape==='mist')e.vel.y=Math.max(e.vel.y,0);
+}
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,t*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -1445,8 +1452,9 @@ function spawnElementalFX(type,pos,mode='impact',power=1){
   const c=cfg.core,a=cfg.accent;
   if(mode!=='trail') spawnRingPulse(base.clone(),c,{scale:(mode==='summon'?0.68:0.48)*Math.max(0.9,power),life:mode==='aura'?0.45:0.24,y:0.08});
   for(let i=0;i<count;i++){
+    const pSize=(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1);
     const mesh=new THREE.Mesh(
-      fxGeom(cfg.shape,(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1)),
+      fxGeom(cfg.shape,pSize),
       new THREE.MeshStandardMaterial({color:i%2?a:c,emissive:i%2?a:c,emissiveIntensity:mode==='trail'?0.45:0.7,transparent:true,opacity:0.92,roughness:0.25,metalness:cfg.shape==='metal'?0.45:0.02})
     );
     mesh.position.copy(base); mesh.castShadow=false;
@@ -1456,7 +1464,7 @@ function spawnElementalFX(type,pos,mode='impact',power=1){
     const vx=(mode==='trail'?0.4:(0.7+Math.random()*1.2))*cfg.speed;
     const vy=mode==='trail'?0.12:(0.35+Math.random())*cfg.speed;
     const vel=new THREE.Vector3(Math.cos(angle)*vx,vy,Math.sin(angle)*vx);
-    effects.push({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8});
+    effects.push({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8,size:pSize,typeCfg:cfg});
   }
 }
 function setTextIfChanged(node,text){const value=String(text);if(node&&node.textContent!==value)node.textContent=value;}
