@@ -379,7 +379,7 @@ export function createBigheadMonsterProvider({
         addFormBox(g, 'muzzle', 0.18, 0.12, 0.16, 0xe6d3a0, 0, 0.82, -0.52, scale);
         addFormCone(g, 'spike', 0.06, 0.16, 0x8f7c30, -0.08, 0.92, 0.18, scale);
         addFormCone(g, 'spike', 0.06, 0.16, 0x8f7c30, 0.08, 0.92, 0.30, scale);
-        g.scale.set(1.12, 1.05, 1.16);
+        g.scale.set(1.12, 0.99, 1.16);
         break;
       case 'ghostpurr':
         addEarPair(g, 0x7c67bf, scale, { y: 0.98, z: -0.52, h: 0.20, w: 0.10, tilt: 0.26 });
@@ -403,7 +403,7 @@ export function createBigheadMonsterProvider({
         addFormCone(g, 'spike', 0.06, 0.16, 0x6d28d9, 0, 0.96, 0.18, scale);
         addFormCone(g, 'spike', 0.06, 0.16, 0x6d28d9, -0.10, 0.90, 0.30, scale);
         addFormCone(g, 'spike', 0.06, 0.16, 0x6d28d9, 0.10, 0.90, 0.30, scale);
-        g.scale.set(1.10, 1.06, 1.18);
+        g.scale.set(1.10, 0.98, 1.18);
         break;
       case 'ironbug':
         addEarPair(g, 0x4b5563, scale, { y: 1.10, z: -0.20, h: 0.18, w: 0.06, d: 0.05, tilt: 0 });
@@ -433,7 +433,7 @@ export function createBigheadMonsterProvider({
         for (const [x, z] of [[-0.17, 0.26], [0.17, 0.26], [-0.17, -0.02], [0.17, -0.02]]) {
           addFormBox(g, 'paw', 0.12, 0.08, 0.12, 0xff9f1c, x, 0.12, z, scale);
         }
-        g.scale.set(0.88, 1.06, 1.24);
+        g.scale.set(0.88, 0.98, 1.24);
         break;
       case 'magma_bear':
         addEarPair(g, 0x78350f, scale, { y: 1.12, z: -0.12, h: 0.14, w: 0.14, d: 0.10, tilt: 0.12 });
@@ -446,7 +446,7 @@ export function createBigheadMonsterProvider({
         for (const [x, z] of [[-0.28, 0.22], [0.28, 0.22], [-0.26, -0.06], [0.26, -0.06]]) {
           addFormBox(g, 'paw', 0.16, 0.10, 0.16, 0x44403c, x, 0.14, z, scale);
         }
-        g.scale.set(1.28, 0.92, 1.08);
+        g.scale.set(1.28, 1.06, 1.08);
         break;
       default:
         addEarPair(g, color, scale);
