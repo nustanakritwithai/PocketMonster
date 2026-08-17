@@ -886,7 +886,7 @@ function makeMagmaBearMesh(color,scale=1){
 }
 function makeSpeciesMesh(sp,inst=null){
   const path=inst?getEvolutionPath(inst):null;
-  const scaleBase=(inst?.lifeStage==='Baby')?.72:1;
+  const scaleBase=(inst?.lifeStage==='Baby')?.85:1;
   const scale=(path?.scale||1)*scaleBase;
   const color=path?.color??sp.color;
   if(!path) return applyVisualGrowth(makeSlimeMesh(color,scaleBase,sp.types[0]),inst);
@@ -1060,7 +1060,7 @@ function makeSpeciesMesh(sp,inst=null){
 }
 function addMonsterRing(g,{owned=false,eliteOverride=false,boss=false,inst=null,sp}={}){
   const path=inst?getEvolutionPath(inst):null;
-  const lifeScale=(inst?.lifeStage==='Baby')?.72:1;
+  const lifeScale=(inst?.lifeStage==='Baby')?.85:1;
   const elite=!!(eliteOverride||sp?.elite);
   if(isBigheadMonsterRoot(g)){
     addBigheadMonsterMarks(g,{
@@ -1085,7 +1085,7 @@ function addMonsterRing(g,{owned=false,eliteOverride=false,boss=false,inst=null,
 }
 function monsterMesh(sp,owned=false,inst=null,eliteOverride=false,boss=false){
   const path=inst?getEvolutionPath(inst):null;
-  const lifeScale=(inst?.lifeStage==='Baby')?.72:1;
+  const lifeScale=(inst?.lifeStage==='Baby')?.85:1;
   let g;
   try{
     const handle=assets.spawn(resolveMonsterAssetId(sp.id,path?.form||'slime'),{
