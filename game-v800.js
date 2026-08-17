@@ -1518,23 +1518,23 @@ function animateMonster(mesh,dt,moving=false){
   const pulse=Math.sin(p), pulse2=Math.cos(p*0.7), actionBoost=u.monActionTimer>0?Math.sin((1-u.monActionTimer/0.22)*Math.PI):0;
   if(!u.monsterEvolved){ sx=1+pulse*0.04; sy=1+Math.abs(pulse)*0.08; sz=1+pulse2*0.03; }
   switch(u.monsterType){
-    case 'Fire': sy+=Math.abs(Math.sin(p*1.4))*0.08; sx-=0.04*Math.sin(p*1.2); rz+=Math.sin(p*1.6)*0.04; break;
-    case 'Water': rx+=Math.sin(p)*0.06; sx+=Math.sin(p*0.8)*0.03; sz+=Math.cos(p*0.8)*0.03; break;
-    case 'Electric': rz+=Math.sin(p*2.8)*0.08; sx+=Math.sin(p*2.4)*0.05; sy+=Math.abs(Math.cos(p*2.1))*0.05; break;
-    case 'Grass': rz+=Math.sin(p*0.9)*0.05; rx+=Math.cos(p*0.6)*0.03; break;
-    case 'Ice': sx+=Math.sin(p)*0.015; sy+=Math.abs(Math.sin(p))*0.03; rz+=Math.sin(p)*0.02; break;
-    case 'Fighting': rx-=Math.abs(Math.sin(p))*0.08; sx+=Math.abs(Math.sin(p*0.8))*0.05; break;
-    case 'Poison': rz+=Math.sin(p*0.85)*0.07; sy+=Math.sin(p*1.4)*0.03; break;
-    case 'Ground': rx-=Math.abs(Math.sin(p*0.65))*0.04; sy+=Math.abs(Math.sin(p*0.65))*0.02; break;
-    case 'Flying': sy+=Math.abs(Math.sin(p*1.3))*0.12; rz+=Math.sin(p)*0.03; break;
-    case 'Psychic': sy+=Math.abs(Math.sin(p))*0.05; rz+=Math.sin(p*0.7)*0.03; break;
-    case 'Bug': sx+=Math.sin(p*1.7)*0.025; rz+=Math.sin(p*1.7)*0.05; break;
-    case 'Rock': sy+=Math.abs(Math.sin(p*0.55))*0.015; rx-=Math.abs(Math.sin(p*0.55))*0.03; break;
-    case 'Ghost': sy+=Math.sin(p*1.2)*0.08; rz+=Math.sin(p*0.7)*0.05; break;
-    case 'Dragon': sx+=Math.sin(p)*0.04; sy+=Math.abs(Math.sin(p*1.15))*0.06; rx+=Math.cos(p*0.7)*0.04; break;
-    case 'Dark': rz+=Math.sin(p*0.6)*0.04; rx+=Math.cos(p*0.9)*0.05; break;
-    case 'Steel': sy+=Math.abs(Math.sin(p*0.5))*0.012; break;
-    case 'Fairy': sy+=Math.abs(Math.sin(p*1.35))*0.08; rz+=Math.sin(p)*0.06; break;
+    case 'Fire': sy+=Math.abs(Math.sin(p*1.4))*0.03; sx-=0.02*Math.sin(p*1.2); rz+=Math.sin(p*1.6)*0.02; break;
+    case 'Water': rx+=Math.sin(p)*0.04; sx+=Math.sin(p*0.8)*0.02; sz+=Math.cos(p*0.8)*0.02; break;
+    case 'Electric': rz+=Math.sin(p*2.8)*0.04; sx+=Math.sin(p*2.4)*0.03; sy+=Math.abs(Math.cos(p*2.1))*0.03; break;
+    case 'Grass': rz+=Math.sin(p*0.9)*0.03; rx+=Math.cos(p*0.6)*0.02; break;
+    case 'Ice': sx+=Math.sin(p)*0.01; sy+=Math.abs(Math.sin(p))*0.02; rz+=Math.sin(p)*0.01; break;
+    case 'Fighting': rx-=Math.abs(Math.sin(p))*0.04; sx+=Math.abs(Math.sin(p*0.8))*0.03; break;
+    case 'Poison': rz+=Math.sin(p*0.85)*0.04; sy+=Math.sin(p*1.4)*0.02; break;
+    case 'Ground': rx-=Math.abs(Math.sin(p*0.65))*0.02; sy+=Math.abs(Math.sin(p*0.65))*0.02; break;
+    case 'Flying': sy+=Math.abs(Math.sin(p*1.3))*0.03; rz+=Math.sin(p)*0.02; break;
+    case 'Psychic': sy+=Math.abs(Math.sin(p))*0.03; rz+=Math.sin(p*0.7)*0.02; break;
+    case 'Bug': sx+=Math.sin(p*1.7)*0.02; rz+=Math.sin(p*1.7)*0.03; break;
+    case 'Rock': sy+=Math.abs(Math.sin(p*0.55))*0.01; rx-=Math.abs(Math.sin(p*0.55))*0.02; break;
+    case 'Ghost': sy+=Math.sin(p*1.2)*0.03; rz+=Math.sin(p*0.7)*0.03; break;
+    case 'Dragon': sx+=Math.sin(p)*0.03; sy+=Math.abs(Math.sin(p*1.15))*0.03; rx+=Math.cos(p*0.7)*0.02; break;
+    case 'Dark': rz+=Math.sin(p*0.6)*0.02; rx+=Math.cos(p*0.9)*0.03; break;
+    case 'Steel': sy+=Math.abs(Math.sin(p*0.5))*0.01; break;
+    case 'Fairy': sy+=Math.abs(Math.sin(p*1.35))*0.03; rz+=Math.sin(p)*0.03; break;
   }
   if(u.monsterEvolved){ sx=1+(sx-1)*0.45; sy=1+(sy-1)*0.4; sz=1+(sz-1)*0.4; }
   if(u.monAction==='attack'){ sx+=actionBoost*0.12; sy-=actionBoost*0.05; rx-=actionBoost*0.16; }
@@ -1828,7 +1828,7 @@ function setZoneGround(zone){
 function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp.elite,evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
   mesh.position.set(x,0,z);
-  mesh.scale.multiplyScalar(boss?1.08:1.12);
+  mesh.scale.multiplyScalar(boss?1.12:1.06);
   const markerColor=boss?0xfb7185:(elite?0xfde047:0x86efac);
   const marker=new THREE.Mesh(octahedronGeometry(boss?.22:.16),new THREE.MeshStandardMaterial({color:markerColor,emissive:markerColor,emissiveIntensity:.65,roughness:.35}));
   marker.position.set(0,boss?2.45:2.05,0);marker.name='wildMarker';mesh.add(marker);
