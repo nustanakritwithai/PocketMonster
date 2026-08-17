@@ -14,7 +14,7 @@ export const ANIMAL_FORMS = Object.freeze([
   'flame_wolf', 'magma_bear',
 ]);
 
-export const BIGHEAD_SLIME_BODY = Object.freeze({ w: 0.92, h: 0.88, d: 0.80, y: 0.50 });
+export const BIGHEAD_SLIME_BODY = Object.freeze({ w: 0.92, h: 0.84, d: 0.80, y: 0.48 });
 export const MONSTER_ANCHOR_Y = Object.freeze({
   hitText: 1.35,
   label: 2.15,
@@ -467,8 +467,8 @@ export function createBigheadMonsterProvider({
     g.add(body);
     addBoxEyes(g, { y: 0.62 * scale, z: -0.38 * scale, spread: 0.18 * scale, size: 0.08 * scale });
     addBoxMouth(g, { y: 0.42 * scale, z: -0.39 * scale });
-    const nub = boxMesh(0.24 * scale, 0.18 * scale, 0.24 * scale, color, 0.18, 0, 'nub');
-    nub.position.y = 0.98 * scale;
+    const nub = boxMesh(0.24 * scale, 0.14 * scale, 0.24 * scale, color, 0.18, 0, 'nub');
+    nub.position.y = 0.94 * scale;
     g.add(nub);
     addBigheadSlimeDecoration(g, type, scale);
     return g;
@@ -479,61 +479,61 @@ export function createBigheadMonsterProvider({
     const headColor = accent || color;
 
     if (kind === 'bird') {
-      const body = boxMesh(0.70 * scale, 0.80 * scale, 0.70 * scale, color, 0.72, 0.06, 'body');
-      body.position.y = 0.66 * scale;
+      const body = boxMesh(0.70 * scale, 0.56 * scale, 0.70 * scale, color, 0.72, 0.06, 'body');
+      body.position.y = 0.60 * scale;
       paintBody(body, type, color, 0.72, 0.06, { facial: false });
       g.add(body);
-      const head = boxMesh(0.55 * scale, 0.50 * scale, 0.50 * scale, headColor, 0.70, 0.06, 'head');
-      head.position.set(0, 1.10 * scale, -0.10 * scale);
+      const head = boxMesh(0.55 * scale, 0.42 * scale, 0.50 * scale, headColor, 0.70, 0.06, 'head');
+      head.position.set(0, 0.92 * scale, -0.10 * scale);
       paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const sx of [-0.42, 0.42]) {
         const wing = boxMesh(0.06 * scale, 0.40 * scale, 0.50 * scale, color, 0.72, 0.06, 'wing');
-        wing.position.set(sx * scale, 0.80 * scale, 0.05 * scale);
+        wing.position.set(sx * scale, 0.70 * scale, 0.05 * scale);
         g.add(wing);
       }
       for (const sx of [-0.15, 0.15]) {
-        const leg = boxMesh(0.10 * scale, 0.30 * scale, 0.10 * scale, color, 0.8, 0.04, 'leg');
-        leg.position.set(sx * scale, 0.15 * scale, 0.10 * scale);
+        const leg = boxMesh(0.10 * scale, 0.26 * scale, 0.10 * scale, color, 0.8, 0.04, 'leg');
+        leg.position.set(sx * scale, 0.13 * scale, 0.10 * scale);
         g.add(leg);
       }
       const beak = coneMesh(0.09 * scale, 0.22 * scale, 0xf6ad31, 0.7, 0.05, 'beak');
-      beak.position.set(0, 0.98 * scale, -0.56 * scale);
+      beak.position.set(0, 0.82 * scale, -0.48 * scale);
       beak.rotation.x = -Math.PI / 2;
       g.add(beak);
-      addBoxEyes(g, { y: 1.12 * scale, z: -0.43 * scale, spread: 0.12 * scale, size: 0.06 * scale });
+      addBoxEyes(g, { y: 0.96 * scale, z: -0.40 * scale, spread: 0.12 * scale, size: 0.06 * scale });
     } else if (kind === 'serpent') {
-      const body = boxMesh(0.90 * scale, 0.40 * scale, 0.45 * scale, color, 0.72, 0.08, 'body');
-      body.position.set(0, 0.50 * scale, 0);
+      const body = boxMesh(0.90 * scale, 0.38 * scale, 0.45 * scale, color, 0.72, 0.08, 'body');
+      body.position.set(0, 0.52 * scale, 0);
       paintBody(body, type, color, 0.72, 0.08, { facial: false });
       g.add(body);
-      const head = boxMesh(0.50 * scale, 0.45 * scale, 0.45 * scale, headColor, 0.70, 0.06, 'head');
-      head.position.set(0, 0.70 * scale, -0.40 * scale);
+      const head = boxMesh(0.50 * scale, 0.42 * scale, 0.45 * scale, headColor, 0.70, 0.06, 'head');
+      head.position.set(0, 0.80 * scale, -0.40 * scale);
       paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const sx of [-0.35, 0.35]) {
         const fin = boxMesh(0.04 * scale, 0.18 * scale, 0.25 * scale, color, 0.72, 0.08, 'fin');
-        fin.position.set(sx * scale, 0.62 * scale, 0.06 * scale);
+        fin.position.set(sx * scale, 0.66 * scale, 0.06 * scale);
         g.add(fin);
       }
-      addBoxEyes(g, { y: 0.78 * scale, z: -0.58 * scale, spread: 0.10 * scale, size: 0.05 * scale });
+      addBoxEyes(g, { y: 0.88 * scale, z: -0.50 * scale, spread: 0.10 * scale, size: 0.05 * scale });
     } else {
-      const body = boxMesh(0.65 * scale, 0.45 * scale, 0.85 * scale, color, 0.72, 0.06, 'body');
-      body.position.set(0, 0.55 * scale, 0.05 * scale);
+      const body = boxMesh(0.65 * scale, 0.42 * scale, 0.85 * scale, color, 0.72, 0.06, 'body');
+      body.position.set(0, 0.54 * scale, 0.05 * scale);
       paintBody(body, type, color, 0.72, 0.06, { facial: false });
       g.add(body);
-      const head = boxMesh(0.55 * scale, 0.50 * scale, 0.48 * scale, headColor, 0.70, 0.06, 'head');
-      head.position.set(0, 0.90 * scale, -0.30 * scale);
+      const head = boxMesh(0.55 * scale, 0.44 * scale, 0.48 * scale, headColor, 0.70, 0.06, 'head');
+      head.position.set(0, 0.86 * scale, -0.30 * scale);
       paintBody(head, type, headColor, 0.70, 0.06, { facial: false });
       g.add(head);
       for (const [sx, sz] of [[-0.20, 0.25], [0.20, 0.25], [-0.20, -0.15], [0.20, -0.15]]) {
-        const leg = boxMesh(0.12 * scale, 0.35 * scale, 0.12 * scale, color, 0.78, 0.04, 'leg');
-        leg.position.set(sx * scale, 0.17 * scale, sz * scale);
+        const leg = boxMesh(0.12 * scale, 0.32 * scale, 0.12 * scale, color, 0.78, 0.04, 'leg');
+        leg.position.set(sx * scale, 0.16 * scale, sz * scale);
         g.add(leg);
       }
-      addBoxEyes(g, { y: 0.98 * scale, z: -0.50 * scale, spread: 0.10 * scale, size: 0.06 * scale });
+      addBoxEyes(g, { y: 0.94 * scale, z: -0.50 * scale, spread: 0.10 * scale, size: 0.06 * scale });
       const nose = boxMesh(0.08 * scale, 0.06 * scale, 0.06 * scale, 0x1f2937, 0.8, 0, 'nose');
-      nose.position.set(0, 0.85 * scale, -0.52 * scale);
+      nose.position.set(0, 0.81 * scale, -0.52 * scale);
       g.add(nose);
     }
     addBigheadAnimalDecoration(g, form, scale, color);
