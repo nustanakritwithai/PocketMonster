@@ -530,3 +530,106 @@ export function stopBGM() {
 
 // ── Export: getCurrentBGM() (for tests/debug) ─────────────────
 export function getCurrentBGM() { return bgmActiveZone; }
+
+// ── Ambient Sound (Phase 5) ───────────────────────────────────
+let ambBus = null;
+let ambTimer = null;
+let ambActiveZone = null;
+
+export function startAmbient(zone) {
+  if (!ctx) return;
+  stopAmbient();
+  if (zone === 'hub') zone = 'ranch';
+  if (!['ranch', 'grassland', 'cave'].includes(zone)) return;
+  ambBus = ctx.createGain();
+  ambBus.gain.value = 0;
+  ambBus.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.8);
+  ambBus.connect(masterGain);
+  ambActiveZone = zone;
+  const patterns = {
+    ranch: () => {
+      noiseBurstTo(ambBus, 0, 2, { gain: 0.02, filter: 'lowpass', freq: 500 });
+      const chirp = () => {
+        if (!ambBus || ambActiveZone !== 'ranch') return;
+        const f = 2000 + Math.random() * 1000;
+        toneTo(ambBus, f, 0, 0.08, { type: 'sine', gain: 0.03 });
+        toneTo(ambBus, f * 1.2, 0.06, 0.06, { type: 'sine', gain: 0.02 });
+      };
+      const next = 3000 + Math.random() * 5000;
+      ambTimer = setTimeout(() => { chirp(); if (ambActiveZone === 'ranch') scheduleNext(patterns.ranch); }, next);
+    },
+    grassland: () => {
+      noiseBurstTo(ambBus, 0, 3, { gain: 0.03, filter: 'lowpass', freq: 400 });
+      const cricket = () => {
+        if (!ambBus || ambActiveZone !== 'grassland') return;
+        for (let i = 0; i < 3; i++) {
+          toneTo(ambBus, 4000, i * 0.04, 0.03, { type: 'sine', gain: 0.015 });
+        }
+      };
+      const next = 2000 + Math.random() * 3000;
+      ambTimer = setTimeout(() => { cricket(); if (ambActiveZone === 'grassland') scheduleNext(patterns.grassland); }, next);
+    },
+    cave: () => {
+      toneTo(ambBus, 80, 0, 4, { type: 'sine', gain: 0.02, attack: 0.5 });
+      const drop = () => {
+        if (!ambBus || ambActiveZone !== 'cave') return;
+        toneTo(ambBus, 800 + Math.random() * 400, 0, 0.3, { type: 'sine', gain: 0.04, attack: 0.005 });
+        toneTo(ambBus, 400, 0.1, 0.4, { type: 'sine', gain: 0.02 });
+      };
+      const next = 4000 + Math.random() * 8000;
+      ambTimer = setTimeout(() => { drop(); if (ambActiveZone === 'cave') scheduleNext(patterns.cave); }, next);
+    },
+  };
+  const scheduleNext = (fn) => { if (ambActiveZone) fn(); };
+  patterns[zone]();
+}
+
+export function stopAmbient() {
+  if (ambTimer) { clearTimeout(ambTimer); ambTimer = null; }
+  if (ambBus && ctx) {
+    ambBus.gain.cancelScheduledValues(ctx.currentTime);
+    ambBus.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+    const old = ambBus;
+    setTimeout(() => old.disconnect(), 400);
+  }
+  ambBus = null;
+  ambActiveZone = null;
+}
+
+// Helpers for routing to specific bus
+function toneTo(bus, freq, start, dur, { type = 'sine', gain = 0.2, attack = 0.005 } = {}) {
+  if (!ctx || !bus) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.connect(g);
+  g.connect(bus);
+  const t = ctx.currentTime + start;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+function noiseBurstTo(bus, start, dur, { gain = 0.15, filter = 'highpass', freq = 2000, q = 1 } = {}) {
+  if (!ctx || !bus) return;
+  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const f = ctx.createBiquadFilter();
+  f.type = filter; f.frequency.value = freq; f.Q.value = q;
+  const g = ctx.createGain();
+  src.connect(f);
+  f.connect(g);
+  g.connect(bus);
+  const t = ctx.currentTime + start;
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.start(t);
+  src.stop(t + dur + 0.02);
+}
