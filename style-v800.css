@@ -102,6 +102,8 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:rad
 .action span{display:block;font-size:21px;letter-spacing:.2px}
 .action small{font-size:9px;opacity:.92}
 .skill1 span,.skill2 span,.skill3 span{font-size:20px}
+.action.skill.on-cooldown{filter:grayscale(.55);opacity:.7}
+.action.skill .cd-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;background:rgba(0,0,0,.45);border-radius:inherit;pointer-events:none}
 .capture::before,.summon::before,.recall::before{content:attr(data-label);position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;letter-spacing:.7px;opacity:.86}
 .capture.aiming{box-shadow:0 0 0 3px rgba(96,165,250,.25),0 18px 42px rgba(37,99,235,.42), inset 0 1px 0 rgba(255,255,255,.28)!important;filter:brightness(1.08)}
 .party-slot.compact{background:linear-gradient(180deg,rgba(18,26,41,.88),rgba(10,16,27,.78));border-color:rgba(255,255,255,.1);box-shadow:0 10px 22px rgba(0,0,0,.22)}
