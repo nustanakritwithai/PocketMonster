@@ -1169,6 +1169,87 @@ function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentat
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
 if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
 const effects=[];
+// Skill sprite texture cache — radial gradient glow per element type
+const skillSpriteCache=new Map();
+function getSkillSpriteTexture(type){
+  if(skillSpriteCache.has(type))return skillSpriteCache.get(type);
+  const cfg=typeFx(type);
+  const c=document.createElement('canvas');
+  c.width=128;c.height=128;
+  const ctx=c.getContext('2d');
+  const grad=ctx.createRadialGradient(64,64,0,64,64,64);
+  const coreHex='#'+cfg.core.toString(16).padStart(6,'0');
+  const accentHex='#'+cfg.accent.toString(16).padStart(6,'0');
+  grad.addColorStop(0,accentHex);
+  grad.addColorStop(0.25,coreHex);
+  grad.addColorStop(0.5,coreHex+'88');
+  grad.addColorStop(1,coreHex+'00');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,128,128);
+  // Add type-specific motif
+  ctx.save();
+  ctx.translate(64,64);
+  ctx.globalAlpha=0.4;
+  ctx.strokeStyle=accentHex;
+  ctx.lineWidth=3;
+  switch(cfg.shape){
+    case'flame':ctx.beginPath();for(let i=0;i<5;i++){const a=(i/5)*Math.PI*2;ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*40,Math.sin(a)*40-10);}ctx.stroke();break;
+    case'drop':ctx.beginPath();ctx.arc(0,5,35,0,Math.PI*2);ctx.stroke();break;
+    case'spark':ctx.beginPath();for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2;ctx.moveTo(Math.cos(a)*30,Math.sin(a)*30);ctx.lineTo(Math.cos(a+0.5)*45,Math.sin(a+0.5)*45);}ctx.stroke();break;
+    case'leaf':ctx.beginPath();ctx.ellipse(0,0,40,20,0,0,Math.PI*2);ctx.stroke();break;
+    case'crystal':ctx.beginPath();for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;ctx.lineTo(Math.cos(a)*38,Math.sin(a)*38);}ctx.closePath();ctx.stroke();break;
+    case'impact':ctx.beginPath();ctx.arc(0,0,38,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,25,0,Math.PI*2);ctx.stroke();break;
+    case'halo':ctx.beginPath();ctx.arc(0,0,42,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,28,0,Math.PI*2);ctx.stroke();break;
+    case'shard':ctx.beginPath();ctx.moveTo(0,-40);ctx.lineTo(15,0);ctx.lineTo(0,40);ctx.lineTo(-15,0);ctx.closePath();ctx.stroke();break;
+    case'mist':ctx.beginPath();ctx.arc(-15,0,25,0,Math.PI*2);ctx.arc(15,0,25,0,Math.PI*2);ctx.stroke();break;
+    case'star':ctx.beginPath();for(let i=0;i<10;i++){const a=(i/10)*Math.PI*2;const r=i%2?15:40;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);}ctx.closePath();ctx.stroke();break;
+    case'arc':ctx.beginPath();ctx.arc(0,0,40,Math.PI*0.2,Math.PI*0.8);ctx.stroke();break;
+    case'smoke':ctx.beginPath();ctx.arc(-10,-10,20,0,Math.PI*2);ctx.arc(10,10,25,0,Math.PI*2);ctx.arc(0,0,30,0,Math.PI*2);ctx.stroke();break;
+    case'metal':ctx.beginPath();ctx.rect(-30,-20,60,40);ctx.stroke();break;
+    case'feather':ctx.beginPath();ctx.ellipse(0,0,15,40,0,0,Math.PI*2);ctx.stroke();break;
+    case'bubble':ctx.beginPath();ctx.arc(0,0,35,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(-10,-10,8,0,Math.PI*2);ctx.stroke();break;
+    case'dust':ctx.beginPath();ctx.arc(0,5,30,0,Math.PI*2);ctx.arc(-15,-5,18,0,Math.PI*2);ctx.arc(15,-5,18,0,Math.PI*2);ctx.stroke();break;
+    case'spore':ctx.beginPath();for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;ctx.arc(Math.cos(a)*20,Math.sin(a)*20,8,0,Math.PI*2);}ctx.stroke();break;
+    default:ctx.beginPath();ctx.arc(0,0,35,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.restore();
+  const tex=new THREE.CanvasTexture(c);
+  tex.needsUpdate=true;
+  skillSpriteCache.set(type,tex);
+  return tex;
+}
+const skillSpritePool=createObjectPool({
+  maxSize:80,
+  create:()=>{
+    const mat=new THREE.SpriteMaterial({map:null,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    const sprite=new THREE.Sprite(mat);
+    sprite.castShadow=false;
+    return sprite;
+  },
+  reset:sprite=>{
+    sprite.removeFromParent();
+    sprite.visible=false;
+    sprite.position.set(0,0,0);
+    sprite.scale.setScalar(1);
+    sprite.material.opacity=0;
+    sprite.material.map=null;
+  },
+  destroy:sprite=>disposeObject3D(sprite),
+});
+function spawnSkillSprite(type,pos,size=0.3,life=0.4){
+  const tex=getSkillSpriteTexture(type);
+  const sprite=skillSpritePool.acquire();
+  if(!sprite)return null;
+  sprite.material.map=tex;
+  sprite.visible=true;
+  sprite.material.opacity=0.9;
+  sprite.material.needsUpdate=true;
+  sprite.position.copy(pos);
+  sprite.scale.setScalar(size);
+  scene.add(sprite);
+  effects.push({mesh:sprite,life:life,maxLife:life,kind:'skill-sprite',pooled:true,spritePool:true,size:size});
+  return sprite;
+}
 const sparkPool=createObjectPool({
   maxSize:200,
   create:()=>new THREE.Mesh(
@@ -1217,7 +1298,8 @@ function animateHumanoid(model,dt,moving=false){
 function colorNum(type){ return parseInt((TYPE_COLOR[type]||'#8b5cf6').replace('#',''),16); }
 function releaseTransientEffect(effect){
   if(!effect?.mesh)return;
-  if(effect.pooled)sparkPool.release(effect.mesh);
+  if(effect.spritePool)skillSpritePool.release(effect.mesh);
+  else if(effect.pooled)sparkPool.release(effect.mesh);
   else removeAndDispose(scene,effect.mesh);
 }
 function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
@@ -1413,7 +1495,7 @@ function updateSparkType(e,dt,t){
   if(cfg.speed>1.3){e.mesh.position.x+=Math.sin(e.life*20)*0.02;e.mesh.position.z+=Math.cos(e.life*20)*0.02;}
   if(cfg.shape==='mist')e.vel.y=Math.max(e.vel.y,0);
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } else if(e.kind==='area-wave'){ const u=1-t; const scale=0.5+u*(e.expandTo||3); e.mesh.scale.set(scale,1,scale); e.mesh.material.opacity=Math.max(0,t*0.8); } else if(e.kind==='shield-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.35); e.mesh.rotation.y+=dt*0.8; } else if(e.kind==='buff-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.4); e.mesh.rotation.y+=dt*1.2; e.mesh.scale.setScalar(1+Math.sin(u*Math.PI*4)*0.05); } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } else if(e.kind==='area-wave'){ const u=1-t; const scale=0.5+u*(e.expandTo||3); e.mesh.scale.set(scale,1,scale); e.mesh.material.opacity=Math.max(0,t*0.8); } else if(e.kind==='shield-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.35); e.mesh.rotation.y+=dt*0.8; } else if(e.kind==='buff-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.4); e.mesh.rotation.y+=dt*1.2; e.mesh.scale.setScalar(1+Math.sin(u*Math.PI*4)*0.05); } else if(e.kind==='skill-sprite'){ const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*0.9); e.mesh.scale.setScalar(e.size*(1+(1-t)*0.5)); e.mesh.material.rotation+=dt*1.5; } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -2198,6 +2280,8 @@ function spawnSkillTrail(type, fromPos, toPos) {
   const cfg = typeFx(type);
   const dist = fromPos.distanceTo(toPos);
   const count = Math.max(4, Math.round(dist * 3));
+  spawnSkillSprite(type, fromPos.clone(), 0.5, 0.35);
+  spawnSkillSprite(type, toPos.clone(), 0.6, 0.4);
   for (let i = 0; i < count; i++) {
     const t = i / count;
     const m = sparkPool.acquire();
@@ -2239,6 +2323,7 @@ function spawnSkillTrail(type, fromPos, toPos) {
 }
 function spawnAreaWave(type, pos, range) {
   const cfg = typeFx(type);
+  spawnSkillSprite(type, pos.clone(), 0.8 + range * 0.1, 0.5);
   const wave = new THREE.Mesh(
     boxGeometry(0.5, 0.05, 0.5),
     new THREE.MeshBasicMaterial({color: cfg.core, transparent: true, opacity: 0.8, wireframe: true, depthWrite: false})
@@ -2339,11 +2424,11 @@ function useSkill(index){
   const sfxId=`sfx_skill_${move.type.toLowerCase()}`;
   if(sfxId)playSFX(sfxId);
   if(move.targetType==='enemy'){
-    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
+    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));spawnSkillSprite(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
   }else if(move.targetType==='area'){
     const targets=wilds.filter(w=>!w.dead&&distXZ(a.mesh.position,w.mesh.position)<=move.range);if(!targets.length){msg(`${move.name}: ไม่มีศัตรูในพื้นที่`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:Math.min(2.8,move.range*.7),duration:1.45,intensity:1.15});spawnAreaWave(move.type,a.mesh.position.clone(),move.range);triggerCameraShake(.11,.17);let total=0;for(const t of targets){spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});damageWild(t,res.damage,{type:move.type,eff:res.eff});total+=res.damage;}a.skillCds[index]=move.cooldown;msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
   }else if(move.targetType==='self'){
-    triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
+    triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnSkillSprite(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0.8,0.6);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
     if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});spawnHealSkillEffect(a.mesh.position.clone(),move.type);msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);logBattleEvent('spirit',move.value*10);}
     if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;spawnShieldSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
     if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
