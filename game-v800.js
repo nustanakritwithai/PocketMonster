@@ -2128,33 +2128,40 @@ function resolveCapture(w){
   if(w.dead)return;
   const sp=spById[w.speciesId],name=wildDisplayName(w);
   if(w.capturePolicy==='disabled'){msg(`Boss ${name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);return;}
-  const chance=captureChance(w);
-  if(Math.random()<chance){
-    playSFX('sfx_capture_success');
-    spawnBurst(w.mesh.position.clone().add(new THREE.Vector3(0,.7,0)),0x22c55e,{count:14,life:.42,size:.06});
-    spawnRingPulse(w.mesh.position.clone(),0x22c55e,{scale:.75,life:.3});
-    spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.1,duration:.8,intensity:.75});
-    triggerCameraShake(.08,.12);
-    const inst=makeInstance(sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??sp.types[1]??null});
-    state.collection.push(inst);
-    const empty=state.party.findIndex(x=>x===null);
-    if(empty>=0)state.party[empty]=inst.instanceId;
-    else state.storage.push(inst.instanceId);
-    w.dead=true;
-    removeAndDispose(scene,w.mesh);
-    removeWildLabel(w);
-    state.exp+=5;
-    msg(`จับ ${name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''}`);
-    renderAll();
-    saveGame(false);
-    respawnWild(w,8000);
-    retireWild(w);
-  }else{
-    playSFX('sfx_capture_fail');
-    msg(`จับ ${name} ไม่สำเร็จ (${Math.round(chance*100)}%) • บอลถูกใช้ไปแล้ว`);
+  playSFX('sfx_capture_tension');
+  const shakeMesh=w.mesh;
+  let shakeCount=0;
+  const shakeTimer=setInterval(()=>{if(shakeMesh&&!w.dead){shakeMesh.position.x+=(Math.random()-.5)*.15;shakeMesh.rotation.z+=(Math.random()-.5)*.1;}shakeCount++;if(shakeCount>=8){clearInterval(shakeTimer);if(shakeMesh&&!w.dead){shakeMesh.position.x=w.home.x;shakeMesh.rotation.z=0;}}},200);
+  setTimeout(()=>{
+    if(w.dead){msg(`${name} หนีไปแล้ว • เสีย Capture Ball 1 ลูก`);return;}
+    const chance=captureChance(w);
+    if(Math.random()<chance){
+      playSFX('sfx_capture_success');
+      spawnBurst(w.mesh.position.clone().add(new THREE.Vector3(0,.7,0)),0x22c55e,{count:14,life:.42,size:.06});
+      spawnRingPulse(w.mesh.position.clone(),0x22c55e,{scale:.75,life:.3});
+      spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.1,duration:.8,intensity:.75});
+      triggerCameraShake(.08,.12);
+      const inst=makeInstance(sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??sp.types[1]??null});
+      state.collection.push(inst);
+      const empty=state.party.findIndex(x=>x===null);
+      if(empty>=0)state.party[empty]=inst.instanceId;
+      else state.storage.push(inst.instanceId);
+      w.dead=true;
+      removeAndDispose(scene,w.mesh);
+      removeWildLabel(w);
+      state.exp+=5;
+      msg(`จับ ${name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''}`);
+      renderAll();
+      saveGame(false);
+      respawnWild(w,8000);
+      retireWild(w);
+    }else{
+      playSFX('sfx_capture_fail');
+      msg(`จับ ${name} ไม่สำเร็จ (${Math.round(chance*100)}%) • บอลถูกใช้ไปแล้ว`);
     w.engaged=true;
     w.state='chase';
   }
+  },1700);
 }
 function summonThrow(){const inst=selectedInstance();if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;playerVisual.play('throw',{duration:.34});pendingSummon={instanceId:inst.instanceId};clearHubCompanion();throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return;pendingSummon=null;spawnOwned(inst,end);});msg(`ปาเรียก ${displayName(inst)}`);}
 function spawnOwned(inst,pos){
@@ -2255,6 +2262,7 @@ function updateWild(w,dt,canEngage=false){
 
   if(!canEngage||!targetValid){
     if(w.engaged)resetWild(w);
+    for(const other of wilds){if(other===w||other.dead)continue;const d=distXZ(w.mesh.position,other.mesh.position);if(d<1.2&&d>0.001){const push=safeVec3(w.mesh.position).sub(other.mesh.position);push.y=0;push.normalize().multiplyScalar((1.2-d)*dt*2);w.mesh.position.add(push);}}
     if(w.wanderT<=0){
       w.state='wander';
       w.wanderT=1.6+Math.random()*2.2;
