@@ -95,16 +95,11 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:rad
 .joystick{background:radial-gradient(circle at 50% 45%,rgba(175,255,191,.36),rgba(77,181,108,.2) 45%,rgba(255,255,255,.08) 100%);border-color:rgba(255,255,255,.25);box-shadow:inset 0 10px 30px rgba(255,255,255,.06),0 12px 34px rgba(0,0,0,.18)}
 .stick{background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.58),rgba(255,255,255,.22) 72%);border:1px solid rgba(255,255,255,.28)}
 .controls-right{padding:8px;border-radius:34px;background:radial-gradient(circle at 100% 100%,rgba(255,255,255,.06),transparent 42%)}
-.action{overflow:hidden;border:1px solid rgba(255,255,255,.18)!important;box-shadow:0 12px 28px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.22);background:radial-gradient(circle at 30% 22%,var(--action-accent, rgba(255,255,255,.28)),transparent 34%),linear-gradient(180deg,var(--action-main,#3b82f6),color-mix(in srgb, var(--action-main,#3b82f6) 72%, #0f172a 28%))!important;transition:transform .15s ease, box-shadow .15s ease, filter .18s ease}
+.action{overflow:hidden;border:1px solid rgba(255,255,255,.18)!important;box-shadow:0 12px 28px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.22);background-color:color-mix(in srgb, var(--action-main,#3b82f6) 72%, #0f172a 28%)!important;background-size:70%;background-repeat:no-repeat;background-position:center;transition:transform .15s ease, box-shadow .15s ease, filter .18s ease}
 .action:hover,.action:active{transform:translateY(-1px) scale(1.03);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 0 2px rgba(255,255,255,.06), inset 0 1px 0 rgba(255,255,255,.32)}
 .action:disabled{filter:saturate(.48) brightness(.72);opacity:.72}
-.action::after{content:attr(data-sub);position:absolute;left:50%;bottom:11px;transform:translateX(-50%);font-size:10px;font-weight:700;opacity:.95;white-space:nowrap;pointer-events:none}
-.action span{display:block;font-size:21px;letter-spacing:.2px}
-.action small{font-size:9px;opacity:.92}
-.skill1 span,.skill2 span,.skill3 span{font-size:20px}
 .action.skill.on-cooldown{filter:grayscale(.55);opacity:.7}
 .action.skill .cd-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;background:rgba(0,0,0,.45);border-radius:inherit;pointer-events:none}
-.capture::before,.summon::before,.recall::before{content:attr(data-label);position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;letter-spacing:.7px;opacity:.86}
 .capture.aiming{box-shadow:0 0 0 3px rgba(96,165,250,.25),0 18px 42px rgba(37,99,235,.42), inset 0 1px 0 rgba(255,255,255,.28)!important;filter:brightness(1.08)}
 .party-slot.compact{background:linear-gradient(180deg,rgba(18,26,41,.88),rgba(10,16,27,.78));border-color:rgba(255,255,255,.1);box-shadow:0 10px 22px rgba(0,0,0,.22)}
 .party-slot.compact.active{border-color:rgba(245,196,81,.9)!important;box-shadow:0 0 0 1px rgba(245,196,81,.42),0 14px 26px rgba(0,0,0,.24)}
