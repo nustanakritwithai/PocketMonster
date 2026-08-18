@@ -1413,7 +1413,7 @@ function updateSparkType(e,dt,t){
   if(cfg.speed>1.3){e.mesh.position.x+=Math.sin(e.life*20)*0.02;e.mesh.position.z+=Math.cos(e.life*20)*0.02;}
   if(cfg.shape==='mist')e.vel.y=Math.max(e.vel.y,0);
 }
-function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } else if(e.kind==='area-wave'){ const u=1-t; const scale=0.5+u*(e.expandTo||3); e.mesh.scale.set(scale,1,scale); e.mesh.material.opacity=Math.max(0,t*0.8); } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
+function updateEffects(dt){ for(let i=effects.length-1;i>=0;i--){ const e=effects[i]; e.life-=dt; const t=Math.max(0,e.life/e.maxLife); if(e.kind==='spark'){ e.vel.y-=(e.gravity||0)*dt; updateSparkType(e,dt,t); e.mesh.position.addScaledVector(e.vel,dt); e.mesh.scale.setScalar(e.size*(.5+t)); const fade=easeOut(t); e.mesh.material.opacity=Math.max(0,fade*.9); if(e.mesh.material.emissiveIntensity!=null){ if(e.emi==null)e.emi=e.mesh.material.emissiveIntensity; e.mesh.material.emissiveIntensity=e.emi*fade; } } else if(e.kind==='ring'){ e.mesh.scale.multiplyScalar(1+dt*2.8); e.mesh.material.opacity=Math.max(0,easeOut(t)*.9); } else if(e.kind==='evolution-aura'){ const u=1-t; const fade=u<.35?u/.35:(u>.7?(1-u)/.3:1); e.mesh.material.opacity=Math.max(0,fade*.55); e.mesh.rotation.y+=dt*1.8; } else if(e.kind==='area-wave'){ const u=1-t; const scale=0.5+u*(e.expandTo||3); e.mesh.scale.set(scale,1,scale); e.mesh.material.opacity=Math.max(0,t*0.8); } else if(e.kind==='shield-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.35); e.mesh.rotation.y+=dt*0.8; } else if(e.kind==='buff-aura'){ const u=1-t; const fade=u<.15?u/.15:(u>.85?(1-u)/.15:1); e.mesh.material.opacity=Math.max(0,fade*0.4); e.mesh.rotation.y+=dt*1.2; e.mesh.scale.setScalar(1+Math.sin(u*Math.PI*4)*0.05); } if(e.life<=0){ releaseTransientEffect(e); effects.splice(i,1);} } }
 
 const ELEMENT_FX={
   Normal:{core:0xc4b08b,accent:0xf5e2be,shape:'orb',intensity:0.95,speed:1.0},
@@ -2263,6 +2263,75 @@ function spawnAreaWave(type, pos, range) {
     effects.push({mesh: m, life: 0.4, maxLife: 0.4, kind: 'spark', pooled: true, vel: new THREE.Vector3(Math.cos(angle) * range, 0.3, Math.sin(angle) * range), size: 0.05, gravity: 0.3});
   }
 }
+function spawnHealSkillEffect(pos, type) {
+  const cfg = typeFx(type);
+  for (let i = 0; i < 10; i++) {
+    const m = sparkPool.acquire();
+    if (!m) break;
+    m.visible = true;
+    m.material.color.setHex(0x4ade80);
+    m.material.emissive.setHex(0x4ade80);
+    m.material.emissiveIntensity = 0.6;
+    m.material.opacity = 0.9;
+    m.castShadow = false;
+    const angle = (i / 10) * Math.PI * 2;
+    m.position.set(pos.x + Math.cos(angle) * 0.5, pos.y + 0.2 + Math.random() * 0.3, pos.z + Math.sin(angle) * 0.5);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh: m, life: 0.8, maxLife: 0.8, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.0 + Math.random() * 0.3, 0), size: 0.05, gravity: -0.1});
+  }
+  spawnRingPulse(pos.clone(), 0x4ade80, {scale: 0.8, life: 0.4, y: 0.1});
+  spawnElementalFX(type, pos, 'aura', 0.5);
+}
+function spawnShieldSkillEffect(pos, type, duration) {
+  const cfg = typeFx(type);
+  const shieldMesh = new THREE.Mesh(boxGeometry(1.4, 1.8, 1.4), new THREE.MeshBasicMaterial({color: cfg.core, transparent: true, opacity: 0, wireframe: true, depthWrite: false}));
+  shieldMesh.position.copy(pos);
+  shieldMesh.position.y += 0.9;
+  shieldMesh.castShadow = false;
+  scene.add(shieldMesh);
+  effects.push({mesh: shieldMesh, life: duration, maxLife: duration, kind: 'shield-aura'});
+  for (let i = 0; i < 8; i++) {
+    const m = sparkPool.acquire();
+    if (!m) break;
+    m.visible = true;
+    m.material.color.setHex(cfg.core);
+    m.material.emissive.setHex(cfg.core);
+    m.material.emissiveIntensity = 0.5;
+    m.material.opacity = 0.9;
+    m.castShadow = false;
+    const angle = (i / 8) * Math.PI * 2;
+    m.position.set(pos.x + Math.cos(angle) * 0.6, pos.y + 0.1, pos.z + Math.sin(angle) * 0.6);
+    m.scale.setScalar(0.04);
+    scene.add(m);
+    effects.push({mesh: m, life: 0.6, maxLife: 0.6, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 0.8, 0), size: 0.04, gravity: -0.05});
+  }
+}
+function spawnBuffAtkSkillEffect(pos, type, duration) {
+  const cfg = typeFx(type);
+  for (let i = 0; i < 12; i++) {
+    const m = sparkPool.acquire();
+    if (!m) break;
+    m.visible = true;
+    m.material.color.setHex(cfg.accent);
+    m.material.emissive.setHex(cfg.accent);
+    m.material.emissiveIntensity = 0.6;
+    m.material.opacity = 0.9;
+    m.castShadow = false;
+    const angle = (i / 12) * Math.PI * 2;
+    m.position.set(pos.x + Math.cos(angle) * 0.4, pos.y + 0.1, pos.z + Math.sin(angle) * 0.4);
+    m.scale.setScalar(0.05);
+    scene.add(m);
+    effects.push({mesh: m, life: 0.7, maxLife: 0.7, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.5 + Math.random() * 0.5, 0), size: 0.05, gravity: -0.3});
+  }
+  spawnRingPulse(pos.clone(), cfg.accent, {scale: 0.7, life: 0.35, y: 0.1});
+  const auraMesh = new THREE.Mesh(boxGeometry(1.2, 2.0, 1.2), new THREE.MeshBasicMaterial({color: cfg.accent, transparent: true, opacity: 0, wireframe: true, depthWrite: false}));
+  auraMesh.position.copy(pos);
+  auraMesh.position.y += 1.0;
+  auraMesh.castShadow = false;
+  scene.add(auraMesh);
+  effects.push({mesh: auraMesh, life: duration, maxLife: duration, kind: 'buff-aura'});
+}
 function useSkill(index){
   if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return;}const a=activeSummon,move=getMonsterSkills(a.inst)[index];if(!move)return;if((a.skillCds[index]||0)>0){msg(`${move.name} คูลดาวน์ ${a.skillCds[index].toFixed(1)}s`);return;}
   let res=null;
@@ -2274,9 +2343,9 @@ function useSkill(index){
     const targets=wilds.filter(w=>!w.dead&&distXZ(a.mesh.position,w.mesh.position)<=move.range);if(!targets.length){msg(`${move.name}: ไม่มีศัตรูในพื้นที่`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:Math.min(2.8,move.range*.7),duration:1.45,intensity:1.15});spawnAreaWave(move.type,a.mesh.position.clone(),move.range);triggerCameraShake(.11,.17);let total=0;for(const t of targets){spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});damageWild(t,res.damage,{type:move.type,eff:res.eff});total+=res.damage;}a.skillCds[index]=move.cooldown;msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
   }else if(move.targetType==='self'){
     triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
-    if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);logBattleEvent('spirit',move.value*10);}
-    if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
-    if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
+    if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});spawnHealSkillEffect(a.mesh.position.clone(),move.type);msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);logBattleEvent('spirit',move.value*10);}
+    if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;spawnShieldSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
+    if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
   }
   a.inst.bond=clamp(a.inst.bond+.3);
   // V7.5: Award Skill EXP for skill usage (mastery progression)
