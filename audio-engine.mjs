@@ -160,6 +160,19 @@ function registerCombatSFX() {
     tone(600, 0.05, 0.15, { type: 'sine', gain: 0.04 });
   };
 
+  // Skill normal — quick impact thud
+  SFX_HANDLERS['sfx_skill_normal'] = () => {
+    noiseBurst(0, 0.08, { gain: 0.07, filter: 'lowpass', freq: 600 });
+    tone(200, 0, 0.06, { type: 'square', gain: 0.05 });
+  };
+
+  // Skill fighting — heavy hit
+  SFX_HANDLERS['sfx_skill_fighting'] = () => {
+    noiseBurst(0, 0.12, { gain: 0.1, filter: 'lowpass', freq: 400 });
+    tone(150, 0, 0.1, { type: 'square', gain: 0.08 });
+    tone(100, 0.05, 0.08, { type: 'sine', gain: 0.05 });
+  };
+
   // Faint — descending tone
   SFX_HANDLERS['sfx_faint'] = () => {
     toneSweep(400, 60, 0, 0.35, { type: 'sine', gain: 0.12, attack: 0.01 });

@@ -3049,8 +3049,8 @@ function loadGame(){
 }
 
 // ---------- UI events ----------
-el('npcBtn').onclick=openManager;el('closeManager').onclick=closeManager;el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
-document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>setManagerTab(b.dataset.managerTab));
+el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');openManager();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');
 const fullscreenBtn=el('fullscreenBtn');
@@ -3058,15 +3058,16 @@ for(const b of [enterImmersiveBtn,retryImmersiveBtn,fullscreenBtn]){
   if(!b) continue;
   b.addEventListener('click',requestImmersiveMode,{passive:false});
 }
-el('menuBtn').onclick=()=>el('utilityMenu').classList.toggle('hidden');
+el('menuBtn').onclick=()=>{playSFX('sfx_ui_click');el('utilityMenu').classList.toggle('hidden');};
 window.addEventListener('resize',syncOrientationLock); window.addEventListener('orientationchange',syncOrientationLock); document.addEventListener('fullscreenchange',syncOrientationLock);
 startGameInteraction(); setTimeout(syncOrientationLock,80);
-el('parentABtn').onclick=()=>openMonsterPicker('parentA');el('parentBBtn').onclick=()=>openMonsterPicker('parentB');el('breedBtn').onclick=createEgg;el('closePicker').onclick=closeMonsterPicker;el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
-el('healAllBtn').onclick=healAll;el('refillBallsBtn').onclick=()=>{state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
+el('parentABtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentA');};el('parentBBtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentB');};el('breedBtn').onclick=()=>{playSFX('sfx_ui_click');createEgg();};el('closePicker').onclick=()=>{playSFX('sfx_ui_click');closeMonsterPicker();};el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
+el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{playSFX('sfx_ui_click');for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
 function bindActionPress(button,handler){
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();
     event.stopPropagation();
+    playSFX('sfx_ui_click');
     handler();
   },{passive:false});
 }
@@ -3076,6 +3077,7 @@ captureBtn.addEventListener('pointerdown',event=>{
   if(capturePointerId!==null)return;
   event.preventDefault();
   event.stopPropagation();
+  playSFX('sfx_ui_click');
   capturePointerId=event.pointerId;
   captureBtn.setPointerCapture?.(event.pointerId);
   beginCaptureAim();
@@ -3101,11 +3103,11 @@ el('saveBtn').onclick=()=>saveGame(true);
 el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'🔇 เสียงปิด':'🔊 เสียงเปิด';localStorage.setItem('mlr-audio-muted',String(m));};
 {const savedVol=localStorage.getItem('mlr-audio-volume');if(savedVol){setVolume(parseFloat(savedVol));el('volumeSlider').value=Math.round(parseFloat(savedVol)*100);}const savedMute=localStorage.getItem('mlr-audio-muted');if(savedMute==='true'){toggleMute();el('muteBtn').textContent='🔇 เสียงปิด';}}
 el('volumeSlider').oninput=(e)=>{const v=parseFloat(e.target.value)/100;setVolume(v);localStorage.setItem('mlr-audio-volume',String(v));};
-el('resetBtn').onclick=()=>{for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};
-el('zoneToggleBtn').onclick=()=>{el('zoneDropdown').classList.toggle('hidden');};
-document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
+el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};
+el('zoneToggleBtn').onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.toggle('hidden');};
+document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
 addEventListener('pointerdown',e=>{const dd=el('zoneDropdown');if(!dd.classList.contains('hidden')&&!el('zoneTravel').contains(e.target))dd.classList.add('hidden');});
-el('huntBtn').onclick=()=>switchZone(state.currentZone==='hub'?'grassland':'hub');
+el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;
