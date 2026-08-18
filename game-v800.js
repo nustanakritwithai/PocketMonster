@@ -2193,13 +2193,56 @@ function recall(show=true,setCooldown=true){
   renderParty();renderSkillButtons();renderHUD();
 }
 function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
+function spawnSkillTrail(type, fromPos, toPos) {
+  const cfg = typeFx(type);
+  const dist = fromPos.distanceTo(toPos);
+  const count = Math.max(4, Math.round(dist * 3));
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
+    const m = sparkPool.acquire();
+    if (!m) break;
+    m.visible = true;
+    m.material.color.setHex(i % 2 ? cfg.accent : cfg.core);
+    m.material.emissive.setHex(i % 2 ? cfg.accent : cfg.core);
+    m.material.emissiveIntensity = 0.6;
+    m.material.opacity = 0.9;
+    m.castShadow = false;
+    m.position.lerpVectors(fromPos, toPos, t);
+    m.position.y += Math.sin(t * Math.PI) * 0.5;
+    m.scale.setScalar(0.04 * (1 - t * 0.5));
+    m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    scene.add(m);
+    const vel = new THREE.Vector3();
+    switch (cfg.shape) {
+      case 'flame': vel.y = 0.3; break;
+      case 'drop': vel.y = -0.2; break;
+      case 'spark': vel.x = Math.sin(i * 2) * 0.5; break;
+      case 'leaf': vel.set(Math.cos(i)*0.2, 0.1, Math.sin(i)*0.2); break;
+      case 'crystal': vel.y = -0.15; break;
+      case 'impact': vel.set(0, 0.05, 0); break;
+      case 'bubble': vel.y = 0.05; break;
+      case 'dust': vel.y = -0.3; break;
+      case 'feather': vel.set(Math.sin(i)*0.3, 0.08, Math.cos(i)*0.3); break;
+      case 'halo': vel.y = 0.05; break;
+      case 'spore': vel.set(Math.cos(i)*0.1, 0.03, Math.sin(i)*0.1); break;
+      case 'shard': vel.y = -0.4; break;
+      case 'mist': vel.y = 0.03; break;
+      case 'arc': vel.y = 0.2; break;
+      case 'smoke': vel.set(0, -0.05, 0); break;
+      case 'metal': vel.set(0, 0, 0); break;
+      case 'star': vel.y = 0.08; break;
+      default: vel.set(0, 0.1, 0);
+    }
+    effects.push({mesh: m, life: 0.3, maxLife: 0.3, kind: 'spark', pooled: true, vel, size: m.scale.x, gravity: 0.2});
+  }
+}
 function useSkill(index){
   if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return;}const a=activeSummon,move=getMonsterSkills(a.inst)[index];if(!move)return;if((a.skillCds[index]||0)>0){msg(`${move.name} คูลดาวน์ ${a.skillCds[index].toFixed(1)}s`);return;}
   let res=null;
   const sfxId=`sfx_skill_${move.type.toLowerCase()}`;
   if(sfxId)playSFX(sfxId);
   if(move.targetType==='enemy'){
-    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
+    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
   }else if(move.targetType==='area'){
     const targets=wilds.filter(w=>!w.dead&&distXZ(a.mesh.position,w.mesh.position)<=move.range);if(!targets.length){msg(`${move.name}: ไม่มีศัตรูในพื้นที่`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:Math.min(2.8,move.range*.7),duration:1.45,intensity:1.15});triggerCameraShake(.11,.17);let total=0;for(const t of targets){spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});damageWild(t,res.damage,{type:move.type,eff:res.eff});total+=res.damage;}a.skillCds[index]=move.cooldown;msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
   }else if(move.targetType==='self'){
