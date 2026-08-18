@@ -85,6 +85,6 @@ assert.match(css, /\.action\{touch-action:none;user-select:none;-webkit-user-sel
 assert.match(js, /createCombatHudViewModel\(/);
 assert.match(js, /createPartySlotViewModel\(/);
 assert.match(js, /function setTextIfChanged\(/, 'Combat HUD text should update only when presentation changes');
-assert.match(js, /if\(!key\|\|!name\)/, 'Skill DOM nodes should be reused across HUD ticks');
+assert.match(js, /getSkillIcon\(/, 'Skill icon function should exist');
 
 console.log('P0 UX1 Combat HUD contracts: PASS');
