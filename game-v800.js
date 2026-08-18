@@ -1646,8 +1646,6 @@ function setActionStyle(btn,type,label,sub){
   if(label&&btn.dataset.label!==label)btn.dataset.label=label;
   if(sub&&btn.dataset.sub!==sub)btn.dataset.sub=sub;
   if(btn.dataset.type!==type)btn.dataset.type=type;
-  const iconUrl=getSkillIcon(type);
-  if(btn.style.backgroundImage!==`url(${iconUrl})`)btn.style.backgroundImage=`url(${iconUrl})`;
 }
 function setupMonsterMotion(mesh,sp,inst=null){
   const primary=inst?.instanceId?monsterTypes(inst)[0]:(sp?.types?.[0]||'Normal');
@@ -3155,18 +3153,13 @@ function renderCombatPresentation(){
   const skillDefs=skillOwner?getMonsterSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
   [0,1,2].forEach(index=>{
     const button=el(`skill${index+1}Btn`),skill=skillDefs[index],view=presentation.skills[index];
-    let key=button.querySelector('span'),name=button.querySelector('small');
-    if(!key||!name){
-      key=document.createElement('span');
-      name=document.createElement('small');
-      button.replaceChildren(key,name);
-    }
-    setTextIfChanged(key,'');
     const iconUrl=getSkillIcon(skill?.type||activeType);
-    if(key.style.backgroundImage!==`url(${iconUrl})`){key.style.backgroundImage=`url(${iconUrl})`;key.style.backgroundSize='contain';key.style.backgroundRepeat='no-repeat';key.style.backgroundPosition='center';key.style.width='24px';key.style.height='24px';key.style.display='inline-block';}
-    setTextIfChanged(name,skill?.name||`สกิล ${index+1}`);
+    if(button.style.backgroundImage!==`url(${iconUrl})`){button.style.backgroundImage=`url(${iconUrl})`;button.style.backgroundSize='70%';button.style.backgroundRepeat='no-repeat';button.style.backgroundPosition='center';}
+    const skillName=skill?.name||`สกิล ${index+1}`;
+    if(button.title!==skillName)button.title=skillName;
+    if(button.getAttribute('aria-label')!==skillName)button.setAttribute('aria-label',skillName);
     setActionStyle(button,skill?.type||activeType,`S${index+1}`,view.statusText);
-    applyActionPresentation(button,view,`Skill ${index+1} ${name.textContent}`);
+    applyActionPresentation(button,view,`Skill ${index+1} ${skillName}`);
   });
   const capture=el('captureBtn'),summon=el('summonBtn'),recallButton=el('recallBtn');
   setActionStyle(capture,'Water','CAP',presentation.actions.capture.statusText);

@@ -18,8 +18,8 @@ assert.ok(js.includes('function getActionIcon') || js.includes('getActionIcon'),
 // 5. Icons wired into renderCombatPresentation
 assert.ok(js.includes('getSkillIcon') && js.includes('backgroundImage'), 'icons not wired into render');
 
-// 6. setActionStyle sets background image
-assert.ok(js.includes('backgroundImage') || js.includes('background-image'), 'setActionStyle: background image missing');
+// 6. Icons wired into renderCombatPresentation (not setActionStyle)
+assert.ok(js.includes('getSkillIcon') && js.includes('backgroundImage'), 'icons not wired into render');
 
 // 7. Action icons for capture/summon/recall
 assert.ok(js.includes('getActionIcon'), 'action icons not called');
