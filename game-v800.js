@@ -1987,6 +1987,7 @@ function createWild(sp,x,z,level=1,opts={}){
   w.labelEl=createWildLabel(w);wilds.push(w);return w;
 }
 function clearWilds(){
+  abortCaptureSequence();
   for(const w of wilds){removeAndDispose(scene,w.mesh);removeWildLabel(w);}
   wilds.length=0;
   distanceTickScheduler.clearAll();
@@ -2003,7 +2004,7 @@ function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;for(const [id,x,z,
 function resetWild(w){if(w.dead)return;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
-  const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
+  const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead||w.capturing)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
 }
 function respawnWild(w,delay=6000){
   const generation=zoneGeneration,zone=w.zone,id=w.speciesId,level=w.level,boss=w.boss,elite=w.elite,x=w.home.x,z=w.home.z,evolutionPath=w.evolutionPath;
@@ -2061,6 +2062,7 @@ function switchZone(zone,silent=false){
   if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return;}
   const safetyBalls=zone!=='hub'&&ensureCaptureBallSafety();
   zoneGeneration++;
+  abortCaptureSequence();
   if(activeSummon)recall(false,false);
   clearProjectiles();
   clearHubCompanion();
@@ -2265,51 +2267,124 @@ let captureAimActive=false;
 const captureAimMat=new THREE.LineBasicMaterial({color:0x60a5fa,transparent:true,opacity:.8});
 const captureAimGeom=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
 const captureAimLine=new THREE.Line(captureAimGeom,captureAimMat);captureAimLine.visible=false;scene.add(captureAimLine);
-function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้องไป Wild Zone เพื่อจับมอน');return false;}if(activeSummon){msg('ต้อง Recall มอนของเราก่อนเข้าสู่ Capture Aim');return false;}if((state.inventory.captureBalls||0)<=0){msg('Capture Ball หมด • กลับ Ranch แล้ว Keeper จะเติม Starter Kit +5');return false;}return true;}
+function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้องไป Wild Zone เพื่อจับมอน');return false;}if(activeSummon){msg('ต้อง Recall มอนของเราก่อนเข้าสู่ Capture Aim');return false;}if(captureSequence){msg('รอผลจับก่อน');return false;}if((state.inventory.captureBalls||0)<=0){msg('Capture Ball หมด • กลับ Ranch แล้ว Keeper จะเติม Starter Kit +5');return false;}return true;}
 function beginCaptureAim(){if(!capturePrerequisite())return false;captureAimActive=true;captureAimLine.visible=true;el('captureBtn').classList.add('aiming');renderSkillButtons();msg('Capture Aim • ลากด้านขวาหมุนกล้อง แล้วปล่อยปุ่มเพื่อขว้าง');return true;}
 function cancelCaptureAim(){captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');renderSkillButtons();}
 function updateCaptureAimVisual(){if(!captureAimActive)return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),start=playerThrowOrigin().clone(),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0)),pts=[];for(let i=0;i<=18;i++){const u=i/18,p=start.clone().lerp(end,u);p.y+=Math.sin(u*Math.PI)*2.2;pts.push(p);}captureAimGeom.setFromPoints(pts);}
-function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');state.inventory.captureBalls--;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,()=>{if(!t||t.dead){msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}resolveCapture(t);});if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
+function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');state.inventory.captureBalls--;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,ballMesh=>{if(!t||t.dead){if(ballMesh)removeAndDispose(scene,ballMesh);spawnBurst(safeVec3(end),0x3b82f6,{count:6,life:.16,size:.04});msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}resolveCapture(t,ballMesh);});if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
 function captureThrow(){if(beginCaptureAim())executeCaptureThrow();}
-function resolveCapture(w){
-  if(w.dead)return;
-  const sp=spById[w.speciesId],name=wildDisplayName(w);
-  if(w.capturePolicy==='disabled'){msg(`Boss ${name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);return;}
-  playSFX('sfx_capture_tension');
-  const shakeMesh=w.mesh;
-  let shakeCount=0;
-  const shakeTimer=setInterval(()=>{if(shakeMesh&&!w.dead){shakeMesh.position.x+=(Math.random()-.5)*.15;shakeMesh.rotation.z+=(Math.random()-.5)*.1;}shakeCount++;if(shakeCount>=8){clearInterval(shakeTimer);if(shakeMesh&&!w.dead){shakeMesh.position.x=w.home.x;shakeMesh.rotation.z=0;}}},200);
-  setTimeout(()=>{
-    if(w.dead){msg(`${name} หนีไปแล้ว • เสีย Capture Ball 1 ลูก`);return;}
-    const chance=captureChance(w);
-    if(Math.random()<chance){
-      playSFX('sfx_capture_success');
-      spawnBurst(w.mesh.position.clone().add(new THREE.Vector3(0,.7,0)),0x22c55e,{count:14,life:.42,size:.06});
-      spawnRingPulse(w.mesh.position.clone(),0x22c55e,{scale:.75,life:.3});
-      spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.1,duration:.8,intensity:.75});
-      triggerCameraShake(.08,.12);
-      const inst=makeInstance(sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??sp.types[1]??null});
-      state.collection.push(inst);
-      const empty=state.party.findIndex(x=>x===null);
-      if(empty>=0)state.party[empty]=inst.instanceId;
-      else state.storage.push(inst.instanceId);
-      w.dead=true;
-      removeAndDispose(scene,w.mesh);
-      removeWildLabel(w);
-      state.exp+=5;
-      msg(`จับ ${name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''}`);
-      renderAll();
-      saveGame(false);
-      respawnWild(w,8000);
-      retireWild(w);
-    }else{
-      playSFX('sfx_capture_fail');
-      msg(`จับ ${name} ไม่สำเร็จ (${Math.round(chance*100)}%) • บอลถูกใช้ไปแล้ว`);
-    w.engaged=true;
-    w.state='chase';
+let captureSequence=null;
+function spawnCaptureResultEffect(pos,success){
+  if(!pos)return;
+  if(success){
+    spawnBurst(pos.clone().add(new THREE.Vector3(0,.5,0)),0x22c55e,{count:16,life:.5,size:.06});
+    spawnRingPulse(pos.clone(),0x22c55e,{scale:.9,life:.4,y:.1});
+    spawnRingPulse(pos.clone(),0x22c55e,{scale:1.2,life:.5,y:.1});
+  }else{
+    spawnBurst(pos.clone().add(new THREE.Vector3(0,.45,0)),0xef4444,{count:8,life:.3,size:.05,gravity:1});
+    spawnRingPulse(pos.clone(),0xef4444,{scale:.5,life:.22,y:.1});
   }
-  },1700);
 }
+function abortCaptureSequence(){
+  if(!captureSequence)return;
+  const cs=captureSequence;
+  captureSequence=null;
+  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
+  if(cs.wild?.mesh){
+    cs.wild.capturing=false;
+    if(!cs.wild.dead)cs.wild.mesh.visible=true;
+  }
+}
+function startCaptureSequence(w,ballMesh){
+  if(!w||w.dead){if(ballMesh)removeAndDispose(scene,ballMesh);msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}
+  const sp=spById[w.speciesId],name=wildDisplayName(w);
+  if(w.capturePolicy==='disabled'){if(ballMesh)removeAndDispose(scene,ballMesh);msg(`Boss ${name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);return;}
+  abortCaptureSequence();
+  const pos=w.mesh.position.clone();
+  w.capturing=true;
+  w.mesh.visible=false;
+  if(!ballMesh){
+    ballMesh=new THREE.Mesh(boxGeometry(.28,.28,.28),new THREE.MeshStandardMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:clampEmissive(.35),roughness:.2,metalness:.6,transparent:true,opacity:.96}));
+    scene.add(ballMesh);
+  }else{
+    ballMesh.scale.setScalar(2);
+  }
+  ballMesh.position.copy(pos);
+  ballMesh.position.y=.7;
+  playSFX('sfx_capture_tension');
+  spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05});
+  spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1});
+  const chance=captureChance(w);
+  captureSequence={wild:w,ballMesh,pos,sp,name,chance,success:Math.random()<chance,phaseTime:0,phase:'tension'};
+}
+function finishCaptureSuccess(cs){
+  playSFX('sfx_capture_success');
+  const w=cs.wild;
+  spawnCaptureResultEffect(cs.pos,true);
+  spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.2,duration:.8,intensity:.85});
+  triggerCameraShake(.1,.2);
+  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
+  const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??cs.sp.types[1]??null});
+  state.collection.push(inst);
+  const empty=state.party.findIndex(x=>x===null);
+  if(empty>=0)state.party[empty]=inst.instanceId;
+  else state.storage.push(inst.instanceId);
+  w.dead=true;
+  w.capturing=false;
+  if(w.mesh)removeAndDispose(scene,w.mesh);
+  removeWildLabel(w);
+  state.exp+=5;
+  msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''} (${Math.round(cs.chance*100)}%)`);
+  renderAll();
+  saveGame(false);
+  respawnWild(w,8000);
+  retireWild(w);
+}
+function finishCaptureFail(cs){
+  playSFX('sfx_capture_fail');
+  spawnCaptureResultEffect(cs.pos,false);
+  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
+  if(cs.wild?.mesh){
+    cs.wild.capturing=false;
+    cs.wild.mesh.visible=true;
+    cs.wild.mesh.position.copy(cs.pos);
+    cs.wild.mesh.rotation.z=0;
+    cs.wild.engaged=true;
+    cs.wild.state='chase';
+  }
+  msg(`จับ ${cs.name} ไม่สำเร็จ (${Math.round(cs.chance*100)}%) • บอลแตก!`);
+}
+function updateCaptureSequence(dt){
+  if(!captureSequence)return;
+  const cs=captureSequence;
+  if(!cs.wild||cs.wild.dead||!cs.ballMesh){
+    if(cs.wild?.dead)msg(`${cs.name} หนีไปแล้ว • เสีย Capture Ball 1 ลูก`);
+    abortCaptureSequence();
+    return;
+  }
+  cs.phaseTime+=dt;
+  const t=Math.min(1,cs.phaseTime/1.7);
+  const drop=Math.min(1,cs.phaseTime/.25);
+  const shake=.01+t*.04;
+  cs.ballMesh.position.x=cs.pos.x+(Math.random()-.5)*shake;
+  cs.ballMesh.position.z=cs.pos.z+(Math.random()-.5)*shake;
+  cs.ballMesh.position.y=.7-drop*.52;
+  cs.ballMesh.rotation.y+=dt*10;
+  cs.ballMesh.rotation.z=(Math.random()-.5)*.18;
+  const flashColor=t<.5?0x3b82f6:(t<.8?0xfacc15:0xef4444);
+  const flashRate=.12+t*.12;
+  if(Math.floor(cs.phaseTime/flashRate)!==Math.floor((cs.phaseTime-dt)/flashRate)){
+    cs.ballMesh.material.color.setHex(flashColor);
+    cs.ballMesh.material.emissive.setHex(flashColor);
+    cs.ballMesh.material.emissiveIntensity=clampEmissive(.35+Math.random()*.25);
+  }
+  if(cs.phaseTime>=1.7){
+    captureSequence=null;
+    if(cs.success)finishCaptureSuccess(cs);
+    else finishCaptureFail(cs);
+  }
+}
+function resolveCapture(w,ballMesh){startCaptureSequence(w,ballMesh);}
 function summonThrow(){const inst=selectedInstance();if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;playerVisual.play('throw',{duration:.34});pendingSummon={instanceId:inst.instanceId};clearHubCompanion();throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return;pendingSummon=null;spawnOwned(inst,end);});msg(`ปาเรียก ${displayName(inst)}`);}
 function spawnOwned(inst,pos){
   clearHubCompanion();
@@ -2530,7 +2605,7 @@ function selectWildAggressors(){
   return new Set(selectEngagedWildIds(candidates,ENCOUNTER_POLICY));
 }
 function updateWild(w,dt,canEngage=false){
-  if(!w||w.dead||!w.mesh)return;
+  if(!w||w.dead||!w.mesh||w.capturing)return;
   w.attackCd=tickCooldown(w.attackCd,dt);
   w.wanderT=(Number.isFinite(w.wanderT)?w.wanderT:0)-dt;
   w.dir=ensureDirection(w.dir||w.wanderDir);
@@ -2606,7 +2681,7 @@ function updateWild(w,dt,canEngage=false){
   animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
   animateMonster(w.mesh,dt,moving);
 }
-function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, p.mesh);projectiles.splice(i,1);p.onHit?.();}}}
+function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){const mesh=p.mesh;projectiles.splice(i,1);if(p.type==='capture'){p.onHit?.(mesh);continue;}spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, mesh);p.onHit?.();}}}
 
 // ---------- V8.2.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
@@ -3425,6 +3500,7 @@ function loop(now){
     updateWorldLabels(dt);
     updateFloatingTexts(dt);
     updateProjectiles(dt);
+    updateCaptureSequence(dt);
     updateEffects(dt);
     updateGroundDecals(dt);
     updateCaptureAimVisual();
