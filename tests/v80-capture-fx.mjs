@@ -43,6 +43,9 @@ assert.match(extractFn('finishCaptureSuccess'), /playSFX\('sfx_capture_success'\
 assert.match(extractFn('finishCaptureFail'), /playSFX\('sfx_capture_fail'\)/, 'fail SFX stays');
 
 assert.match(extractFn('updateProjectiles'), /p\.type==='capture'/, 'capture projectile mesh is handed to the sequence');
+assert.match(extractFn('executeCaptureThrow'), /t\.capturing=true/, 'wild freezes at throw so the ball does not land on a stale point');
+assert.match(extractFn('capturePrerequisite'), /w\.capturing/, 'a second throw cannot start while a wild is inside a ball');
+assert.match(extractFn('capturePrerequisite'), /p\.type==='capture'/, 'a second throw cannot start while a capture ball is in flight');
 assert.match(extractFn('updateWild'), /w\.capturing/, 'AI skips a wild that is inside the ball');
 assert.match(extractFn('switchZone'), /abortCaptureSequence/, 'changing zone disposes the capture ball');
 assert.match(extractFn('clearWilds'), /abortCaptureSequence/, 'despawning wilds aborts an open capture');

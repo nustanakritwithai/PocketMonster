@@ -32,5 +32,7 @@ assert.match(extractFn('updateWild'), /w\.capturing/, 'mutant 9: capturing wilds
 assert.match(js, /updateCaptureSequence\(dt\)/, 'mutant 10: the game loop ticks the capture ball');
 assert.match(extractFn('abortCaptureSequence'), /removeAndDispose\(scene,cs\.ballMesh\)/, 'mutant 11: abort disposes the ball');
 assert.match(js, /playSFX\('sfx_capture_fail'\)/, 'mutant 12: fail SFX stays wired');
+assert.match(extractFn('executeCaptureThrow'), /t\.capturing=true/, 'mutant 13: freeze the wild before the ball flies');
+assert.match(extractFn('capturePrerequisite'), /projectiles\.some/, 'mutant 14: do not stack a second capture throw');
 
 console.log('V8.2 capture FX mutants: PASS');
