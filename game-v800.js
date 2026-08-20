@@ -6,6 +6,7 @@ import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-
 import {
   ACTIVE_SUMMON_READONLY_REASON,
   ACTIVE_SUMMON_SWITCH_REASON,
+  ACTIVE_SUMMON_RECALL_REASON,
   attachCharacterUi,
   createCharacterUIController,
   persistableState,
@@ -187,6 +188,7 @@ ensureCombatHudSemantics();
 const TYPES=['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
 const TYPE_TH={Normal:'ปกติ',Fire:'ไฟ',Water:'น้ำ',Electric:'สายฟ้า',Grass:'พืช',Ice:'น้ำแข็ง',Fighting:'ต่อสู้',Poison:'พิษ',Ground:'ดิน',Flying:'บิน',Psychic:'จิต',Bug:'แมลง',Rock:'หิน',Ghost:'วิญญาณ',Dragon:'มังกร',Dark:'มืด',Steel:'เหล็ก',Fairy:'ภูต'};
 const TYPE_COLOR={Normal:'#8a8a78',Fire:'#ef6c32',Water:'#4f87e8',Electric:'#e8bd22',Grass:'#63b34b',Ice:'#79c9c9',Fighting:'#b9342c',Poison:'#93489e',Ground:'#cba94e',Flying:'#8d7cdb',Psychic:'#ec4d7f',Bug:'#9cab25',Rock:'#a48e38',Ghost:'#61568f',Dragon:'#6a45d3',Dark:'#584b43',Steel:'#8e8eaa',Fairy:'#dc87b8'};
+const TYPE_EMOJI={Normal:'⚪',Fire:'🔥',Water:'💧',Electric:'⚡',Grass:'🌿',Ice:'❄️',Fighting:'🥊',Poison:'☠️',Ground:'⛰️',Flying:'🪽',Psychic:'🔮',Bug:'🐛',Rock:'🪨',Ghost:'👻',Dragon:'🐉',Dark:'🌑',Steel:'⚙️',Fairy:'✨'};
 const TYPE_CHART={
   Normal:{Rock:.5,Ghost:0,Steel:.5},Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},Water:{Fire:2,Water:.5,Grass:.5,Ground:2,Rock:2,Dragon:.5},
   Electric:{Water:2,Electric:.5,Grass:.5,Ground:0,Flying:2,Dragon:.5},Grass:{Fire:.5,Water:2,Grass:.5,Poison:.5,Ground:2,Flying:.5,Bug:.5,Rock:2,Dragon:.5,Steel:.5},
@@ -1820,8 +1822,17 @@ function bindMonsterSelect(panel,stateKey,renderFn){
   const select=panel.querySelector('select[data-monster-select]');
   if(select)select.onchange=()=>{state[stateKey]=select.value;renderFn();};
 }
+function liveCharacterTabPanel(tab){
+  if(!characterUI)return null;
+  const snap=characterUI.snapshot();
+  if(snap.characterPanel==='tab'&&snap.characterTab===tab)return el('characterQuickTabBody');
+  return null;
+}
+function characterSystemPanel(tab,fallbackId){
+  return liveCharacterTabPanel(tab)||el(fallbackId);
+}
 function renderTraining(){
-  const panel=el('trainingPanel');
+  const panel=characterSystemPanel('training','trainingPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
@@ -1857,7 +1868,7 @@ function renderTraining(){
   panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
 }
 function renderSkills(){
-  const panel=el('skillsPanel');
+  const panel=characterSystemPanel('skills','skillsPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
@@ -1894,7 +1905,7 @@ function renderSkills(){
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
 }
 function renderEquipment(){
-  const panel=el('equipmentPanel');
+  const panel=characterSystemPanel('equipment','equipmentPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
@@ -3043,7 +3054,7 @@ function openManager(){
   if(!gate.ok){msg(gate.reasonText);return;}
   if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');
 }
-function closeManager(){characterUI.closeAll();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();renderCharacterAccess();playSFX('sfx_ui_close');}
+function closeManager(){characterUI.closeAll();dismissCharacterAccessHistory();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();renderCharacterAccess();playSFX('sfx_ui_close');}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
 function needsHTML(inst){
@@ -3419,6 +3430,7 @@ function renderParty(){
       const peeked=getInst(peek.monsterId);
       if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);
       else msg(`Party ช่อง ${index+1} ว่าง`);
+      rememberCharacterAccessHistory();
       renderParty();
       renderCharacterAccess();
     },{passive:false});
@@ -3432,18 +3444,79 @@ function focusedPartyMonsterId(){
   if(focused&&getInst(focused))return focused;
   return state.party[state.selectedSlot]||state.party.find(Boolean)||null;
 }
+let characterAccessHistoryOpen=false;
+let characterAccessIgnorePop=false;
+function rememberCharacterAccessHistory(){
+  if(characterAccessHistoryOpen)return;
+  if(typeof history==='undefined'||typeof history.pushState!=='function')return;
+  try{
+    history.pushState({characterAccess:true},'');
+    characterAccessHistoryOpen=true;
+  }catch{
+    characterAccessHistoryOpen=false;
+  }
+}
+function dismissCharacterAccessHistory(){
+  if(!characterAccessHistoryOpen)return;
+  characterAccessHistoryOpen=false;
+  if(typeof history==='undefined'||typeof history.back!=='function')return;
+  characterAccessIgnorePop=true;
+  try{history.back();}catch{characterAccessIgnorePop=false;}
+}
+function closeCharacterAccess(playClose=true){
+  characterUI.closeAll();
+  dismissCharacterAccessHistory();
+  renderCharacterAccess();
+  renderParty();
+  if(playClose)playSFX('sfx_ui_close');
+}
+function typeLineFromInst(inst){
+  if(!inst)return '';
+  return monsterTypes(inst).map(type=>`${TYPE_EMOJI[type]||'•'} ${type}`).join('  ');
+}
 function renderCharacterAccess(){
   const button=el('globalCharacterBtn'),entry=el('characterAccessEntry');
   if(!button||!entry||!characterUI)return;
   const snap=characterUI.snapshot();
-  const open=snap.characterPanel==='quick';
+  const open=snap.characterPanel==='quick'||snap.characterPanel==='tab';
   button.classList.toggle('open',open);
   button.classList.toggle('readonly',snap.readOnly);
-  button.setAttribute('aria-pressed',String(open));
+  setAttributeIfChanged(button,'aria-pressed',String(open));
   const inst=getInst(snap.focusedMonsterId);
+  const roster=characterUI.describeRoster(snap.focusedMonsterId);
+  const portrait=el('characterAccessPortrait');
+  const species=inst?spById[inst.speciesId]:null;
+  const portraitColor=species?`#${species.color.toString(16).padStart(6,'0')}`:'#334155';
+  setTextIfChanged(portrait,inst?displayName(inst).slice(0,1):'?');
+  if(portrait&&portrait.dataset.color!==portraitColor){
+    portrait.dataset.color=portraitColor;
+    portrait.style.backgroundColor=portraitColor;
+  }
   setTextIfChanged(el('characterAccessName'),inst?displayName(inst):'ยังไม่ได้เลือกมอน');
-  setTextIfChanged(el('characterAccessHint'),'ทางเข้าตัวละคร • แผงรายละเอียดยังไม่เปิดใช้');
-  setTextIfChanged(el('characterAccessState'),snap.readOnly?'ดูอย่างเดียว • มีคู่หูในสนาม':(inst?'พร้อมดู':'เลือกมอนจาก Party หรือปุ่มนี้'));
+  setTextIfChanged(el('characterAccessMeta'),inst?`Lv.${inst.level} · HP ${fmt(inst.hp)}/${inst.maxHp}`:'Lv.— · HP —');
+  const typeNode=el('characterAccessType');
+  const typeLine=typeLineFromInst(inst);
+  if(typeNode&&typeNode.dataset.typeLine!==typeLine){
+    typeNode.dataset.typeLine=typeLine;
+    typeNode.textContent=typeLine;
+  }
+  const cr=inst?monsterCrValue(inst):null;
+  setTextIfChanged(el('characterAccessCr'),inst?`CR ${cr??'—'}`:'CR —');
+  setTextIfChanged(el('characterAccessPlace'),inst?roster.label:'');
+  setTextIfChanged(el('characterAccessStats'),inst?`ATK ${inst.atk} · DEF ${inst.def} · SPD ${inst.spd}`:'ATK — · DEF — · SPD —');
+  const reason=el('characterAccessReason');
+  const showReason=Boolean(open&&snap.readOnly);
+  setClassTokenIfChanged(reason,'hidden',!showReason);
+  setTextIfChanged(reason,showReason?ACTIVE_SUMMON_RECALL_REASON:'');
+  const actions=el('characterAccessActions');
+  setClassTokenIfChanged(actions,'hidden',!open||snap.readOnly||!inst);
+  if(actions){
+    actions.querySelectorAll('[data-character-tab]').forEach(btn=>{
+      btn.classList.toggle('active',snap.characterPanel==='tab'?btn.dataset.characterTab===snap.characterTab:btn.dataset.characterTab==='collection');
+    });
+  }
+  const tabBody=el('characterQuickTabBody');
+  setClassTokenIfChanged(tabBody,'hidden',snap.characterPanel!=='tab');
   setClassTokenIfChanged(entry,'hidden',!open);
   setClassTokenIfChanged(entry,'readonly',snap.readOnly);
 }
@@ -3456,8 +3529,23 @@ function openCharacterAccess(source='global-button'){
     partySlot:Number.isInteger(state.ui?.selectedPartySlot)?state.ui.selectedPartySlot:state.selectedSlot,
   });
   if(!result.ok){if(result.reasonText)msg(result.reasonText);renderCharacterAccess();return result;}
+  rememberCharacterAccessHistory();
   renderCharacterAccess();
   renderParty();
+  return result;
+}
+function openCharacterQuickTab(tab){
+  const focused=state.ui.focusedMonsterId||focusedPartyMonsterId();
+  const result=characterUI.requestOpenTab(tab,{monsterId:focused,source:state.ui.source||'global-button'});
+  if(!result.ok){
+    if(result.reasonText)msg(result.reasonText);
+    renderCharacterAccess();
+    return result;
+  }
+  if(tab==='skills')renderSkills();
+  else if(tab==='equipment')renderEquipment();
+  else if(tab==='training')renderTraining();
+  renderCharacterAccess();
   return result;
 }
 function toggleCharacterAccess(){
@@ -3465,20 +3553,37 @@ function toggleCharacterAccess(){
     msg('ปิดหน้าต่างผู้ดูแลก่อนใช้ทางเข้าตัวละคร');
     return;
   }
-  if(characterUI.snapshot().characterPanel==='quick'){
-    characterUI.closeAll();
-    renderCharacterAccess();
-    renderParty();
-    playSFX('sfx_ui_close');
+  const panel=characterUI.snapshot().characterPanel;
+  if(panel==='quick'||panel==='tab'){
+    closeCharacterAccess(true);
     return;
   }
   const result=openCharacterAccess('global-button');
   if(!result.ok)return;
   playSFX('sfx_ui_open');
   const inst=getInst(result.monsterId);
-  if(result.readOnly)msg(ACTIVE_SUMMON_READONLY_REASON);
-  else if(inst)msg(`ทางเข้าตัวละคร • ${displayName(inst)} • แผงรายละเอียดยังไม่เปิดใช้`);
-  else msg('ทางเข้าตัวละคร • แผงรายละเอียดยังไม่เปิดใช้');
+  if(result.readOnly)msg(ACTIVE_SUMMON_RECALL_REASON);
+  else if(inst)msg(`ตัวละคร • ${displayName(inst)}`);
+  else msg('ตัวละคร • ยังไม่ได้เลือกมอน');
+}
+function handleCharacterUiHardwareBack(event){
+  if(characterAccessIgnorePop){
+    characterAccessIgnorePop=false;
+    return false;
+  }
+  const panel=characterUI?.snapshot?.().characterPanel;
+  if(!panel||panel==='closed'||panel==='full')return false;
+  event?.preventDefault?.();
+  if(event?.type==='popstate'){
+    characterAccessHistoryOpen=false;
+    characterUI.closeAll();
+    renderCharacterAccess();
+    renderParty();
+    playSFX('sfx_ui_close');
+  }else{
+    closeCharacterAccess(true);
+  }
+  return true;
 }
 function renderSkillButtons(){renderCombatPresentation();}
 function updateTarget(){
@@ -3579,10 +3684,20 @@ bindCharacterAccessControl(el('globalCharacterBtn'),()=>{
   toggleCharacterAccess();
 });
 bindCharacterAccessControl(el('characterAccessClose'),()=>{
-  characterUI.closeAll();
-  renderCharacterAccess();
-  renderParty();
-  playSFX('sfx_ui_close');
+  closeCharacterAccess(true);
+});
+el('characterAccessActions')?.querySelectorAll('[data-character-tab]').forEach(btn=>{
+  bindCharacterAccessControl(btn,()=>{
+    playSFX('sfx_ui_click');
+    openCharacterQuickTab(btn.dataset.characterTab);
+  });
+});
+addEventListener('popstate',event=>{
+  handleCharacterUiHardwareBack(event);
+});
+addEventListener('keydown',event=>{
+  if(event.code!=='Escape'&&event.key!=='Escape')return;
+  if(handleCharacterUiHardwareBack(event))event.preventDefault();
 });
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
 const enterImmersiveBtn=el('enterImmersiveBtn');
