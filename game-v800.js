@@ -3554,21 +3554,31 @@ function loadGame(){
 }
 
 // ---------- UI events ----------
+function bindCharacterAccessControl(node,handler){
+  if(!node)return;
+  let lastAt=0;
+  const run=event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    const now=typeof performance!=='undefined'?performance.now():Date.now();
+    if(now-lastAt<350)return;
+    lastAt=now;
+    handler();
+  };
+  node.addEventListener('pointerdown',run,{passive:false});
+  node.addEventListener('click',run);
+}
 el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');openManager();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
-el('globalCharacterBtn')?.addEventListener('pointerdown',event=>{
-  event.preventDefault();
-  event.stopPropagation();
+bindCharacterAccessControl(el('globalCharacterBtn'),()=>{
   playSFX('sfx_ui_click');
   toggleCharacterAccess();
-},{passive:false});
-el('characterAccessClose')?.addEventListener('pointerdown',event=>{
-  event.preventDefault();
-  event.stopPropagation();
+});
+bindCharacterAccessControl(el('characterAccessClose'),()=>{
   characterUI.closeAll();
   renderCharacterAccess();
   renderParty();
   playSFX('sfx_ui_close');
-},{passive:false});
+});
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');

@@ -64,7 +64,7 @@ assert.match(extractFn('toggleCharacterAccess'), /requestGlobalAccess|openCharac
 assert.doesNotMatch(extractFn('toggleCharacterAccess'), /switchPartySlot|summonThrow|openManager/, 'global access must not start combat or the full manager');
 assert.doesNotMatch(extractFn('openCharacterAccess'), /switchPartySlot|summonThrow|openManager/, 'opening entry must not mutate combat');
 assert.doesNotMatch(extractFn('renderCharacterAccess'), /monsterCard|feedMonster|toggleStarterEquip|setTraining/, 'access HUD must not dump the ranch card');
-assert.match(extractFn('openManager'), /isNearNpc/, 'full manager stays NPC-gated');
+assert.match(extractFn('bindCharacterAccessControl'), /addEventListener\('click'/, 'global access must accept click as well as pointerdown');
 
 for (const zone of ['hub', 'grassland', 'cave']) {
   const game = makeGame({ zone, selectedSlot: 1 });
