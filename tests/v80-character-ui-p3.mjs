@@ -101,12 +101,10 @@ assert.match(extractFn('renderCharacterAccess'), /describeRoster/, 'location/par
 assert.match(extractFn('renderCharacterAccess'), /ACTIVE_SUMMON_RECALL_REASON/, 'summon state shows a short recall reason');
 assert.match(extractFn('renderCharacterAccess'), /characterAccessActions/, 'actions hide instead of disabling during summon');
 assert.doesNotMatch(extractFn('renderCharacterAccess'), /monsterCard|feedMonster|innerHTML\s*=/, 'per-frame sheet does not rebuild a second character store');
-assert.match(extractFn('openCharacterQuickTab'), /requestOpenTab/, 'tab actions go through the controller');
-assert.match(extractFn('openCharacterQuickTab'), /renderSkills\(\)/, 'skills reuse the existing renderer');
-assert.match(extractFn('openCharacterQuickTab'), /renderEquipment\(\)/, 'equipment reuses the existing renderer');
-assert.match(extractFn('openCharacterQuickTab'), /renderTraining\(\)/, 'training reuses the existing renderer');
-assert.doesNotMatch(extractFn('openCharacterQuickTab'), /openManager\(/, 'quick tabs must not unlock the NPC manager');
-assert.doesNotMatch(extractFn('toggleCharacterAccess'), /openManager\(|switchPartySlot\(|summonThrow\(/, 'the ตัว button still only toggles the sheet');
+assert.match(extractFn('openCharacterQuickTab'), /requestOpenFromQuick/, 'tab actions go through the controller');
+assert.match(extractFn('openCharacterQuickTab'), /revealMonsterManager/, 'quick actions reuse the existing #monsterManager overlay');
+assert.doesNotMatch(extractFn('openCharacterQuickTab'), /switchPartySlot\(|summonThrow\(/, 'quick tabs must not start combat');
+assert.doesNotMatch(extractFn('toggleCharacterAccess'), /switchPartySlot\(|summonThrow\(/, 'the ตัว button still only toggles character UI');
 assert.match(extractFn('handleCharacterUiHardwareBack'), /closeAll\(\)/, 'Android Back / Escape closes the sheet');
 assert.doesNotMatch(extractFn('handleCharacterUiHardwareBack'), /switchPartySlot\(|summonThrow\(|openManager\(/, 'hardware back must not mutate combat');
 assert.match(extractFn('renderSkills'), /characterSystemPanel\('skills'/, 'skills renderer can host inside the quick sheet');

@@ -7,6 +7,7 @@ import {
   ACTIVE_SUMMON_READONLY_REASON,
   ACTIVE_SUMMON_SWITCH_REASON,
   ACTIVE_SUMMON_RECALL_REASON,
+  FULL_MANAGER_NPC_REASON,
   attachCharacterUi,
   createCharacterUIController,
   persistableState,
@@ -1798,6 +1799,10 @@ function distXZ(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
 function hpPct(v){return Math.max(0,Math.min(1,v));}
 function msg(t){el('message').textContent=t;}
 function setManagerTab(tab='collection'){
+  if(tab==='breeding'&&!isNearNpc()){
+    msg(FULL_MANAGER_NPC_REASON);
+    return;
+  }
   currentManagerTab=tab;
   characterUI?.setTab(tab);
   playSFX('sfx_ui_tab');
@@ -1820,7 +1825,13 @@ function monsterSelectHTML(selectedId){
 }
 function bindMonsterSelect(panel,stateKey,renderFn){
   const select=panel.querySelector('select[data-monster-select]');
-  if(select)select.onchange=()=>{state[stateKey]=select.value;renderFn();};
+  if(select)select.onchange=()=>{
+    state[stateKey]=select.value;
+    characterUI?.focusMonster(select.value);
+    renderFn();
+    renderParty();
+    renderCharacterAccess();
+  };
 }
 function liveCharacterTabPanel(tab){
   if(!characterUI)return null;
@@ -1989,6 +2000,7 @@ characterUI=createCharacterUIController({
     state.trainingSelectedId=id;
     state.skillsSelectedId=id;
     state.equipSelectedId=id;
+    state.evolutionCandidate=id;
   },
 });
 let hubCompanion=null;
@@ -2907,7 +2919,7 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!assert
   spawnTrainingEffect(fxWorldPos(id),focus);
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
   renderManager();if(currentManagerTab==='training')renderTraining();saveGame(false);}
-function healAll(){for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
+function healAll(){if(!assertRanchOperation())return;for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){
   for(const [id,obj] of ranchVisuals){removeAndDispose(scene, obj.mesh);ranchVisuals.delete(id);}
@@ -2919,7 +2931,7 @@ function syncRanchVisuals(){
 }
 
 function updateRanchVisuals(dt){let i=0;for(const obj of ranchVisuals.values()){obj.phase+=dt*.55;const radius=.45+(i%3)*.12,tx=obj.home.x+Math.cos(obj.phase)*radius,tz=obj.home.z+Math.sin(obj.phase*.8)*radius;const moving=Math.hypot(tx-obj.mesh.position.x,tz-obj.mesh.position.z)>.08;obj.mesh.position.x+=(tx-obj.mesh.position.x)*dt*.8;obj.mesh.position.z+=(tz-obj.mesh.position.z)*dt*.8;const dir=new THREE.Vector3(tx-obj.mesh.position.x,0,tz-obj.mesh.position.z);if(dir.lengthSq()>.0001)obj.mesh.rotation.y=monsterLookYaw(dir.normalize(),obj.mesh);animateEntity(obj.mesh,dt,true,.65);animateMonster(obj.mesh,dt,moving);i++;}}
-function toggleRanchActive(id){if(!state.storage.includes(id))return;if(state.ranchActive.includes(id)){state.ranchActive=state.ranchActive.filter(x=>x!==id);msg('เก็บมอนออกจากลาน Ranch แล้ว');}else{if(state.ranchActive.length>=RANCH_ACTIVE_MAX){msg(`Ranch Active เต็ม ${RANCH_ACTIVE_MAX} ตัว`);return;}state.ranchActive.push(id);msg(`ปล่อย ${displayName(getInst(id))} ออกมาเดินใน Ranch`);}syncRanchVisuals();renderManager();renderHUD();saveGame(false);}
+function toggleRanchActive(id){if(!assertRanchOperation())return;if(!state.storage.includes(id))return;if(state.ranchActive.includes(id)){state.ranchActive=state.ranchActive.filter(x=>x!==id);msg('เก็บมอนออกจากลาน Ranch แล้ว');}else{if(state.ranchActive.length>=RANCH_ACTIVE_MAX){msg(`Ranch Active เต็ม ${RANCH_ACTIVE_MAX} ตัว`);return;}state.ranchActive.push(id);msg(`ปล่อย ${displayName(getInst(id))} ออกมาเดินใน Ranch`);}syncRanchVisuals();renderManager();renderHUD();saveGame(false);}
 
 // ---------- Breeding / genetics ----------
 function adultForBreeding(inst){return ['Adult','Mature'].includes(inst.lifeStage);}
@@ -2954,7 +2966,7 @@ function makeChild(a,b,holder){
   child.skillPotential=bred.child.skillPotential||[];
   return child;
 }
-function createEgg(){const a=getInst(state.breeding.parentA),b=getInst(state.breeding.parentB),compat=breedingCompatibility(a,b);if(!compat.ok){msg(compat.text);renderBreeding();return;}
+function createEgg(){if(!assertRanchOperation())return;const a=getInst(state.breeding.parentA),b=getInst(state.breeding.parentB),compat=breedingCompatibility(a,b);if(!compat.ok){msg(compat.text);renderBreeding();return;}
   a.parents=a.parents||{a:a.parentAId||null,b:a.parentBId||null};
   b.parents=b.parents||{a:b.parentAId||null,b:b.parentBId||null};
   const breedCheck=canBreedFn(a,b);
@@ -2969,7 +2981,7 @@ function createEgg(){const a=getInst(state.breeding.parentA),b=getInst(state.bre
   if(posA.distanceTo(posB)<.05){posA=incubator.position.clone().add(new THREE.Vector3(-.8,0,0));posB=incubator.position.clone().add(new THREE.Vector3(.8,0,0));}
   spawnBreedingEffect(posA,posB);
   msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
-function hatchEgg(eggId){const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
+function hatchEgg(eggId){if(!assertRanchOperation())return;const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
   const child=egg.child?ensureInstanceShape({...egg.child,origin:'bred',parentAId:a.instanceId,parentBId:b.instanceId}):makeChild(a,b,holder);
   if(!child){msg('ฟักไข่ไม่สำเร็จ');return;}
   refreshStats(child,true);
@@ -2995,7 +3007,7 @@ function evoRequirementStatus(inst,path){
 }
 function reqEnvironment(path){return !!path?.requires?.environment;}
 function showEvolution(id){state.evolutionCandidate=id;setManagerTab('evolution');}
-function evolveMonster(id,pathId){const inst=getInst(id),sp=spById[inst?.speciesId],path=sp?.evolutionPaths?.find(p=>p.id===pathId);if(!inst||!path||inst.formId===path.id||inst.evolutionPath===path.id)return;
+function evolveMonster(id,pathId){if(!assertCharacterMutable(id))return;const inst=getInst(id),sp=spById[inst?.speciesId],path=sp?.evolutionPaths?.find(p=>p.id===pathId);if(!inst||!path||inst.formId===path.id||inst.evolutionPath===path.id)return;
   syncToBodyMind(inst);
   const def=evoDefFromPath(path,sp.id);
   const st=evoRequirementStatus(inst,path);
@@ -3017,7 +3029,7 @@ function evoHistoryHTML(inst){
   return `<div class="evo-history"><div class="evo-history-title">ประวัติ Evolution</div>${hist.map(h=>`<div class="evo-history-item">${h.from||'base'} → ${h.to} • ${new Date(h.at||Date.now()).toLocaleDateString('th-TH',{year:'2-digit',month:'short',day:'numeric'})}</div>`).join('')}</div>`;
 }
 function renderEvolution(){
-  const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate);
+  const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate||state.ui?.focusedMonsterId);
   if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}
   const sp=spById[inst.speciesId],paths=availableEvolutionPaths(inst);
   const identity=`<div class="evo-identity-lock">🔒 Gene / Parents / Generation ไม่เปลี่ยน (Identity Lock)</div>`;
@@ -3048,15 +3060,66 @@ function assertCharacterMutable(id){
   if(!gate.ok){msg(gate.reasonText);return false;}
   return true;
 }
-function openManager(){
-  const focused=state.ui.focusedMonsterId||state.party[state.selectedSlot];
-  const gate=characterUI.requestOpenFull({isNearNpc:isNearNpc(),monsterId:focused,tab:currentManagerTab||'collection'});
-  if(!gate.ok){msg(gate.reasonText);return;}
-  if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');
+function assertRanchOperation(){
+  if(isNearNpc())return true;
+  msg(FULL_MANAGER_NPC_REASON);
+  return false;
 }
-function closeManager(){characterUI.closeAll();dismissCharacterAccessHistory();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();renderCharacterAccess();playSFX('sfx_ui_close');}
-function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
-function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
+function revealMonsterManager(tab){
+  if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');
+  applyLifeSimulation(Date.now(),true);
+  el('monsterManager').classList.remove('hidden');
+  const close=el('closeManager');
+  if(close){
+    close.textContent='✕';
+    close.setAttribute('aria-label',characterUI.snapshot().source==='character'?'กลับแผงตัวละคร':'ปิดหน้าต่างผู้ดูแล');
+  }
+  setManagerTab(tab||currentManagerTab||'collection');
+  if((tab||currentManagerTab||'collection')==='collection'){
+    const focused=el('monsterManager')?.querySelector('.manager-item.focused-monster');
+    focused?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  managerDirty.consume(performance.now());
+  playSFX('sfx_ui_open');
+}
+function openManager(options={}){
+  const source=options.source==='character'?'character':'npc';
+  const focused=options.monsterId||state.ui.focusedMonsterId||state.party[state.selectedSlot];
+  const tab=options.tab||currentManagerTab||'collection';
+  const gate=characterUI.requestOpenFull({
+    isNearNpc:isNearNpc(),
+    monsterId:focused,
+    tab,
+    source,
+  });
+  if(!gate.ok){if(gate.reasonText)msg(gate.reasonText);return gate;}
+  revealMonsterManager(tab);
+  renderParty();
+  renderCharacterAccess();
+  return gate;
+}
+function closeManager(){
+  const snap=characterUI.snapshot();
+  const returnToQuick=snap.source==='character'&&snap.characterStack.some(frame=>frame.resumePanel==='quick'||frame.resumePanel==='tab'||frame.returnTo==='quick');
+  if(returnToQuick){
+    characterUI.back();
+    el('monsterManager').classList.add('hidden');
+    saveGame(false);
+    renderParty();
+    renderCharacterAccess();
+    playSFX('sfx_ui_close');
+    return;
+  }
+  characterUI.closeAll();
+  dismissCharacterAccessHistory();
+  el('monsterManager').classList.add('hidden');
+  saveGame(false);
+  renderParty();
+  renderCharacterAccess();
+  playSFX('sfx_ui_close');
+}
+function depositMonster(id){if(!assertRanchOperation())return;if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
+function withdrawMonster(id){if(!assertRanchOperation())return;const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
 function needsHTML(inst){
   syncToBodyMind(inst);
   const cond=deriveCondition(inst)||'normal';
@@ -3134,7 +3197,7 @@ function monsterCrValue(inst){
   }
 }
 function monsterCard(inst,where){
-  const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
+  const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';if(state.ui?.focusedMonsterId===inst.instanceId)wrap.classList.add('focused-monster');const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
   const eq=inst.equipment||{};
   const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
   wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
@@ -3196,7 +3259,7 @@ function breedingAdultIds(){return state.storage.filter(id=>{const i=getInst(id)
 let pickerTarget='parentA';
 function parentButtonHTML(inst){if(!inst)return '<span class="parent-empty">＋ เลือกมอน</span>';const sp=spById[inst.speciesId];return `<span class="parent-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span><b>${displayName(inst)}</b><small>${GENDER_TH[inst.gender]||inst.gender} • Bond ${fmt(inst.bond)} • ${sp.breedingGroup}</small></span>`;}
 function closeMonsterPicker(){el('monsterPicker').classList.add('hidden');}
-function openMonsterPicker(target){pickerTarget=target;const list=el('monsterPickerList'),ids=breedingAdultIds();el('pickerTitle').textContent=target==='parentA'?'เลือก Parent A':'เลือก Parent B';list.innerHTML='';if(!ids.length){list.innerHTML='<div class="manager-empty">ยังไม่มีมอน Adult/Mature ใน Storage</div>';}for(const id of ids){const inst=getInst(id),sp=spById[inst.speciesId],selected=state.breeding[target]===id,d=document.createElement('button');d.className='picker-mon-card'+(selected?' selected':'');d.innerHTML=`<span class="picker-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span class="picker-info"><b>${displayName(inst)}</b><small>Lv.${inst.level} • ${inst.lifeStage} • ${GENDER_TH[inst.gender]||inst.gender}</small><small>Bond ${fmt(inst.bond)} • Group ${sp.breedingGroup}</small></span>${inst.bond>=50?'<span class="picker-ok">พร้อม</span>':'<span class="picker-warn">Bond ต่ำ</span>'}`;d.onclick=()=>{state.breeding[target]=id;closeMonsterPicker();renderBreeding();};list.appendChild(d);}el('monsterPicker').classList.remove('hidden');}
+function openMonsterPicker(target){if(!assertRanchOperation())return;pickerTarget=target;const list=el('monsterPickerList'),ids=breedingAdultIds();el('pickerTitle').textContent=target==='parentA'?'เลือก Parent A':'เลือก Parent B';list.innerHTML='';if(!ids.length){list.innerHTML='<div class="manager-empty">ยังไม่มีมอน Adult/Mature ใน Storage</div>';}for(const id of ids){const inst=getInst(id),sp=spById[inst.speciesId],selected=state.breeding[target]===id,d=document.createElement('button');d.className='picker-mon-card'+(selected?' selected':'');d.innerHTML=`<span class="picker-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span class="picker-info"><b>${displayName(inst)}</b><small>Lv.${inst.level} • ${inst.lifeStage} • ${GENDER_TH[inst.gender]||inst.gender}</small><small>Bond ${fmt(inst.bond)} • Group ${sp.breedingGroup}</small></span>${inst.bond>=50?'<span class="picker-ok">พร้อม</span>':'<span class="picker-warn">Bond ต่ำ</span>'}`;d.onclick=()=>{state.breeding[target]=id;closeMonsterPicker();renderBreeding();};list.appendChild(d);}el('monsterPicker').classList.remove('hidden');}
 function renderBreeding(){
   const ids=breedingAdultIds();
   if(state.breeding.parentA&&!ids.includes(state.breeding.parentA))state.breeding.parentA=null;
@@ -3248,7 +3311,7 @@ function updateEggCountdowns(now=Date.now()){
     }
   }
 }
-function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();}
+function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
 function renderCrDebug(){
   const box=el('crDebugPanel');if(!box)return;
   const inst=getInst(state.crCandidate);
@@ -3506,9 +3569,11 @@ function renderCharacterAccess(){
   setClassTokenIfChanged(reason,'hidden',!showReason);
   setTextIfChanged(reason,showReason?ACTIVE_SUMMON_RECALL_REASON:'');
   const actions=el('characterAccessActions');
-  setClassTokenIfChanged(actions,'hidden',!open||snap.readOnly||!inst);
+  setClassTokenIfChanged(actions,'hidden',!open||!inst);
   if(actions){
     actions.querySelectorAll('[data-character-tab]').forEach(btn=>{
+      const mutate=['skills','equipment','training'].includes(btn.dataset.characterTab);
+      setClassTokenIfChanged(btn,'hidden',Boolean(snap.readOnly&&mutate));
       btn.classList.toggle('active',snap.characterPanel==='tab'?btn.dataset.characterTab===snap.characterTab:btn.dataset.characterTab==='collection');
     });
   }
@@ -3531,20 +3596,23 @@ function openCharacterAccess(source='global-button'){
 }
 function openCharacterQuickTab(tab){
   const focused=state.ui.focusedMonsterId||focusedPartyMonsterId();
-  const result=characterUI.requestOpenTab(tab,{monsterId:focused,source:state.ui.source||'global-button'});
+  const result=characterUI.requestOpenFromQuick({tab,monsterId:focused});
   if(!result.ok){
     if(result.reasonText)msg(result.reasonText);
     renderCharacterAccess();
     return result;
   }
-  if(tab==='skills')renderSkills();
-  else if(tab==='equipment')renderEquipment();
-  else if(tab==='training')renderTraining();
+  revealMonsterManager(tab==='collection'?'collection':tab);
+  renderParty();
   renderCharacterAccess();
   return result;
 }
 function toggleCharacterAccess(){
   if(el('monsterManager')&&!el('monsterManager').classList.contains('hidden')){
+    if(characterUI.snapshot().source==='character'){
+      closeManager();
+      return;
+    }
     msg('ปิดหน้าต่างผู้ดูแลก่อนใช้ทางเข้าตัวละคร');
     return;
   }
@@ -3567,11 +3635,23 @@ function handleCharacterUiHardwareBack(event){
     return false;
   }
   const panel=characterUI?.snapshot?.().characterPanel;
-  if(!panel||panel==='closed'||panel==='full')return false;
+  if(!panel||panel==='closed')return false;
   event?.preventDefault?.();
+  if(panel==='full'){
+    if(event?.type==='popstate'){
+      characterAccessHistoryOpen=false;
+      closeManager();
+      const next=characterUI.snapshot().characterPanel;
+      if(next==='quick'||next==='tab')rememberCharacterAccessHistory();
+    }else{
+      closeManager();
+    }
+    return true;
+  }
   if(event?.type==='popstate'){
     characterAccessHistoryOpen=false;
     characterUI.closeAll();
+    el('monsterManager').classList.add('hidden');
     renderCharacterAccess();
     renderParty();
     playSFX('sfx_ui_close');
@@ -3706,7 +3786,7 @@ el('menuBtn').onclick=()=>{playSFX('sfx_ui_click');el('utilityMenu').classList.t
 window.addEventListener('resize',syncOrientationLock); window.addEventListener('orientationchange',syncOrientationLock); document.addEventListener('fullscreenchange',syncOrientationLock);
 startGameInteraction(); setTimeout(syncOrientationLock,80);
 el('parentABtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentA');};el('parentBBtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentB');};el('breedBtn').onclick=()=>{playSFX('sfx_ui_click');createEgg();};el('closePicker').onclick=()=>{playSFX('sfx_ui_click');closeMonsterPicker();};el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
-el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{playSFX('sfx_ui_click');for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
+el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
 function bindActionPress(button,handler){
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();

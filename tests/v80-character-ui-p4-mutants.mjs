@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { activeHtml as html, activeJs as js } from './active-assets.mjs';
-import { ACTIVE_SUMMON_RECALL_REASON, createCharacterUIController } from '../character-ui-controller.mjs';
+import { activeJs as js } from './active-assets.mjs';
+import { FULL_MANAGER_NPC_REASON, createCharacterUIController } from '../character-ui-controller.mjs';
 
 const controllerSource = fs.readFileSync(new URL('../character-ui-controller.mjs', import.meta.url), 'utf8');
 let serial = 0;
@@ -34,7 +34,7 @@ async function importMutant(mutant, label) {
 
 function liveProbe(module) {
   const state = {
-    collection: [{ instanceId: 'alpha', hp: 9 }],
+    collection: [{ instanceId: 'alpha', hp: 9 }, { instanceId: 'beta', hp: 4 }],
     party: ['alpha', 'beta', null],
     storage: [],
     ranchActive: [],
@@ -55,27 +55,21 @@ function liveProbe(module) {
       state.trainingSelectedId = id;
     },
   });
-  const opened = controller.requestGlobalAccess({ source: 'global-button' });
-  assert.equal(opened.ok, true);
-  assert.equal(opened.openedManager, false);
-  assert.equal(opened.panel, 'quick');
-  assert.equal(opened.readOnly, true);
-  const skills = controller.requestOpenTab('skills');
-  assert.equal(skills.ok, false, 'summoned skills must stay closed');
-  assert.equal(skills.reasonText, module.ACTIVE_SUMMON_RECALL_REASON || ACTIVE_SUMMON_RECALL_REASON);
-  assert.equal(state.ui.focusedMonsterId, 'beta');
   assert.equal(controller.requestOpenFull({ isNearNpc: false }).ok, false);
-  const normal = module.createCharacterUIController({
-    getState: () => state,
-    getActiveSummonId: () => null,
-    getZone: () => state.currentZone,
-    syncLegacySelection(id) { state.equipSelectedId = id; },
-  });
-  state.ui.readOnly = false;
-  const equip = normal.requestOpenTab('equipment', { monsterId: 'beta' });
-  assert.equal(equip.ok, true);
-  assert.equal(equip.openedManager, false);
+  assert.equal(controller.requestOpenFull({ isNearNpc: false }).reasonText, module.FULL_MANAGER_NPC_REASON || FULL_MANAGER_NPC_REASON);
+  controller.requestGlobalAccess({ source: 'global-button' });
   assert.equal(state.ui.focusedMonsterId, 'beta');
+  assert.equal(controller.requestOpenFromQuick({ tab: 'equipment' }).ok, false);
+  const opened = controller.requestOpenFromQuick({ tab: 'collection' });
+  assert.equal(opened.ok, true);
+  assert.equal(opened.openedManager, true);
+  assert.equal(opened.source, 'character');
+  assert.equal(opened.returnTo, 'quick');
+  assert.equal(state.ui.focusedMonsterId, 'beta');
+  assert.equal(controller.canMutate(), false);
+  const back = controller.back();
+  assert.equal(back.resumePanel, 'quick');
+  assert.equal(state.ui.characterPanel, 'quick');
 }
 
 liveProbe(await import('../character-ui-controller.mjs'));
@@ -84,53 +78,45 @@ async function expectKilled(label, mutant) {
   const module = await importMutant(mutant, label);
   let killed = false;
   try { liveProbe(module); } catch { killed = true; }
-  assert.equal(killed, true, `${label}: Character UI Phase 3 regression survived the mutant`);
+  assert.equal(killed, true, `${label}: Character UI Phase 4 regression survived the mutant`);
 }
 
 await expectKilled(
-  'summon-opens-skills',
+  'npc-unlocks-in-field',
+  mutate(controllerSource, 'return Boolean(isNearNpc);', 'return true;', 'npc-unlocks-in-field'),
+);
+await expectKilled(
+  'quick-drops-focus',
+  mutate(
+    controllerSource,
+    'openPanel(\'full\', { source: from, monsterId: id, tab });',
+    'openPanel(\'full\', { source: from, monsterId: null, tab });',
+    'quick-drops-focus',
+  ),
+);
+await expectKilled(
+  'summon-mutates-through-manager',
   mutate(
     controllerSource,
     'if (QUICK_MUTATE_TABS.includes(tab) && !canMutate()) {',
     'if (false && QUICK_MUTATE_TABS.includes(tab) && !canMutate()) {',
-    'summon-opens-skills',
+    'summon-mutates-through-manager',
   ),
 );
 await expectKilled(
-  'tab-drops-focus',
+  'manager-skips-quick',
   mutate(
     controllerSource,
-    'openPanel(\'tab\', { ...details, tab, monsterId: focused });',
-    'openPanel(\'tab\', { ...details, tab, monsterId: null });',
-    'tab-drops-focus',
-  ),
-);
-await expectKilled(
-  'field-unlocks-manager',
-  mutate(controllerSource, 'return Boolean(isNearNpc);', 'return true;', 'field-unlocks-manager'),
-);
-await expectKilled(
-  'tab-opens-manager',
-  mutate(
-    controllerSource,
-    `      openedManager: false,
-    };
-  }
-
-  function requestGlobalAccess`,
-    `      openedManager: true,
-    };
-  }
-
-  function requestGlobalAccess`,
-    'tab-opens-manager',
+    'returnTo: returnFrame?.returnTo || (returnFrame?.resumePanel === \'quick\' ? \'quick\' : \'world\'),',
+    'returnTo: \'world\',',
+    'manager-skips-quick',
   ),
 );
 
-assert.doesNotMatch(extractFn('openCharacterQuickTab'), /switchPartySlot\(/, 'mutant: quick tabs must not switch party');
+assert.match(extractFn('closeManager'), /characterUI\.back\(\)/, 'mutant: character manager must pop to Quick');
+assert.match(extractFn('openManager'), /source==='character'/, 'mutant: character source stays distinct from NPC');
+assert.match(extractFn('openCharacterQuickTab'), /requestOpenFromQuick/, 'mutant: Quick still uses the shared controller');
 assert.doesNotMatch(extractFn('handleCharacterUiHardwareBack'), /switchPartySlot\(/, 'mutant: Android Back must not switch party');
-assert.match(extractFn('renderCharacterAccess'), /getInst\(/, 'mutant: identity stays on getInst');
-assert.match(html, /id="characterQuickTabBody"/, 'mutant: quick tab host stays in the live entry');
 assert.equal(typeof createCharacterUIController, 'function');
 
-console.log('V8.2 Character UI Phase 3 mutants: PASS');
+console.log('V8.2 Character UI Phase 4 mutants: PASS');

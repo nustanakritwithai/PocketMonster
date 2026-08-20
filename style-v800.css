@@ -482,3 +482,13 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
     max-height:calc(100vh - var(--safe-top) - 206px);
   }
 }
+
+/* Character UI Phase 4 — existing manager as full character overlay */
+.manager{
+  padding-top:max(14px,var(--safe-top));
+  padding-right:max(14px,var(--safe-right));
+  padding-bottom:max(14px,var(--safe-bottom));
+  padding-left:max(14px,var(--safe-left));
+}
+#closeManager{min-width:var(--touch-min);min-height:var(--touch-min)}
+.manager-item.focused-monster{outline:2px solid #facc15;box-shadow:0 0 0 2px #facc1533}
