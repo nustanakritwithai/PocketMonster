@@ -4,6 +4,7 @@ import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createS
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
+  ACTIVE_SUMMON_READONLY_REASON,
   ACTIVE_SUMMON_SWITCH_REASON,
   attachCharacterUi,
   createCharacterUIController,
@@ -3042,7 +3043,7 @@ function openManager(){
   if(!gate.ok){msg(gate.reasonText);return;}
   if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');
 }
-function closeManager(){characterUI.closeAll();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();playSFX('sfx_ui_close');}
+function closeManager(){characterUI.closeAll();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();renderCharacterAccess();playSFX('sfx_ui_close');}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
 function needsHTML(inst){
@@ -3327,6 +3328,7 @@ function renderHUD(){
   const wildCount=el('wildCount');
   setTextIfChanged(wildCount,state.currentZone==='hub'?'0':livingWilds().length);
   renderCombatPresentation();
+  renderCharacterAccess();
 }
 function switchPartySlot(index){
   if(index<0||index>=state.party.length)return;
@@ -3418,11 +3420,63 @@ function renderParty(){
       if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);
       else msg(`Party ช่อง ${index+1} ว่าง`);
       renderParty();
+      renderCharacterAccess();
     },{passive:false});
     button.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();const peek=characterUI.peekPartySlot(index);const peeked=getInst(peek.monsterId);if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);else msg(`Party ช่อง ${index+1} ว่าง`);renderParty();});
     button.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;event.preventDefault();button.click();});
     party.appendChild(button);
   });
+}
+function focusedPartyMonsterId(){
+  const focused=state.ui?.focusedMonsterId;
+  if(focused&&getInst(focused))return focused;
+  return state.party[state.selectedSlot]||state.party.find(Boolean)||null;
+}
+function renderCharacterAccess(){
+  const button=el('globalCharacterBtn'),entry=el('characterAccessEntry');
+  if(!button||!entry||!characterUI)return;
+  const snap=characterUI.snapshot();
+  const open=snap.characterPanel==='quick';
+  button.classList.toggle('open',open);
+  button.classList.toggle('readonly',snap.readOnly);
+  button.setAttribute('aria-pressed',String(open));
+  const inst=getInst(snap.focusedMonsterId);
+  setTextIfChanged(el('characterAccessName'),inst?displayName(inst):'ยังไม่ได้เลือกมอน');
+  setTextIfChanged(el('characterAccessHint'),'ทางเข้าตัวละคร • แผงรายละเอียดยังไม่เปิดใช้');
+  setTextIfChanged(el('characterAccessState'),snap.readOnly?'ดูอย่างเดียว • มีคู่หูในสนาม':(inst?'พร้อมดู':'เลือกมอนจาก Party หรือปุ่มนี้'));
+  setClassTokenIfChanged(entry,'hidden',!open);
+  setClassTokenIfChanged(entry,'readonly',snap.readOnly);
+}
+function openCharacterAccess(source='global-button'){
+  const result=characterUI.requestGlobalAccess({
+    source,
+    monsterId:focusedPartyMonsterId(),
+    partySlot:Number.isInteger(state.ui?.selectedPartySlot)?state.ui.selectedPartySlot:state.selectedSlot,
+  });
+  if(!result.ok){if(result.reasonText)msg(result.reasonText);renderCharacterAccess();return result;}
+  renderCharacterAccess();
+  renderParty();
+  return result;
+}
+function toggleCharacterAccess(){
+  if(el('monsterManager')&&!el('monsterManager').classList.contains('hidden')){
+    msg('ปิดหน้าต่างผู้ดูแลก่อนใช้ทางเข้าตัวละคร');
+    return;
+  }
+  if(characterUI.snapshot().characterPanel==='quick'){
+    characterUI.closeAll();
+    renderCharacterAccess();
+    renderParty();
+    playSFX('sfx_ui_close');
+    return;
+  }
+  const result=openCharacterAccess('global-button');
+  if(!result.ok)return;
+  playSFX('sfx_ui_open');
+  const inst=getInst(result.monsterId);
+  if(result.readOnly)msg(ACTIVE_SUMMON_READONLY_REASON);
+  else if(inst)msg(`ทางเข้าตัวละคร • ${displayName(inst)} • แผงรายละเอียดยังไม่เปิดใช้`);
+  else msg('ทางเข้าตัวละคร • แผงรายละเอียดยังไม่เปิดใช้');
 }
 function renderSkillButtons(){renderCombatPresentation();}
 function updateTarget(){
@@ -3504,6 +3558,20 @@ function loadGame(){
 
 // ---------- UI events ----------
 el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');openManager();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+el('globalCharacterBtn')?.addEventListener('pointerdown',event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  playSFX('sfx_ui_click');
+  toggleCharacterAccess();
+},{passive:false});
+el('characterAccessClose')?.addEventListener('pointerdown',event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  characterUI.closeAll();
+  renderCharacterAccess();
+  renderParty();
+  playSFX('sfx_ui_close');
+},{passive:false});
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');

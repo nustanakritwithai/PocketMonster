@@ -231,6 +231,43 @@ export function createCharacterUIController(options = {}) {
     return { ok: true, snapshot: snapshot() };
   }
 
+  function requestGlobalAccess({ source = 'global-button', monsterId, partySlot } = {}) {
+    const current = ui();
+    if (current.characterPanel === 'full') {
+      return {
+        ok: false,
+        switched: false,
+        openedManager: false,
+        reason: 'manager-open',
+        reasonText: 'ปิดหน้าต่างผู้ดูแลก่อนใช้ทางเข้าตัวละคร',
+        panel: 'full',
+        monsterId: current.focusedMonsterId,
+        readOnly: isSummonActive(),
+        zone: getZone(),
+      };
+    }
+    const state = getState();
+    const party = Array.isArray(state.party) ? state.party : [];
+    const slot = Number.isInteger(partySlot)
+      ? partySlot
+      : (Number.isInteger(state.selectedSlot) ? state.selectedSlot : 0);
+    const id = typeof monsterId === 'string'
+      ? monsterId
+      : (typeof party[slot] === 'string' ? party[slot] : current.focusedMonsterId);
+    openPanel('quick', { source, monsterId: id ?? null, partySlot: Number.isInteger(slot) ? slot : null });
+    return {
+      ok: true,
+      switched: false,
+      openedManager: false,
+      reason: null,
+      panel: 'quick',
+      monsterId: id ?? null,
+      partySlot: Number.isInteger(slot) ? slot : null,
+      readOnly: isSummonActive(),
+      zone: getZone(),
+    };
+  }
+
   function back() {
     const frame = ui().characterStack.pop() || null;
     applyFrame(frame);
@@ -261,6 +298,7 @@ export function createCharacterUIController(options = {}) {
     requestSwitchParty,
     requestMutate,
     requestOpenFull,
+    requestGlobalAccess,
     openPanel,
     back,
     closeAll,
