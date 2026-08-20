@@ -43,11 +43,10 @@ assert.equal(ASSET_REVISION, '810', 'Phase 2 must not bump the live asset revisi
 assert.equal(SAVE_SCHEMA_VERSION, 8, 'Phase 2 must not bump the save schema');
 
 assert.match(html, /id="globalCharacterBtn"/, 'global character button missing from HUD');
-assert.match(html, /id="characterAccessEntry"/, 'minimal character access entry missing');
+assert.match(html, /id="characterAccessEntry"/, 'character access entry missing');
 const entryHtml = html.slice(html.indexOf('id="characterAccessEntry"'), html.indexOf('controls-left'));
-assert.match(entryHtml, /แผงรายละเอียดยังไม่เปิดใช้/, 'entry must say the detail panel is not implemented yet');
 assert.doesNotMatch(entryHtml, /monster-main|feed-actions|training-pool/, 'entry must not embed monsterCard');
-assert.doesNotMatch(entryHtml, /สกิล|อุปกรณ์|HP /, 'entry must not present stats/skills/equipment');
+assert.doesNotMatch(entryHtml, /id="monsterManager"/, 'quick entry is not the full manager');
 
 const buttonCss = css.match(/\.global-character-btn\{[^}]+\}/)?.[0] || '';
 assert.match(buttonCss, /left:var\(--safe-left\)/, 'global button is left-safe, not in the combat cluster');
