@@ -420,10 +420,10 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   position:absolute;
   z-index:8;
   pointer-events:auto;
-  left:calc(var(--safe-left) + 56px);
+  left:calc(var(--safe-left) + 134px);
   bottom:calc(var(--safe-bottom) + 216px);
-  width:min(228px,36vw);
-  max-height:min(52vh,280px);
+  width:min(220px,32vw);
+  max-height:min(48vh,260px);
   overflow:auto;
   padding:8px 9px 9px;
   border-radius:16px;
@@ -477,8 +477,8 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .character-access-entry,.character-quick-panel{
     bottom:auto;
     top:calc(var(--safe-top) + 148px);
-    left:calc(var(--safe-left) + 118px);
-    width:min(220px,42vw);
+    left:calc(var(--safe-left) + 134px);
+    width:min(210px,38vw);
     max-height:calc(100vh - var(--safe-top) - 206px);
   }
 }

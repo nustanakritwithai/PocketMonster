@@ -86,13 +86,13 @@ assert.match(html, /id="equipmentPanel"/, 'existing equipment renderer host rema
 assert.match(html, /id="trainingPanel"/, 'existing training renderer host remains');
 
 const panelCss = css.match(/\.character-access-entry,\.character-quick-panel\{[^}]+\}/)?.[0] || '';
-assert.match(panelCss, /left:calc\(var\(--safe-left\) \+ 56px\)/, 'sheet hangs off the ตัว button, not a full left column');
+assert.match(panelCss, /left:calc\(var\(--safe-left\) \+ 134px\)/, 'sheet sits right of the joystick column, not a full left column');
 assert.match(panelCss, /bottom:calc\(var\(--safe-bottom\) \+ 216px\)/, 'default sheet sits above the joystick');
 assert.match(panelCss, /max-height:/, 'sheet height is capped so it cannot eat the movement stick');
 assert.match(panelCss, /width:min\(/, 'sheet width is capped');
 assert.doesNotMatch(panelCss, /left:\s*0/, 'sheet must not stretch from the left edge');
 assert.doesNotMatch(panelCss, /width:\s*100%/, 'sheet must not become a left-side menu column');
-assert.match(css, /left:calc\(var\(--safe-left\) \+ 118px\)/, 'narrow landscape shifts the sheet past the joystick column');
+assert.match(css, /left:calc\(var\(--safe-left\) \+ 134px\)/, 'narrow landscape also keeps the sheet past the joystick column');
 assert.match(css, /max-height:calc\(100vh - var\(--safe-top\) - 206px\)/, 'narrow landscape keeps bottom combat/move chrome clear');
 assert.doesNotMatch(css, /\.controls-right[^{]*\{[^}]*character-/, 'quick panel is not a combat control');
 
