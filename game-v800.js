@@ -1592,8 +1592,7 @@ function getSkillIcon(skill){
   const ctx=c.getContext('2d');
   ctx.translate(32,32);
   ctx.lineCap='round';ctx.lineJoin='round';
-  ctx.fillStyle='rgba(7,12,22,0.42)';
-  ctx.beginPath();ctx.arc(0,0,29,0,Math.PI*2);ctx.fill();
+  ctx.shadowColor='rgba(0,0,0,0.72)';ctx.shadowBlur=5;ctx.shadowOffsetY=1;
   ctx.strokeStyle='#fff';ctx.fillStyle='#fff';ctx.lineWidth=4;
   switch(kind){
     case'enemy':
