@@ -540,6 +540,16 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 }
 /* Character UI mobile portrait overflow guard */
 
+/* Character UI compact landscape manager guard */
+@media (pointer:coarse) and (orientation:landscape){
+  .manager{align-items:center}
+  .manager-card{width:min(960px,94vw);height:min(86dvh,500px);max-height:86dvh;overflow:auto;padding:9px}
+  .character-manager-layout{grid-template-columns:minmax(116px,.78fr) minmax(176px,1.08fr) minmax(142px,.88fr);gap:6px;min-height:0}
+  .character-roster,.character-information{overflow:auto}
+  .character-roster .manager-item{padding:5px}.character-storage-head{margin:7px 0 4px;padding-top:5px}
+  .character-preview{padding:6px}.character-preview-kicker{font-size:8px}.character-preview-art{width:min(88px,14vw);margin:4px 0}.character-preview-name{font-size:14px}.character-preview-meta,.character-preview-types{margin-top:2px;font-size:9px}.character-preview-place,.character-preview-growth{margin-top:4px;font-size:9px}
+  .character-section-head{margin-bottom:5px}.character-section-head h3{font-size:14px}.character-info-tabs{gap:3px;padding-bottom:5px}.character-info-tab{padding:4px 6px;min-height:28px;font-size:9px}.character-info-body{min-height:0;font-size:10px;padding-top:6px}
+}
 /* Character UI compact landscape control guard */
 @media (pointer:coarse) and (orientation:landscape){
   .global-character-btn{bottom:calc(var(--safe-bottom) + 164px)}
