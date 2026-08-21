@@ -539,3 +539,14 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .character-quick-panel{left:calc(var(--safe-left) + 134px);width:min(238px,40vw)}
 }
 /* Character UI mobile portrait overflow guard */
+
+/* Character UI compact landscape control guard */
+@media (pointer:coarse) and (orientation:landscape){
+  .global-character-btn{bottom:calc(var(--safe-bottom) + 164px)}
+  .character-quick-panel{width:min(186px,30vw);max-height:min(38dvh,240px);overflow:auto}
+  .character-quick-actions{gap:4px;margin-top:6px}
+  .character-quick-actions button{min-height:38px;padding:4px 6px;font-size:10px}
+  .character-quick-identity{margin-top:4px}.character-quick-portrait{width:34px;height:34px;flex-basis:34px}
+  .character-quick-meta,.character-quick-type,.character-quick-cr,.character-quick-place,.character-quick-stats{font-size:9px}
+}
+/* Character UI compact portrait control guard */
