@@ -1804,6 +1804,13 @@ function setManagerTab(tab='collection'){
     msg(FULL_MANAGER_NPC_REASON);
     return;
   }
+  if(['skills','equipment'].includes(tab)&&characterUI?.snapshot().characterPanel==='full'){
+    currentManagerTab='collection';
+    document.querySelectorAll('.manager-tab').forEach(b=>b.classList.toggle('active',b.dataset.managerTab==='collection'));
+    document.querySelectorAll('[data-tab-pane]').forEach(p=>p.classList.toggle('active',p.dataset.tabPane==='collection'));
+    setFullCharacterInfoTab(tab);
+    return;
+  }
   currentManagerTab=tab;
   characterUI?.setTab(tab);
   playSFX('sfx_ui_tab');
