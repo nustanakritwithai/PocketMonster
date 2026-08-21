@@ -1851,8 +1851,8 @@ function liveFullCharacterTabPanel(tab){
   const manager=el('monsterManager');
   const collectionPane=manager?.querySelector('[data-tab-pane="collection"]');
   const snap=characterUI?.snapshot?.();
-  if(!manager||manager.classList.contains('hidden')||!collectionPane?.classList.contains('active')||snap?.characterPanel!=='full')return null;
-  const activeTab=snap.characterTab==='collection'?'info':snap.characterTab;
+  if(!manager||manager.classList.contains('hidden')||!collectionPane?.classList.contains('active'))return null;
+  const activeTab=snap?.characterTab==='collection'||!snap?.characterTab?'info':snap.characterTab;
   return activeTab===tab?el('characterInfoBody'):null;
 }
 function characterSystemPanel(tab,fallbackId){
@@ -3977,10 +3977,10 @@ addEventListener('keydown',event=>{
 });
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
 document.querySelectorAll('.character-info-tab').forEach(btn=>{
-  bindCharacterAccessControl(btn,()=>{
+  btn.onclick=()=>{
     playSFX('sfx_ui_click');
     setFullCharacterInfoTab(btn.dataset.characterTab);
-  });
+  };
 });
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');
