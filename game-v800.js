@@ -1879,6 +1879,28 @@ function renderTraining(){
   bindMonsterSelect(panel,'trainingSelectedId',renderTraining);
   panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
 }
+function renderFocusedSkillLoadoutV2(){
+  const presentation=focusedCharacterPresentation();
+  const inst=presentation.id?getInst(presentation.id):null;
+  if(!inst)return '<div class="manager-empty">เลือกมอนเพื่อดู Skill Loadout</div>';
+  const moves=getMonsterSkills(inst);
+  const learned=inst.skills||[];
+  const slotNames=['Basic AI','S1','S2','S3'];
+  const slots=slotNames.map((slot,index)=>{
+    const move=moves[index];
+    if(!move)return `<div class="skill-card skill-locked"><b>${slot}</b><div class="skill-detail">ยังไม่มีสกิลในสล็อตนี้</div></div>`;
+    const rec=learned.find(skill=>skill.skillId===move.name);
+    const rank=rec?.masteryRank||'novice';
+    const exp=rec?.masteryExp||0;
+    const mutations=rec&&rank==='master'?SKILL_MUTATIONS[rec.skillId]||[]:[];
+    return `<div class="skill-card"><div class="skill-card-header"><b>${slot} • ${move.name} ${typeBadge(move.type||'Normal')}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank}</span></div><div class="skill-detail">Power: ${move.power??'—'} • CD: ${move.cooldown??'—'}s • ${move.targetType||'enemy'}</div><div class="skill-detail">Mastery: ${rank} • Skill EXP: ${exp}${rec?.mutationId?` • Mutation: ${rec.mutationId}`:''}${mutations.length?' • Mutation พร้อมเลือกในระบบเดิม':''}</div></div>`;
+  }).join('');
+  const sp=spById[inst.speciesId];
+  const path=getEvolutionPath(inst);
+  const passive=inst.passive||inst.genes?.trait||sp?.traits?.[0]||'—';
+  const evolutionTrait=path?.trait||path?.evolutionTrait||'—';
+  return `<section class="focused-skill-loadout"><div class="skills-section-title">Skill Loadout • ${presentation.name}</div><div class="skill-loadout-slots">${slots}</div><div class="skill-card skill-passive"><b>Passive</b><div class="skill-detail">${passive}</div></div><div class="skill-card skill-evolution-trait"><b>Evolution Trait</b><div class="skill-detail">${evolutionTrait}</div></div></section>`;
+}
 function renderSkills(){
   const panel=characterSystemPanel('skills','skillsPanel');
   if(!panel)return;
@@ -1912,7 +1934,7 @@ function renderSkills(){
     const ev=evaluateSkillCandidate(d,inst);
     return `<div class="skill-card ${ev.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${d.id} ${typeBadge(d.move?.type||'Fire')}</b></div><div class="skill-detail">Power: ${d.move?.power??'—'} • CD: ${d.move?.cooldown??'—'}s</div>${ev.eligible?`<button data-learn="${d.id}">เรียน</button>`:`<div class="skill-req">ล็อก: ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')||'ยังไม่พร้อม'}</div>`}</div>`;
   }).join('');
-  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  panel.innerHTML=`<div class="skills-panel">${renderFocusedSkillLoadoutV2()}<div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
 }
