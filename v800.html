@@ -83,12 +83,30 @@
     <div id="aimReticle" class="aim-reticle"><span></span></div>
     <div id="party" class="party"></div>
     <button id="globalCharacterBtn" class="global-character-btn" type="button" aria-label="ทางเข้าตัวละคร" aria-pressed="false">ตัว</button>
-    <div id="characterAccessEntry" class="character-access-entry hidden" role="status" aria-live="polite">
-      <div class="character-access-kicker">ทางเข้าตัวละคร</div>
-      <div id="characterAccessName" class="character-access-name">ยังไม่ได้เลือกมอน</div>
-      <div id="characterAccessHint" class="character-access-hint">แผงรายละเอียดยังไม่เปิดใช้</div>
-      <div id="characterAccessState" class="character-access-state"></div>
-      <button id="characterAccessClose" type="button">ปิด</button>
+    <div id="characterAccessEntry" class="character-access-entry character-quick-panel hidden" role="dialog" aria-modal="false" aria-labelledby="characterAccessName">
+      <div class="character-quick-head">
+        <div class="character-access-kicker">ตัวละคร</div>
+        <button id="characterAccessClose" type="button" aria-label="ปิดแผงตัวละคร">ปิด</button>
+      </div>
+      <div class="character-quick-identity">
+        <span id="characterAccessPortrait" class="character-quick-portrait">?</span>
+        <div class="character-quick-copy">
+          <div id="characterAccessName" class="character-access-name">ยังไม่ได้เลือกมอน</div>
+          <div id="characterAccessMeta" class="character-quick-meta">Lv.— · HP —</div>
+          <div id="characterAccessType" class="character-quick-type"></div>
+          <div id="characterAccessCr" class="character-quick-cr">CR —</div>
+          <div id="characterAccessPlace" class="character-quick-place"></div>
+        </div>
+      </div>
+      <div id="characterAccessStats" class="character-quick-stats">ATK — · DEF — · SPD —</div>
+      <div id="characterAccessReason" class="character-quick-reason hidden"></div>
+      <div id="characterAccessActions" class="character-quick-actions">
+        <button type="button" data-character-tab="collection">รายละเอียด</button>
+        <button type="button" data-character-tab="skills">สกิล</button>
+        <button type="button" data-character-tab="equipment">อุปกรณ์</button>
+        <button type="button" data-character-tab="training">ฝึก</button>
+      </div>
+      <div id="characterQuickTabBody" class="character-quick-tab hidden"></div>
     </div>
 
     <div class="controls-left">

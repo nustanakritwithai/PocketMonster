@@ -389,7 +389,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .party-cond-dot.fatigued{background:#f97316}
 .party-cond-dot.bad{background:#ef4444;box-shadow:0 0 4px #ef444488}
 
-/* Character UI Phase 2 — global access entry (not a Quick Panel) */
+/* Character UI Phase 3 — Quick Panel attached to the left ตัว button */
 .global-character-btn{
   position:absolute;
   z-index:8;
@@ -416,25 +416,50 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   box-shadow:0 0 0 2px rgba(250,204,21,.7),0 10px 22px #0007;
 }
 .global-character-btn.readonly{border-style:dashed}
-.character-access-entry{
+.character-access-entry,.character-quick-panel{
   position:absolute;
   z-index:8;
   pointer-events:auto;
-  left:calc(var(--safe-left) + 56px);
+  left:calc(var(--safe-left) + 134px);
   bottom:calc(var(--safe-bottom) + 216px);
-  width:min(176px,24vw);
-  padding:8px 9px;
-  border-radius:14px;
+  width:min(220px,32vw);
+  max-height:min(48vh,260px);
+  overflow:auto;
+  padding:8px 9px 9px;
+  border-radius:16px;
   border:1px solid rgba(125,211,252,.45);
   background:rgba(9,15,28,.94);
   box-shadow:0 10px 24px #0007;
 }
 .character-access-entry.readonly{border-style:dashed;border-color:#67e8f9}
+.character-quick-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .character-access-kicker{font-size:8px;font-weight:900;letter-spacing:.4px;color:#93c5fd}
-.character-access-name{font-size:12px;font-weight:1000;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.character-access-hint,.character-access-state{font-size:9px;color:#cbd5e1;margin-top:3px;line-height:1.3}
+.character-quick-identity{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
+.character-quick-portrait{
+  width:40px;height:40px;flex:0 0 40px;border-radius:12px;
+  display:grid;place-items:center;font-size:16px;font-weight:1000;color:#fff;
+  text-shadow:0 1px 2px #0009;border:1px solid #ffffff33;background:#334155;
+}
+.character-quick-copy{min-width:0;flex:1}
+.character-access-name{font-size:13px;font-weight:1000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.character-quick-meta,.character-quick-type,.character-quick-cr,.character-quick-place,.character-quick-stats{
+  font-size:10px;color:#e2e8f0;margin-top:2px;line-height:1.35;
+}
+.character-quick-place{color:#fde68a;font-weight:800}
+.character-quick-reason{
+  margin-top:6px;padding:6px 8px;border-radius:10px;background:#0b1220;
+  border:1px solid #67e8f955;color:#a5f3fc;font-size:10px;font-weight:800;line-height:1.35;
+}
+.character-quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.character-quick-actions button{
+  border:0;border-radius:10px;min-height:var(--touch-min);padding:6px 8px;
+  background:#1d4ed8;color:#fff;font-size:11px;font-weight:900;
+}
+.character-quick-actions button.active{background:#0f172a;color:#fde68a;box-shadow:inset 0 0 0 1px #facc15}
+.character-quick-tab{margin-top:8px;max-height:min(34vh,180px);overflow:auto}
+.character-quick-tab .monster-selector{display:none}
+.character-quick-tab .skills-panel,.character-quick-tab .equipment-panel,.character-quick-tab .training-panel{font-size:10px}
 #characterAccessClose{
-  margin-top:6px;
   border:0;
   border-radius:8px;
   padding:6px 8px;
@@ -454,5 +479,12 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
     top:calc(var(--safe-top) + 292px);
     left:calc(var(--safe-left) + 56px);
     width:min(150px,28vw);
+  }
+  .character-quick-panel{
+    bottom:auto;
+    top:calc(var(--safe-top) + 292px);
+    left:calc(var(--safe-left) + 134px);
+    width:min(210px,38vw);
+    max-height:calc(100vh - var(--safe-top) - 206px);
   }
 }

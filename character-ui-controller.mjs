@@ -16,7 +16,9 @@ export const PARTY_SLOT_COUNT = 3;
 
 export const ACTIVE_SUMMON_READONLY_REASON = 'กำลังซัมมอนอยู่ • ดูอย่างเดียว';
 export const ACTIVE_SUMMON_SWITCH_REASON = 'Recall คู่หูก่อนจึงจะสลับตัวได้';
+export const ACTIVE_SUMMON_RECALL_REASON = 'ต้องเรียกกลับก่อน';
 export const FULL_MANAGER_NPC_REASON = 'กลับ Ranch Hub และเข้าใกล้ NPC ก่อน';
+export const QUICK_MUTATE_TABS = Object.freeze(['skills', 'equipment', 'training']);
 
 const UI_KEYS = Object.freeze([
   'focusedMonsterId',
@@ -231,6 +233,90 @@ export function createCharacterUIController(options = {}) {
     return { ok: true, snapshot: snapshot() };
   }
 
+  function describeRoster(monsterId) {
+    const state = getState();
+    const id = typeof monsterId === 'string' ? monsterId : ui().focusedMonsterId;
+    const party = Array.isArray(state.party) ? state.party : [];
+    const partyIndex = id ? party.indexOf(id) : -1;
+    const ranch = Boolean(id && Array.isArray(state.ranchActive) && state.ranchActive.includes(id));
+    const storage = Boolean(id && Array.isArray(state.storage) && state.storage.includes(id));
+    const summoned = Boolean(id && activeSummonId() === id);
+    let place = 'Unknown';
+    if (!id) place = 'None';
+    else if (summoned) place = 'Active';
+    else if (partyIndex >= 0) place = 'Party';
+    else if (ranch) place = 'Ranch';
+    else if (storage) place = 'Storage';
+    let label = place;
+    if (place === 'Active') label = partyIndex >= 0 ? `Party ช่อง ${partyIndex + 1} • Active` : 'Active';
+    else if (place === 'Party' && partyIndex >= 0) label = `Party ช่อง ${partyIndex + 1}`;
+    return {
+      place,
+      partyPosition: partyIndex >= 0 ? partyIndex + 1 : null,
+      summoned,
+      ranch,
+      storage,
+      label,
+    };
+  }
+
+  function requestOpenTab(tab, details = {}) {
+    if (!CHARACTER_TABS.includes(tab)) {
+      return {
+        ok: false,
+        reason: 'invalid-tab',
+        reasonText: 'แท็บนี้ไม่มี',
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: ui().characterPanel,
+      };
+    }
+    if (QUICK_MUTATE_TABS.includes(tab) && !canMutate()) {
+      return {
+        ok: false,
+        reason: 'active-summon',
+        reasonText: ACTIVE_SUMMON_RECALL_REASON,
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: ui().characterPanel,
+        openedManager: false,
+      };
+    }
+    if (tab === 'collection') {
+      const current = ui();
+      if (current.characterPanel === 'tab') {
+        back();
+        current.characterTab = 'collection';
+        current.readOnly = isSummonActive();
+        if (details.monsterId !== undefined) current.focusedMonsterId = details.monsterId;
+        if (current.focusedMonsterId) syncLegacySelection(current.focusedMonsterId);
+        return {
+          ok: true,
+          snapshot: snapshot(),
+          focusedMonsterId: current.focusedMonsterId,
+          panel: current.characterPanel,
+          openedManager: false,
+        };
+      }
+      openPanel('quick', { ...details, tab: 'collection' });
+      return {
+        ok: true,
+        snapshot: snapshot(),
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: 'quick',
+        openedManager: false,
+      };
+    }
+    const focused = details.monsterId !== undefined ? details.monsterId : ui().focusedMonsterId;
+    openPanel('tab', { ...details, tab, monsterId: focused });
+    return {
+      ok: true,
+      snapshot: snapshot(),
+      focusedMonsterId: ui().focusedMonsterId,
+      panel: 'tab',
+      characterTab: tab,
+      openedManager: false,
+    };
+  }
+
   function requestGlobalAccess({ source = 'global-button', monsterId, partySlot } = {}) {
     const current = ui();
     if (current.characterPanel === 'full') {
@@ -299,6 +385,8 @@ export function createCharacterUIController(options = {}) {
     requestMutate,
     requestOpenFull,
     requestGlobalAccess,
+    requestOpenTab,
+    describeRoster,
     openPanel,
     back,
     closeAll,
