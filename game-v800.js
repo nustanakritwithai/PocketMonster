@@ -3,6 +3,12 @@ import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mj
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
+import {
+  ACTIVE_SUMMON_SWITCH_REASON,
+  attachCharacterUi,
+  createCharacterUIController,
+  persistableState,
+} from './character-ui-controller.mjs';
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
@@ -1780,6 +1786,8 @@ function clearTransientEffects(){
 
 // ---------- State / save ----------
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
+attachCharacterUi(state);
+let characterUI=null;
 let currentManagerTab='collection';
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
@@ -1788,6 +1796,7 @@ function hpPct(v){return Math.max(0,Math.min(1,v));}
 function msg(t){el('message').textContent=t;}
 function setManagerTab(tab='collection'){
   currentManagerTab=tab;
+  characterUI?.setTab(tab);
   playSFX('sfx_ui_tab');
   document.querySelectorAll('.manager-tab').forEach(b=>b.classList.toggle('active',b.dataset.managerTab===tab));
   document.querySelectorAll('[data-tab-pane]').forEach(p=>p.classList.toggle('active',p.dataset.tabPane===tab));
@@ -1959,6 +1968,17 @@ function ensureStarter(){
 
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;
+characterUI=createCharacterUIController({
+  getState:()=>state,
+  getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
+  getZone:()=>state.currentZone,
+  syncLegacySelection(id){
+    if(!id)return;
+    state.trainingSelectedId=id;
+    state.skillsSelectedId=id;
+    state.equipSelectedId=id;
+  },
+});
 let hubCompanion=null;
 const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[]},
@@ -2098,6 +2118,7 @@ function switchZone(zone,silent=false){
   clearWilds();
   clearTransientEffects();
   el('monsterManager').classList.add('hidden');
+  characterUI.closeAll();
   state.currentZone=zone;
   playBGM(zone);
   startAmbient(zone);
@@ -2746,6 +2767,7 @@ function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLas
 const FOOD_DEFS=FOOD_CATALOG;
 function feedMonster(id,food){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
   state.inventory[food]--;
   // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
@@ -2770,6 +2792,7 @@ function feedMonster(id,food){
 // V7.4: Care actions (rest/play) from food-care.mjs
 function careAction(id,action){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   syncToBodyMind(inst);
   const result=action==='rest'?careRest(inst,{now:Date.now()}):carePlay(inst,{now:Date.now()});
   syncFromBodyMind(inst);
@@ -2783,12 +2806,14 @@ function careAction(id,action){
 // V7.6: Equipment functions (3-slot reversible loadout)
 function equipMonsterItem(id,item){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   const result=equipItem(inst,item);
   if(result.ok){refreshStats(inst,false);msg(`${displayName(inst)} → Equip ${item.id} [${item.slot}]${result.previous?` (แทนที่ ${result.previous.id})`:''}`);renderManager();saveGame(false);}
   else msg('Equipment: invalid item/slot');
 }
 function unequipMonster(id,slot){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   const removed=unequip(inst,slot);
   if(removed){refreshStats(inst,false);msg(`${displayName(inst)} → Unequip ${slot} (${removed.id})`);renderManager();saveGame(false);}
 }
@@ -2862,7 +2887,7 @@ function renderRaisingEventBanner(){
   box.innerHTML=`<div class="event-title">★ Event: ${displayName(inst)||'?'} • ${pendingEvent.eventDef.id}</div><div class="event-choices">${choices.map(c=>`<button data-choice="${c.id}">${c.label}</button>`).join('')}</div>`;
   box.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>resolveRaisingEvent(b.dataset.choice));
 }
-function setTraining(id,focus){const inst=getInst(id);if(!inst)return;inst.trainingFocus=focus;
+function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!assertCharacterMutable(id))return;inst.trainingFocus=focus;
   syncToBodyMind(inst);
   const gain=ranchTrainingGain(inst,focus,15);
   const applied=addTrainingExp(inst,focus,gain);
@@ -3006,8 +3031,18 @@ function renderEvolution(){
 // ---------- NPC manager ----------
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
 function updateNpcUI(){const b=el('npcBtn');if(isNearNpc()&&state.currentZone==='hub'&&el('monsterManager').classList.contains('hidden')){const p=worldToScreen(npc.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent='คุย';b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;}else b.classList.add('hidden');}else b.classList.add('hidden');}
-function openManager(){if(!isNearNpc()){msg('กลับ Ranch Hub และเข้าใกล้ NPC ก่อน');return;}if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');}
-function closeManager(){el('monsterManager').classList.add('hidden');saveGame(false);renderParty();playSFX('sfx_ui_close');}
+function assertCharacterMutable(id){
+  const gate=characterUI.requestMutate(id);
+  if(!gate.ok){msg(gate.reasonText);return false;}
+  return true;
+}
+function openManager(){
+  const focused=state.ui.focusedMonsterId||state.party[state.selectedSlot];
+  const gate=characterUI.requestOpenFull({isNearNpc:isNearNpc(),monsterId:focused,tab:currentManagerTab||'collection'});
+  if(!gate.ok){msg(gate.reasonText);return;}
+  if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');applyLifeSimulation(Date.now(),true);el('monsterManager').classList.remove('hidden');setManagerTab(currentManagerTab||'collection');renderManager();managerDirty.consume(performance.now());playSFX('sfx_ui_open');
+}
+function closeManager(){characterUI.closeAll();el('monsterManager').classList.add('hidden');saveGame(false);renderParty();playSFX('sfx_ui_close');}
 function depositMonster(id){if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderParty();saveGame(false);}
 function withdrawMonster(id){const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;state.selectedSlot=empty;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderParty();saveGame(false);}
 function needsHTML(inst){
@@ -3105,6 +3140,7 @@ function monsterCard(inst,where){
 }
 function toggleStarterEquip(id,itemId){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   const item=equipmentById(itemId);if(!item)return;
   if(inst.equipment?.[item.slot]?.id===item.id)unequipMonster(id,item.slot);
   else{
@@ -3115,6 +3151,7 @@ function toggleStarterEquip(id,itemId){
 }
 function learnCandidateSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   const def=(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===skillId);if(!def)return;
   const ev=evaluateSkillCandidate(def,inst);
   if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
@@ -3124,6 +3161,7 @@ function learnCandidateSkill(id,skillId){
 }
 function mutateOwnedSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
   const mut=(SKILL_MUTATIONS[skillId]||[])[0];if(!mut)return;
   const owned=getSkill(inst,skillId);
   const result=applyMutation(inst,{skillId,baseSkillDef:{id:skillId,damage:100},mutationDef:mut});
@@ -3292,6 +3330,8 @@ function renderHUD(){
 }
 function switchPartySlot(index){
   if(index<0||index>=state.party.length)return;
+  const gate=characterUI.requestSwitchParty(index);
+  if(!gate.ok){if(gate.reasonText)msg(gate.reasonText);return;}
   state.selectedSlot=index;
   const inst=selectedInstance();
   if(state.currentZone!=='hub'&&inst&&!inst.fainted&&inst.hp>0){
@@ -3310,11 +3350,13 @@ function renderParty(){
   const party=el('party'),activeInstanceId=activeSummon?.inst.instanceId||null;
   party.replaceChildren();
   state.party.forEach((id,index)=>{
-    const inst=getInst(id),button=document.createElement('button');
+    const inst=getInst(id),button=document.createElement('div');
     const monster=combatMonsterPresentation(inst);
     const presentation=createPartySlotViewModel({monster,index,selectedSlot:state.selectedSlot,activeInstanceId});
-    button.type='button';
+    button.setAttribute('role','button');
+    button.tabIndex=0;
     button.className=['party-slot','compact',!inst?'empty':'',...presentation.states.map(stateName=>stateName==='active'?'active-monster':stateName==='fainted'?'fainted-slot':stateName)].filter(Boolean).join(' ');
+    if(characterUI.isPeekedSlot(index))button.classList.add('peeked');
     button.dataset.state=presentation.states.join(' ')||'idle';
     button.setAttribute('aria-pressed',String(presentation.ariaPressed));
     button.setAttribute('aria-label',presentation.ariaLabel);
@@ -3343,6 +3385,20 @@ function renderParty(){
       condDot.title='สภาพ: '+cond;
       mini.append(name,hp,detail,stateLabel,condDot);
       button.append(portrait,mini);
+      const sw=document.createElement('button');
+      sw.type='button';
+      sw.className='party-switch';
+      sw.dataset.partySwitch=String(index);
+      sw.textContent='สลับ';
+      sw.disabled=!characterUI.canSwitchParty();
+      sw.title=sw.disabled?ACTIVE_SUMMON_SWITCH_REASON:'สลับตัวใน Party';
+      sw.setAttribute('aria-label',`สลับเป็นช่อง ${index+1}`);
+      sw.addEventListener('pointerdown',event=>{
+        event.preventDefault();event.stopPropagation();
+        switchPartySlot(index);
+      },{passive:false});
+      sw.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();switchPartySlot(index);});
+      button.append(sw);
     }else{
       const portrait=document.createElement('span'),mini=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),stateLabel=document.createElement('span');
       portrait.className='party-portrait empty-portrait';
@@ -3357,8 +3413,14 @@ function renderParty(){
     }
     button.addEventListener('pointerdown',event=>{
       event.preventDefault();event.stopPropagation();
-      switchPartySlot(index);
+      const peek=characterUI.peekPartySlot(index);
+      const peeked=getInst(peek.monsterId);
+      if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);
+      else msg(`Party ช่อง ${index+1} ว่าง`);
+      renderParty();
     },{passive:false});
+    button.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();const peek=characterUI.peekPartySlot(index);const peeked=getInst(peek.monsterId);if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);else msg(`Party ช่อง ${index+1} ว่าง`);renderParty();});
+    button.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;event.preventDefault();button.click();});
     party.appendChild(button);
   });
 }
@@ -3412,11 +3474,13 @@ function migrateLoadedState(s){
   state.evolutionCandidate=null;
   state.currentZone=ZONES[clean.currentZone]?clean.currentZone:'hub';
   state.saveVersion=SAVE_SCHEMA_VERSION;
+  attachCharacterUi(state);
+  characterUI?.closeAll();
 }
 function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
   state.lifeLastAt=Date.now();
-  writeStoredSave(localStorage,{state,playerHp:playerData.hp});
+  writeStoredSave(localStorage,{state:persistableState(state),playerHp:playerData.hp});
   const si=el('saveIndicator');
   if(si){si.style.opacity='1';setTimeout(()=>{si.style.opacity='0';},800);}
   if(show)msg('บันทึกเกม V8.2.0 แล้ว');
