@@ -3279,6 +3279,18 @@ function monsterCrValue(inst){
     return null;
   }
 }
+function bindRosterFocus(wrap,inst){
+  wrap.addEventListener('pointerdown',event=>{
+    if(event.target.closest('button'))return;
+    event.preventDefault();
+    event.stopPropagation();
+    characterUI.focusMonster(inst.instanceId);
+    renderManager();
+    if(currentManagerTab==='training')renderTraining();
+    if(currentManagerTab==='skills')renderSkills();
+    if(currentManagerTab==='equipment')renderEquipment();
+  },{passive:false});
+}
 function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';if(state.ui?.focusedMonsterId===inst.instanceId)wrap.classList.add('focused-monster');const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
   const eq=inst.equipment||{};
@@ -3294,6 +3306,7 @@ function monsterCard(inst,where){
   const rt=wrap.querySelector('.ranch-toggle');if(rt)rt.onclick=()=>toggleRanchActive(inst.instanceId);
   const eb=wrap.querySelector('.evo-btn');if(eb)bindManagerAction(eb,()=>showEvolution(inst.instanceId));
   bindManagerAction(wrap.querySelector('.cr-btn'),()=>showCrDebug(inst.instanceId));
+  bindRosterFocus(wrap,inst);
   return wrap;
 }
 function toggleStarterEquip(id,itemId){
