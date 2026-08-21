@@ -22,7 +22,7 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
-import { evolutionContext, evaluateEvolution, listEligibleBranches, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
+import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { canBreed as canBreedFn, breed as breedFn, createEgg as createEggFn, GENE_RANKS as BREED_GENE_RANKS } from './breeding.mjs';
 import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveCaptureChance, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
@@ -3067,6 +3067,32 @@ function evoHistoryHTML(inst){
   if(!hist.length)return '';
   return `<div class="evo-history"><div class="evo-history-title">ประวัติ Evolution</div>${hist.map(h=>`<div class="evo-history-item">${h.from||'base'} → ${h.to} • ${new Date(h.at||Date.now()).toLocaleDateString('th-TH',{year:'2-digit',month:'short',day:'numeric'})}</div>`).join('')}</div>`;
 }
+function renderFocusedEvolutionBuildPreview(){
+  const presentation=focusedCharacterPresentation();
+  const inst=presentation.id?getInst(presentation.id):null;
+  if(!inst)return '<div class="manager-empty">เลือกมอนเพื่อดู Evolution Build</div>';
+  const sp=spById[inst.speciesId];
+  const paths=availableEvolutionPaths(inst);
+  if(!paths.length)return `<section class="focused-evolution-preview"><div class="skills-section-title">Evolution Build • ${presentation.name}</div><div class="skill-detail">ไม่มี Candidate Form จากฟอร์มปัจจุบัน</div></section>`;
+  const build=instanceCombatBuildSafe(inst);
+  const candidates=paths.map(path=>{
+    const def=evoDefFromPath(path,sp.id);
+    const eligibility=evaluateEvolution(def,inst);
+    const requirement=evoRequirementStatus(inst,path);
+    const preview=previewEvolution(inst,def,build);
+    const mods=path.statMods||{};
+    const delta=['hp','atk','def','spd'].map(stat=>{
+      const current=stat==='hp'?inst.maxHp:inst[stat];
+      const next=Math.round((current||0)*(mods[stat]||1));
+      return `${stat.toUpperCase()} ${next-current>=0?'+':''}${next-current}`;
+    }).join(' • ');
+    const types=[sp.types[0],preview.secondaryType||path.secondaryType||inst.secondaryType].filter(Boolean).map(type=>TYPE_TH[type]||type).join(' / ');
+    const carry=preview.skillCarry.map(skill=>`${skill.from} → ${skill.to} ${Math.round(skill.carry*100)}%`).join(', ')||'ไม่มี Skill Carry';
+    const trait=path.evolutionTrait||path.trait||'—';
+    return `<div class="evo-card"><div class="evo-title"><b>${displayName(inst)} → ${path.name}</b><span>${eligibility.eligible?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">Form: ${path.id} • Type: ${types}<br>${delta}<br>Skill Carry: ${carry}<br>Passive / Evolution Trait: ${trait}<br>Requirement: ${requirement.text}</div></div>`;
+  }).join('');
+  return `<section class="focused-evolution-preview"><div class="skills-section-title">Evolution Build • ${presentation.name}</div>${candidates}</section>`;
+}
 function renderEvolution(){
   const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate||state.ui?.focusedMonsterId);
   if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}
@@ -3081,7 +3107,7 @@ function renderEvolution(){
     box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div>${identity}${evoHistoryHTML(inst)}</div>`;
     return;
   }
-  box.innerHTML='';
+  box.innerHTML=renderFocusedEvolutionBuildPreview();
   for(const p of paths){
     const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');
     d.className='evo-card';
