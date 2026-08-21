@@ -1938,6 +1938,22 @@ function renderSkills(){
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
 }
+function renderFocusedEquipmentLoadout(){
+  const presentation=focusedCharacterPresentation();
+  const inst=presentation.id?getInst(presentation.id):null;
+  if(!inst)return '<div class="manager-empty">เลือกมอนเพื่อดู Equipment Loadout</div>';
+  const flat=getEquipmentFlat(inst);
+  const contribution=computeEquipmentContribution(equippedItems(inst));
+  const preview=loadoutPreview(instanceCombatBuildSafe(inst),contribution);
+  const active=activeSummon?.inst?.instanceId===inst.instanceId;
+  const slots=EQUIPMENT_SLOTS.map(slot=>{
+    const item=inst.equipment?.[slot];
+    return `<div class="equip-slot-card"><b>${slot[0].toUpperCase()+slot.slice(1)}</b><div>${item?.name||item?.id||'ว่าง'}</div></div>`;
+  }).join('');
+  const stats=['hp','atk','def','spd'].map(stat=>`${stat.toUpperCase()} +${flat[stat]||0}`).join(' • ');
+  const deltas=['hp','atk','def','spd'].map(stat=>`${stat.toUpperCase()} ${preview.statDelta[stat]>=0?'+':''}${Math.round(preview.statDelta[stat])}`).join(' • ');
+  return `<section class="focused-equipment-loadout"><div class="skills-section-title">Equipment Loadout • ${presentation.name}</div><div class="equipment-slots">${slots}</div><div class="equip-summary-stats">${stats}</div><div class="skill-detail">Preview: ${deltas} • CR ${preview.crDelta>=0?'+':''}${Math.round(preview.crDelta)}</div>${active?`<div class="skill-req">${ACTIVE_SUMMON_READONLY_REASON}</div>`:''}</section>`;
+}
 function renderEquipment(){
   const panel=characterSystemPanel('equipment','equipmentPanel');
   if(!panel)return;
@@ -1968,7 +1984,7 @@ function renderEquipment(){
     return `<div class="equip-slot-card"><div class="equip-slot-info"><div class="equip-slot-name">${slot}</div><div class="equip-slot-empty">ว่าง</div><div class="equip-slot-desc">${slotDesc[slot]||''}</div></div><div class="equip-slot-actions">${options||'<span class="equip-slot-empty">ไม่มีของในคลัง</span>'}</div></div>`;
   }).join('');
   const flatHTML=['hp','atk','def','spd'].map(s=>{const v=flat[s]||0;return `<span class="${v===0?'zero':''}">${s.toUpperCase()} +${v}</span>`;}).join(' • ');
-  panel.innerHTML=`<div class="equipment-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="equip-summary"><div class="equip-summary-stats">${flatHTML}</div>${equippedCount>0?`<div class="budget-label">Power Budget: ${budgetPct}% (ควร ${budgetMin}-${budgetMax}%) — ${budgetStatus}</div><div class="budget-bar"><div class="budget-fill ${budgetClass}" style="width:${Math.min(100,budgetPct*5)}%"></div></div><div class="budget-range">0% — ${budgetMin}% — ${budgetMax}% — 20%</div>`:'<div class="budget-label">ยังไม่ได้ใส่อุปกรณ์</div>'}</div>${slotsHTML}<div class="equip-help"><b>3 สล็อก:</b> Gear / Charm / Utility<br><b>ถอดได้ตลอดเวลา</b> (reversible) — ไม่ทำลายสถิติ<br><b>Affix ประเภทเดียวกัน</b> — รวมกันแล้วไม่เกิน cap<br><b>พลังรวม</b> — ควรอยู่ ${budgetMin}-${budgetMax}% ของ combat power</div></div>`;
+  panel.innerHTML=`<div class="equipment-panel">${renderFocusedEquipmentLoadout()}<div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="equip-summary"><div class="equip-summary-stats">${flatHTML}</div>${equippedCount>0?`<div class="budget-label">Power Budget: ${budgetPct}% (ควร ${budgetMin}-${budgetMax}%) — ${budgetStatus}</div><div class="budget-bar"><div class="budget-fill ${budgetClass}" style="width:${Math.min(100,budgetPct*5)}%"></div></div><div class="budget-range">0% — ${budgetMin}% — ${budgetMax}% — 20%</div>`:'<div class="budget-label">ยังไม่ได้ใส่อุปกรณ์</div>'}</div>${slotsHTML}<div class="equip-help"><b>3 สล็อก:</b> Gear / Charm / Utility<br><b>ถอดได้ตลอดเวลา</b> (reversible) — ไม่ทำลายสถิติ<br><b>Affix ประเภทเดียวกัน</b> — รวมกันแล้วไม่เกิน cap<br><b>พลังรวม</b> — ควรอยู่ ${budgetMin}-${budgetMax}% ของ combat power</div></div>`;
   bindMonsterSelect(panel,'equipSelectedId',renderEquipment);
   panel.querySelectorAll('[data-unequip]').forEach(b=>b.onclick=()=>{unequipMonster(inst.instanceId,b.dataset.unequip);renderEquipment();});
   panel.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>{toggleStarterEquip(inst.instanceId,b.dataset.equip);renderEquipment();});
