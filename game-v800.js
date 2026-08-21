@@ -1843,6 +1843,24 @@ function liveCharacterTabPanel(tab){
 function characterSystemPanel(tab,fallbackId){
   return liveCharacterTabPanel(tab)||el(fallbackId);
 }
+function renderFocusedGrowthSummary(){
+  const presentation=focusedCharacterPresentation();
+  const inst=presentation.id?getInst(presentation.id):null;
+  if(!inst)return '<div class="manager-empty">เลือกมอนเพื่อดู Growth</div>';
+  const used=instTrainingUsed(inst);
+  const cap=BALANCE_CONFIG.training.capacity.base+BALANCE_CONFIG.training.capacity.perLevel*inst.level;
+  const body=inst.body||{};
+  const mind=inst.mind||{};
+  const training=TRAINING_LINES.map(line=>{
+    const value=inst.training?.[line]||0;
+    const aptitude=inst.aptitude?.[line]||3;
+    const dim=balanceFormulas.diminishingMultiplier(value);
+    return `<div class="skill-detail"><b>${line[0].toUpperCase()+line.slice(1)}</b>: ${Math.round(value)} • Aptitude ${'★'.repeat(aptitude)}${'☆'.repeat(5-aptitude)} • ลดลง ${dim}x</div>`;
+  }).join('');
+  const gene=['hp','atk','def','spd'].map(stat=>`${stat.toUpperCase()} ${inst.genes?.[stat]??'—'}`).join(' • ');
+  const needs=[['Hunger',body.hunger??inst.hunger],['Energy',body.energy??inst.energy],['Fitness',body.fitness],['Health',body.health],['Mood',mind.mood??inst.mood],['Stress',mind.stress??inst.stress],['Bond',mind.bond??inst.bond],['Trust',mind.trust??inst.trust],['Discipline',mind.discipline]].map(([label,value])=>`${label} ${value??'—'}`).join(' • ');
+  return `<section class="focused-growth-summary"><div class="skills-section-title">Growth • ${presentation.name}</div><div class="training-summary"><b>Capacity</b> ${Math.round(used)} / ${cap}</div><div class="growth-lines">${training}</div><div class="skill-detail"><b>Gene HP</b> ${gene}</div><div class="skill-detail"><b>Body / Mind</b>: ${needs}</div></section>`;
+}
 function renderTraining(){
   const panel=characterSystemPanel('training','trainingPanel');
   if(!panel)return;
@@ -1875,7 +1893,7 @@ function renderTraining(){
     const gain=Math.round(ranchTrainingGain(inst,line,15));
     return `<div class="training-line-card ${isFocus?'focus-active':''}"><div class="training-line-header"><b>${line[0].toUpperCase()+line.slice(1)}</b>${isFocus?'<span class="focus-tag">เลือกอยู่</span>':''}</div><div class="training-line-stats"><span>ค่า: <strong>${Math.round(val)}</strong></span><span class="dim">ลดลง: ${dim}x (${bandLabel})</span><span class="apt">Apt: <span class="apt-stars">${stars}</span> (${aptMult}x)</span></div><div class="line-progress"><div class="line-progress-fill ${line}" style="width:${valPct}%"></div></div><button class="train-btn" data-train-line="${line}" ${poolFull?'disabled':''}>${poolFull?'Pool เต็ม':`ฝึก ${line} +${gain}`}</button></div>`;
   }).join('');
-  panel.innerHTML=`<div class="training-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="training-summary"><div class="pool-header"><span>Training Pool (รวม 5 สาย)</span><span class="pool-count">${Math.round(used)} / ${cap}</span></div><div class="pool-bar"><div class="pool-bar-fill" style="width:${poolPct}%"></div></div></div>${linesHTML}<div class="condition-box"><div>สภาพ: <strong class="cond-${cond}">${condTH[cond]||cond}</strong> → ${condMult}x training gain</div><div>Training Food: ${hasBuff?'<span style="color:#fde68a">มี buff ทำงาน</span>':'ไม่มี buff'}</div></div><div class="training-info">Pool = 40 + 8xLevel (รวมทุกสาย) • ค่ามาก = gain ลดลง (diminishing return) • Aptitude ดาวเยอะ = gain เพิ่ม • สภาพดี = gain เพิ่ม</div></div>`;
+  panel.innerHTML=`${renderFocusedGrowthSummary()}<div class="training-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="training-summary"><div class="pool-header"><span>Training Pool (รวม 5 สาย)</span><span class="pool-count">${Math.round(used)} / ${cap}</span></div><div class="pool-bar"><div class="pool-bar-fill" style="width:${poolPct}%"></div></div></div>${linesHTML}<div class="condition-box"><div>สภาพ: <strong class="cond-${cond}">${condTH[cond]||cond}</strong> → ${condMult}x training gain</div><div>Training Food: ${hasBuff?'<span style="color:#fde68a">มี buff ทำงาน</span>':'ไม่มี buff'}</div></div><div class="training-info">Pool = 40 + 8xLevel (รวมทุกสาย) • ค่ามาก = gain ลดลง (diminishing return) • Aptitude ดาวเยอะ = gain เพิ่ม • สภาพดี = gain เพิ่ม</div></div>`;
   bindMonsterSelect(panel,'trainingSelectedId',renderTraining);
   panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
 }
