@@ -66,6 +66,10 @@ export function attachCharacterUi(state, ui = createCharacterUiState()) {
 function freezeFrame(frame = {}) {
   const tab = CHARACTER_TABS.includes(frame.characterTab) ? frame.characterTab : 'collection';
   const resumePanel = CHARACTER_PANELS.includes(frame.resumePanel) ? frame.resumePanel : 'closed';
+  const kind = typeof frame.kind === 'string' ? frame.kind : (resumePanel === 'closed' ? 'world' : resumePanel);
+  const returnTo = frame.returnTo === 'quick' || frame.returnTo === 'world' || CHARACTER_PANELS.includes(frame.returnTo)
+    ? frame.returnTo
+    : (resumePanel === 'quick' || resumePanel === 'tab' ? 'quick' : 'world');
   return Object.freeze({
     resumePanel,
     focusedMonsterId: typeof frame.focusedMonsterId === 'string' ? frame.focusedMonsterId : null,
@@ -73,7 +77,8 @@ function freezeFrame(frame = {}) {
     characterTab: tab,
     source: typeof frame.source === 'string' ? frame.source : 'world',
     zone: typeof frame.zone === 'string' ? frame.zone : null,
-    kind: typeof frame.kind === 'string' ? frame.kind : (resumePanel === 'closed' ? 'world' : resumePanel),
+    kind,
+    returnTo,
   });
 }
 
@@ -107,20 +112,24 @@ export function createCharacterUIController(options = {}) {
     return !isSummonActive();
   }
 
-  function canOpenFullManager({ isNearNpc } = {}) {
+  function canOpenFullManager({ isNearNpc, source } = {}) {
+    if (source === 'character') return true;
     return Boolean(isNearNpc);
   }
 
   function captureFrame(overrides = {}) {
     const current = ui();
+    const panel = current.characterPanel;
+    const returnTo = panel === 'quick' || panel === 'tab' ? 'quick' : (panel === 'closed' ? 'world' : panel);
     return freezeFrame({
-      resumePanel: current.characterPanel,
+      resumePanel: panel,
       focusedMonsterId: current.focusedMonsterId,
       selectedPartySlot: current.selectedPartySlot,
       characterTab: current.characterTab,
       source: current.source,
       zone: getZone(),
-      kind: current.characterPanel === 'closed' ? 'world' : current.characterPanel,
+      kind: panel === 'closed' ? 'world' : panel,
+      returnTo,
       ...overrides,
     });
   }
@@ -225,12 +234,75 @@ export function createCharacterUIController(options = {}) {
     return { ok: true, reason: null, reasonText: '' };
   }
 
-  function requestOpenFull({ isNearNpc, monsterId, tab } = {}) {
-    if (!canOpenFullManager({ isNearNpc })) {
-      return { ok: false, reason: 'npc-required', reasonText: FULL_MANAGER_NPC_REASON };
+  function requestOpenFull({ isNearNpc, monsterId, tab, source } = {}) {
+    const from = source === 'character' ? 'character' : 'npc';
+    if (!canOpenFullManager({ isNearNpc, source: from })) {
+      return {
+        ok: false,
+        reason: 'npc-required',
+        reasonText: FULL_MANAGER_NPC_REASON,
+        openedManager: false,
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: ui().characterPanel,
+      };
     }
-    openPanel('full', { source: 'npc', monsterId, tab });
-    return { ok: true, snapshot: snapshot() };
+    const id = typeof monsterId === 'string' ? monsterId : ui().focusedMonsterId;
+    openPanel('full', { source: from, monsterId: id, tab });
+    const stack = ui().characterStack;
+    const returnFrame = stack.length ? stack[stack.length - 1] : null;
+    return {
+      ok: true,
+      snapshot: snapshot(),
+      openedManager: true,
+      focusedMonsterId: ui().focusedMonsterId,
+      panel: 'full',
+      characterTab: ui().characterTab,
+      source: from,
+      kind: 'full-manager',
+      returnTo: returnFrame?.returnTo || (returnFrame?.resumePanel === 'quick' ? 'quick' : 'world'),
+    };
+  }
+
+  function blockedQuickMutate(tab) {
+    if (QUICK_MUTATE_TABS.includes(tab) && !canMutate()) {
+      return {
+        ok: false,
+        reason: 'active-summon',
+        reasonText: ACTIVE_SUMMON_RECALL_REASON,
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: ui().characterPanel,
+        openedManager: false,
+      };
+    }
+    return null;
+  }
+
+  function requestOpenFromQuick({ tab = 'collection', monsterId } = {}) {
+    if (tab === 'breeding') {
+      return {
+        ok: false,
+        reason: 'npc-required',
+        reasonText: FULL_MANAGER_NPC_REASON,
+        openedManager: false,
+        focusedMonsterId: ui().focusedMonsterId,
+        panel: ui().characterPanel,
+      };
+    }
+    const mutateBlock = blockedQuickMutate(tab);
+    if (mutateBlock) return mutateBlock;
+    const nextTab = CHARACTER_TABS.includes(tab) ? tab : 'collection';
+    return requestOpenFull({
+      source: 'character',
+      monsterId: monsterId ?? ui().focusedMonsterId,
+      tab: nextTab,
+    });
+  }
+
+  function focusMonster(monsterId) {
+    const current = ui();
+    current.focusedMonsterId = typeof monsterId === 'string' ? monsterId : null;
+    if (current.focusedMonsterId) syncLegacySelection(current.focusedMonsterId);
+    return snapshot();
   }
 
   function describeRoster(monsterId) {
@@ -270,16 +342,8 @@ export function createCharacterUIController(options = {}) {
         panel: ui().characterPanel,
       };
     }
-    if (QUICK_MUTATE_TABS.includes(tab) && !canMutate()) {
-      return {
-        ok: false,
-        reason: 'active-summon',
-        reasonText: ACTIVE_SUMMON_RECALL_REASON,
-        focusedMonsterId: ui().focusedMonsterId,
-        panel: ui().characterPanel,
-        openedManager: false,
-      };
-    }
+    const mutateBlock = blockedQuickMutate(tab);
+    if (mutateBlock) return mutateBlock;
     if (tab === 'collection') {
       const current = ui();
       if (current.characterPanel === 'tab') {
@@ -384,9 +448,11 @@ export function createCharacterUIController(options = {}) {
     requestSwitchParty,
     requestMutate,
     requestOpenFull,
+    requestOpenFromQuick,
     requestGlobalAccess,
     requestOpenTab,
     describeRoster,
+    focusMonster,
     openPanel,
     back,
     closeAll,
