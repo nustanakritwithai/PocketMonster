@@ -14,7 +14,7 @@ export const CHARACTER_TABS = Object.freeze([
 export const PARTY_TAP_MODES = Object.freeze(['peek', 'switch']);
 export const PARTY_SLOT_COUNT = 3;
 
-export const ACTIVE_SUMMON_READONLY_REASON = 'กำลังซัมมอนอยู่ • ดูอย่างเดียว';
+export const ACTIVE_SUMMON_READONLY_REASON = 'กำลังซัมมอนอยู่ • ต้องเรียกกลับก่อนจึงจะปรับแต่งได้';
 export const ACTIVE_SUMMON_SWITCH_REASON = 'Recall คู่หูก่อนจึงจะสลับตัวได้';
 export const ACTIVE_SUMMON_RECALL_REASON = 'ต้องเรียกกลับก่อน';
 export const FULL_MANAGER_NPC_REASON = 'กลับ Ranch Hub และเข้าใกล้ NPC ก่อน';
