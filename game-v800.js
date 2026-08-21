@@ -1840,8 +1840,26 @@ function liveCharacterTabPanel(tab){
   if(snap.characterPanel==='tab'&&snap.characterTab===tab)return el('characterQuickTabBody');
   return null;
 }
+function liveFullCharacterTabPanel(tab){
+  const manager=el('monsterManager');
+  const collectionPane=manager?.querySelector('[data-tab-pane="collection"]');
+  const snap=characterUI?.snapshot?.();
+  if(!manager||manager.classList.contains('hidden')||!collectionPane?.classList.contains('active')||snap?.characterPanel!=='full')return null;
+  const activeTab=snap.characterTab==='collection'?'info':snap.characterTab;
+  return activeTab===tab?el('characterInfoBody'):null;
+}
 function characterSystemPanel(tab,fallbackId){
-  return liveCharacterTabPanel(tab)||el(fallbackId);
+  return liveCharacterTabPanel(tab)||liveFullCharacterTabPanel(tab)||el(fallbackId);
+}
+function setFullCharacterInfoTab(tab){
+  if(!['info','skills','equipment','training','evolution'].includes(tab))return;
+  characterUI?.setTab(tab);
+  document.querySelectorAll('.character-info-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.characterTab===tab));
+  if(tab==='info')renderFullCharacterStatus();
+  if(tab==='skills')renderSkills();
+  if(tab==='equipment')renderEquipment();
+  if(tab==='training')renderTraining();
+  if(tab==='evolution')renderEvolution();
 }
 function renderFocusedGrowthSummary(){
   const presentation=focusedCharacterPresentation();
@@ -3473,7 +3491,16 @@ function renderFullCharacterStatus(){
     ${renderFullCharacterStatBreakdown()}
   </div>`;
 }
-function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});renderFullCharacterPreview();renderFullCharacterStatus();el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
+function renderFullCharacterInfoTab(){
+  const snap=characterUI?.snapshot?.();
+  const tab=snap?.characterTab==='collection'||!snap?.characterTab?'info':snap.characterTab;
+  document.querySelectorAll('.character-info-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.characterTab===tab));
+  if(tab==='skills')return renderSkills();
+  if(tab==='equipment')return renderEquipment();
+  if(tab==='training')return renderTraining();
+  return renderFullCharacterStatus();
+}
+function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});renderFullCharacterPreview();renderFullCharacterInfoTab();el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
 function renderCrDebug(){
   const box=el('crDebugPanel');if(!box)return;
   const inst=getInst(state.crCandidate);
@@ -3942,6 +3969,12 @@ addEventListener('keydown',event=>{
   if(handleCharacterUiHardwareBack(event))event.preventDefault();
 });
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
+document.querySelectorAll('.character-info-tab').forEach(btn=>{
+  bindCharacterAccessControl(btn,()=>{
+    playSFX('sfx_ui_click');
+    setFullCharacterInfoTab(btn.dataset.characterTab);
+  });
+});
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');
 const fullscreenBtn=el('fullscreenBtn');
