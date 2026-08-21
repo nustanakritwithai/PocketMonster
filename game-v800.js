@@ -3337,6 +3337,27 @@ function renderFullCharacterPreview(){
   const growth=presentation.growth&&typeof presentation.growth==='object'?Object.values(presentation.growth).reduce((sum,value)=>sum+(Number(value)||0),0):presentation.growth;
   setTextIfChanged(el('characterPreviewGrowth'),presentation.isEmpty?'Bond — · Growth —':`HP ${fmt(presentation.hp??0)}/${fmt(presentation.maxHp??0)} · Bond ${fmt(presentation.bond??0)} · Growth ${growth??'—'}`);
 }
+function renderFullCharacterStatBreakdown(){
+  const presentation=focusedCharacterPresentation();
+  const inst=presentation.id?getInst(presentation.id):null;
+  if(!inst)return '';
+  const species=spById[inst.speciesId];
+  const path=getEvolutionPath(inst);
+  const equipmentFlat=getEquipmentFlat(inst);
+  const details=[
+    ['HP',explainStat(inst,species,path,equipmentFlat,'hp')],
+    ['ATK',explainStat(inst,species,path,equipmentFlat,'atk')],
+    ['DEF',explainStat(inst,species,path,equipmentFlat,'def')],
+    ['SPD',explainStat(inst,species,path,equipmentFlat,'spd')],
+  ];
+  const source=(label,value)=>`<span><b>${label}</b> ${value}</span>`;
+  return `<details class="character-stat-breakdown"><summary>Stat Breakdown</summary>${details.map(([label,detail])=>`<section class="character-stat-source"><h4>${label} ${fmt(detail.final)}</h4><div>${[
+    source('Species Base',fmt(detail.speciesBase)),source('Level Growth',fmt(detail.levelGrowth)),
+    source('Training',fmt(detail.training)),source('Nutrition',fmt(detail.nutritionFlat)),
+    source('Equipment',fmt(detail.equipmentFlat)),source('Gene',detail.geneRank),
+    source('Evolution',detail.evolutionProfile.toFixed(2)),source('Condition',detail.conditionModifier.toFixed(2)),
+  ].join('')}</div></section>`).join('')}</details>`;
+}
 function renderFullCharacterStatus(){
   const body=el('characterInfoBody');
   if(!body)return;
@@ -3354,6 +3375,7 @@ function renderFullCharacterStatus(){
     <div class="character-status-spd"><b>SPD</b><span>${fmt(presentation.spd??0)}</span></div>
     <div class="character-status-cr"><b>CR</b><span>${presentation.cr??'—'}</span></div>
     <div class="character-status-condition"><b>Condition</b><span>${condition}</span></div>
+    ${renderFullCharacterStatBreakdown()}
   </div>`;
 }
 function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});renderFullCharacterPreview();renderFullCharacterStatus();el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
