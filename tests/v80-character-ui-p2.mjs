@@ -56,6 +56,8 @@ assert.doesNotMatch(buttonCss, /right:/, 'global button must not sit on the skil
 assert.match(css, /\.global-character-btn\.open/, 'open visual state exists');
 assert.match(css, /\.global-character-btn\.readonly/, 'read-only visual state exists');
 assert.doesNotMatch(css, /\.controls-right[^{]*\{[^}]*global-character/, 'global button is not a combat control');
+const compactCharacterCss = css.slice(css.lastIndexOf('@media(max-width:760px),(max-height:500px){'));
+assert.match(compactCharacterCss, /top:calc\(var\(--safe-top\) \+ 292px\)/, 'short/mobile Character controls must sit below the expanded zone dropdown');
 
 assert.match(js, /function toggleCharacterAccess\(/, 'global access toggle missing');
 assert.match(js, /function openCharacterAccess\(/, 'global access opener missing');
@@ -63,6 +65,7 @@ assert.match(js, /requestGlobalAccess/, 'live runtime must use the shared contro
 assert.match(extractFn('toggleCharacterAccess'), /requestGlobalAccess|openCharacterAccess/, 'button path goes through Character UI entry');
 assert.doesNotMatch(extractFn('toggleCharacterAccess'), /switchPartySlot|summonThrow|openManager/, 'global access must not start combat or the full manager');
 assert.doesNotMatch(extractFn('openCharacterAccess'), /switchPartySlot|summonThrow|openManager/, 'opening entry must not mutate combat');
+assert.match(extractFn('openCharacterAccess'), /zoneDropdown\?\.classList\.add\('hidden'\)/, 'opening Character access closes the zone dropdown');
 assert.doesNotMatch(extractFn('renderCharacterAccess'), /monsterCard|feedMonster|toggleStarterEquip|setTraining/, 'access HUD must not dump the ranch card');
 assert.match(extractFn('bindCharacterAccessControl'), /addEventListener\('click'/, 'global access must accept click as well as pointerdown');
 

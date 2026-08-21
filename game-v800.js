@@ -3448,6 +3448,8 @@ function renderCharacterAccess(){
   setClassTokenIfChanged(entry,'readonly',snap.readOnly);
 }
 function openCharacterAccess(source='global-button'){
+  const zoneDropdown=el('zoneDropdown');
+  zoneDropdown?.classList.add('hidden');
   const result=characterUI.requestGlobalAccess({
     source,
     monsterId:focusedPartyMonsterId(),
