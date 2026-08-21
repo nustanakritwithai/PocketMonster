@@ -10,6 +10,7 @@ import {
   FULL_MANAGER_NPC_REASON,
   attachCharacterUi,
   createCharacterUIController,
+  getFocusedCharacterPresentation,
   persistableState,
 } from './character-ui-controller.mjs';
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
@@ -3311,7 +3312,29 @@ function updateEggCountdowns(now=Date.now()){
     }
   }
 }
-function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
+function renderFullCharacterPreview(){
+  const presentation=getFocusedCharacterPresentation({
+    getInst,
+    focusedMonsterId:state.ui?.focusedMonsterId,
+    describeRoster:id=>characterUI?.describeRoster(id),
+    displayName,
+    getTypes:monsterTypes,
+    getCr:monsterCrValue,
+  });
+  const inst=presentation.id?getInst(presentation.id):null;
+  const species=inst?spById[inst.speciesId]:null;
+  const portrait=el('characterPreviewPortrait');
+  const portraitColor=species?`#${species.color.toString(16).padStart(6,'0')}`:'#334155';
+  setTextIfChanged(portrait,presentation.isEmpty?'?':presentation.name.slice(0,1));
+  if(portrait&&portrait.dataset.color!==portraitColor){portrait.dataset.color=portraitColor;portrait.style.backgroundColor=portraitColor;}
+  setTextIfChanged(el('characterPreviewName'),presentation.isEmpty?'เลือกมอนสเตอร์':presentation.name);
+  setTextIfChanged(el('characterPreviewMeta'),presentation.isEmpty?'Lv.— · EXP — · CR —':`Lv.${presentation.level??'—'} · EXP ${fmt(presentation.exp??0)} · CR ${presentation.cr??'—'}`);
+  setTextIfChanged(el('characterPreviewTypes'),presentation.isEmpty?'เลือก Party ด้านซ้ายเพื่อดูรายละเอียด':presentation.types.map(type=>`${TYPE_EMOJI[type]||'•'} ${type}`).join('  '));
+  setTextIfChanged(el('characterPreviewPlace'),presentation.isEmpty?'—':presentation.placeLabel);
+  const growth=presentation.growth&&typeof presentation.growth==='object'?Object.values(presentation.growth).reduce((sum,value)=>sum+(Number(value)||0),0):presentation.growth;
+  setTextIfChanged(el('characterPreviewGrowth'),presentation.isEmpty?'Bond — · Growth —':`HP ${fmt(presentation.hp??0)}/${fmt(presentation.maxHp??0)} · Bond ${fmt(presentation.bond??0)} · Growth ${growth??'—'}`);
+}
+function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty'),storageBox=el('managerStorage');partyBox.innerHTML='';storageBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;el('storageCountLabel').textContent=`${state.storage.length}`;el('ranchActiveCountLabel').textContent=`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});if(!state.storage.length)storageBox.innerHTML='<div class="manager-empty">Storage ว่าง</div>';state.storage.forEach(id=>{const i=getInst(id);if(i)storageBox.appendChild(monsterCard(i,'storage'));});renderFullCharacterPreview();el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
 function renderCrDebug(){
   const box=el('crDebugPanel');if(!box)return;
   const inst=getInst(state.crCandidate);
