@@ -52,6 +52,45 @@ export function persistableState(state) {
   return rest;
 }
 
+export function getFocusedCharacterPresentation({
+  getInst,
+  focusedMonsterId,
+  describeRoster = () => ({ place: 'None', label: 'None' }),
+  displayName = inst => inst?.instanceId || 'Monster',
+  getTypes = () => [],
+  getCr = () => null,
+} = {}) {
+  const inst = typeof getInst === 'function' && typeof focusedMonsterId === 'string'
+    ? getInst(focusedMonsterId)
+    : null;
+  if (!inst) {
+    return {
+      id: null, name: '', level: null, exp: null, hp: null, maxHp: null,
+      atk: null, def: null, spd: null, cr: null, bond: null, growth: null,
+      types: [], place: 'None', placeLabel: 'None', isEmpty: true,
+    };
+  }
+  const roster = describeRoster(inst.instanceId) || {};
+  return {
+    id: inst.instanceId,
+    name: displayName(inst),
+    level: inst.level ?? null,
+    exp: inst.exp ?? null,
+    hp: inst.hp ?? null,
+    maxHp: inst.maxHp ?? null,
+    atk: inst.atk ?? null,
+    def: inst.def ?? null,
+    spd: inst.spd ?? null,
+    cr: getCr(inst),
+    bond: inst.bond ?? null,
+    growth: inst.growth ?? null,
+    types: getTypes(inst) || [],
+    place: roster.place ?? 'Unknown',
+    placeLabel: roster.label ?? roster.place ?? 'Unknown',
+    isEmpty: false,
+  };
+}
+
 export function attachCharacterUi(state, ui = createCharacterUiState()) {
   if (!state || typeof state !== 'object') throw new TypeError('game state is required');
   Object.defineProperty(state, 'ui', {
