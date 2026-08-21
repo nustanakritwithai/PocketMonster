@@ -158,10 +158,14 @@ assert.match(extractFn('closeManager'), /closeAll\(\)/, 'closing the manager cle
 assert.match(extractFn('switchPartySlot'), /requestSwitchParty/, 'combat switch is gated');
 assert.match(extractFn('switchPartySlot'), /summonThrow\(\)/, 'allowed switch still uses the original summon path');
 assert.match(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap peeks');
+assert.match(extractFn('renderParty'), /sw\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Switch chip supports keyboard click without duplicating pointer input');
+assert.match(extractFn('renderParty'), /button\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Party peek supports keyboard click without duplicating pointer input');
 assert.match(extractFn('renderParty'), /dataset.partySwitch/, 'party HUD exposes an explicit Switch control');
 assert.match(extractFn('renderParty'), /switchPartySlot\(index\)/, 'Switch control still calls switchPartySlot');
 assert.doesNotMatch(
-  extractFn('renderParty').replace(/sw\.addEventListener\('pointerdown',[\s\S]*?\},\{passive:false\}\);/, ''),
+  extractFn('renderParty')
+    .replace(/sw\.addEventListener\('pointerdown',[\s\S]*?\},\{passive:false\}\);/, '')
+    .replace(/sw\.addEventListener\('click',[\s\S]*?\}\);/, ''),
   /switchPartySlot\(index\)/,
   'the slot peek handler must not call switchPartySlot',
 );

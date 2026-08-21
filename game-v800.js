@@ -3397,6 +3397,7 @@ function renderParty(){
         event.preventDefault();event.stopPropagation();
         switchPartySlot(index);
       },{passive:false});
+      sw.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();switchPartySlot(index);});
       button.append(sw);
     }else{
       const portrait=document.createElement('span'),mini=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),stateLabel=document.createElement('span');
@@ -3418,6 +3419,7 @@ function renderParty(){
       else msg(`Party ช่อง ${index+1} ว่าง`);
       renderParty();
     },{passive:false});
+    button.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();const peek=characterUI.peekPartySlot(index);const peeked=getInst(peek.monsterId);if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);else msg(`Party ช่อง ${index+1} ว่าง`);renderParty();});
     party.appendChild(button);
   });
 }
