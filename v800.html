@@ -129,7 +129,7 @@
     <button id="npcBtn" class="npc-btn hidden">คุย</button>
 
     <div id="monsterManager" class="manager hidden">
-      <div class="manager-card">
+      <div class="manager-card" data-character-layout="three-column">
         <div class="manager-head">
           <div>
             <b>Monster Ranch & Breeding Center</b>
@@ -161,7 +161,7 @@
           </div>
         </div>
 
-        <div class="manager-tabs">
+        <div class="manager-tabs character-tabs">
           <button class="manager-tab active" data-manager-tab="collection">มอน</button>
           <button class="manager-tab" data-manager-tab="training">ฝึก</button>
           <button class="manager-tab" data-manager-tab="skills">สกิล</button>
@@ -170,15 +170,37 @@
           <button class="manager-tab" data-manager-tab="breeding">Breeding</button>
         </div>
 
-        <div class="manager-grid manager-tab-pane active" data-tab-pane="collection">
-          <section class="manager-section">
-            <h3>Party <span id="partyCountLabel" class="section-count"></span></h3>
-            <div id="managerParty"></div>
+        <div class="character-manager-layout manager-tab-pane active" data-tab-pane="collection">
+          <section class="character-roster manager-section" aria-label="Party และ Monster List">
+            <div class="character-section-head"><h3>Party <span id="partyCountLabel" class="section-count"></span></h3><span class="character-section-note">แตะเพื่อดู</span></div>
+            <div id="managerParty" class="character-roster-slots"></div>
+            <div class="character-storage-head">Storage / Ranch <span id="storageCountLabel" class="section-count"></span> • Active <span id="ranchActiveCountLabel" class="section-count"></span></div>
+            <div id="managerStorage" class="character-storage-list"></div>
           </section>
 
-          <section class="manager-section">
-            <h3>Storage / Ranch <span id="storageCountLabel" class="section-count"></span> • Active <span id="ranchActiveCountLabel" class="section-count"></span></h3>
-            <div id="managerStorage"></div>
+          <section class="character-preview" aria-label="Monster Preview">
+            <div class="character-preview-kicker">MONSTER PREVIEW</div>
+            <div class="character-preview-art" aria-hidden="true"><span id="characterPreviewPortrait">?</span></div>
+            <div id="characterPreviewName" class="character-preview-name">เลือกมอนสเตอร์</div>
+            <div id="characterPreviewMeta" class="character-preview-meta">Lv.— · EXP — · CR —</div>
+            <div id="characterPreviewTypes" class="character-preview-types">เลือก Party ด้านซ้ายเพื่อดูรายละเอียด</div>
+            <div id="characterPreviewPlace" class="character-preview-place">—</div>
+            <div id="characterPreviewGrowth" class="character-preview-growth">Bond — · Growth —</div>
+            <div class="character-preview-empty">ข้อมูลทั้งหมดจะอ่านจาก Monster Instance จริง</div>
+          </section>
+
+          <section class="character-information manager-section" aria-label="Character Information">
+            <div class="character-section-head"><h3>ข้อมูลตัวละคร</h3><span class="character-section-note">Live Data</span></div>
+            <div class="character-info-tabs" role="tablist" aria-label="ข้อมูลมอนสเตอร์">
+              <button type="button" class="character-info-tab active" data-character-tab="info">ข้อมูล</button>
+              <button type="button" class="character-info-tab" data-character-tab="skills">สกิล</button>
+              <button type="button" class="character-info-tab" data-character-tab="equipment">อุปกรณ์</button>
+              <button type="button" class="character-info-tab" data-character-tab="training">ฝึก</button>
+              <button type="button" class="character-info-tab" data-character-tab="evolution">วิวัฒนาการ</button>
+            </div>
+            <div id="characterInfoBody" class="character-info-body">
+              <div class="character-info-empty">เลือกมอนสเตอร์จากรายการเพื่อแสดง HP, Stats, CR, Growth, Skills และ Equipment</div>
+            </div>
           </section>
         </div>
 
