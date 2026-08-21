@@ -3420,6 +3420,7 @@ function renderParty(){
       renderParty();
     },{passive:false});
     button.addEventListener('click',event=>{if(event.detail!==0)return;event.preventDefault();event.stopPropagation();const peek=characterUI.peekPartySlot(index);const peeked=getInst(peek.monsterId);if(peeked)msg(`ดู ${displayName(peeked)} • Lv.${peeked.level}${peek.readOnly?' • ดูอย่างเดียว':''}`);else msg(`Party ช่อง ${index+1} ว่าง`);renderParty();});
+    button.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;event.preventDefault();button.click();});
     party.appendChild(button);
   });
 }

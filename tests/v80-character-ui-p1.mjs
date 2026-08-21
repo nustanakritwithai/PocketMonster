@@ -160,6 +160,7 @@ assert.match(extractFn('switchPartySlot'), /summonThrow\(\)/, 'allowed switch st
 assert.match(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap peeks');
 assert.match(extractFn('renderParty'), /sw\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Switch chip supports keyboard click without duplicating pointer input');
 assert.match(extractFn('renderParty'), /button\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Party peek supports keyboard click without duplicating pointer input');
+assert.match(extractFn('renderParty'), /button\.addEventListener\('keydown',event=>\{if\(event\.key!=='Enter'&&event\.key!==' '\)return;/, 'role=button Party peek handles Enter and Space explicitly');
 assert.match(extractFn('renderParty'), /dataset.partySwitch/, 'party HUD exposes an explicit Switch control');
 assert.match(extractFn('renderParty'), /switchPartySlot\(index\)/, 'Switch control still calls switchPartySlot');
 assert.doesNotMatch(
