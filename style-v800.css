@@ -447,11 +447,11 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 @media(max-width:760px),(max-height:500px){
   .global-character-btn{
     bottom:auto;
-    top:calc(var(--safe-top) + 148px);
+    top:calc(var(--safe-top) + 292px);
   }
   .character-access-entry{
     bottom:auto;
-    top:calc(var(--safe-top) + 148px);
+    top:calc(var(--safe-top) + 292px);
     left:calc(var(--safe-left) + 56px);
     width:min(150px,28vw);
   }
