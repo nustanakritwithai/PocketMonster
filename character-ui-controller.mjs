@@ -4,6 +4,7 @@
 
 export const CHARACTER_PANELS = Object.freeze(['closed', 'quick', 'full', 'tab']);
 export const CHARACTER_TABS = Object.freeze([
+  'info',
   'collection',
   'training',
   'skills',
