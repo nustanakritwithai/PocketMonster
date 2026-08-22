@@ -142,6 +142,7 @@
 
     <div id="merchantShop" class="merchant-shop hidden" role="dialog" aria-label="ร้านค้าพ่อค้าเร่เสบียง">
       <div class="merchant-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
         <div class="merchant-head"><div><b>พ่อค้าเร่เสบียง</b><small>General Merchant • Farm Hub</small></div><button id="merchantClose" aria-label="ปิดร้านค้า">✕</button></div>
         <div class="merchant-dialog">มีโพชั่น ยาฟื้นฟู และลูกแก้วจับมอนสเตอร์คุณภาพเยี่ยม ขายราคาเป็นกันเอง!</div>
         <div id="merchantProducts" class="merchant-products"></div>
@@ -151,6 +152,7 @@
 
     <section id="trainerPanel" class="trainer-panel hidden" role="dialog" aria-label="สนามฝึกมอนสเตอร์">
       <div class="trainer-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
         <header class="trainer-head"><div><span class="trainer-kicker">TRAINING GROUND</span><h2>ครูฝึกเรนเจอร์</h2><p>พัฒนาความสามารถของมอนสเตอร์ให้เหมาะกับสไตล์การเล่น</p></div><button id="trainerClose" aria-label="ปิดสนามฝึก">✕</button></header>
         <div class="trainer-dialog">เลือกมอนสเตอร์และค่าสถานะที่ต้องการฝึก ระบบจะแสดง Pool, Aptitude และสภาพก่อนเริ่มทุกครั้ง</div>
         <div id="trainerBody" class="trainer-body"></div>
@@ -159,6 +161,7 @@
 
     <section id="evolutionPanel" class="evolution-guide-panel hidden" role="dialog" aria-label="ศูนย์วิวัฒนาการ">
       <div class="evolution-guide-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
         <header class="evolution-guide-head"><div><span class="evolution-kicker">EVOLUTION RESEARCH</span><h2>นักวิจัยวิวัฒนาการ</h2><p>ค้นพบร่างถัดไปโดยรักษา Gene และประวัติของมอนสเตอร์ไว้ครบถ้วน</p></div><button id="evolutionClose" aria-label="ปิดศูนย์วิวัฒนาการ">✕</button></header>
         <div class="evolution-guide-dialog">เลือกมอนสเตอร์เพื่อดูเส้นทาง ร่างใหม่ ค่าสถานะ และเงื่อนไขก่อนยืนยัน</div>
         <label class="evolution-select-label">มอนสเตอร์ที่ต้องการวิวัฒนาการ<select id="evolutionMonsterSelect"></select></label>
@@ -168,6 +171,7 @@
 
     <section id="breedingPanel" class="breeding-caretaker-panel hidden" role="dialog" aria-label="ศูนย์เพาะพันธุ์">
       <div class="breeding-caretaker-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
         <header class="breeding-caretaker-head"><div><span class="breeding-kicker">BREEDING CENTER</span><h2>ผู้ดูแลเพาะพันธุ์</h2><p>จับคู่มอนสเตอร์ที่เข้ากันได้และดู Gene ที่อาจส่งต่อ</p></div><button id="breedingClose" aria-label="ปิดศูนย์เพาะพันธุ์">✕</button></header>
         <div class="breeding-caretaker-dialog">เลือก Parent A และ Parent B จาก Storage แล้วตรวจ Compatibility ก่อนเริ่มสร้างไข่</div>
         <div class="breeding-preview-grid"><div><span>Parent A</span><strong>มอนสเตอร์ตัวที่หนึ่ง</strong></div><div class="breeding-heart">♥</div><div><span>Parent B</span><strong>มอนสเตอร์ตัวที่สอง</strong></div></div>
