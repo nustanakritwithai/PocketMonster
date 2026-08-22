@@ -17,7 +17,7 @@ for(const id of ['frozen-pass','rocky-canyon','sky-ruins','poison-marsh','dream-
 assert.equal(stageUnlockReason(progress,'haunted-woods').ok,true,'Dream Shrine clear unlocks Haunted Woods');
 const route=routesFrom('dream-shrine').find(candidate=>candidate.to==='haunted-woods');
 assert.equal(warpAvailability(progress,route,stageUnlockReason).ok,true,'Haunted Woods route is available after Dream Shrine');
-const zoneBlock=js.match(/['"]haunted-woods['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const zoneBlock=js.match(/['"]haunted-woods['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]shadow-city['"]\s*:)/)?.[0]||'';
 assert.match(zoneBlock,/stageId:'haunted-woods'/,'Haunted Woods runtime zone is catalog-linked');
 assert.match(zoneBlock,/spawn:\[/,'Haunted Woods has Normal encounter spawn data');
 assert.match(zoneBlock,/eliteSpawn:\[/,'Haunted Woods has Elite encounter data');
