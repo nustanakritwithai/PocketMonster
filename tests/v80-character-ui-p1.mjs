@@ -54,7 +54,7 @@ function makeGame({ party = ['alpha', 'beta', null], selectedSlot = 1, zone = 'h
 }
 
 assert.equal(PARTY_SLOT_COUNT, 3, 'party stays 3 slots');
-assert.equal(SAVE_SCHEMA_VERSION, 10, 'Character UI uses the current breeding-egg save schema');
+assert.equal(SAVE_SCHEMA_VERSION, 11, 'Character UI uses the current passive-instance save schema');
 
 const uiKeys = Object.keys(createCharacterUiState());
 assert.deepEqual(uiKeys.sort(), [

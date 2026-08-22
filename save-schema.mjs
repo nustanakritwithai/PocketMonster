@@ -1,6 +1,7 @@
 import {
   INSTANCE_SAVE_VERSION,
   TRANSIENT_COOLDOWN_FIELDS,
+  TRANSIENT_PASSIVE_FIELDS,
   catalogIdentityDiagnostics,
   migrateState,
   sanitizeMonsterInstanceForPersistence,
@@ -12,7 +13,7 @@ import {
 
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
-export const SAVE_SCHEMA_VERSION = 10;
+export const SAVE_SCHEMA_VERSION = 11;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
@@ -35,12 +36,18 @@ export const SAVE_MIGRATION_REGISTRY = Object.freeze([
     targetVersion: 10,
     migrate: migrateState,
   }),
+  Object.freeze({
+    id: 'passive-instance-v11',
+    targetVersion: 11,
+    migrate: migrateState,
+  }),
 ]);
 
 export function sanitizeStateForPersistence(input) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const state = { ...source };
   for (const field of TRANSIENT_COOLDOWN_FIELDS) delete state[field];
+  for (const field of TRANSIENT_PASSIVE_FIELDS) delete state[field];
   state.collection = Array.isArray(source.collection)
     ? source.collection.map(sanitizeMonsterInstanceForPersistence)
     : [];
@@ -166,7 +173,15 @@ export function writeStoredSave(storage, envelope, { onDiagnostic } = {}) {
   const persistentState = sanitizeStateForPersistence(envelope.state);
   reportSaveDiagnostics(persistentState, onDiagnostic);
   const previousRaw = storage.getItem(SAVE_KEY);
-  if (parseEnvelope(previousRaw)) storage.setItem(SAVE_BACKUP_KEY, previousRaw);
+  const previous = parseEnvelope(previousRaw);
+  if (previous) {
+    storage.setItem(SAVE_BACKUP_KEY, JSON.stringify({
+      ...previous,
+      state: sanitizeStateForPersistence(previous.state),
+      appVersion: APP_VERSION,
+      saveSchemaVersion: SAVE_SCHEMA_VERSION,
+    }));
+  }
   const next = {
     ...envelope,
     state: persistentState,

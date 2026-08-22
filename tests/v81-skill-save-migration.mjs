@@ -36,8 +36,8 @@ const legacy = {
 };
 
 const migrated = normalizeSavedState(legacy, { now: 1000 });
-assert.equal(SAVE_SCHEMA_VERSION, 10);
-assert.equal(migrated.saveVersion, 10);
+assert.equal(SAVE_SCHEMA_VERSION, 11);
+assert.equal(migrated.saveVersion, 11);
 assert.equal('cooldownRemaining' in migrated, false, 'encounter cooldown state never survives load migration');
 const monster = migrated.collection[0];
 assert.equal('cooldownRemaining' in monster, false);
@@ -76,8 +76,8 @@ assert.equal('cooldownRemaining' in sanitized.collection[0].skills[0], false);
 const storage = new MemoryStorage();
 writeStoredSave(storage, { state: rawForSave, playerHp: 80 });
 const envelope = JSON.parse(storage.getItem(SAVE_KEY));
-assert.equal(envelope.saveSchemaVersion, 10);
-assert.equal(envelope.state.saveVersion, 10);
+assert.equal(envelope.saveSchemaVersion, 11);
+assert.equal(envelope.state.saveVersion, 11);
 assert.equal(envelope.state.collection[0].skills[0].currentUses, 7);
 assert.doesNotMatch(storage.getItem(SAVE_KEY), /cooldownRemaining|cooldownRemainingMs|skillCds/, 'local payload cannot persist cooldown runtime fields');
 

@@ -27,6 +27,7 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
+import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
@@ -36,7 +37,7 @@ import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
-import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, refreshCoreStats, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
   applySpeciesProgression,
@@ -700,9 +701,8 @@ function refreshStats(inst,heal=false){
   inst.training=inst.training||{power:0,defense:0,speed:0,technique:0,spirit:0};
   inst._condition=deriveCondition(inst);
   const path=getEvolutionPath(inst);
-  const computed=computeCoreStats(inst,sp,path,getEquipmentFlat(inst));
+  const computed=refreshCoreStats(inst,sp,path,getEquipmentFlat(inst),{heal});
   inst.statBreakdown=computed.breakdown;
-  applyComputedStats(inst,computed.stats,{heal});
   inst.lifeStage=lifeStageFor(inst);
   syncFromBodyMind(inst);
 }
@@ -2275,9 +2275,9 @@ function renderFocusedSkillLoadoutV2(){
     const mutations=rec&&rank==='master'?SKILL_MUTATIONS[rec.skillId]||[]:[];
     return `<div class="skill-card"><div class="skill-card-header"><b>${slot} • ${move.name} ${typeBadge(move.type||'Normal')}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank}</span></div><div class="skill-detail">Power: ${move.power??'—'} • CD: ${move.cooldown??'—'}s • ${move.targetType||'enemy'}</div><div class="skill-detail">Mastery: ${rank} • Skill EXP: ${exp}${rec?.mutationId?` • Mutation: ${rec.mutationId}`:''}${mutations.length?' • Mutation พร้อมเลือกในระบบเดิม':''}</div></div>`;
   }).join('');
-  const sp=spById[inst.speciesId];
   const path=getEvolutionPath(inst);
-  const passive=inst.passive||inst.genes?.trait||sp?.traits?.[0]||'—';
+  const passiveDefinition=passiveCatalogEntry(inst.passiveId);
+  const passive=passiveDefinition?`${passiveDefinition.nameTH} (${passiveDefinition.nameEN})`:'—';
   const evolutionTrait=path?.trait||path?.evolutionTrait||'—';
   return `<section class="focused-skill-loadout"><div class="skills-section-title">Skill Loadout • ${presentation.name}</div><div class="skill-loadout-slots">${slots}</div><div class="skill-card skill-passive"><b>Passive</b><div class="skill-detail">${passive}</div></div><div class="skill-card skill-evolution-trait"><b>Evolution Trait</b><div class="skill-detail">${evolutionTrait}</div></div></section>`;
 }
