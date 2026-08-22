@@ -2,7 +2,7 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, recordStageClear, stageUnlockReason } from './stage-catalog.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, recordStageClear, stageRewards, stageUnlockReason } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, warpAvailability } from './warp-routes.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
@@ -2521,7 +2521,7 @@ function completeStageClear(stageId){
   const elapsed=stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
   const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
   const first=!next.firstClearRewards[stageId];
-  const rewards=stageId==='ember-valley'?{captureBalls:5,protein:2,emberFruit:1}:stageId==='misty-lake'?{captureBalls:5,healthy:2,moonFruit:1}:stageId==='storm-field'?{captureBalls:5,trainingChow:2,mineralBite:1}:{captureBalls:5,healthy:2,mineralBite:1};
+  const rewards=stageRewards(stageId);
   if(first){
     for(const [key,value] of Object.entries(rewards))state.inventory[key]=(state.inventory[key]||0)+value;
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};

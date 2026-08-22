@@ -15,7 +15,7 @@ export const STAGE_CATALOG=Object.freeze([
   stage('ember-valley','Ember Valley','volcanic-valley',['Fire'],['Rock','Ground'],{min:4,max:7},{type:'clearStage',stageId:'grass-meadow'}),
   stage('misty-lake','Misty Lake','misty-lake',['Water'],['Grass','Flying'],{min:5,max:8},{type:'clearStage',stageId:'ember-valley'}),
   stage('storm-field','Storm Field','storm-field',['Electric'],['Flying','Steel'],{min:6,max:10},{type:'clearStage',stageId:'misty-lake'}),
-  stage('frozen-pass','Frozen Pass','frozen-pass',['Ice'],['Flying','Water'],{min:10,max:14},{type:'clearSet',setId:'set-1'}),
+  stage('frozen-pass','Frozen Pass','frozen-pass',['Ice'],['Flying','Water'],{min:10,max:14},{type:'clearStage',stageId:'storm-field'}),
   stage('rocky-canyon','Rocky Canyon','rocky-canyon',['Rock'],['Ground','Fighting'],{min:12,max:16},{type:'clearStage',stageId:'frozen-pass'}),
   stage('sky-ruins','Sky Ruins','sky-ruins',['Flying'],['Electric','Psychic'],{min:14,max:18},{type:'clearStage',stageId:'rocky-canyon'}),
   stage('poison-marsh','Poison Marsh','poison-marsh',['Poison'],['Grass','Bug'],{min:16,max:20},{type:'clearStage',stageId:'sky-ruins'}),
@@ -30,6 +30,23 @@ export const STAGE_CATALOG=Object.freeze([
 ]);
 
 export const STAGE_BY_ID=Object.freeze(Object.fromEntries(STAGE_CATALOG.map(definition=>[definition.id,definition])));
+
+export const STAGE_REWARD_PROFILES=Object.freeze({
+  'stage-grass-meadow-v1':Object.freeze({captureBalls:5,healthy:2,mineralBite:1}),
+  'stage-ember-valley-v1':Object.freeze({captureBalls:5,protein:2,emberFruit:1}),
+  'stage-misty-lake-v1':Object.freeze({captureBalls:5,healthy:2,moonFruit:1}),
+  'stage-storm-field-v1':Object.freeze({captureBalls:5,trainingChow:2,mineralBite:1}),
+  'stage-frozen-pass-v1':Object.freeze({captureBalls:5,healthy:2,moonFruit:1}),
+  'stage-rocky-canyon-v1':Object.freeze({captureBalls:5,mineralBite:2,protein:1}),
+  'stage-sky-ruins-v1':Object.freeze({captureBalls:5,trainingChow:2,mineralBite:1}),
+  'stage-poison-marsh-v1':Object.freeze({captureBalls:5,healthy:2,mineralBite:1}),
+});
+
+export function stageRewards(stageId){
+  const definition=STAGE_BY_ID[stageId];
+  if(!definition)return {};
+  return {...(STAGE_REWARD_PROFILES[definition.rewardProfileId]||{})};
+}
 
 export function createStageProgress(){
   return {version:1,unlocked:['grass-meadow'],cleared:[],bossClears:{},eliteClears:{},firstClearRewards:{},bestTimes:{},elementDiscovery:{}};
