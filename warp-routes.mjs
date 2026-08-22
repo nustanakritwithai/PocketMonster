@@ -1,3 +1,5 @@
+import { STAGE_BY_ID } from './stage-catalog.mjs';
+
 export const WARP_ROUTES=Object.freeze([
   {id:'hub-to-grass',from:'hub',to:'grass-meadow',label:'Grass Meadow',position:[0,18],spawn:[0,0,16],kind:'forward'},
   {id:'grass-to-hub',from:'grass-meadow',to:'hub',label:'Ranch Hub',position:[0,19],spawn:[0,0,7],kind:'return'},
@@ -27,6 +29,33 @@ export const WARP_ROUTES=Object.freeze([
   {id:'steel-to-hub',from:'steel-factory',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
   {id:'storm-to-hub',from:'storm-field',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
 ]);
+
+export function validateWarpRoutes(routes=WARP_ROUTES,{knownZoneIds=['hub',...Object.keys(STAGE_BY_ID)]}={}){
+  const issues=[],known=new Set(knownZoneIds),ids=new Set();
+  if(!Array.isArray(routes))return Object.freeze({ok:false,issues:Object.freeze([{code:'invalid_route_catalog'}])});
+  routes.forEach((route,index)=>{
+    if(!route||typeof route!=='object'){
+      issues.push(Object.freeze({code:'invalid_route',index}));
+      return;
+    }
+    if(typeof route.id!=='string'||!route.id)issues.push(Object.freeze({code:'invalid_route_id',index}));
+    else if(ids.has(route.id))issues.push(Object.freeze({code:'duplicate_route_id',index,id:route.id}));
+    else ids.add(route.id);
+    if(!known.has(route.from))issues.push(Object.freeze({code:'unknown_route_origin',index,value:route.from??null}));
+    if(!known.has(route.to))issues.push(Object.freeze({code:'unknown_route_destination',index,value:route.to??null}));
+    if(route.from===route.to)issues.push(Object.freeze({code:'self_route',index,value:route.from??null}));
+    if(!['forward','return'].includes(route.kind))issues.push(Object.freeze({code:'invalid_route_kind',index,value:route.kind??null}));
+    if(!Array.isArray(route.position)||route.position.length!==2||!route.position.every(Number.isFinite))issues.push(Object.freeze({code:'invalid_route_position',index}));
+    if(!Array.isArray(route.spawn)||route.spawn.length!==3||!route.spawn.every(Number.isFinite))issues.push(Object.freeze({code:'invalid_route_spawn',index}));
+  });
+  routes.forEach((route,index)=>{
+    if(!route||route.to==='hub'||!known.has(route.from)||!known.has(route.to))return;
+    if(!routes.some(candidate=>candidate?.from===route.to&&candidate?.to===route.from)){
+      issues.push(Object.freeze({code:'missing_reverse_route',index,id:route.id??null}));
+    }
+  });
+  return Object.freeze({ok:issues.length===0,issues:Object.freeze(issues)});
+}
 
 export function routesFrom(stageId){return WARP_ROUTES.filter(route=>route.from===stageId);}
 

@@ -96,6 +96,66 @@ export function resolveEncounterProfile({stageId=null,runtimeSpeciesId,variant='
   });
 }
 
+export function validateZoneEncounterConfig(zones){
+  const issues=[];
+  if(!zones||typeof zones!=='object'||Array.isArray(zones)){
+    return Object.freeze({ok:false,issues:Object.freeze([encounterIssue('invalid_zone_catalog','zones')])});
+  }
+  const lists=[['spawn',null],['rareSpawn','rare'],['eliteSpawn','elite'],['bossSpawn','boss']];
+  for(const [zoneId,zone] of Object.entries(zones)){
+    if(!zone||typeof zone!=='object'){
+      issues.push(encounterIssue('invalid_zone','zone',{zoneId}));
+      continue;
+    }
+    const stageId=zone.stageId??(STAGE_BY_ID[zoneId]?zoneId:null);
+    if(stageId&&stageId!==zoneId)issues.push(encounterIssue('stage_zone_mismatch','stageId',{zoneId,value:stageId}));
+    for(const [listName,requiredVariant] of lists){
+      const records=zone[listName];
+      if(records===undefined)continue;
+      if(!Array.isArray(records)){
+        issues.push(encounterIssue('invalid_spawn_list',listName,{zoneId}));
+        continue;
+      }
+      records.forEach((record,index)=>{
+        if(!Array.isArray(record)||record.length<4){
+          issues.push(encounterIssue('invalid_spawn_record',listName,{zoneId,index}));
+          return;
+        }
+        const [runtimeSpeciesId,x,z,level,rawOptions] = record;
+        const options=rawOptions===undefined?{}:rawOptions;
+        if(!options||typeof options!=='object'||Array.isArray(options)){
+          issues.push(encounterIssue('invalid_spawn_options',listName,{zoneId,index}));
+          return;
+        }
+        const flagVariant=encounterVariantFromFlags(options);
+        const variant=requiredVariant??flagVariant;
+        if(requiredVariant&&flagVariant!==requiredVariant){
+          issues.push(encounterIssue('variant_mismatch',listName,{zoneId,index,value:flagVariant,expected:requiredVariant}));
+        }
+        if(!Number.isFinite(x)||!Number.isFinite(z))issues.push(encounterIssue('invalid_spawn_position',listName,{zoneId,index}));
+        const bounds=zone.bounds;
+        if(bounds&&Number.isFinite(x)&&Number.isFinite(z)&&(x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ)){
+          issues.push(encounterIssue('spawn_out_of_bounds',listName,{zoneId,index,x,z}));
+        }
+        const result=resolveEncounterProfile({
+          stageId,
+          runtimeSpeciesId,
+          variant,
+          level,
+          capturePolicy:options?.capturePolicy??null,
+        });
+        for(const issue of result.issues){
+          issues.push(encounterIssue(issue.code,listName,{zoneId,index,detail:issue}));
+        }
+      });
+    }
+    if(zone.progressionBossSpeciesId&&Array.isArray(zone.bossSpawn)&&!zone.bossSpawn.some(record=>record?.[0]===zone.progressionBossSpeciesId)){
+      issues.push(encounterIssue('progression_boss_reference_mismatch','progressionBossSpeciesId',{zoneId,value:zone.progressionBossSpeciesId}));
+    }
+  }
+  return Object.freeze({ok:issues.length===0,issues:Object.freeze(issues)});
+}
+
 export const STAGE_SET_MEMBERS=Object.freeze({
   'set-1':Object.freeze(['grass-meadow','ember-valley','misty-lake','storm-field']),
   'set-2':Object.freeze(['frozen-pass','rocky-canyon','sky-ruins','poison-marsh']),
