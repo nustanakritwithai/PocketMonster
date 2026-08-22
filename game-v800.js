@@ -1739,6 +1739,62 @@ function animateMonster(mesh,dt,moving=false){
   mesh.rotation.x += (rx-mesh.rotation.x)*Math.min(1,dt*8);
   mesh.rotation.z += (rz-mesh.rotation.z)*Math.min(1,dt*8);
 }
+let characterPreviewRenderer=null;
+let characterPreviewScene=null;
+let characterPreviewCamera=null;
+let characterPreviewMesh=null;
+let characterPreviewId=null;
+let characterPreviewZoom=4.2;
+let characterPreviewDrag=null;
+let characterPreviewSize={width:0,height:0};
+function initCharacterPreview3D(){
+  const canvas=el('characterPreviewCanvas');
+  if(!canvas||typeof THREE==='undefined')return;
+  try{
+    characterPreviewRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'low-power'});
+    characterPreviewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+    characterPreviewRenderer.setClearColor(0x000000,0);
+    characterPreviewScene=new THREE.Scene();
+    characterPreviewCamera=new THREE.PerspectiveCamera(28,1,.1,30);
+    characterPreviewCamera.position.set(0,1.05,characterPreviewZoom);
+    const hemi=new THREE.HemisphereLight(0xffffff,0x172554,1.8);
+    const key=new THREE.DirectionalLight(0xffffff,2.2); key.position.set(2,4,3);
+    characterPreviewScene.add(hemi,key);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.72,.018,6,32),new THREE.MeshBasicMaterial({color:0x7dd3fc,transparent:true,opacity:.8}));
+    ring.rotation.x=Math.PI/2; ring.position.y=.04; ring.name='characterPreviewRing';
+    characterPreviewScene.add(ring);
+    canvas.parentElement?.classList.add('has-3d');
+    canvas.addEventListener('pointerdown',event=>{
+      characterPreviewDrag={x:event.clientX,rotation:characterPreviewMesh?.rotation.y||0};
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('pointermove',event=>{
+      if(!characterPreviewDrag||!characterPreviewMesh)return;
+      characterPreviewMesh.rotation.y=characterPreviewDrag.rotation+(event.clientX-characterPreviewDrag.x)*.012;
+    });
+    const stopDrag=()=>{characterPreviewDrag=null;};
+    canvas.addEventListener('pointerup',stopDrag); canvas.addEventListener('pointercancel',stopDrag);
+    canvas.addEventListener('wheel',event=>{
+      event.preventDefault();
+      characterPreviewZoom=THREE.MathUtils.clamp(characterPreviewZoom+event.deltaY*.002,2.8,6);
+    },{passive:false});
+  }catch(error){
+    characterPreviewRenderer=null; characterPreviewScene=null; characterPreviewCamera=null;
+    console.warn('3D character preview unavailable; using portrait fallback',error);
+  }
+}
+function updateCharacterPreview(dt){
+  if(!characterPreviewRenderer||!characterPreviewScene||!characterPreviewCamera)return;
+  const canvas=el('characterPreviewCanvas');
+  if(!canvas)return;
+  const rect=canvas.getBoundingClientRect(),width=Math.floor(rect.width),height=Math.floor(rect.height);
+  if(width<2||height<2)return;
+  if(characterPreviewSize.width!==width||characterPreviewSize.height!==height){characterPreviewRenderer.setSize(Math.max(2,width),Math.max(2,height),false);characterPreviewSize={width,height};}
+  characterPreviewCamera.aspect=rect.width/Math.max(1,rect.height); characterPreviewCamera.position.z+=(characterPreviewZoom-characterPreviewCamera.position.z)*Math.min(1,dt*8); characterPreviewCamera.lookAt(0,.78,0);
+  const ring=characterPreviewScene.getObjectByName('characterPreviewRing'); if(ring)ring.rotation.z+=dt*.35;
+  if(characterPreviewMesh){animateMonster(characterPreviewMesh,dt,false); if(!characterPreviewDrag)characterPreviewMesh.rotation.y+=dt*.22;}
+  try{characterPreviewRenderer.render(characterPreviewScene,characterPreviewCamera);}catch(error){console.warn('3D character preview render failed',error);characterPreviewRenderer=null;}
+}
 function monsterLookYaw(dir,mesh){ return Math.atan2(dir.x,dir.z) + (mesh?.userData?.faceOffset??Math.PI); }
 
 // ---------- V7.0 Combat feedback: floating damage, camera shake, elemental ground decals ----------
@@ -3525,9 +3581,22 @@ function focusedCharacterPresentation(){
   });
 }
 function renderFullCharacterPreview(){
+  if(!characterPreviewScene&&!characterPreviewRenderer)initCharacterPreview3D();
   const presentation=focusedCharacterPresentation();
   const inst=presentation.id?getInst(presentation.id):null;
   const species=inst?spById[inst.speciesId]:null;
+  const previewId=inst?.instanceId||null;
+  if(previewId!==characterPreviewId){
+    if(characterPreviewMesh&&characterPreviewScene)removeAndDispose(characterPreviewScene,characterPreviewMesh);
+    characterPreviewMesh=null; characterPreviewId=previewId;
+    if(inst&&species&&characterPreviewScene){
+      characterPreviewMesh=monsterMesh(species,true,inst);
+      characterPreviewMesh.scale.multiplyScalar(.86);
+      characterPreviewMesh.position.y=.02;
+      setupMonsterMotion(characterPreviewMesh,species,inst);
+      characterPreviewScene.add(characterPreviewMesh);
+    }
+  }
   const portrait=el('characterPreviewPortrait');
   const portraitColor=species?`#${species.color.toString(16).padStart(6,'0')}`:'#334155';
   setTextIfChanged(portrait,presentation.isEmpty?'?':presentation.name.slice(0,1));
@@ -4260,6 +4329,7 @@ function loop(now){
       updateNpcUI();
       if(!el('monsterManager').classList.contains('hidden')&&managerDirty.consume(now))renderManager();
     }
+    updateCharacterPreview(dt);
     renderer.render(scene,camera);
     if(firstFrame){
       firstFrame=false;
