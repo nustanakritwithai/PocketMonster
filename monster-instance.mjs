@@ -5,6 +5,7 @@
 // layer with no engine/UI coupling (R19, R24).
 
 import { BALANCE_CONFIG } from './balance-config.mjs';
+import { monsterCatalogEntry } from './monster-catalog.mjs';
 import {
   levelFromTotalExp,
   trainingCapacity,
@@ -140,6 +141,27 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
 
 export function createInstance(overrides = {}, options = {}) {
   return normalizeInstance(overrides, options);
+}
+
+export function instanceSpeciesIdentity(instance) {
+  const runtimeSpeciesId = typeof instance?.speciesId === 'string' ? instance.speciesId : null;
+  const mapping = runtimeSpeciesId ? monsterCatalogEntry(runtimeSpeciesId) : null;
+  if (!mapping) {
+    return Object.freeze({
+      ok: false,
+      reason: 'unknown_species_id',
+      runtimeSpeciesId,
+      workbookBaseMonsterId: null,
+      workbookStage2MonsterId: null,
+    });
+  }
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    runtimeSpeciesId,
+    workbookBaseMonsterId: mapping.workbookBaseMonsterId,
+    workbookStage2MonsterId: mapping.workbookStage2MonsterId,
+  });
 }
 
 // Migrate a whole save state's monster collection to the V8 instance schema,
