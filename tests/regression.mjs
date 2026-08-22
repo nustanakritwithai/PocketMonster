@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { RUNTIME_TYPES } from '../type-catalog.mjs';
 import { activeHtml as html, activeJs as js } from './active-assets.mjs';
 const must=(needle,msg)=>assert.ok(js.includes(needle),msg||`missing ${needle}`);
 
@@ -23,6 +24,8 @@ must('if(!confirm(`Evolution ย้อนกลับไม่ได้','evolut
 must("hub:{label:'Ranch Hub'"); must("grassland:{label:'Green Meadow'"); must("cave:{label:'Echo Cave'");
 const expected=['flameling','mossbun','voltkit','aquapuff','frostowl','ironbug','emberdrake','voidhorn'];
 for(const id of expected) must(`id:'${id}'`,`missing vertical slice species ${id}`);
-const typeLine=js.match(/const TYPES=\[(.*?)\];/s)?.[1]||'';
-assert.equal((typeLine.match(/'/g)||[]).length/2,18,'type baseline must contain 18 types');
+assert.equal(RUNTIME_TYPES.length,18,'type baseline must contain 18 types');
+assert.equal(new Set(RUNTIME_TYPES).size,18,'type baseline identities must stay unique');
+assert.ok(RUNTIME_TYPES.includes('Fairy'),'Fairy must remain the canonical runtime type');
+assert.ok(!RUNTIME_TYPES.includes('Light'),'Light must not become a second runtime type');
 console.log('Active Ring 0 + Ring 1 static regression: PASS');

@@ -43,6 +43,13 @@ import {
   foodById,
 } from './content-catalog.mjs';
 import { createSpeciesCatalogAdapter } from './monster-catalog.mjs';
+import {
+  RUNTIME_TYPES as TYPES,
+  TYPE_LABEL_TH as TYPE_TH,
+  TYPE_COLOR,
+  TYPE_EMOJI,
+  typeEffectiveness,
+} from './type-catalog.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
@@ -193,20 +200,6 @@ function ensureCombatHudSemantics(){
 ensureCombatHudSemantics();
 
 // ---------- 18-Type system ----------
-const TYPES=['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
-const TYPE_TH={Normal:'ปกติ',Fire:'ไฟ',Water:'น้ำ',Electric:'สายฟ้า',Grass:'พืช',Ice:'น้ำแข็ง',Fighting:'ต่อสู้',Poison:'พิษ',Ground:'ดิน',Flying:'บิน',Psychic:'จิต',Bug:'แมลง',Rock:'หิน',Ghost:'วิญญาณ',Dragon:'มังกร',Dark:'มืด',Steel:'เหล็ก',Fairy:'ภูต'};
-const TYPE_COLOR={Normal:'#8a8a78',Fire:'#ef6c32',Water:'#4f87e8',Electric:'#e8bd22',Grass:'#63b34b',Ice:'#79c9c9',Fighting:'#b9342c',Poison:'#93489e',Ground:'#cba94e',Flying:'#8d7cdb',Psychic:'#ec4d7f',Bug:'#9cab25',Rock:'#a48e38',Ghost:'#61568f',Dragon:'#6a45d3',Dark:'#584b43',Steel:'#8e8eaa',Fairy:'#dc87b8'};
-const TYPE_EMOJI={Normal:'⚪',Fire:'🔥',Water:'💧',Electric:'⚡',Grass:'🌿',Ice:'❄️',Fighting:'🥊',Poison:'☠️',Ground:'⛰️',Flying:'🪽',Psychic:'🔮',Bug:'🐛',Rock:'🪨',Ghost:'👻',Dragon:'🐉',Dark:'🌑',Steel:'⚙️',Fairy:'✨'};
-const TYPE_CHART={
-  Normal:{Rock:.5,Ghost:0,Steel:.5},Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},Water:{Fire:2,Water:.5,Grass:.5,Ground:2,Rock:2,Dragon:.5},
-  Electric:{Water:2,Electric:.5,Grass:.5,Ground:0,Flying:2,Dragon:.5},Grass:{Fire:.5,Water:2,Grass:.5,Poison:.5,Ground:2,Flying:.5,Bug:.5,Rock:2,Dragon:.5,Steel:.5},
-  Ice:{Fire:.5,Water:.5,Grass:2,Ice:.5,Ground:2,Flying:2,Dragon:2,Steel:.5},Fighting:{Normal:2,Ice:2,Poison:.5,Flying:.5,Psychic:.5,Bug:.5,Rock:2,Ghost:0,Dark:2,Steel:2,Fairy:.5},
-  Poison:{Grass:2,Poison:.5,Ground:.5,Rock:.5,Ghost:.5,Steel:0,Fairy:2},Ground:{Fire:2,Electric:2,Grass:.5,Poison:2,Flying:0,Bug:.5,Rock:2,Steel:2},
-  Flying:{Electric:.5,Grass:2,Fighting:2,Bug:2,Rock:.5,Steel:.5},Psychic:{Fighting:2,Poison:2,Psychic:.5,Dark:0,Steel:.5},Bug:{Fire:.5,Grass:2,Fighting:.5,Poison:.5,Flying:.5,Psychic:2,Ghost:.5,Dark:2,Steel:.5,Fairy:.5},
-  Rock:{Fire:2,Ice:2,Fighting:.5,Ground:.5,Flying:2,Bug:2,Steel:.5},Ghost:{Normal:0,Psychic:2,Ghost:2,Dark:.5},Dragon:{Dragon:2,Steel:.5,Fairy:0},Dark:{Fighting:.5,Psychic:2,Ghost:2,Dark:.5,Fairy:.5},
-  Steel:{Fire:.5,Water:.5,Electric:.5,Ice:2,Rock:2,Steel:.5,Fairy:2},Fairy:{Fire:.5,Fighting:2,Poison:.5,Dragon:2,Dark:2,Steel:.5}
-};
-function typeEffectiveness(moveType,defTypes){ return defTypes.filter(Boolean).reduce((m,t)=>m*(TYPE_CHART[moveType]?.[t]??1),1); }
 function typeBadge(type){ return `<span class="type-badge" style="background:${TYPE_COLOR[type]||'#64748b'}">${TYPE_TH[type]||type}</span>`; }
 function effectLabel(mult){ if(mult===0)return ['ไม่มีผล','none']; if(mult>=4)return [`แรงมาก ${mult}×`,'super']; if(mult>1)return [`ได้เปรียบ ${mult}×`,'super']; if(mult<1)return [`ต้าน ${mult}×`,'weak']; return ['ปกติ 1×','none']; }
 
