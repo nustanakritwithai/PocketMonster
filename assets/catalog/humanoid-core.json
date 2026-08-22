@@ -19,7 +19,8 @@
         "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] },
         "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] },
         "trainer": { "accessories": ["hat-a", "apron-a", "staff-a"] },
-        "evolution": { "accessories": ["hat-a", "apron-a", "orb-a"] }
+        "evolution": { "accessories": ["hat-a", "apron-a", "orb-a"] },
+        "breeding": { "accessories": ["hat-a", "apron-a", "orb-a"] }
       }
     },
     {
@@ -39,7 +40,8 @@
         "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] },
         "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] },
         "trainer": { "accessories": ["hat-a", "apron-a", "staff-a"] },
-        "evolution": { "accessories": ["hat-a", "apron-a", "orb-a"] }
+        "evolution": { "accessories": ["hat-a", "apron-a", "orb-a"] },
+        "breeding": { "accessories": ["hat-a", "apron-a", "orb-a"] }
       }
     }
   ],
