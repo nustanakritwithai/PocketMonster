@@ -48,6 +48,51 @@ export const WORKBOOK_EXP_ADAPTER = Object.freeze({
   curveDecision: 'D7_LIVE_CURVE_UNCHANGED',
 });
 
+export const WORKBOOK_CAPTURE_ADAPTER = Object.freeze({
+  formulaVersion: 'CAP_v1.0',
+  minChancePct: 1,
+  maxChancePct: 95,
+  hpFactor: Object.freeze({ base: 0.5, slope: 1.5, min: 0.5, max: 2.0 }),
+  statusRules: Object.freeze([
+    Object.freeze({ statusId: 'NONE', multiplier: 1.0, priority: 0 }),
+    Object.freeze({ statusId: 'ST_BURN', multiplier: 1.1, priority: 10 }),
+    Object.freeze({ statusId: 'ST_POISON', multiplier: 1.1, priority: 10 }),
+    Object.freeze({ statusId: 'ST_BLEED', multiplier: 1.08, priority: 8 }),
+    Object.freeze({ statusId: 'ST_SLOW', multiplier: 1.1, priority: 10 }),
+    Object.freeze({ statusId: 'ST_PARALYZE', multiplier: 1.25, priority: 25 }),
+    Object.freeze({ statusId: 'ST_ROOT', multiplier: 1.25, priority: 25 }),
+    Object.freeze({ statusId: 'ST_CONFUSE', multiplier: 1.12, priority: 12 }),
+    Object.freeze({ statusId: 'ST_STUN', multiplier: 1.35, priority: 35 }),
+    Object.freeze({ statusId: 'ST_FREEZE', multiplier: 1.35, priority: 35 }),
+    Object.freeze({ statusId: 'ST_FEAR', multiplier: 1.2, priority: 20 }),
+    Object.freeze({ statusId: 'ST_STAGGER', multiplier: 1.05, priority: 5 }),
+  ]),
+  ballRules: Object.freeze({
+    Basic: Object.freeze({ baseMultiplier: 1.0, conditionType: 'None', conditionalMultiplier: 1.0 }),
+    Great: Object.freeze({ baseMultiplier: 1.25, conditionType: 'None', conditionalMultiplier: 1.0 }),
+    Ultra: Object.freeze({ baseMultiplier: 1.5, conditionType: 'None', conditionalMultiplier: 1.0 }),
+    TypeBall: Object.freeze({ baseMultiplier: 1.0, conditionType: 'MatchesPrimaryOrSecondary', conditionalMultiplier: 1.35 }),
+    EliteSeal: Object.freeze({ baseMultiplier: 1.0, conditionType: 'TargetVariant=Elite', conditionalMultiplier: 1.35 }),
+  }),
+  levelRules: Object.freeze([
+    Object.freeze({ ruleId: 'LV_EASY', maxDifference: -5, multiplier: 1.15 }),
+    Object.freeze({ ruleId: 'LV_NORMAL', minDifference: -4, maxDifference: 2, multiplier: 1.0 }),
+    Object.freeze({ ruleId: 'LV_HARD', minDifference: 3, maxDifference: 5, multiplier: 0.85 }),
+    Object.freeze({ ruleId: 'LV_VERY_HARD', minDifference: 6, maxDifference: 9, multiplier: 0.7 }),
+    Object.freeze({ ruleId: 'LV_EXTREME', minDifference: 10, multiplier: 0.55 }),
+  ]),
+  variantRules: Object.freeze({
+    Normal: Object.freeze({ captureEnabled: true, multiplier: 1.0 }),
+    Elite: Object.freeze({ captureEnabled: true, multiplier: 0.55 }),
+    Boss: Object.freeze({ captureEnabled: false, multiplier: 0.0 }),
+    BossVariant: Object.freeze({ captureEnabled: false, multiplier: 0.0 }),
+  }),
+  referenceLevelRule: 'HighestPartyLevelAtEncounterStart',
+  statusStackRule: 'StrongestOnly',
+  activation: 'calculator_only',
+  rollAuthority: 'future_server_boundary',
+});
+
 export const BALANCE_CONFIG = Object.freeze({
   version: BALANCE_SCHEMA_VERSION,
 
