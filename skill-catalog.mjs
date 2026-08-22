@@ -8,6 +8,16 @@ export const SKILL_TARGET_TYPES = Object.freeze(['NearestEnemy', 'Self', 'EnemyA
 export const SKILL_EFFECT_CLASSES = Object.freeze(['DirectMechanic', 'AttackModifier', 'Status', 'Displacement', 'DamageShape', 'Heal', 'FieldMechanic', 'Movement', 'DamageModifier', 'Summon', 'MultiStatus', 'HealModifier']);
 export const SKILL_APPLICATION_MODES = Object.freeze(['None', 'Direct', 'Self', 'Single', 'Area', 'SingleOrArea', 'GroundPoint', 'GroundArea', 'Line']);
 
+// Skill_Advanced.RangeM/RadiusM is uniform for each authoritative TargetType
+// in workbook v2.1. Keep this derived table separate from SKILL_CATALOG so the
+// reviewed Skill_Master provenance hash remains stable.
+export const SKILL_TARGET_GEOMETRY = Object.freeze({
+  NearestEnemy: Object.freeze({ rangeM: 2.2, radiusM: 0.8 }),
+  Self: Object.freeze({ rangeM: 0, radiusM: 0 }),
+  EnemyArea: Object.freeze({ rangeM: 7.5, radiusM: 3.5 }),
+  GroundPoint: Object.freeze({ rangeM: 5, radiusM: 0 }),
+});
+
 const TYPE_MAP = Object.freeze({
   "NORMAL": "Normal",
   "FIRE": "Fire",

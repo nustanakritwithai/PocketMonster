@@ -43,12 +43,19 @@ function createSkillAction(skill, activeMonster) {
   if (!activeMonster) return disabledAction('เรียกคู่หูก่อน');
   if (activeMonster.fainted) return disabledAction('Fainted • Heal ก่อน');
   if (!skill) return disabledAction('ยังไม่มีสกิลช่องนี้');
+  if (skill.effectAvailable === false) return disabledAction(skill.unavailableReason || 'เอฟเฟกต์สกิลนี้ยังไม่เปิดใช้');
+  if (Number.isFinite(skill.currentUses) && skill.currentUses <= 0) {
+    return disabledAction(`${skill.name} Uses หมด • กลับ Ranch เพื่อฟื้นฟู`);
+  }
   const cooldownSeconds = Number.isFinite(skill.cooldownSeconds) ? Math.max(0, skill.cooldownSeconds) : 0;
   if (cooldownSeconds > 0) {
     const seconds = Math.ceil(cooldownSeconds * 10) / 10;
     return action('cooldown', true, `คูลดาวน์ ${seconds.toFixed(1)}s`, `${skill.name} ยังไม่พร้อม`);
   }
-  return readyAction('พร้อมใช้');
+  const uses = Number.isFinite(skill.currentUses) && Number.isFinite(skill.maxUses)
+    ? ` • Uses ${skill.currentUses}/${skill.maxUses}`
+    : '';
+  return readyAction(`พร้อมใช้${uses}`);
 }
 
 export function createCombatHudViewModel(input = {}) {
@@ -64,7 +71,7 @@ export function createCombatHudViewModel(input = {}) {
     recall: createRecallAction(shared),
     capture: createCaptureAction(shared),
   });
-  const skills = Object.freeze(Array.from({ length: 3 }, (_, index) => createSkillAction(input.skills?.[index] ?? null, activeMonster)));
+  const skills = Object.freeze(Array.from({ length: 4 }, (_, index) => createSkillAction(input.skills?.[index] ?? null, activeMonster)));
   let actionReason = actions.capture.reason || actions.summon.reason || actions.recall.reason || 'พร้อมใช้คำสั่ง';
   if (activeMonster && !activeMonster.fainted) actionReason = 'Capture ถูกปิด • Recall คู่หูก่อน';
   else if (selectedMonster?.fainted) actionReason = `${selectedMonster.name} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`;

@@ -4,9 +4,10 @@ import { createCombatHudViewModel, createPartySlotViewModel } from '../combat-ui
 
 const selected = Object.freeze({ instanceId: 'monster-a', name: 'Aquapuff', hp: 84, maxHp: 84, fainted: false });
 const skills = Object.freeze([
-  Object.freeze({ name: 'Water Jet', cooldownSeconds: 0 }),
-  Object.freeze({ name: 'Mist Shield', cooldownSeconds: 4.04 }),
+  Object.freeze({ name: 'Water Jet', cooldownSeconds: 0, currentUses: 8, maxUses: 10 }),
+  Object.freeze({ name: 'Mist Shield', cooldownSeconds: 4.04, currentUses: 7, maxUses: 10 }),
   null,
+  Object.freeze({ name: 'Tidal Guard', cooldownSeconds: 0, currentUses: 0, maxUses: 10 }),
 ]);
 const readyInput = Object.freeze({
   zoneIsWild: true,
@@ -37,9 +38,13 @@ assert.equal(active.actions.summon.state, 'disabled');
 assert.match(active.actions.summon.reason, /มีคู่หูในสนามแล้ว/);
 assert.equal(active.actions.recall.state, 'ready');
 assert.equal(active.skills[0].state, 'ready');
+assert.match(active.skills[0].statusText, /Uses 8\/10/);
 assert.equal(active.skills[1].state, 'cooldown');
 assert.equal(active.skills[1].disabled, true);
 assert.match(active.skills[1].statusText, /4\.1s/);
+assert.equal(active.skills.length, 4, 'workbook manual HUD exposes four slots');
+assert.equal(active.skills[2].state, 'disabled', 'empty slot four-slot model stays disabled');
+assert.match(active.skills[3].reason, /Uses หมด/, 'zero Uses disables the canonical fourth slot');
 assert.match(active.actionReason, /Capture ถูกปิด.*Recall คู่หูก่อน/);
 
 const recalled = createCombatHudViewModel({ ...readyInput, activeMonster: null });

@@ -49,7 +49,7 @@ assert.match(update, /d\.inner\.rotation\.y-=dt\*d\.spin\*1\.4/, 'inner frame sp
 assert.match(update, /removeAndDispose\(scene, d\.group\)/, 'expired decals still dispose');
 assert.match(js, /updateGroundDecals\(dt\)/, 'loop still ticks ground decals');
 assert.match(js, /spawnRingPulse\(activeSummon\.mesh\.position/, 'summon still fires a ring pulse');
-assert.match(js, /spawnGroundDecal\(move\.type,t\.mesh\.position/, 'skills still stamp a ground decal');
+assert.match(js, /spawnGroundDecal\(move\.type,target\.mesh\.position/, 'accepted skills still stamp a ground decal');
 
 assert.match(js, /new THREE\.Fog\(0x65c9f5,30,76\)/, 'boot Fog constructor stays 0x65c9f5,30,76');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere');

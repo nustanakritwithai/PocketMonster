@@ -121,7 +121,7 @@ for (const needle of [
   assert.ok(js.includes(needle), `game-v800.js must wire ${needle}`);
 }
 const useSkillStart = js.indexOf('function useSkill(');
-const useSkillOpen = js.indexOf('{', useSkillStart);
+const useSkillOpen = js.indexOf('{', js.indexOf(')', useSkillStart) + 1);
 let useSkillDepth = 0;
 let useSkillEnd = -1;
 for (let i = useSkillOpen; i < js.length; i += 1) {
@@ -130,8 +130,13 @@ for (let i = useSkillOpen; i < js.length; i += 1) {
   if (useSkillDepth === 0) { useSkillEnd = i; break; }
 }
 const useSkillSrc = js.slice(useSkillStart, useSkillEnd + 1);
-assert.ok(useSkillSrc.includes('let res=null'), 'useSkill hoists res for mastery EXP');
-assert.ok(!useSkillSrc.includes('const res=monsterDamage'), 'useSkill must not shadow the outer res');
+assert.ok(useSkillSrc.includes('executeEquippedSkillCommand('), 'manual useSkill enters the canonical A25 execution boundary');
+assert.ok(!useSkillSrc.includes('getMonsterSkills('), 'manual useSkill cannot read legacy species moves');
+const applySkillStart = js.indexOf('function applyAcceptedSkillCommand(');
+const applySkillEnd = js.indexOf('\nfunction skillFailureMessage(', applySkillStart);
+const applySkillSrc = js.slice(applySkillStart, applySkillEnd);
+assert.ok(applySkillSrc.includes('let res=null'), 'accepted compatibility executor hoists res for mastery EXP');
+assert.ok(!applySkillSrc.includes('const res=monsterDamage'), 'accepted executor must not shadow the mastery result');
 assert.ok(html.includes('game-v800.js?v=810'), 'active HTML loads the v800 runtime');
 assert.ok(html.includes('style-v800.css?v=810'), 'active HTML loads the v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');

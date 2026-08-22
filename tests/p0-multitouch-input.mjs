@@ -7,14 +7,15 @@ function assertMultitouchContract(js,css){
   for(const binding of [
     "bindActionPress(el('summonBtn'),summonThrow)",
     "bindActionPress(el('recallBtn'),()=>recall(true))",
-    "bindActionPress(el('skill1Btn'),()=>useSkill(0))",
-    "bindActionPress(el('skill2Btn'),()=>useSkill(1))",
-    "bindActionPress(el('skill3Btn'),()=>useSkill(2))",
+    "bindActionPress(el('skill1Btn'),()=>dispatchSkill(0))",
+    "bindActionPress(el('skill2Btn'),()=>dispatchSkill(1))",
+    "bindActionPress(el('skill3Btn'),()=>dispatchSkill(2))",
+    "bindActionPress(el('skill4Btn'),()=>dispatchSkill(3))",
   ]) assert.ok(js.includes(binding),`pointerdown action binding missing: ${binding}`);
   assert.match(js,/captureBtn\.addEventListener\('pointerdown'/);
   assert.match(js,/captureBtn\.addEventListener\('pointerup'/);
   assert.match(js,/capturePointerId=event\.pointerId/);
-  assert.doesNotMatch(js,/el\('(summonBtn|skill1Btn|skill2Btn|skill3Btn)'\)\.onclick/,'mobile actions must not depend on compatibility click while another pointer is held');
+  assert.doesNotMatch(js,/el\('(summonBtn|skill1Btn|skill2Btn|skill3Btn|skill4Btn)'\)\.onclick/,'mobile actions must not depend on compatibility click while another pointer is held');
 }
 
 function mutate(source,needle,replacement,label){
@@ -36,7 +37,7 @@ expectKilled(
 );
 expectKilled(
   'skill-reverts-to-compatibility-click',
-  mutate(activeJs,"bindActionPress(el('skill1Btn'),()=>useSkill(0))","el('skill1Btn').onclick=()=>useSkill(0)",'skill-reverts-to-compatibility-click'),
+  mutate(activeJs,"bindActionPress(el('skill1Btn'),()=>dispatchSkill(0))","el('skill1Btn').onclick=()=>dispatchSkill(0)",'skill-reverts-to-compatibility-click'),
   activeCss,
 );
 expectKilled(

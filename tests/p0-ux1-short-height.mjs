@@ -2,6 +2,7 @@ const ACTION_SELECTORS = [
   '#skill1Btn',
   '#skill2Btn',
   '#skill3Btn',
+  '#skill4Btn',
   '#captureBtn',
   '#summonBtn',
   '#recallBtn',
@@ -59,7 +60,7 @@ export function measureShortHeightLayout(doc = globalThis.document, win = global
   const topbar = snapshotElement(doc, '#hud .topbar');
   const hunt = snapshotElement(doc, '#huntBtn');
   const actions = ACTION_SELECTORS.map(selector => snapshotElement(doc, selector));
-  const skills = actions.slice(0, 3);
+  const skills = actions.slice(0, 4);
   const targetSkillIntersections = positiveIntersections(target, skills);
   const targetActionIntersections = positiveIntersections(target, actions);
   const partyActionIntersections = positiveIntersections(party, actions);
