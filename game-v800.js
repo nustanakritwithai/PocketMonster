@@ -1866,8 +1866,8 @@ function setFullCharacterInfoTab(tab){
   if(tab==='info')renderFullCharacterStatus();
   if(tab==='skills')renderSkills(el('characterInfoBody'));
   if(tab==='equipment')renderEquipment(el('characterInfoBody'));
-  if(tab==='training')renderTraining();
-  if(tab==='evolution')renderEvolution();
+  if(tab==='training')renderTraining(el('characterInfoBody'));
+  if(tab==='evolution')renderEvolution(el('characterInfoBody'));
 }
 function renderFocusedGrowthSummary(){
   const presentation=focusedCharacterPresentation();
@@ -1887,8 +1887,8 @@ function renderFocusedGrowthSummary(){
   const needs=[['Hunger',body.hunger??inst.hunger],['Energy',body.energy??inst.energy],['Fitness',body.fitness],['Health',body.health],['Mood',mind.mood??inst.mood],['Stress',mind.stress??inst.stress],['Bond',mind.bond??inst.bond],['Trust',mind.trust??inst.trust],['Discipline',mind.discipline]].map(([label,value])=>`${label} ${value??'—'}`).join(' • ');
   return `<section class="focused-growth-summary"><div class="skills-section-title">Growth • ${presentation.name}</div><div class="training-summary"><b>Capacity</b> ${Math.round(used)} / ${cap}</div><div class="growth-lines">${training}</div><div class="skill-detail"><b>Gene HP</b> ${gene}</div><div class="skill-detail"><b>Body / Mind</b>: ${needs}</div></section>`;
 }
-function renderTraining(){
-  const panel=characterSystemPanel('training','trainingPanel');
+function renderTraining(targetPanel=null){
+  const panel=targetPanel||characterSystemPanel('training','trainingPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
@@ -3137,8 +3137,8 @@ function renderFocusedEvolutionBuildPreview(){
   }).join('');
   return `<section class="focused-evolution-preview"><div class="skills-section-title">Evolution Build • ${presentation.name}</div>${candidates}</section>`;
 }
-function renderEvolution(){
-  const box=el('evolutionPreview'),inst=getInst(state.evolutionCandidate||state.ui?.focusedMonsterId);
+function renderEvolution(targetPanel=null){
+  const box=targetPanel||el('evolutionPreview'),inst=getInst(state.evolutionCandidate||state.ui?.focusedMonsterId);
   if(!inst){box.innerHTML='เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง';return;}
   const sp=spById[inst.speciesId],paths=availableEvolutionPaths(inst);
   const identity=`<div class="evo-identity-lock">🔒 Gene / Parents / Generation ไม่เปลี่ยน (Identity Lock)</div>`;
@@ -3177,7 +3177,9 @@ function assertRanchOperation(){
 function revealMonsterManager(tab){
   if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');
   applyLifeSimulation(Date.now(),true);
-  el('monsterManager').classList.remove('hidden');
+  const manager=el('monsterManager');
+  manager.classList.remove('hidden');
+  manager.classList.toggle('character-manager-mode',characterUI.snapshot().source==='character');
   const close=el('closeManager');
   if(close){
     close.textContent='✕';
