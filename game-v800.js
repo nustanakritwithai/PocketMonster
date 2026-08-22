@@ -4,7 +4,7 @@ import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createS
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
-import { resolveStageObjective } from './stage-objectives.mjs';
+import { resolveStageObjective, runStageClearReconciliation } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -2046,14 +2046,14 @@ function markEliteProgress(w,kind='found'){
   bucket[key]={count:1,firstAt:Date.now()};
   saveGame(false);
 }
-function markBossProgress(w,kind='found'){
+function markBossProgress(w,kind='found',persist=true){
   if(!w?.boss)return;
   state.bossProgress=state.bossProgress||{found:{},defeated:{}};
   const bucket=state.bossProgress[kind]||(state.bossProgress[kind]={});
   const key=`${w.zone}:${w.speciesId}`;
   if(bucket[key])return;
   bucket[key]={count:1,firstAt:Date.now()};
-  saveGame(false);
+  if(persist)saveGame(false);
 }
 function markStarterJourney(step){
   if(state.currentZone!=='grass-meadow')return;
@@ -2562,9 +2562,14 @@ function ensureProgressionEncounter(zone=state.currentZone){
   renderStarterJourney();
   return objective.encounter;
 }
+function reconcilePendingStageClear(zone,objective){
+  if(!runStageClearReconciliation({objective,stageId:zone,completeStageClear:stageId=>completeStageClear(stageId,{recovered:true})}))return objective;
+  return currentStageObjective(zone);
+}
 function spawnZone(zone){
   const cfg=ZONES[zone];if(!cfg)return;
-  const objective=currentStageObjective(zone);
+  let objective=currentStageObjective(zone);
+  objective=reconcilePendingStageClear(zone,objective);
   if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}
   spawnRecords(cfg.spawn);
   if(objective.encounter!=='elite'&&cfg.rareSpawn?.length&&Math.random()<cfg.rareChance)spawnRecords(cfg.rareSpawn);
@@ -2761,10 +2766,10 @@ function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+a
 let battleEventLog=[];
 function logBattleEvent(category,amount,meaningful=true){if(TRAINING_LINES.includes(category)&&amount>0)battleEventLog.push({category,amount,meaningful});}
 function getEnemyTier(w){if(w.boss)return'boss';if(w.elite)return'elite';if(w.trial)return'trial';if(w.strong)return'strong';return'normal';}
-function completeStageClear(stageId){
+function completeStageClear(stageId,{recovered=false}={}){
   const definition=STAGE_BY_ID[stageId];
   if(!definition)return '';
-  const elapsed=stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
+  const elapsed=!recovered&&stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
   const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
   const first=!next.firstClearRewards[stageId];
   const rewards=stageRewards(stageId);
@@ -2773,6 +2778,7 @@ function completeStageClear(stageId){
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
   }
   state.stageProgress=next;
+  saveGame(false);
   renderStageSelect();
   renderWarpPrompt();
   renderStageReward({definition,first,rewards,elapsed});
@@ -2784,7 +2790,7 @@ function defeatWild(w){
   w.dead=true;
   if(state.currentZone==='grass-meadow')markStarterJourney('battled');
   if(w.elite)markEliteProgress(w,'defeated');
-  if(w.boss)markBossProgress(w,'defeated');
+  if(w.boss)markBossProgress(w,'defeated',false);
   removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
   const playerExp=playerExpReward('battle',w);
@@ -4566,7 +4572,7 @@ function migrateLoadedState(s){
   attachCharacterUi(state);
   characterUI?.closeAll();
 }
-let remoteSaveReady=false;
+let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false;
 function currentSaveEnvelope(){
   return {state:persistableState(state),playerHp:playerData.hp};
 }
@@ -4578,6 +4584,7 @@ function saveGame(show=true){
   if(remoteSaveReady){
     void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));
   }
+  else if(remoteSaveSyncing)remoteSavePending=true;
   const si=el('saveIndicator');
   if(si){si.style.opacity='1';setTimeout(()=>{si.style.opacity='0';},800);}
   if(show)msg('บันทึกเกม V8.2.0 แล้ว');
@@ -4758,21 +4765,37 @@ function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
+function reloadWorldFromLoadedState(){
+  const loadedZone=state.currentZone;
+  state.currentZone='hub';
+  return switchZone(loadedZone,true)||switchZone('hub',true);
+}
+async function flushRemoteSaveUntilSettled(){
+  do{
+    remoteSavePending=false;
+    await saveRemoteSave(currentSaveEnvelope());
+  }while(remoteSavePending);
+  remoteSaveReady=true;
+  remoteSaveSyncing=false;
+}
 async function syncCloudSave(){
+  remoteSaveSyncing=true;
   try{
     const remote=await loadRemoteSave();
+    let successMessage='สร้างข้อมูลผู้เล่นบน Cloud สำเร็จ';
     if(remote?.state){
       migrateLoadedState(remote.state);
       playerData.hp=Number.isFinite(remote.playerHp)?remote.playerHp:100;
       applyLifeSimulation(Date.now(),true);
+      reloadWorldFromLoadedState();
       renderAll();
-      msg('โหลดข้อมูล Cloud สำเร็จ');
-    }else{
-      await saveRemoteSave(currentSaveEnvelope());
-      msg('สร้างข้อมูลผู้เล่นบน Cloud สำเร็จ');
+      successMessage='โหลดข้อมูล Cloud สำเร็จ';
     }
-    remoteSaveReady=true;
+    await flushRemoteSaveUntilSettled();
+    msg(successMessage);
   }catch(error){
+    remoteSaveSyncing=false;
+    remoteSavePending=false;
     console.warn('cloud sync unavailable; using local save',error);
     msg('Cloud ยังไม่พร้อม • ใช้ Save ในเครื่องชั่วคราว');
   }

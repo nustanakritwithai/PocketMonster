@@ -6,7 +6,7 @@ assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'
 assert.match(html,/id="stageReward"/,'Stage reward sheet exists');
 assert.match(html,/id="stageRewardList"/,'Reward list mount exists');
 assert.match(css,/\.stage-reward-card/,'Reward sheet has mobile-safe presentation');
-assert.match(js,/function completeStageClear\(stageId\)/,'Stage clear resolver exists');
+assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)/,'Stage clear resolver exists');
 assert.match(js,/recordStageClear\(state\.stageProgress,stageId/,'Clear state uses catalog resolver');
 assert.match(js,/const first=!next\.firstClearRewards\[stageId\]/,'First-clear reward is idempotent');
 assert.match(js,/next\.firstClearRewards\[stageId\]=\{grantedAt:Date\.now\(\),rewards\}/,'First-clear grant is persisted');

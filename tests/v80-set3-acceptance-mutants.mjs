@@ -7,7 +7,7 @@ const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const set3=stageIdsForSet('set-3');
 assert.equal(set3.length,4,'mutation 1: Set 3 cannot lose a stage');
 assert.match(routes,/from:'steel-factory',to:'hub'/,'mutation 2: Steel Factory must retain safe Hub return');
-assert.match(js,/function completeStageClear\(stageId\)\{[\s\S]*?const first=!next\.firstClearRewards\[stageId\]/,'mutation 3: first-clear guard cannot be removed');
+assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?const first=!next\.firstClearRewards\[stageId\]/,'mutation 3: first-clear guard cannot be removed');
 assert.doesNotMatch(js,/state\.stageProgress\.setCleared|next\.setCleared/,'mutation 4: no persisted set completion duplicate');
 const partial=createStageProgress();
 for(const id of set3.slice(0,3))Object.assign(partial,recordStageClear(partial,id));
