@@ -3198,6 +3198,9 @@ function revealMonsterManager(tab){
   managerDirty.consume(performance.now());
   playSFX('sfx_ui_open');
 }
+function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
+function showRanchStorageShell(){const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');return result;}
+function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');}
 function openManager(options={}){
   const source=options.source==='character'?'character':'npc';
   const focused=options.monsterId||state.ui.focusedMonsterId||state.party[state.selectedSlot];
@@ -3971,7 +3974,10 @@ function bindCharacterAccessControl(node,handler){
   node.addEventListener('pointerdown',run,{passive:false});
   node.addEventListener('click',run);
 }
-el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');openManager();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
+document.querySelector('[data-ranch-back]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeRanchSurface();});
+document.querySelector('[data-ranch-close]')?.addEventListener('click',()=>{playSFX('sfx_ui_close');closeRanchSurface();});
 bindCharacterAccessControl(el('globalCharacterBtn'),()=>{
   playSFX('sfx_ui_click');
   toggleCharacterAccess();
