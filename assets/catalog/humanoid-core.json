@@ -17,7 +17,8 @@
       "roles": {
         "player": { "accessories": ["hair-a", "backpack-a"] },
         "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] },
-        "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] }
+        "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] },
+        "trainer": { "accessories": ["hat-a", "apron-a", "staff-a"] }
       }
     },
     {
@@ -35,7 +36,8 @@
       "roles": {
         "player": { "accessories": ["hair-a", "backpack-a"] },
         "keeper": { "accessories": ["hat-a", "apron-a", "staff-a"] },
-        "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] }
+        "merchant": { "accessories": ["hat-a", "apron-a", "satchel-a"] },
+        "trainer": { "accessories": ["hat-a", "apron-a", "staff-a"] }
       }
     }
   ],
