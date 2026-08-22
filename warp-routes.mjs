@@ -7,6 +7,15 @@ export const WARP_ROUTES=Object.freeze([
   {id:'misty-to-ember',from:'misty-lake',to:'ember-valley',label:'Ember Valley',position:[-20,0],spawn:[19,0,0],kind:'return'},
   {id:'misty-to-storm',from:'misty-lake',to:'storm-field',label:'Storm Field',position:[0,-18],spawn:[0,0,17],kind:'forward'},
   {id:'storm-to-misty',from:'storm-field',to:'misty-lake',label:'Misty Lake',position:[0,18],spawn:[0,0,-17],kind:'return'},
+  {id:'storm-to-frozen',from:'storm-field',to:'frozen-pass',label:'Frozen Pass',position:[20,0],spawn:[-19,0,0],kind:'forward'},
+  {id:'frozen-to-storm',from:'frozen-pass',to:'storm-field',label:'Storm Field',position:[-20,0],spawn:[19,0,0],kind:'return'},
+  {id:'frozen-to-rocky',from:'frozen-pass',to:'rocky-canyon',label:'Rocky Canyon',position:[20,0],spawn:[-19,0,0],kind:'forward'},
+  {id:'rocky-to-frozen',from:'rocky-canyon',to:'frozen-pass',label:'Frozen Pass',position:[-20,0],spawn:[19,0,0],kind:'return'},
+  {id:'rocky-to-sky',from:'rocky-canyon',to:'sky-ruins',label:'Sky Ruins',position:[20,0],spawn:[-19,0,0],kind:'forward'},
+  {id:'sky-to-rocky',from:'sky-ruins',to:'rocky-canyon',label:'Rocky Canyon',position:[-20,0],spawn:[19,0,0],kind:'return'},
+  {id:'sky-to-poison',from:'sky-ruins',to:'poison-marsh',label:'Poison Marsh',position:[0,-18],spawn:[0,0,17],kind:'forward'},
+  {id:'poison-to-sky',from:'poison-marsh',to:'sky-ruins',label:'Sky Ruins',position:[0,18],spawn:[0,0,-17],kind:'return'},
+  {id:'poison-to-hub',from:'poison-marsh',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
   {id:'storm-to-hub',from:'storm-field',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
 ]);
 

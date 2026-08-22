@@ -10,7 +10,7 @@ const unlock=(value,id)=>({ok:value.unlocked.includes(id),reason:value.unlocked.
 assert.deepEqual(routesFrom('grass-meadow').map(route=>route.to),['hub','ember-valley'],'Grass has return and forward warp points');
 assert.deepEqual(routesFrom('ember-valley').map(route=>route.to),['grass-meadow','misty-lake'],'Ember has return and forward warp points');
 assert.deepEqual(routesFrom('misty-lake').map(route=>route.to),['ember-valley','storm-field'],'Misty has return and forward warp points');
-assert.deepEqual(routesFrom('storm-field').map(route=>route.to),['misty-lake','hub'],'Storm has return and Hub warp points');
+assert.deepEqual(routesFrom('storm-field').map(route=>route.to),['misty-lake','frozen-pass','hub'],'Storm has return, Set 2 forward, and Hub warp points');
 assert.equal(WARP_ROUTES.every(route=>Array.isArray(route.position)&&route.position.length===2&&Array.isArray(route.spawn)),true,'Every warp has scene and spawn coordinates');
 assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='grass-to-ember'),unlock).ok,true,'Unlocked stage can be entered from warp');
 assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='ember-to-misty'),unlock).ok,false,'Locked stage cannot be entered from warp');
