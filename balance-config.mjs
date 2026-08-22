@@ -70,6 +70,9 @@ export const BALANCE_CONFIG = Object.freeze({
   // R3 — Training capacity, diminishing return, aptitude and condition multipliers.
   training: Object.freeze({
     capacity: Object.freeze({ base: 40, perLevel: 8 }),
+    // A13 — Workbook-compatible hard guards. The existing five live training
+    // lines and level-based shared capacity remain unchanged.
+    allocationLimits: Object.freeze({ perLineMax: 200, totalMax: 600 }),
     // Shared pool across the 5 training lines (Power/Defense/Speed/Technique/Spirit).
     lines: Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']),
     // Diminishing multiplier by the CURRENT value of the trained line.
