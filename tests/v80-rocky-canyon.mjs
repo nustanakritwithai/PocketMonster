@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { STAGE_BY_ID, createStageProgress, recordStageClear, stageUnlockReason } from '../stage-catalog.mjs';
+import { routesFrom } from '../warp-routes.mjs';
+import { activeJs as js } from './active-assets.mjs';
+
+const stage=STAGE_BY_ID['rocky-canyon'];
+assert.ok(stage,'Rocky Canyon catalog definition exists');
+assert.equal(stage.unlockRule.stageId,'frozen-pass','Rocky Canyon follows Frozen Pass');
+assert.deepEqual(stage.primaryTypes,['Rock'],'Rocky Canyon is Rock-led');
+assert.ok(stage.secondaryTypes.includes('Ground'),'Rocky Canyon includes Ground identity');
+assert.equal(stage.capturePolicy,'normal-wild-only','Rocky Canyon keeps Boss capture disabled policy');
+assert.equal(routesFrom('frozen-pass').some(route=>route.to==='rocky-canyon'),true,'Frozen Pass has Rocky Canyon warp');
+assert.equal(routesFrom('rocky-canyon').some(route=>route.to==='frozen-pass'),true,'Rocky Canyon has return warp');
+const progress=createStageProgress();
+Object.assign(progress,recordStageClear(progress,'storm-field'),recordStageClear(progress,'frozen-pass'));
+assert.equal(stageUnlockReason(progress,'rocky-canyon').ok,true,'Frozen clear unlocks Rocky Canyon');
+const zoneBlock=js.match(/['"]rocky-canyon['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]frozen-pass['"]\s*:)/)?.[0]||'';
+assert.match(zoneBlock,/stageId:'rocky-canyon'/,'Rocky Canyon runtime zone is catalog-linked');
+assert.match(zoneBlock,/spawn:\[/,'Rocky Canyon has Normal encounter spawn data');
+assert.match(zoneBlock,/eliteSpawn:\[/,'Rocky Canyon has Elite encounter data');
+assert.match(zoneBlock,/bossSpawn:\[/,'Rocky Canyon has Boss encounter data');
+assert.match(zoneBlock,/progressionBossSpeciesId:/,'Rocky Canyon has deterministic Boss progression');
+assert.match(zoneBlock,/sceneStatus:'stage-ready'/,'Rocky Canyon is a presentation-only stage baseline');
+assert.match(js,/zone==='rocky-canyon'\?'rocky'/,'Rocky Canyon uses its own ground presentation');
+assert.doesNotMatch(zoneBlock,/playerData\.hp|status|damage/,'Rocky Canyon has no terrain damage/status logic');
+console.log('V8 Rocky Canyon: PASS');

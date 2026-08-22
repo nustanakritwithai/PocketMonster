@@ -29,8 +29,8 @@ const flower = extractFn('makeFlower');
 
 assert.doesNotMatch(lighting, /scene\.children\.find/, 'mutant 3: do not look up hemi by scanning the scene');
 assert.match(js, /const hemi=new THREE\.HemisphereLight/, 'mutant 4: hemisphere stays a named light');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:30/, 'mutant 5: cave and Frozen Pass fog near distances stay intentional');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:76/, 'mutant 6: cave and Frozen Pass fog far distances stay intentional');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:30/, 'mutant 5: cave, Frozen Pass, and Rocky Canyon fog near distances stay intentional');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:76/, 'mutant 6: cave, Frozen Pass, and Rocky Canyon fog far distances stay intentional');
 assert.match(ground, /zone==='hub'\?0x65c9f5/, 'mutant 7: hub fog must not reuse the sky hex');
 assert.match(lighting, /sun\.color\.setHex\(0xb0c4de\)/, 'mutant 8: cave sun color must cool down');
 assert.match(lighting, /sun\.color\.setHex\(0xfff4e0\)/, 'mutant 9: hub sun color must warm up');
@@ -45,6 +45,7 @@ assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'mutant 13: ranch pad call
 assert.match(js, /function spawnRingPulse[\s\S]*?boxGeometry\(size,\.02,size\)/, 'mutant 14: Phase 5 does not revert ring pulses');
 assert.match(flower, /glowMat\(color,color,\.08/, 'mutant 15: flower bloom now uses the Phase 6 emissive glow');
 assert.match(painterSrc, /zoneType === 'cave'/, 'mutant 16: cave grid still uses the cave speckle path');
+assert.match(painterSrc, /zoneType === 'rocky'/, 'mutant 17: Rocky Canyon grid still uses the rock speckle path');
 assert.match(extractFn('switchZone'), /setZoneGround\(zone\)/, 'mutant 17: zone changes still call setZoneGround');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 18: monster shine stays a sphere');
 
