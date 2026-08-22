@@ -31,6 +31,8 @@ const UI_KEYS = Object.freeze([
   'pendingEquipItemId',
   'source',
   'readOnly',
+  'ranchPanel',
+  'ranchStack',
 ]);
 
 export function createCharacterUiState() {
@@ -44,6 +46,8 @@ export function createCharacterUiState() {
     pendingEquipItemId: null,
     source: 'world',
     readOnly: false,
+    ranchPanel: null,
+    ranchStack: [],
   };
 }
 
@@ -212,6 +216,8 @@ export function createCharacterUIController(options = {}) {
       pendingEquipItemId: current.pendingEquipItemId,
       source: current.source,
       readOnly: isSummonActive(),
+      ranchPanel: current.ranchPanel || null,
+      ranchStack: Array.isArray(current.ranchStack) ? [...current.ranchStack] : [],
       canMutate: canMutate(),
       canSwitchParty: canSwitchParty(),
     };
@@ -459,6 +465,29 @@ export function createCharacterUIController(options = {}) {
     };
   }
 
+  function requestOpenRanchServices({ isNearNpc } = {}) {
+    if (!isNearNpc) return { ok: false, reason: 'npc-required', reasonText: FULL_MANAGER_NPC_REASON, panel: ui().ranchPanel || null };
+    const current = ui();
+    current.ranchPanel = 'services';
+    current.ranchStack = [];
+    return { ok: true, snapshot: snapshot(), ranchPanel: current.ranchPanel };
+  }
+
+  function requestOpenRanchStorage({ isNearNpc } = {}) {
+    if (!isNearNpc) return { ok: false, reason: 'npc-required', reasonText: FULL_MANAGER_NPC_REASON, panel: ui().ranchPanel || null };
+    const current = ui();
+    if (current.ranchPanel !== 'services') current.ranchStack = [];
+    else current.ranchStack.push('services');
+    current.ranchPanel = 'storage';
+    return { ok: true, snapshot: snapshot(), ranchPanel: current.ranchPanel };
+  }
+
+  function backRanch() {
+    const current = ui();
+    current.ranchPanel = current.ranchStack.pop() || null;
+    return snapshot();
+  }
+
   function back() {
     const frame = ui().characterStack.pop() || null;
     applyFrame(frame);
@@ -471,6 +500,8 @@ export function createCharacterUIController(options = {}) {
     applyFrame(null);
     current.partyTapMode = 'peek';
     current.pendingEquipItemId = null;
+    current.ranchPanel = null;
+    current.ranchStack = [];
     return snapshot();
   }
 
@@ -491,11 +522,14 @@ export function createCharacterUIController(options = {}) {
     requestOpenFull,
     requestOpenFromQuick,
     requestGlobalAccess,
+    requestOpenRanchServices,
+    requestOpenRanchStorage,
     requestOpenTab,
     describeRoster,
     focusMonster,
     openPanel,
     back,
+    backRanch,
     closeAll,
     setTab,
     canMutate,

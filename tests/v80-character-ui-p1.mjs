@@ -64,6 +64,8 @@ assert.deepEqual(uiKeys.sort(), [
   'focusedMonsterId',
   'partyTapMode',
   'pendingEquipItemId',
+  'ranchPanel',
+  'ranchStack',
   'readOnly',
   'selectedPartySlot',
   'source',
