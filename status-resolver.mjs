@@ -11,8 +11,8 @@ assertContentProvenance(CONTENT_PROVENANCE);
 
 export const STATUS_APPLICATION_POLICY = Object.freeze({
   activation: 'resolver_only',
-  liveStatusMutation: 'deferred_A23',
-  hardCcDiminishingReturns: 'deferred_A24',
+  liveStatusMutation: 'status_lifecycle_A23',
+  hardCcDiminishingReturns: 'status_lifecycle_A24',
   chanceMinimumPct: 5,
   chanceMaximumPct: 95,
   positiveBuffChancePct: 100,

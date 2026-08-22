@@ -6,8 +6,8 @@ import {
 } from '../status-resolver.mjs';
 
 assert.equal(STATUS_APPLICATION_POLICY.activation, 'resolver_only');
-assert.equal(STATUS_APPLICATION_POLICY.liveStatusMutation, 'deferred_A23');
-assert.equal(STATUS_APPLICATION_POLICY.hardCcDiminishingReturns, 'deferred_A24');
+assert.equal(STATUS_APPLICATION_POLICY.liveStatusMutation, 'status_lifecycle_A23');
+assert.equal(STATUS_APPLICATION_POLICY.hardCcDiminishingReturns, 'status_lifecycle_A24');
 assert.equal(STATUS_TYPE_RULES.length, 12, 'all Workbook immunity/resistance rows are present');
 
 let draws = 0;
