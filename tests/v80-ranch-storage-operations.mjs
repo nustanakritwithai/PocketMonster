@@ -8,6 +8,8 @@ assert.match(withdraw,/assertRanchOperation\(\)/,'Withdraw rechecks NPC gate');
 assert.match(withdraw,/const empty=state\.party\.findIndex\(x=>x===null\)/,'Withdraw needs an empty Party slot');
 assert.doesNotMatch(withdraw,/state\.selectedSlot\s*=/,'Withdraw cannot change combat Party selection');
 assert.match(toggle,/state\.ranchActive\.length>=RANCH_ACTIVE_MAX/,'Ranch Active cap is enforced');
+assert.match(render,/const partyIds=state\.party\.filter\(Boolean\)/,'Storage page exposes Party targets for Deposit');
+assert.match(render,/const selectableIds=\[\.\.\.partyIds,\.\.\.ids\]/,'Storage focus accepts Party or Storage target');
 assert.match(render,/depositMonster\(focused\.instanceId\)/,'Storage detail owns Deposit action');
 assert.match(render,/withdrawMonster\(focused\.instanceId\)/,'Storage detail owns Withdraw action');
 assert.match(render,/toggleRanchActive\(focused\.instanceId\)/,'Storage detail owns Ranch Active action');
