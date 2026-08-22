@@ -2231,6 +2231,9 @@ const ZONES={
   'misty-lake':{label:'Misty Lake • Water + Grass + Flying',stageId:'misty-lake',biomeId:'misty-lake',bg:0x38bdf8,ground:0x0e7490,spawn:[
     ['aquapuff',-11,2,7,{}],['aquapuff',11,2,7,{}],['mossbun',-11,-8,7,{}],['mossbun',11,-8,7,{}],['galebird',-7,-14,8,{}],['galebird',7,-14,8,{}]
   ],eliteSpawn:[['aquapuff',0,-16,10,{elite:true}]],eliteChance:.16,bossSpawn:[['aquapuff',0,-18,12,{boss:true}]],progressionBossSpeciesId:'aquapuff',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Water'],secondaryTypes:['Grass','Flying'],encounterTableId:'encounter-misty-lake-v1',eliteEncounterTableId:'elite-misty-lake-v1',bossEncounterTableId:'boss-misty-lake-v1',balanceProfileId:'stage-misty-lake-v1',recommendedLevel:{min:7,max:12},sceneStatus:'stage-ready'},
+  'storm-field':{label:'Storm Field • Electric + Flying + Steel',stageId:'storm-field',biomeId:'storm-field',bg:0x1e40af,ground:0x1e3a8a,spawn:[
+    ['voltkit',-11,2,12,{}],['voltkit',11,2,12,{}],['galebird',-11,-8,12,{}],['galebird',11,-8,12,{}],['ironbug',-7,-14,13,{}],['ironbug',7,-14,13,{}]
+  ],eliteSpawn:[['voltkit',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,18,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:{min:12,max:18},sceneStatus:'stage-ready'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2258,6 +2261,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.35;
     sun.intensity=1.8;
     sun.color.setHex(0xd9f7ff);
+  }else if(zone==='storm-field'){
+    hemi.intensity=1.05;
+    sun.intensity=1.45;
+    sun.color.setHex(0x9db8ff);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2267,7 +2274,7 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
@@ -2501,7 +2508,7 @@ function completeStageClear(stageId){
   const elapsed=stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
   const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
   const first=!next.firstClearRewards[stageId];
-  const rewards=stageId==='ember-valley'?{captureBalls:5,protein:2,emberFruit:1}:stageId==='misty-lake'?{captureBalls:5,healthy:2,moonFruit:1}:{captureBalls:5,healthy:2,mineralBite:1};
+  const rewards=stageId==='ember-valley'?{captureBalls:5,protein:2,emberFruit:1}:stageId==='misty-lake'?{captureBalls:5,healthy:2,moonFruit:1}:stageId==='storm-field'?{captureBalls:5,trainingChow:2,mineralBite:1}:{captureBalls:5,healthy:2,mineralBite:1};
   if(first){
     for(const [key,value] of Object.entries(rewards))state.inventory[key]=(state.inventory[key]||0)+value;
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
@@ -4217,7 +4224,7 @@ function renderStageReward({definition,first,rewards,elapsed}){
   title.textContent=`${definition.displayName} เคลียร์แล้ว!`;
   summary.textContent=`Boss ถูกปราบ • เวลา ${elapsed?`${elapsed} วินาที`:'—'} • ${first?'ได้รับรางวัลครั้งแรก':'รางวัลครั้งแรกได้รับไปแล้ว'}`;
   list.replaceChildren();
-  const labels={captureBalls:'🔴 Capture Ball',healthy:'💚 อาหารฟื้นฟู',mineralBite:'🪨 แร่บำรุง',protein:'🥩 โปรตีน',emberFruit:'🔥 ผลไฟ',moonFruit:'🌙 ผลจันทร์'};
+  const labels={captureBalls:'🔴 Capture Ball',healthy:'💚 อาหารฟื้นฟู',mineralBite:'🪨 แร่บำรุง',protein:'🥩 โปรตีน',emberFruit:'🔥 ผลไฟ',moonFruit:'🌙 ผลจันทร์',trainingChow:'⚡ อาหารฝึก'};
   for(const [key,value] of Object.entries(rewards)){const item=document.createElement('div');item.className='stage-reward-item';item.textContent=`${labels[key]||key} +${value}`;list.append(item);}
   el('stageReward')?.classList.remove('hidden');
 }
