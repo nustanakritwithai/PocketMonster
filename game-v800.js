@@ -22,6 +22,7 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
+import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { canBreed as canBreedFn, breed as breedFn, createEgg as createEggFn, GENE_RANKS as BREED_GENE_RANKS } from './breeding.mjs';
@@ -3914,10 +3915,18 @@ function migrateLoadedState(s){
   attachCharacterUi(state);
   characterUI?.closeAll();
 }
+let remoteSaveReady=false;
+function currentSaveEnvelope(){
+  return {state:persistableState(state),playerHp:playerData.hp};
+}
 function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
   state.lifeLastAt=Date.now();
-  writeStoredSave(localStorage,{state:persistableState(state),playerHp:playerData.hp});
+  const envelope=currentSaveEnvelope();
+  writeStoredSave(localStorage,envelope);
+  if(remoteSaveReady){
+    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));
+  }
   const si=el('saveIndicator');
   if(si){si.style.opacity='1';setTimeout(()=>{si.style.opacity='0';},800);}
   if(show)msg('บันทึกเกม V8.2.0 แล้ว');
@@ -4056,6 +4065,26 @@ function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
+async function syncCloudSave(){
+  try{
+    const remote=await loadRemoteSave();
+    if(remote?.state){
+      migrateLoadedState(remote.state);
+      playerData.hp=Number.isFinite(remote.playerHp)?remote.playerHp:100;
+      applyLifeSimulation(Date.now(),true);
+      renderAll();
+      msg('โหลดข้อมูล Cloud สำเร็จ');
+    }else{
+      await saveRemoteSave(currentSaveEnvelope());
+      msg('สร้างข้อมูลผู้เล่นบน Cloud สำเร็จ');
+    }
+    remoteSaveReady=true;
+  }catch(error){
+    console.warn('cloud sync unavailable; using local save',error);
+    msg('Cloud ยังไม่พร้อม • ใช้ Save ในเครื่องชั่วคราว');
+  }
+}
+void syncCloudSave();
 let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 function loop(now){
   try{
