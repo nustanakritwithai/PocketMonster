@@ -1,8 +1,8 @@
 export const CONTENT_ID_PATTERNS = Object.freeze({
-  monsters: /^MON\d{3}$/,
-  skills: /^SK\d{3}$/,
-  passives: /^PASS\d{3}$/,
-  statuses: /^ST\d{3}$/,
+  monsters: /^MON_\d{3}$/,
+  skills: /^SK_[A-Z0-9]+(?:_[A-Z0-9]+)*_\d{2}$/,
+  passives: /^PASS_[A-Z0-9]+(?:_[A-Z0-9]+)*_\d{2}$/,
+  statuses: /^ST_[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
 });
 
 export const LEARNSET_METHODS = Object.freeze(['LevelUp', 'Evolution', 'Tutor', 'Breeding', 'RareManual']);
