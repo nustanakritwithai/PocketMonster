@@ -1176,12 +1176,14 @@ const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'playe
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
 const merchantVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'merchant',appearanceId:'appearance.human.merchant-brown.v1',quality:qualityProfile.tier});
 const trainerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'trainer',appearanceId:'appearance.human.trainer-blue.v1',quality:qualityProfile.tier});
-await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready,trainerVisual.ready].filter(Boolean));
+const evolutionVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'evolution',appearanceId:'appearance.human.evolution-purple.v1',quality:qualityProfile.tier});
+await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready,trainerVisual.ready,evolutionVisual.ready].filter(Boolean));
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
 const playerData={hp:100,maxHp:100,speed:5.7,invuln:0};
 const npc=keeperVisual.root; npc.position.set(4,0,3); scene.add(npc);
 const merchantNpc=merchantVisual.root; merchantNpc.position.set(9,0,3); scene.add(merchantNpc);
 const trainerNpc=trainerVisual.root; trainerNpc.position.set(1,0,10); scene.add(trainerNpc);
+const evolutionNpc=evolutionVisual.root; evolutionNpc.position.set(-6,0,8); scene.add(evolutionNpc);
 const presentationScratch={throwOrigin:new THREE.Vector3(),hitText:new THREE.Vector3()};
 function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentationScratch.throwOrigin); }
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
@@ -2184,7 +2186,7 @@ function removeSceneRole(role,instanceId=null){
     removeAndDispose(scene, obj);
   }
 }
-function setHubVisibility(on){npc.visible=on;merchantNpc.visible=on;trainerNpc.visible=on;ranchPad.disk.visible=ranchPad.ring.visible=on;breedingPad.disk.visible=breedingPad.ring.visible=on;incubator.visible=on;}
+function setHubVisibility(on){npc.visible=on;merchantNpc.visible=on;trainerNpc.visible=on;evolutionNpc.visible=on;ranchPad.disk.visible=ranchPad.ring.visible=on;breedingPad.disk.visible=breedingPad.ring.visible=on;incubator.visible=on;}
 function clearHubCompanion(){
   if(hubCompanion) removeAndDispose(scene, hubCompanion.mesh);
   hubCompanion=null;
@@ -3114,7 +3116,7 @@ function evolveMonster(id,pathId){if(!assertCharacterMutable(id))return;const in
   const newColor=colorNum(monsterTypes(inst)[0]);
   spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
   playSFX('sfx_evolution');
-  refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();saveGame(false);}
+  refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();if(!el('evolutionPanel').classList.contains('hidden'))renderEvolutionGuide();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
   if(!hist.length)return '';
@@ -3174,11 +3176,12 @@ function renderEvolution(targetPanel=null){
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
 function isNearMerchant(){return state.currentZone==='hub'&&distXZ(player.position,merchantNpc.position)<3.4;}
 function isNearTrainer(){return state.currentZone==='hub'&&distXZ(player.position,trainerNpc.position)<3.4;}
+function isNearEvolution(){return state.currentZone==='hub'&&distXZ(player.position,evolutionNpc.position)<3.4;}
 function updateNpcUI(){
   const b=el('npcBtn');
-  if(!el('monsterManager').classList.contains('hidden')||!el('merchantShop').classList.contains('hidden')||!el('trainerPanel').classList.contains('hidden')){b.classList.add('hidden');return;}
-  const target=isNearMerchant()?merchantNpc:isNearTrainer()?trainerNpc:isNearNpc()?npc:null;
-  if(target){const p=worldToScreen(target.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent=target===merchantNpc?'ร้านค้า':target===trainerNpc?'ฝึก':'คุย';b.classList.toggle('merchant-btn',target===merchantNpc);b.classList.toggle('trainer-btn',target===trainerNpc);b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;return;}}
+  if(!el('monsterManager').classList.contains('hidden')||!el('merchantShop').classList.contains('hidden')||!el('trainerPanel').classList.contains('hidden')||!el('evolutionPanel').classList.contains('hidden')){b.classList.add('hidden');return;}
+  const target=isNearMerchant()?merchantNpc:isNearTrainer()?trainerNpc:isNearEvolution()?evolutionNpc:isNearNpc()?npc:null;
+  if(target){const p=worldToScreen(target.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent=target===merchantNpc?'ร้านค้า':target===trainerNpc?'ฝึก':target===evolutionNpc?'วิวัฒนาการ':'คุย';b.classList.toggle('merchant-btn',target===merchantNpc);b.classList.toggle('trainer-btn',target===trainerNpc);b.classList.toggle('evolution-btn',target===evolutionNpc);b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;return;}}
   b.classList.add('hidden');
 }
 const MERCHANT_STOCK=Object.freeze([
@@ -3201,6 +3204,21 @@ function openTrainer(){
 }
 function closeTrainer(){el('trainerPanel').classList.add('hidden');playSFX('sfx_ui_close');}
 function renderTrainerPanel(){renderTraining(el('trainerBody'));}
+function openEvolutionGuide(){
+  if(!isNearEvolution()){msg('เข้าใกล้นักวิจัยวิวัฒนาการก่อน');return;}
+  el('evolutionPanel').classList.remove('hidden');
+  renderEvolutionGuide();
+  playSFX('sfx_ui_open');
+}
+function closeEvolutionGuide(){el('evolutionPanel').classList.add('hidden');playSFX('sfx_ui_close');}
+function renderEvolutionGuide(){
+  const ids=[...state.party.filter(Boolean),...state.storage];
+  const selected=ids.includes(state.evolutionCandidate)?state.evolutionCandidate:ids[0]||null;
+  state.evolutionCandidate=selected;
+  const select=el('evolutionMonsterSelect');
+  if(select){select.innerHTML=ids.map(id=>{const inst=getInst(id);return inst?`<option value="${id}" ${id===selected?'selected':''}>${displayName(inst)} • Lv.${inst.level}</option>`:''}).join('');select.onchange=()=>{state.evolutionCandidate=select.value;renderEvolutionGuide();};}
+  renderEvolution(el('evolutionBody'));
+}
 function renderMerchantShop(){
   const box=el('merchantProducts');if(!box)return;
   box.innerHTML=MERCHANT_STOCK.map(item=>`<div class="merchant-item"><div class="merchant-icon">${item.icon}</div><div class="merchant-info"><b>${item.name}</b><small>${item.note}</small><span>${item.price} เหรียญ</span></div><button data-buy-item="${item.id}">ซื้อ</button></div>`).join('');
@@ -4020,7 +4038,7 @@ function bindCharacterAccessControl(node,handler){
   node.addEventListener('pointerdown',run,{passive:false});
   node.addEventListener('click',run);
 }
-el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else if(isNearTrainer())openTrainer();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('trainerClose').onclick=()=>{playSFX('sfx_ui_click');closeTrainer();};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('trainerPanel').addEventListener('pointerdown',e=>{if(e.target===el('trainerPanel'))closeTrainer();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else if(isNearTrainer())openTrainer();else if(isNearEvolution())openEvolutionGuide();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('trainerClose').onclick=()=>{playSFX('sfx_ui_click');closeTrainer();};el('evolutionClose').onclick=()=>{playSFX('sfx_ui_click');closeEvolutionGuide();};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('trainerPanel').addEventListener('pointerdown',e=>{if(e.target===el('trainerPanel'))closeTrainer();});el('evolutionPanel').addEventListener('pointerdown',e=>{if(e.target===el('evolutionPanel'))closeEvolutionGuide();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
@@ -4131,7 +4149,7 @@ function ensureWildPopulation(dt){
 }
 
 // ---------- Frame ----------
-function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,-32,32);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,32);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});}
+function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,-32,32);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,32);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
