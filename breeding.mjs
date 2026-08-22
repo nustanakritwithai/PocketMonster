@@ -10,6 +10,8 @@ import { normalizeInstance, CORE_GENES } from './monster-instance.mjs';
 export const GENE_RANKS = Object.freeze(['D', 'C', 'B', 'A', 'S']);
 export const BREEDING_ADULT_STAGES = Object.freeze(['Adult', 'Mature']);
 export const BREEDING_MIN_BOND = 50;
+export const POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
+export const POTENTIAL_LIMITS = Object.freeze({ min: 0, max: 31 });
 
 // R13 inheritance baselines (tunable rules, not content).
 export const INHERITANCE = Object.freeze({
@@ -136,6 +138,66 @@ export function inheritAptitude(aptA, aptB, speciesBase, rng) {
   const weighted = w.parentA * aptA + w.parentB * aptB + w.speciesBase * speciesBase;
   const mutation = rng.next() < 0.2 ? (rng.next() < 0.5 ? -1 : 1) : 0;
   return clamp(Math.round(weighted + mutation), 1, 5);
+}
+
+function validPotentialRecord(value) {
+  return value && typeof value === 'object' && POTENTIAL_STATS.every(stat => (
+    Number.isInteger(value[stat])
+      && value[stat] >= POTENTIAL_LIMITS.min
+      && value[stat] <= POTENTIAL_LIMITS.max
+  ));
+}
+
+function takeSeededStat(rng, available) {
+  const index = rng.int(0, available.length - 1);
+  return available.splice(index, 1)[0];
+}
+
+// BRD_v1.0: choose exactly two unique Potential stats from the Egg Holder and
+// one unique stat from the Partner. Every unselected stat is a fresh bounded
+// 0..31 roll. A dedicated seed stream keeps this adapter deterministic without
+// perturbing the legacy gene/aptitude RNG sequence.
+export function resolvePotentialInheritance(eggHolder, partner, { seed = 0 } = {}) {
+  if (!eggHolder || typeof eggHolder !== 'object' || !partner || typeof partner !== 'object') {
+    return Object.freeze({ ok: false, reason: 'invalid_parent' });
+  }
+  if (!validPotentialRecord(eggHolder.potential) || !validPotentialRecord(partner.potential)) {
+    return Object.freeze({ ok: false, reason: 'invalid_potential' });
+  }
+
+  const rng = createRng(`${String(seed)}:potential`);
+  const available = [...POTENTIAL_STATS];
+  const holderStats = [takeSeededStat(rng, available), takeSeededStat(rng, available)];
+  const partnerStat = takeSeededStat(rng, available);
+  const inheritedStats = Object.freeze([...holderStats, partnerStat]);
+  const inherited = new Set(inheritedStats);
+  const potential = {};
+  const sources = {};
+
+  for (const stat of POTENTIAL_STATS) {
+    if (holderStats.includes(stat)) {
+      potential[stat] = eggHolder.potential[stat];
+      sources[stat] = 'egg_holder';
+    } else if (stat === partnerStat) {
+      potential[stat] = partner.potential[stat];
+      sources[stat] = 'partner';
+    } else {
+      potential[stat] = rng.int(POTENTIAL_LIMITS.min, POTENTIAL_LIMITS.max);
+      sources[stat] = 'random';
+    }
+  }
+
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    seed,
+    potential: Object.freeze(potential),
+    sources: Object.freeze(sources),
+    inheritedStats,
+    randomStats: Object.freeze(POTENTIAL_STATS.filter(stat => !inherited.has(stat))),
+    holderInheritedCount: holderStats.length,
+    partnerInheritedCount: 1,
+  });
 }
 
 // Produce a child instance from two parents. Deterministic under `seed`.
