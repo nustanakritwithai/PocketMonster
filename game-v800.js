@@ -4479,15 +4479,10 @@ el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'�
 {const savedVol=localStorage.getItem('mlr-audio-volume');if(savedVol){setVolume(parseFloat(savedVol));el('volumeSlider').value=Math.round(parseFloat(savedVol)*100);}const savedMute=localStorage.getItem('mlr-audio-muted');if(savedMute==='true'){toggleMute();el('muteBtn').textContent='🔇 เสียงปิด';}}
 el('volumeSlider').oninput=(e)=>{const v=parseFloat(e.target.value)/100;setVolume(v);localStorage.setItem('mlr-audio-volume',String(v));};
 el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};
-el('zoneToggleBtn').onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.toggle('hidden');};
-el('stageSelectBtn').onclick=()=>{playSFX('sfx_ui_click');openStageSelect();};
-el('stageSelectClose').onclick=()=>{playSFX('sfx_ui_click');closeStageSelect();};
 el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('warpPromptAction').onclick=()=>startWarp();
 el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');closeWarpPrompt();warpPromptCooldown=.35;};
-document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
-addEventListener('pointerdown',e=>{const dd=el('zoneDropdown');if(!dd.classList.contains('hidden')&&!el('zoneTravel').contains(e.target))dd.classList.add('hidden');});
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
 
 // ---------- Wild population safety ----------
