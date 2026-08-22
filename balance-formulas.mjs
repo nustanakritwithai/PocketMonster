@@ -3,7 +3,12 @@
 // tunables from a balance config (defaults to BALANCE_CONFIG) so the engine can
 // stay content-agnostic (Master Plan R1 "data-driven", R23 formulas layer).
 
-import { BALANCE_CONFIG, WORKBOOK_EXP_ADAPTER, WORKBOOK_GROWTH_ADAPTER } from './balance-config.mjs';
+import {
+  BALANCE_CONFIG,
+  WORKBOOK_CAPTURE_ADAPTER,
+  WORKBOOK_EXP_ADAPTER,
+  WORKBOOK_GROWTH_ADAPTER,
+} from './balance-config.mjs';
 
 export function clamp(value, min, max) {
   if (!Number.isFinite(value)) return min;
@@ -428,6 +433,19 @@ export function clampDerived(kind, value, config = BALANCE_CONFIG) {
 // ---------------------------------------------------------------------------
 // R14 — Capture chance
 // ---------------------------------------------------------------------------
+
+// A26 / CAP_v1.0 calculator seam. This does not replace the legacy live formula
+// until A27 wires the full capture transaction and its exactly-once guards.
+export function captureHpFactorV1(hpRatio, config = WORKBOOK_CAPTURE_ADAPTER) {
+  const ratio = Number.isFinite(hpRatio) ? hpRatio : 1;
+  const raw = config.hpFactor.base + config.hpFactor.slope * (1 - ratio);
+  return clamp(raw, config.hpFactor.min, config.hpFactor.max);
+}
+
+export function captureFinalChancePctV1(rawChancePct, config = WORKBOOK_CAPTURE_ADAPTER) {
+  if (!Number.isFinite(rawChancePct) || rawChancePct <= 0) return 0;
+  return clamp(rawChancePct, config.minChancePct, config.maxChancePct);
+}
 
 // Interpolate hpFactor from the descending target-HP table.
 export function captureHpFactor(hpRatio, config = BALANCE_CONFIG) {

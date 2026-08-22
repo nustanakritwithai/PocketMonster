@@ -5,6 +5,34 @@ export const ENCOUNTER_POLICY = Object.freeze({
   maxEngaged: 2,
 });
 
+function capturePolicyResult(ok, reason) {
+  return Object.freeze({ ok, reason, shouldRoll: ok });
+}
+
+// Pure A26 precondition boundary. Ball consumption and ownership mutation are
+// intentionally deferred to the A27 capture transaction.
+export function evaluateCaptureAttemptPolicy({
+  ownedMonsterActive,
+  ballQuantity,
+  targetAlive,
+  projectileHit,
+  capturable,
+} = {}) {
+  if (typeof ownedMonsterActive !== 'boolean'
+    || !Number.isInteger(ballQuantity) || ballQuantity < 0
+    || typeof targetAlive !== 'boolean'
+    || typeof projectileHit !== 'boolean'
+    || typeof capturable !== 'boolean') {
+    return capturePolicyResult(false, 'invalid_state');
+  }
+  if (ownedMonsterActive) return capturePolicyResult(false, 'active_monster_must_recall');
+  if (ballQuantity <= 0) return capturePolicyResult(false, 'no_capture_ball');
+  if (!targetAlive) return capturePolicyResult(false, 'target_fainted');
+  if (!projectileHit) return capturePolicyResult(false, 'projectile_miss');
+  if (!capturable) return capturePolicyResult(false, 'capture_disabled');
+  return capturePolicyResult(true, null);
+}
+
 export function tickCooldown(current, dt) {
   const normalized = Number.isFinite(current) && current > 0 ? current : 0;
   const elapsed = Number.isFinite(dt) && dt > 0 ? dt : 0;
