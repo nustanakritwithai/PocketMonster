@@ -10,7 +10,9 @@ assert.match(grassStage,/sceneStatus:'normal-encounters'/,'Grass Meadow normal e
 assert.match(grassStage,/encounterTableId:'grass-meadow-normal-v1'/,'Grass Meadow encounter table is explicit');
 assert.match(grassStage,/balanceProfileId:'grass-meadow-normal-v1'/,'Grass Meadow balance profile is explicit');
 assert.match(grassStage,/spawn:\[[\s\S]*mossbun[\s\S]*buglet[\s\S]*normalooze/,'Grass Meadow uses the planned normal species');
-assert.doesNotMatch(grassStage,/\{elite:true|\{boss:true/,'Grass Meadow normal stage has no Elite/Boss spawn');
+const normalSpawn=grassStage.match(/spawn:\[([\s\S]*?)\]\s*,rareSpawn/)?.[1]||'';
+assert.ok(normalSpawn,'Grass Meadow normal spawn list is bounded');
+assert.doesNotMatch(normalSpawn,/\{elite:true|\{boss:true/,'Grass Meadow normal spawn list has no Elite/Boss entry');
 assert.match(js,/function makeStageBeacon\(/,'scene traversal markers exist');
 assert.match(js,/bounds=ZONES\[state\.currentZone\]\?\.bounds/,'player bounds are zone-aware');
 assert.match(js,/const start=cfg\.playerStart/,'zone player start is data-driven');

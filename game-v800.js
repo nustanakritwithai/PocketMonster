@@ -1878,7 +1878,7 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},saveVersion:SAVE_SCHEMA_VERSION};
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
@@ -1887,6 +1887,15 @@ function markRareDiscovery(w,kind='found'){
   if(!w?.rare)return;
   state.rareCollection=state.rareCollection||{found:{},captured:{}};
   const bucket=state.rareCollection[kind]||(state.rareCollection[kind]={});
+  const key=`${w.zone}:${w.speciesId}`;
+  if(bucket[key])return;
+  bucket[key]={count:1,firstAt:Date.now()};
+  saveGame(false);
+}
+function markEliteProgress(w,kind='found'){
+  if(!w?.elite)return;
+  state.eliteProgress=state.eliteProgress||{found:{},defeated:{},captured:{}};
+  const bucket=state.eliteProgress[kind]||(state.eliteProgress[kind]={});
   const key=`${w.zone}:${w.speciesId}`;
   if(bucket[key])return;
   bucket[key]={count:1,firstAt:Date.now()};
@@ -2203,9 +2212,9 @@ characterUI=createCharacterUIController({
 let hubCompanion=null;
 const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
-  'grass-meadow':{label:'Grass Meadow • Normal + Rare',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
+  'grass-meadow':{label:'Grass Meadow • Normal + Rare + Elite',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
     ['mossbun',-11,2,1,{}],['mossbun',11,2,1,{}],['buglet',-11,-8,1,{}],['buglet',11,-8,1,{}],['normalooze',-6,-14,1,{}],['normalooze',6,-14,1,{}],['mossbun',-16,14,2,{}],['buglet',16,14,2,{}]
-  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:2},sceneStatus:'normal-encounters'},
+  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,eliteSpawn:[['mossbun',0,-18,3,{elite:true}]],eliteChance:.18,bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',eliteEncounterTableId:'grass-meadow-elite-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:3},sceneStatus:'normal-encounters'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2256,6 +2265,7 @@ function createWild(sp,x,z,level=1,opts={}){
   const capturePolicy=boss?'disabled':(elite?'elite':'normal');
   const w={id:'w'+nextId++,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst};
   if(rare)markRareDiscovery(w,'found');
+  if(elite)markEliteProgress(w,'found');
   w.labelEl=createWildLabel(w);wilds.push(w);return w;
 }
 function clearWilds(){
@@ -2272,7 +2282,7 @@ function retireWild(w){
   if(index>=0)wilds.splice(index,1);
 }
 function livingWilds(){return wilds.filter(w=>!w.dead);}
-function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}}
+function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}const starterDone=state.starterJourney?.grassMeadow?.captured;if(cfg.eliteSpawn?.length&&starterDone&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance){for(const [id,x,z,l,opts] of cfg.eliteSpawn)createWild(spById[id],x,z,l,opts);}}
 function resetWild(w){if(w.dead)return;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
@@ -2460,6 +2470,7 @@ function defeatWild(w){
   if(w.dead)return;
   w.dead=true;
   if(state.currentZone==='grass-meadow')markStarterJourney('battled');
+  if(w.elite)markEliteProgress(w,'defeated');
   removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
   const playerExp=playerExpReward('battle',w);
@@ -2613,6 +2624,7 @@ function finishCaptureSuccess(cs){
   playSFX('sfx_capture_success');
   const w=cs.wild;
   if(w.rare)markRareDiscovery(w,'captured');
+  if(w.elite)markEliteProgress(w,'captured');
   spawnCaptureResultEffect(cs.pos,true);
   spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.2,duration:.8,intensity:.85});
   triggerCameraShake(.1,.2);
@@ -4139,6 +4151,7 @@ function migrateLoadedState(s){
   state.evolutionCandidate=null;
   state.starterJourney=clean.starterJourney||starterJourneyDefaults();
   state.rareCollection=clean.rareCollection||{found:{},captured:{}};
+  state.eliteProgress=clean.eliteProgress||{found:{},defeated:{},captured:{}};
   state.currentZone=ZONES[clean.currentZone]?clean.currentZone:'hub';
   state.saveVersion=SAVE_SCHEMA_VERSION;
   attachCharacterUi(state);
