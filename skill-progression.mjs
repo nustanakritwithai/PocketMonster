@@ -1,8 +1,8 @@
-// Monster Life RPG — V7.5 Skill Progression
-// Skills are learned and mastered through USE, not auto-unlocked by level (A3).
-// This layer computes Skill EXP (miss/immune = 0), mastery ranks with a bounded
-// raw-power increase, candidate eligibility, and mutation with a mandatory
-// trade-off inside the skill power budget (R7). Resolver is UI-independent (R24).
+// Monster Life RPG — workbook v2.1 Skill Progression
+// LevelUp rows auto-learn at their configured threshold; mastery still grows
+// through accepted uses. This layer computes Skill EXP (miss/immune = 0),
+// mastery ranks with a bounded raw-power increase, candidate eligibility, and
+// mutation with a mandatory trade-off inside the skill power budget (R7).
 
 import { BALANCE_CONFIG, SKILL_MASTERY } from './balance-config.mjs';
 import { clamp } from './balance-formulas.mjs';
@@ -269,12 +269,49 @@ export function resolveStage1Learnset(instance) {
     level,
     entries: Object.freeze(entries),
     candidates,
-    autoGrant: false,
+    autoGrant: true,
   });
 }
 
 export function listStage1SkillCandidates(instance) {
   return resolveStage1Learnset(instance).candidates;
+}
+
+// LevelUp rows are AutoLearn=Yes in Learnset_Method_Rules. Newly learned
+// workbook defaults fill their designated manual slot only when it is empty;
+// user-selected occupants are never displaced, and non-default moves stay
+// learned but unequipped.
+export function synchronizeStage1Learnset(instance) {
+  const resolved = resolveStage1Learnset(instance);
+  if (!resolved.ok) {
+    return Object.freeze({
+      ok: false,
+      reason: resolved.reason,
+      granted: Object.freeze([]),
+    });
+  }
+  if (!Array.isArray(instance.skills)) instance.skills = [];
+  const defaultSkillIds = workbookDefaultSkillIds(instance.speciesId);
+  const granted = [];
+  for (const entry of resolved.entries) {
+    if (!entry.eligible || entry.learned) continue;
+    const defaultIndex = defaultSkillIds.indexOf(entry.skillId);
+    const preferredSlot = defaultIndex >= 0 ? MANUAL_SKILL_SLOTS[defaultIndex] : null;
+    const occupied = preferredSlot
+      ? instance.skills.some(skill => skill?.slot === preferredSlot)
+      : false;
+    const learned = learnSkill(instance, { skillId: entry.skillId, slot: null });
+    if (!learned) continue;
+    if (preferredSlot && !occupied) equipSkill(instance, { skillId: entry.skillId, slot: preferredSlot });
+    granted.push(Object.freeze({ skillId: entry.skillId, slot: learned.slot }));
+  }
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    runtimeSpeciesId: resolved.runtimeSpeciesId,
+    workbookMonsterId: resolved.workbookMonsterId,
+    granted: Object.freeze(granted),
+  });
 }
 
 const STAGE2_NATIVE_METHODS = new Set(['LevelUp', 'Evolution']);
