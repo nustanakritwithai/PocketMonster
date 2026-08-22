@@ -95,7 +95,7 @@ const mutants = [
   ['replace secure gender seed', 'crypto.getRandomValues(genderSeedWords);', 'genderSeedWords[0]=Math.floor(Date.now()%100);'],
   ['drop create collection commit', 'state.collection=result.state.collection;state.eggs=result.state.eggs;', 'state.eggs=result.state.eggs;'],
   ['drop create egg commit', 'state.collection=result.state.collection;state.eggs=result.state.eggs;', 'state.collection=result.state.collection;'],
-  ['reintroduce create-time child roll', 'const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1);', 'makeChild(a,b,compat.eggHolder);const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1);'],
+  ['reintroduce create-time child roll', "const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1),inheritedSkillMemoryId=el('breedingSkillMemory')?.value||null;", "makeChild(a,b,compat.eggHolder);const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1),inheritedSkillMemoryId=el('breedingSkillMemory')?.value||null;"],
   ['reintroduce create Math.random', 'crypto.getRandomValues(genderSeedWords);', 'crypto.getRandomValues(genderSeedWords);Math.random();'],
   ['reintroduce parent energy cost', 'crypto.getRandomValues(genderSeedWords);', 'crypto.getRandomValues(genderSeedWords);a.energy=clamp(a.energy-15);'],
   ['show wrong live hatch duration', 'ฟัก 15 นาที', 'ฟัก 30 วินาที'],

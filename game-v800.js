@@ -25,7 +25,7 @@ import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrain
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
-import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS } from './skill-progression.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
@@ -35,7 +35,7 @@ import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
-import { BREEDING_VERSION, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
+import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
 import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
@@ -2060,7 +2060,7 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
@@ -2314,9 +2314,12 @@ function renderSkills(targetPanel=null){
     const ev=evaluateSkillCandidate(d,inst);
     return `<div class="skill-card ${ev.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${d.id} ${typeBadge(d.move?.type||'Fire')}</b></div><div class="skill-detail">Power: ${d.move?.power??'—'} • CD: ${d.move?.cooldown??'—'}s</div>${ev.eligible?`<button data-learn="${d.id}">เรียน</button>`:`<div class="skill-req">ล็อก: ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')||'ยังไม่พร้อม'}</div>`}</div>`;
   }).join('');
-  panel.innerHTML=`<div class="skills-panel">${renderFocusedSkillLoadoutV2()}<div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  const memoryEligibility=resolveInheritedSkillMemoryEligibility(inst);
+  const memoryHTML=inst.inheritedSkillMemoryId?`<div class="skills-section-title">Skill Memory จากการผสมพันธุ์</div><div class="skill-card ${memoryEligibility.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${memoryEligibility.definition?.nameTH||inst.inheritedSkillMemoryId} • ${inst.inheritedSkillMemoryId}</b><span class="skill-mastery-label">${memoryEligibility.method||'Memory'}</span></div><div class="skill-detail">บันทึกจาก Partner • ไม่ติดตั้งสล็อตอัตโนมัติ</div>${memoryEligibility.eligible?`<button data-learn-memory="${inst.instanceId}">เรียนจาก Memory</button>`:`<div class="skill-req">${SKILL_MEMORY_REASON_TH[memoryEligibility.reason]||memoryEligibility.reason}</div>`}</div>`:'';
+  panel.innerHTML=`<div class="skills-panel">${renderFocusedSkillLoadoutV2()}<div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
+  panel.querySelectorAll('[data-learn-memory]').forEach(b=>b.onclick=()=>learnSkillMemory(b.dataset.learnMemory));
 }
 function renderFocusedEquipmentLoadout(){
   const presentation=focusedCharacterPresentation();
@@ -3709,6 +3712,17 @@ const EGG_TRANSACTION_REASON_TH=Object.freeze({
   unknown_id:'ไม่พบพ่อแม่ใน Collection',
   invalid_state:'ข้อมูลธุรกรรมไข่ไม่ถูกต้อง',
 });
+const SKILL_MEMORY_REASON_TH=Object.freeze({
+  no_skill_memory:'ไม่มี Skill Memory',
+  already_learned:'เรียนสกิลนี้แล้ว',
+  stage_required:'ต้องถึง Stage ที่กำหนด',
+  level_required:'Level ยังไม่ถึง',
+  secondary_required:'Secondary Type ยังไม่ตรง',
+  bond_required:'Bond ยังไม่ถึง',
+  family_skill_not_found:'สกิลไม่อยู่ในสาย Stage 2 นี้',
+  ultimate_excluded:'Ultimate ส่งต่อไม่ได้',
+  rare_manual_excluded:'Rare Manual ส่งต่อไม่ได้',
+});
 function standardBreedingRoles(a,b){
   if(a?.gender==='Female'&&b?.gender==='Male')return{eggHolder:a,partner:b};
   if(b?.gender==='Female'&&a?.gender==='Male')return{eggHolder:b,partner:a};
@@ -3729,15 +3743,16 @@ function breedingCompatibility(a,b){
   return{...result,...roles,text:breedingReasonText(result)};
 }
 function createEgg(){if(!assertRanchOperation())return;const a=getInst(state.breeding.parentA),b=getInst(state.breeding.parentB),compat=breedingCompatibility(a,b);if(!compat.ok){msg(compat.text);renderBreeding();return;}
-  const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1);
+  const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1),inheritedSkillMemoryId=el('breedingSkillMemory')?.value||null;
   crypto.getRandomValues(genderSeedWords);
-  const result=createStandardBreedingEggTransaction(state,{eggId,eggHolderOwnedMonsterId:compat.eggHolder.instanceId,partnerOwnedMonsterId:compat.partner.instanceId,genderSeed:genderSeedWords[0],now});
+  const result=createStandardBreedingEggTransaction(state,{eggId,eggHolderOwnedMonsterId:compat.eggHolder.instanceId,partnerOwnedMonsterId:compat.partner.instanceId,genderSeed:genderSeedWords[0],inheritedSkillMemoryId,now});
   if(!result.ok){msg(EGG_TRANSACTION_REASON_TH[result.reason]||`สร้างไข่ไม่สำเร็จ: ${result.reason}`);renderBreeding();return;}
-  state.collection=result.state.collection;state.eggs=result.state.eggs;
+  state.collection=result.state.collection;state.eggs=result.state.eggs;applyBreedingSkillMemoryRequestLedger(state,result.state);
   let posA=fxWorldPos(a.instanceId),posB=fxWorldPos(b.instanceId);
   if(posA.distanceTo(posB)<.05){posA=incubator.position.clone().add(new THREE.Vector3(-.8,0,0));posB=incubator.position.clone().add(new THREE.Vector3(.8,0,0));}
   spawnBreedingEffect(posA,posB);
-  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(compat.eggHolder)} • ฟัก 15 นาที`);renderManager();saveGame(false);}
+  const memoryText=result.egg.inheritedSkillMemoryId?` • Memory ${result.egg.inheritedSkillMemoryId}`:'';
+  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(compat.eggHolder)} • ฟัก 15 นาที${memoryText}`);renderManager();saveGame(false);}
 function prepareHatchedChildForLive(child){
   child.origin='bred';child.lifeStage='Baby';child.createdAt=child.createdAt||Date.now();child.fainted=false;
   child.personality=child.personality||child.personalityId||'balanced';
@@ -4123,6 +4138,14 @@ function learnCandidateSkill(id,skillId){
   msg(`${displayName(inst)} เรียน ${def.id} • ยังไม่ติดตั้งในสล็อต`);
   renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
 }
+function learnSkillMemory(id){
+  const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id))return;
+  const result=learnInheritedSkillMemory(inst);
+  if(!result.ok){msg(`Skill Memory ยังเรียนไม่ได้ • ${SKILL_MEMORY_REASON_TH[result.reason]||result.reason}`);return;}
+  msg(`${displayName(inst)} เรียน ${result.skill.skillId} จาก Skill Memory • ยังไม่ติดตั้งในสล็อต`);
+  renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
+}
 function mutateOwnedSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
@@ -4149,6 +4172,17 @@ let pickerTarget='parentA';
 function parentButtonHTML(inst){if(!inst)return '<span class="parent-empty">＋ เลือกมอน</span>';const sp=spById[inst.speciesId],profile=workbookBreedingProfile(inst.speciesId);return `<span class="parent-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span><b>${displayName(inst)}</b><small>${GENDER_TH[inst.gender]||inst.gender} • Bond ${fmt(inst.mind?.bond??inst.bond)} • ${profile?.breedingGroup||'Unknown'}</small></span>`;}
 function closeMonsterPicker(){el('monsterPicker').classList.add('hidden');}
 function openMonsterPicker(target){if(!assertRanchOperation())return;pickerTarget=target;const list=el('monsterPickerList'),ids=breedingAdultIds();el('pickerTitle').textContent=target==='parentA'?'เลือก Parent A':'เลือก Parent B';list.innerHTML='';if(!ids.length){list.innerHTML='<div class="manager-empty">ยังไม่มีมอน Stage 2 ใน Storage</div>';}for(const id of ids){const inst=getInst(id),sp=spById[inst.speciesId],profile=workbookBreedingProfile(inst.speciesId),bond=inst.mind?.bond??inst.bond??0,cooldown=inst.breedingCooldownUntil??0,eligible=profile?.breedingEligibility==='Yes'&&inst.level>=20&&bond>=50&&cooldown<=Date.now(),selected=state.breeding[target]===id,d=document.createElement('button');d.className='picker-mon-card'+(selected?' selected':'');d.innerHTML=`<span class="picker-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span class="picker-info"><b>${displayName(inst)}</b><small>Lv.${inst.level} • Stage 2 • ${GENDER_TH[inst.gender]||inst.gender}</small><small>Bond ${fmt(bond)} • Group ${profile?.breedingGroup||'Unknown'}</small></span>${eligible?'<span class="picker-ok">พร้อม</span>':'<span class="picker-warn">ยังไม่พร้อม</span>'}`;d.onclick=()=>{state.breeding[target]=id;closeMonsterPicker();renderBreeding();};list.appendChild(d);}el('monsterPicker').classList.remove('hidden');}
+function renderBreedingSkillMemoryChoices(eggHolder,partner,enabled){
+  const select=el('breedingSkillMemory');if(!select)return[];
+  const previous=select.value,candidates=enabled?listBreedingSkillMemoryCandidates(eggHolder,partner):[];
+  select.replaceChildren();
+  const emptyOption=document.createElement('option');emptyOption.value='';emptyOption.textContent='ไม่ส่งต่อ Skill Memory';select.appendChild(emptyOption);
+  for(const candidate of candidates){const option=document.createElement('option');option.value=candidate.skillId;option.textContent=`${candidate.preferred?'★ ':''}${candidate.definition.nameTH} • ${candidate.skillId} (${candidate.method})`;select.appendChild(option);}
+  select.value=candidates.some(candidate=>candidate.skillId===previous)?previous:'';
+  select.disabled=!enabled;
+  const hint=el('breedingSkillMemoryHint');if(hint)hint.textContent=enabled?(candidates.length?`เลือกได้ ${candidates.length} สกิล • ★ = BreedingCandidate ที่แนะนำ`:'คู่นี้ไม่มี Skill Memory ที่ผ่านกฎ'):'เลือกคู่ที่ผ่านกฎก่อน';
+  return candidates;
+}
 function renderBreeding(){
   const ids=breedingAdultIds();
   if(state.breeding.parentA&&!ids.includes(state.breeding.parentA))state.breeding.parentA=null;
@@ -4159,6 +4193,7 @@ function renderBreeding(){
   c.textContent=compat.text;
   c.className='compatibility '+(a&&b?(compat.ok?'ok':'bad'):'');
   el('breedBtn').disabled=!compat.ok;
+  const memoryCandidates=renderBreedingSkillMemoryChoices(compat.eggHolder,compat.partner,compat.ok);
   if(a&&b){
     const holder=compat.eggHolder,partner=compat.partner,childProfile=workbookBreedingProfile(holder?.speciesId);
     const potentialPreview=[['hp','HP'],['atk','ATK'],['def','DEF'],['spAtk','SP.ATK'],['spDef','SP.DEF'],['spd','SPD']].map(([key,label])=>{
@@ -4167,7 +4202,7 @@ function renderBreeding(){
     }).join('');
     const births=(state.collection||[]).filter(m=>m.origin==='bred'||(m.lifeHistory||[]).some(h=>h.type==='birth'));
     const birthHTML=births.length?`<div class="birth-history">${births.slice(-6).map(m=>`<div class="birth-history-item">ฟัก ${displayName(m)} • Stage 1</div>`).join('')}</div>`:'';
-    el('inheritPreview').innerHTML=`Egg Holder: <b>${holder?displayName(holder):'ไม่พบ'}</b> • ลูกเป็น ${childProfile?.childMonsterId||'Stage 1 ของ Holder'}<br><div class="gene-inherit-preview">${potentialPreview}</div><div style="font-size:8px;color:#64748b;margin-top:4px">Potential: สุ่มรับ 2 ค่าจาก Holder + 1 ค่าจาก Partner แบบ exact และสุ่มอีก 3 ค่าในช่วง 0–31 ตอนสร้างไข่เพียงครั้งเดียว</div>${birthHTML}`;
+    el('inheritPreview').innerHTML=`Egg Holder: <b>${holder?displayName(holder):'ไม่พบ'}</b> • ลูกเป็น ${childProfile?.childMonsterId||'Stage 1 ของ Holder'} • Skill Memory ที่เลือกได้ ${memoryCandidates.length}<br><div class="gene-inherit-preview">${potentialPreview}</div><div style="font-size:8px;color:#64748b;margin-top:4px">Potential: สุ่มรับ 2 ค่าจาก Holder + 1 ค่าจาก Partner แบบ exact และสุ่มอีก 3 ค่าในช่วง 0–31 ตอนสร้างไข่เพียงครั้งเดียว • Skill Memory ไม่สุ่ม</div>${birthHTML}`;
   }else el('inheritPreview').textContent='เลือกพ่อแม่เพื่อดู Potential ที่จะส่งต่อ';
   const list=el('eggList');
   list.innerHTML='';
@@ -4184,7 +4219,7 @@ function renderBreeding(){
     const countdown=hatched?'ฟักแล้ว':(!hasDeadline?'ข้อมูลเวลาไม่ถูกต้อง':(remain>0?remain+'s':'พร้อมฟัก!'));
     const action=hatched?'ฟักแล้ว':(!hasDeadline?'ฟักไม่ได้':(remain>0?'กำลังฟัก':'ฟักไข่'));
     const disabled=hatched||!hasDeadline||remain>0;
-    d.innerHTML=`<div class="egg-top"><span class="egg-icon">🥚</span><b data-egg-countdown>${countdown}</b></div><div class="egg-meta">${holder?displayName(holder):holderId||'?'} × ${partner?displayName(partner):partnerId||'?'}<br>ผู้ถือไข่: ${holder?displayName(holder):holderId||'?'}</div><button data-egg-hatch ${disabled?'disabled':''}>${action}</button>`;
+    d.innerHTML=`<div class="egg-top"><span class="egg-icon">🥚</span><b data-egg-countdown>${countdown}</b></div><div class="egg-meta">${holder?displayName(holder):holderId||'?'} × ${partner?displayName(partner):partnerId||'?'}<br>ผู้ถือไข่: ${holder?displayName(holder):holderId||'?'}<br>Skill Memory: ${egg.inheritedSkillMemoryId||'ไม่มี'}</div><button data-egg-hatch ${disabled?'disabled':''}>${action}</button>`;
     d.querySelector('[data-egg-hatch]').onclick=()=>hatchEgg(egg.eggId);
     list.appendChild(d);
   }
@@ -4787,6 +4822,7 @@ function migrateLoadedState(s){
   state.lifeLastAt=clean.lifeLastAt;
   state.inventory=clean.inventory;
   state.eggs=clean.eggs||[];
+  applyBreedingSkillMemoryRequestLedger(state,clean);
   state.breeding=clean.breeding||{parentA:null,parentB:null};
   state.evolutionCandidate=null;
   state.starterJourney=clean.starterJourney||starterJourneyDefaults();

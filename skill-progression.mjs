@@ -11,6 +11,7 @@ import { skillCatalogEntry } from './skill-catalog.mjs';
 import { learnsetEntriesForMonster } from './learnset-catalog.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
 import { resolveWorkbookEvolutionStage } from './evolution.mjs';
+import { resolveSecondaryTypeAssignment } from './secondary-type-resolver.mjs';
 
 export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3', 's4']);
 export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
@@ -383,6 +384,237 @@ export function resolveStage2Learnset(instance) {
 
 export function listStage2SkillCandidates(instance) {
   return resolveStage2Learnset(instance).candidates;
+}
+
+export const SKILL_MEMORY_METHODS = Object.freeze([
+  'LevelUp',
+  'SecondaryLevel',
+  'Tutor',
+  'BreedingCandidate',
+]);
+
+const SKILL_MEMORY_METHOD_SET = new Set(SKILL_MEMORY_METHODS);
+
+function skillMemoryResult(ok, reason, detail = {}) {
+  return Object.freeze({
+    ok,
+    reason,
+    inheritedSkillMemoryId: ok ? detail.skillId ?? null : null,
+    ...detail,
+  });
+}
+
+function normalizedMemorySkillId(value) {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function instanceBond(instance) {
+  const value = instance?.mind?.bond ?? instance?.bond;
+  return Number.isFinite(value) ? value : 0;
+}
+
+// The target side is the Egg Holder's future Stage-2 family. DataReady
+// BreedingCandidate rows are deliberately visible only through this boundary;
+// the ordinary A16 Stage-2 resolver continues to treat them as unavailable.
+export function resolveFamilySkillMemoryTarget(runtimeSpeciesId, skillId) {
+  const mapping = monsterCatalogEntry(runtimeSpeciesId);
+  if (!mapping) return skillMemoryResult(false, 'unknown_id', { runtimeSpeciesId: runtimeSpeciesId ?? null });
+  const definition = skillCatalogEntry(skillId);
+  if (!definition) return skillMemoryResult(false, 'unknown_skill', { runtimeSpeciesId, skillId: skillId ?? null });
+  const entry = learnsetEntriesForMonster(mapping.workbookStage2MonsterId, { includeBlocked: true })
+    .find(candidate => candidate.skillId === skillId) ?? null;
+  if (!entry) return skillMemoryResult(false, 'family_skill_not_found', { runtimeSpeciesId, skillId });
+  if (definition.category === 'Ultimate') {
+    return skillMemoryResult(false, 'ultimate_excluded', { runtimeSpeciesId, skillId, definition, entry });
+  }
+  if (entry.method === 'RareManual') {
+    return skillMemoryResult(false, 'rare_manual_excluded', { runtimeSpeciesId, skillId, definition, entry });
+  }
+  if (entry.state === 'Deferred') {
+    return skillMemoryResult(false, 'target_entry_deferred', { runtimeSpeciesId, skillId, definition, entry });
+  }
+  if (!SKILL_MEMORY_METHOD_SET.has(entry.method)) {
+    return skillMemoryResult(false, 'unsupported_memory_method', { runtimeSpeciesId, skillId, definition, entry });
+  }
+  if (entry.requiredRuntimeSecondaryType) {
+    const secondary = resolveSecondaryTypeAssignment({
+      runtimeSpeciesId,
+      stage: 2,
+      candidateType: entry.requiredRuntimeSecondaryType,
+    });
+    if (!secondary.ok) {
+      return skillMemoryResult(false, 'family_secondary_not_allowed', {
+        runtimeSpeciesId,
+        skillId,
+        definition,
+        entry,
+        secondary,
+      });
+    }
+  }
+  return skillMemoryResult(true, null, {
+    runtimeSpeciesId,
+    workbookMonsterId: mapping.workbookStage2MonsterId,
+    skillId,
+    definition,
+    entry,
+    method: entry.method,
+    preferred: entry.method === 'BreedingCandidate',
+  });
+}
+
+function resolvePartnerSkillMemoryEntry(partner, skillId) {
+  if (!getSkill(partner, skillId)) {
+    return skillMemoryResult(false, 'partner_skill_not_known', { skillId });
+  }
+  const mapping = monsterCatalogEntry(partner?.speciesId);
+  if (!mapping) return skillMemoryResult(false, 'partner_unknown_id', { skillId });
+  const entry = learnsetEntriesForMonster(mapping.workbookStage2MonsterId, { includeBlocked: true })
+    .find(candidate => candidate.skillId === skillId) ?? null;
+  if (!entry) return skillMemoryResult(false, 'partner_skill_entry_not_found', { skillId });
+  if (entry.state === 'Deferred') {
+    return skillMemoryResult(false, 'partner_entry_deferred', { skillId, partnerEntry: entry });
+  }
+  const stage = resolveWorkbookEvolutionStage(partner);
+  if (!stage.ok || !stage.stage2 || entry.stage > 2 || entry.requiredStage > 2) {
+    return skillMemoryResult(false, 'partner_stage_required', { skillId, partnerEntry: entry, stage });
+  }
+  const level = Number.isFinite(partner?.level) ? Math.max(1, Math.floor(partner.level)) : 1;
+  if (level < entry.learnLevel) {
+    return skillMemoryResult(false, 'partner_level_required', { skillId, partnerEntry: entry, level });
+  }
+  if (entry.requiredRuntimeSecondaryType
+    && partner?.secondaryType !== entry.requiredRuntimeSecondaryType) {
+    return skillMemoryResult(false, 'partner_secondary_required', {
+      skillId,
+      partnerEntry: entry,
+      requiredSecondaryType: entry.requiredRuntimeSecondaryType,
+    });
+  }
+  const bond = instanceBond(partner);
+  if (bond < entry.requiredBond) {
+    return skillMemoryResult(false, 'partner_bond_required', { skillId, partnerEntry: entry, bond });
+  }
+  return skillMemoryResult(true, null, {
+    skillId,
+    partnerEntry: entry,
+    partnerWorkbookMonsterId: mapping.workbookStage2MonsterId,
+  });
+}
+
+// Skill Memory has no random component. The caller supplies at most one SkillID
+// and this resolver validates the Partner and Egg Holder family snapshots.
+export function resolveBreedingSkillMemory(eggHolder, partner, requestedSkillId = null) {
+  const skillId = normalizedMemorySkillId(requestedSkillId);
+  if (!skillId) return skillMemoryResult(false, 'no_skill_selected', { skillId: null });
+  const target = resolveFamilySkillMemoryTarget(eggHolder?.speciesId, skillId);
+  if (!target.ok) return target;
+  const source = resolvePartnerSkillMemoryEntry(partner, skillId);
+  if (!source.ok) {
+    return skillMemoryResult(false, source.reason, {
+      skillId,
+      definition: target.definition,
+      targetEntry: target.entry,
+      method: target.method,
+      preferred: target.preferred,
+      partnerEntry: source.partnerEntry ?? null,
+    });
+  }
+  return skillMemoryResult(true, null, {
+    skillId,
+    definition: target.definition,
+    targetEntry: target.entry,
+    partnerEntry: source.partnerEntry,
+    method: target.method,
+    preferred: target.preferred,
+  });
+}
+
+export function listBreedingSkillMemoryCandidates(eggHolder, partner) {
+  const seen = new Set();
+  const candidates = [];
+  for (const record of (Array.isArray(partner?.skills) ? partner.skills : [])) {
+    const skillId = normalizedMemorySkillId(record?.skillId);
+    if (!skillId || seen.has(skillId)) continue;
+    seen.add(skillId);
+    const result = resolveBreedingSkillMemory(eggHolder, partner, skillId);
+    if (result.ok) candidates.push(result);
+  }
+  candidates.sort((left, right) => Number(right.preferred) - Number(left.preferred)
+    || (right.targetEntry?.priority ?? 0) - (left.targetEntry?.priority ?? 0)
+    || left.skillId.localeCompare(right.skillId));
+  return Object.freeze(candidates);
+}
+
+function memoryUnlockResult(target, eligible, reason, detail = {}) {
+  return Object.freeze({
+    ok: true,
+    eligible,
+    reason,
+    skillId: target.skillId,
+    inheritedSkillMemoryId: target.skillId,
+    definition: target.definition,
+    entry: target.entry,
+    method: target.method,
+    ...detail,
+  });
+}
+
+// Memory only grants a cost-free relearn opportunity. It never learns or
+// equips during hatch; the explicit action below always creates an un-slotted
+// owned-skill record after the method-specific timing gates pass.
+export function resolveInheritedSkillMemoryEligibility(instance) {
+  const skillId = normalizedMemorySkillId(instance?.inheritedSkillMemoryId);
+  if (!skillId) {
+    return Object.freeze({ ok: false, eligible: false, reason: 'no_skill_memory', skillId: null });
+  }
+  const target = resolveFamilySkillMemoryTarget(instance?.speciesId, skillId);
+  if (!target.ok) return Object.freeze({ ...target, eligible: false });
+  if (getSkill(instance, skillId)) return memoryUnlockResult(target, false, 'already_learned');
+
+  const stage = resolveWorkbookEvolutionStage(instance);
+  const stageNumber = stage.ok && stage.stage2 ? 2 : 1;
+  const level = Number.isFinite(instance?.level) ? Math.max(1, Math.floor(instance.level)) : 1;
+  const bond = instanceBond(instance);
+  const requiredStage = target.method === 'LevelUp' ? target.entry.requiredStage : 2;
+  if (stageNumber < requiredStage) {
+    return memoryUnlockResult(target, false, 'stage_required', { requiredStage, stage });
+  }
+
+  const bypassLearnLevel = target.method === 'SecondaryLevel'
+    || target.method === 'BreedingCandidate';
+  if (!bypassLearnLevel && level < target.entry.learnLevel) {
+    return memoryUnlockResult(target, false, 'level_required', {
+      level,
+      requiredLevel: target.entry.learnLevel,
+    });
+  }
+  if (target.entry.requiredRuntimeSecondaryType
+    && instance?.secondaryType !== target.entry.requiredRuntimeSecondaryType) {
+    return memoryUnlockResult(target, false, 'secondary_required', {
+      requiredSecondaryType: target.entry.requiredRuntimeSecondaryType,
+    });
+  }
+  if (bond < target.entry.requiredBond) {
+    return memoryUnlockResult(target, false, 'bond_required', {
+      bond,
+      requiredBond: target.entry.requiredBond,
+    });
+  }
+  return memoryUnlockResult(target, true, null, {
+    bypassLearnLevel,
+    bypassServiceCost: target.method === 'Tutor',
+  });
+}
+
+export function learnInheritedSkillMemory(instance) {
+  const eligibility = resolveInheritedSkillMemoryEligibility(instance);
+  if (!eligibility.ok || !eligibility.eligible) {
+    return Object.freeze({ ...eligibility, ok: false, skill: null });
+  }
+  const skill = learnSkill(instance, { skillId: eligibility.skillId, slot: null });
+  if (!skill) return Object.freeze({ ...eligibility, ok: false, eligible: false, reason: 'learn_failed', skill: null });
+  return Object.freeze({ ...eligibility, ok: true, skill });
 }
 
 // Add Skill EXP from a use event and recompute mastery rank.
