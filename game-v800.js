@@ -327,6 +327,14 @@ function makeIceCrystal(x,z,s=1){
   }
   g.position.set(x,0,z); addDeco(g); return g;
 }
+function makeCanyonWall(x,z,s=1,tone=0x92400e){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(boxGeometry(1.7*s,2.8*s,1.25*s),mat(tone,.96,.05));
+  base.position.y=1.4*s; base.scale.set(1,.9+((Math.abs(x)+Math.abs(z))%3)*.08,1); g.add(base);
+  const cap=new THREE.Mesh(boxGeometry(1.25*s,.34*s,1.05*s),mat(0xb45309,.94,.04));
+  cap.position.set(.12*s,2.88*s,-.04*s); cap.rotation.y=.08; g.add(cap);
+  g.position.set(x,0,z); g.rotation.y=(x-z)*.04; addDeco(g); return g;
+}
 function makeFencePost(x,z){
   const post=new THREE.Mesh(boxGeometry(.1,.7,.1),mat(0x8b5e34,.86,.02));
   post.position.set(x,.35,z); addDeco(post); return post;
@@ -387,6 +395,14 @@ function populateWorld(zone='hub'){
       const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xb99a62,transparent:true,opacity:.3}));
       tile.position.set(0,.025,z); addDeco(tile);
     }
+  }else if(zone==='rocky-canyon'){
+    [[-19,10,1.3],[19,-10,1.35],[-19,-10,1.15],[19,10,1.25]].forEach(([x,z,s])=>makeCanyonWall(x,z,s,0x78350f));
+    [[-15,5,1.15],[15,5,1.2],[15,-14,1.3],[-15,-14,1.15],[5,15,1.1],[-5,-15,1.25]].forEach(([x,z,s])=>makeRock(x,z,s,0x92400e));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xd6a66b,transparent:true,opacity:.32}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xfbbf24);
   }else if(zone==='frozen-pass'){
     [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.25],[-8,-17,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x94a3b8));
     [[-15,5,1.2],[15,5,1.1],[15,-14,1.35],[-15,-14,1.2],[5,15,1.15],[-5,-15,1.2],[-4,-5,1],[8,-8,1.1]].forEach(([x,z,s])=>makeIceCrystal(x,z,s));
@@ -2262,6 +2278,9 @@ const ZONES={
   'storm-field':{label:'Storm Field • Electric + Flying + Steel',stageId:'storm-field',biomeId:'storm-field',bg:0x1e40af,ground:0x1e3a8a,spawn:[
     ['voltkit',-11,2,12,{}],['voltkit',11,2,12,{}],['galebird',-11,-8,12,{}],['galebird',11,-8,12,{}],['ironbug',-7,-14,13,{}],['ironbug',7,-14,13,{}]
   ],eliteSpawn:[['voltkit',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,18,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:{min:12,max:18},sceneStatus:'stage-ready'},
+  'rocky-canyon':{label:'Rocky Canyon • Rock + Ground + Fighting',stageId:'rocky-canyon',biomeId:'rocky-canyon',bg:0xd6a66b,ground:0x9a6b3f,spawn:[
+    ['rockhorn',-11,2,20,{}],['rockhorn',11,2,20,{}],['sandmole',-11,-8,20,{}],['sandmole',11,-8,20,{}],['punchcub',-7,-14,21,{}],['rockhorn',7,-14,21,{}]
+  ],eliteSpawn:[['rockhorn',0,-16,23,{elite:true}]],eliteChance:.16,bossSpawn:[['rockhorn',0,-18,26,{boss:true}]],progressionBossSpeciesId:'rockhorn',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Rock'],secondaryTypes:['Ground','Fighting'],encounterTableId:'encounter-rocky-canyon-v1',eliteEncounterTableId:'elite-rocky-canyon-v1',bossEncounterTableId:'boss-rocky-canyon-v1',balanceProfileId:'stage-rocky-canyon-v1',recommendedLevel:{min:20,max:26},sceneStatus:'stage-ready'},
   'frozen-pass':{label:'Frozen Pass • Ice + Flying + Water',stageId:'frozen-pass',biomeId:'frozen-pass',bg:0xbfe8ff,ground:0xdbeafe,spawn:[
     ['frostowl',-11,2,16,{}],['frostowl',11,2,16,{}],['aquapuff',-11,-8,16,{}],['aquapuff',11,-8,16,{}],['frostowl',-7,-14,17,{}],['aquapuff',7,-14,17,{}]
   ],eliteSpawn:[['frostowl',0,-16,19,{elite:true}]],eliteChance:.16,bossSpawn:[['frostowl',0,-18,22,{boss:true}]],progressionBossSpeciesId:'frostowl',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ice'],secondaryTypes:['Flying','Water'],encounterTableId:'encounter-frozen-pass-v1',eliteEncounterTableId:'elite-frozen-pass-v1',bossEncounterTableId:'boss-frozen-pass-v1',balanceProfileId:'stage-frozen-pass-v1',recommendedLevel:{min:16,max:22},sceneStatus:'stage-ready'},
@@ -2300,6 +2319,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.45;
     sun.intensity=1.55;
     sun.color.setHex(0xe0f2fe);
+  }else if(zone==='rocky-canyon'){
+    hemi.intensity=1.2;
+    sun.intensity=1.75;
+    sun.color.setHex(0xffd29a);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2309,14 +2332,14 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='rocky-canyon'?'rocky':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
   scene.background=makeSkyTexture(z.bg);
   scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
-  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:30;
-  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:76;
+  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:zone==='rocky-canyon'?24:30;
+  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:76;
   setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){
