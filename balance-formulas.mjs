@@ -3,7 +3,7 @@
 // tunables from a balance config (defaults to BALANCE_CONFIG) so the engine can
 // stay content-agnostic (Master Plan R1 "data-driven", R23 formulas layer).
 
-import { BALANCE_CONFIG } from './balance-config.mjs';
+import { BALANCE_CONFIG, WORKBOOK_GROWTH_ADAPTER } from './balance-config.mjs';
 
 export function clamp(value, min, max) {
   if (!Number.isFinite(value)) return min;
@@ -144,6 +144,43 @@ export function trainingGain({
 export function geneModifier(rank, config = BALANCE_CONFIG) {
   if (typeof rank !== 'string') return 1.0;
   return config.gene[rank.trim().toUpperCase()] ?? 1.0;
+}
+
+// Workbook v2.1 stat formula exposed as a calculator-only compatibility seam.
+// It does not replace the live HP/ATK/DEF/SPD formula or activate SPATK/SPDEF.
+export function calculateWorkbookGrowthPreview({
+  stat,
+  baseStat = 0,
+  level = WORKBOOK_GROWTH_ADAPTER.sourceLevel.min,
+  potential = WORKBOOK_GROWTH_ADAPTER.potential.default,
+  training = 0,
+} = {}, adapter = WORKBOOK_GROWTH_ADAPTER) {
+  if (!adapter.sourceStats.includes(stat)) {
+    return Object.freeze({ ok: false, reason: 'unknown_id', stat: stat ?? null });
+  }
+  const boundedBase = Math.max(0, Number.isFinite(baseStat) ? baseStat : 0);
+  const boundedLevel = clamp(Math.floor(level), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const boundedPotential = clamp(Math.floor(potential), adapter.potential.min, adapter.potential.max);
+  const boundedTraining = clamp(training, 0, adapter.training.perStatMax);
+  const subtotal = 2 * boundedBase + boundedPotential + boundedTraining / adapter.training.divisor;
+  const levelScaled = Math.floor(subtotal * boundedLevel / 100);
+  const flatBonus = stat === 'hp' ? boundedLevel + 10 : 5;
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    stat,
+    value: levelScaled + flatBonus,
+    baseStat: boundedBase,
+    level: boundedLevel,
+    potential: boundedPotential,
+    training: boundedTraining,
+    subtotal,
+    levelScaled,
+    flatBonus,
+    activation: adapter.activation,
+    runtimeEligible: adapter.activeRuntimeStats.includes(stat),
+    statModelDecision: adapter.statModelDecision,
+  });
 }
 
 // raw = speciesBase + levelGrowth + training + nutritionFlat + equipmentFlat.

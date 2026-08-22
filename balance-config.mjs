@@ -5,6 +5,19 @@
 
 export const BALANCE_SCHEMA_VERSION = 1;
 
+export const WORKBOOK_GROWTH_ADAPTER = Object.freeze({
+  sourceLevel: Object.freeze({ min: 1, cap: 60 }),
+  potential: Object.freeze({ min: 0, max: 31, default: 15 }),
+  training: Object.freeze({ perStatMax: 200, totalMax: 600, divisor: 4 }),
+  rounding: 'floor',
+  sourceStats: Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']),
+  activeRuntimeStats: Object.freeze(['hp', 'atk', 'def', 'spd']),
+  deferredRuntimeStats: Object.freeze(['spAtk', 'spDef']),
+  activation: 'calculator_only',
+  statModelDecision: 'D3_SPATK_SPDEF_DEFERRED',
+  levelCapDecision: 'D7_RUNTIME_CAP_50_UNCHANGED',
+});
+
 export const BALANCE_CONFIG = Object.freeze({
   version: BALANCE_SCHEMA_VERSION,
 
