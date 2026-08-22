@@ -37,7 +37,7 @@ assert.ok(!markSrc.includes('- speed * 0.05'), 'no negative speed in growth y (P
 assert.ok(!markSrc.includes('- defense * 0.04'), 'no negative defense in growth z (Phase 5)');
 
 // ── Phase 6: boss > wild, animation pulse ≤ 0.03 ────────────
-assert.match(gameSrc, /boss\?1\.12:1\.06/, 'boss scale 1.12 > wild 1.06 (Phase 6)');
+assert.match(gameSrc, /boss\?1\.12:\(rare\?1\.1:1\.06\)/, 'boss scale 1.12 > rare 1.1 > wild 1.06 (Phase 6)');
 // Extract the animateMonster switch block and check no sy pulse >= 0.08
 const animBlock = gameSrc.slice(gameSrc.indexOf("switch(u.monsterType)"), gameSrc.indexOf("if(u.monsterEvolved)"));
 assert.ok(!animBlock.includes('*0.12'), 'no animation pulse 0.12 in animateMonster (Phase 6)');
