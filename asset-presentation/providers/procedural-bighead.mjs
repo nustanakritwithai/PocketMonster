@@ -32,6 +32,9 @@ export const MERCHANT_PALETTE = Object.freeze({
 export const TRAINER_PALETTE = Object.freeze({
   skin: 0xf0c8a0, hair: 0x1d4ed8, shirt: 0x1d4ed8, pants: 0x1e293b, bag: 0x0f766e, boot: 0x0f172a, hat: 0x38bdf8, apron: 0xe0f2fe, staff: 0x0f766e, orb: 0x22d3ee,
 });
+export const EVOLUTION_PALETTE = Object.freeze({
+  skin: 0xf0c8a0, hair: 0x7c3aed, shirt: 0x581c87, pants: 0x312e81, bag: 0x7c3aed, boot: 0x1e1b4b, hat: 0xc084fc, apron: 0xf3e8ff, staff: 0x7c3aed, orb: 0xf0abfc,
+});
 
 function trackRest(map, node) {
   map.set(node, {
@@ -90,7 +93,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
   return function bigheadFactory({ request, def }) {
     const role = request.role;
-    const palette = role === 'keeper' ? KEEPER_PALETTE : role === 'merchant' ? MERCHANT_PALETTE : role === 'trainer' ? TRAINER_PALETTE : PLAYER_PALETTE;
+    const palette = role === 'keeper' ? KEEPER_PALETTE : role === 'merchant' ? MERCHANT_PALETTE : role === 'trainer' ? TRAINER_PALETTE : role === 'evolution' ? EVOLUTION_PALETTE : PLAYER_PALETTE;
     const head = def.metrics?.head || [0.64, 0.72, 0.56];
     const headY = def.metrics?.headY ?? 1.44;
     const [headW, headH, headD] = head;
@@ -121,7 +124,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
     const hairRoot = new THREE.Group(); headPivot.add(hairRoot);
     const hatRoot = new THREE.Group(); headPivot.add(hatRoot);
-    if (role === 'keeper' || role === 'merchant' || role === 'trainer') {
+    if (role === 'keeper' || role === 'merchant' || role === 'trainer' || role === 'evolution') {
       const brim = new THREE.Mesh(cylinder ? cylinder(0.42, 0.44, 0.03, 12) : box(0.84, 0.03, 0.84), material(palette.hat, 0.62, 0.08));
       brim.position.y = headH / 2;
       hatRoot.add(brim);
@@ -169,7 +172,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
     const rightLeg = makeLeg(); rightLegRoot.add(rightLeg.leg); rightLegRoot.add(rightLeg.boot);
 
     let staffTip = null;
-    if (role === 'keeper' || role === 'trainer') {
+    if (role === 'keeper' || role === 'trainer' || role === 'evolution') {
       const staffRoot = new THREE.Group();
       staffRoot.position.set(0, -0.10, 0);
       rightHandAnchor.add(staffRoot);
