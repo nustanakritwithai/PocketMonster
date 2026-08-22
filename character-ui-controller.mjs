@@ -444,13 +444,14 @@ export function createCharacterUIController(options = {}) {
     const id = typeof monsterId === 'string'
       ? monsterId
       : (typeof party[slot] === 'string' ? party[slot] : current.focusedMonsterId);
-    openPanel('quick', { source, monsterId: id ?? null, partySlot: Number.isInteger(slot) ? slot : null });
+    const opened = requestOpenFull({
+      source: 'character',
+      monsterId: id ?? null,
+      tab: 'info',
+    });
     return {
-      ok: true,
+      ...opened,
       switched: false,
-      openedManager: false,
-      reason: null,
-      panel: 'quick',
       monsterId: id ?? null,
       partySlot: Number.isInteger(slot) ? slot : null,
       readOnly: isSummonActive(),

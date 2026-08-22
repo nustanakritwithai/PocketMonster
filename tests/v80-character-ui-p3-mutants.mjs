@@ -57,8 +57,9 @@ function liveProbe(module) {
   });
   const opened = controller.requestGlobalAccess({ source: 'global-button' });
   assert.equal(opened.ok, true);
-  assert.equal(opened.openedManager, false);
-  assert.equal(opened.panel, 'quick');
+  assert.equal(opened.openedManager, true);
+  assert.equal(opened.panel, 'full');
+  assert.equal(opened.characterTab, 'info');
   assert.equal(opened.readOnly, true);
   const skills = controller.requestOpenTab('skills');
   assert.equal(skills.ok, false, 'summoned skills must stay closed');

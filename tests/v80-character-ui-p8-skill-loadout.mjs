@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { activeJs as js } from './active-assets.mjs';
 
-const renderer=js.match(/function renderFocusedSkillLoadoutV2\(\)\{([\s\S]*?)\n\}\nfunction renderSkills\(\)/)?.[1]||'';
+const renderer=js.match(/function renderFocusedSkillLoadoutV2\(\)\{([\s\S]*?)\n\}\nfunction renderSkills\([^)]*\)/)?.[1]||'';
 assert.ok(renderer, 'Phase 8 needs a focused Skill Loadout V2 renderer');
 assert.match(renderer, /focusedCharacterPresentation\(\)/, 'loadout must resolve the same focused monster as Status/Overview');
 for (const slot of ['Basic AI', 'S1', 'S2', 'S3', 'Passive', 'Evolution Trait']) {
