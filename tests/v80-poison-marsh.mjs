@@ -13,7 +13,7 @@ assert.equal(routesFrom('poison-marsh').some(route=>route.to==='sky-ruins'),true
 const progress=createStageProgress();
 for(const id of ['storm-field','frozen-pass','rocky-canyon','sky-ruins'])Object.assign(progress,recordStageClear(progress,id));
 assert.equal(stageUnlockReason(progress,'poison-marsh').ok,true,'Sky Ruins clear unlocks Poison Marsh');
-const zoneBlock=js.match(/['"]poison-marsh['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const zoneBlock=js.match(/['"]poison-marsh['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]dream-shrine['"]\s*:)/)?.[0]||'';
 assert.match(zoneBlock,/stageId:'poison-marsh'/,'Poison Marsh runtime zone is catalog-linked');
 assert.match(zoneBlock,/spawn:\[/,'Poison Marsh has Normal encounter spawn data');
 assert.match(zoneBlock,/eliteSpawn:\[/,'Poison Marsh has Elite encounter data');

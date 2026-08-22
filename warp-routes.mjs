@@ -16,6 +16,8 @@ export const WARP_ROUTES=Object.freeze([
   {id:'sky-to-poison',from:'sky-ruins',to:'poison-marsh',label:'Poison Marsh',position:[0,-18],spawn:[0,0,17],kind:'forward'},
   {id:'poison-to-sky',from:'poison-marsh',to:'sky-ruins',label:'Sky Ruins',position:[0,18],spawn:[0,0,-17],kind:'return'},
   {id:'poison-to-hub',from:'poison-marsh',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
+  {id:'poison-to-dream',from:'poison-marsh',to:'dream-shrine',label:'Dream Shrine',position:[20,0],spawn:[-19,0,0],kind:'forward'},
+  {id:'dream-to-poison',from:'dream-shrine',to:'poison-marsh',label:'Poison Marsh',position:[-20,0],spawn:[19,0,0],kind:'return'},
   {id:'storm-to-hub',from:'storm-field',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
 ]);
 
