@@ -2,6 +2,7 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
+import { createStageProgress, normalizeStageProgress } from './stage-catalog.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -1878,7 +1879,7 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
@@ -4165,6 +4166,7 @@ function migrateLoadedState(s){
   state.rareCollection=clean.rareCollection||{found:{},captured:{}};
   state.eliteProgress=clean.eliteProgress||{found:{},defeated:{},captured:{}};
   state.bossProgress=clean.bossProgress||{found:{},defeated:{}};
+  state.stageProgress=normalizeStageProgress(clean.stageProgress);
   state.currentZone=ZONES[clean.currentZone]?clean.currentZone:'hub';
   state.saveVersion=SAVE_SCHEMA_VERSION;
   attachCharacterUi(state);
