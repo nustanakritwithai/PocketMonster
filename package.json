@@ -11,7 +11,7 @@
     "test:v81:loadout": "node tests/v81-skill-loadout-catalog.mjs && node tests/v81-skill-loadout-catalog-mutants.mjs",
     "test:v81:stage1": "node tests/v81-learnset-stage1.mjs && node tests/v81-learnset-stage1-mutants.mjs",
     "test:v81:targeting": "node tests/v81-skill-catalog.mjs && node tests/v81-skill-uses.mjs && node tests/v81-targeting-resolver.mjs && node tests/v81-targeting-resolver-mutants.mjs && node tests/v81-skill-command-runtime.mjs && node tests/v81-skill-command-runtime-mutants.mjs && node tests/v81-targeting-live-wiring.mjs && node tests/v81-targeting-live-wiring-mutants.mjs",
-    "test:v81:breeding": "node tests/v81-breeding-profile.mjs && node tests/v81-potential-inheritance.mjs && node tests/v81-potential-inheritance-mutants.mjs",
+    "test:v81:breeding": "node tests/v81-breeding-profile.mjs && node tests/v81-breeding-profile-mutants.mjs && node tests/v81-potential-inheritance.mjs && node tests/v81-potential-inheritance-mutants.mjs",
     "ci": "npm run check && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding"
   },
   "description": "Monster Life RPG V8.2.0 - Progression Core live loop (balance, raising, battle growth, care, skills, equipment, evolution, events, breeding)"
