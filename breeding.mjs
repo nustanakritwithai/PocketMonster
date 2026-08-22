@@ -9,6 +9,10 @@ import { normalizeInstance, CORE_GENES } from './monster-instance.mjs';
 import { resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { MONSTER_CATALOG } from './monster-catalog.mjs';
 import { resolveSecondaryTypeAssignment } from './secondary-type-resolver.mjs';
+import {
+  resolveBreedingSkillMemory,
+  resolveFamilySkillMemoryTarget,
+} from './skill-progression.mjs';
 
 export const GENE_RANKS = Object.freeze(['D', 'C', 'B', 'A', 'S']);
 export const BREEDING_REQUIRED_STAGE = 2;
@@ -328,6 +332,65 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+const SKILL_MEMORY_REQUEST_LEDGER_FIELD = 'breedingSkillMemoryRequestByEggId';
+
+function normalizedSkillMemoryRequestId(value) {
+  return nonEmptyString(value) ? value : null;
+}
+
+function skillMemoryRequestLedgerSnapshot(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return Object.freeze({ ok: false, ledger: null, legacy: false });
+  }
+  if (!Object.prototype.hasOwnProperty.call(state, SKILL_MEMORY_REQUEST_LEDGER_FIELD)) {
+    return Object.freeze({ ok: true, ledger: Object.freeze({}), legacy: true });
+  }
+  const ledger = state[SKILL_MEMORY_REQUEST_LEDGER_FIELD];
+  if (!ledger || typeof ledger !== 'object' || Array.isArray(ledger)) {
+    return Object.freeze({ ok: false, ledger: null, legacy: false });
+  }
+  return Object.freeze({ ok: true, ledger, legacy: false });
+}
+
+function skillMemoryRequestSnapshot(state, egg) {
+  const ledgerSnapshot = skillMemoryRequestLedgerSnapshot(state);
+  if (!ledgerSnapshot.ok) return Object.freeze({ ok: false, skillId: null });
+  if (Object.prototype.hasOwnProperty.call(ledgerSnapshot.ledger, egg.eggId)) {
+    const skillId = ledgerSnapshot.ledger[egg.eggId];
+    if (skillId !== null && !nonEmptyString(skillId)) return Object.freeze({ ok: false, skillId: null });
+    return Object.freeze({ ok: true, skillId, legacy: false });
+  }
+  // Eggs created before A33 have no separate caller-command ledger. Their
+  // canonical output is the only recoverable request identity.
+  return Object.freeze({
+    ok: true,
+    skillId: egg.inheritedSkillMemoryId ?? null,
+    legacy: true,
+  });
+}
+
+function appendSkillMemoryRequest(ledger, eggId, skillId) {
+  return {
+    ...ledger,
+    [eggId]: skillId,
+  };
+}
+
+// The raw caller selection is transaction identity, not workbook egg data.
+// Live create/load boundaries use this adapter so null output cannot erase an
+// invalid-but-exact command and malformed ledgers remain fail-closed.
+export function applyBreedingSkillMemoryRequestLedger(targetState, sourceState) {
+  if (!targetState || typeof targetState !== 'object' || Array.isArray(targetState)
+    || !sourceState || typeof sourceState !== 'object' || Array.isArray(sourceState)) return false;
+  const sourceHasLedger = Object.prototype.hasOwnProperty.call(sourceState, SKILL_MEMORY_REQUEST_LEDGER_FIELD);
+  const sourceLedger = sourceHasLedger ? sourceState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] : {};
+  targetState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] = sourceLedger && typeof sourceLedger === 'object'
+    && !Array.isArray(sourceLedger)
+    ? { ...sourceLedger }
+    : sourceLedger;
+  return true;
+}
+
 function ownedMonster(state, instanceId) {
   const matches = Array.isArray(state?.collection)
     ? state.collection.filter(monster => monster?.instanceId === instanceId)
@@ -372,6 +435,7 @@ function sameOrderedValues(left, right) {
 function eggCreationSnapshotMatches(egg, eggHolder, partner, {
   eggId,
   now,
+  inheritedSkillMemoryId,
 }) {
   if (!eggHolder || !partner) return false;
   const holderStage = resolveWorkbookEvolutionStage(eggHolder);
@@ -380,13 +444,14 @@ function eggCreationSnapshotMatches(egg, eggHolder, partner, {
     || holderStage.path?.fromWorkbookMonsterId !== holderProfile.childMonsterId) return false;
   const inheritance = resolvePotentialInheritance(eggHolder, partner, { seed: eggId });
   if (!inheritance.ok) return false;
+  const skillMemory = resolveBreedingSkillMemory(eggHolder, partner, inheritedSkillMemoryId);
   return egg.breedingVersion === BREEDING_VERSION
     && egg.childMonsterId === holderProfile.childMonsterId
     && egg.hatchAt === now + holderProfile.hatchTimeMin * 60 * 1000
     && sameOrderedValues(egg.potentialInheritedStats, inheritance.inheritedStats)
     && samePotential(egg.potentialValues, inheritance.potential)
     && (egg.secondaryAffinity ?? null) === resolveSecondaryAffinity(eggHolder)
-    && egg.inheritedSkillMemoryId == null
+    && (egg.inheritedSkillMemoryId ?? null) === skillMemory.inheritedSkillMemoryId
     && egg.recipeId == null;
 }
 
@@ -437,6 +502,12 @@ export function validateWorkbookEgg(egg) {
     }
   }
   if (egg.inheritedSkillMemoryId != null && !nonEmptyString(egg.inheritedSkillMemoryId)) issues.push(eggIssue('egg_schema_invalid', 'inheritedSkillMemoryId'));
+  if (egg.inheritedSkillMemoryId != null && nonEmptyString(egg.inheritedSkillMemoryId) && childProfile) {
+    const memoryTarget = resolveFamilySkillMemoryTarget(childProfile.runtimeSpeciesId, egg.inheritedSkillMemoryId);
+    if (!memoryTarget.ok) {
+      issues.push(eggIssue('egg_schema_invalid', 'inheritedSkillMemoryId', { reason: memoryTarget.reason }));
+    }
+  }
   if (egg.recipeId != null) issues.push(eggIssue('egg_schema_invalid', 'recipeId'));
   if (egg.hatchedOwnedMonsterId != null) {
     if (!UUID_PATTERN.test(egg.hatchedOwnedMonsterId ?? '')) {
@@ -527,6 +598,7 @@ export function createStandardBreedingEggTransaction(state, {
   eggHolderOwnedMonsterId,
   partnerOwnedMonsterId,
   genderSeed,
+  inheritedSkillMemoryId = null,
   now = Date.now(),
 } = {}) {
   if (!state || typeof state !== 'object' || !Array.isArray(state.collection) || !Array.isArray(state.eggs)
@@ -535,6 +607,9 @@ export function createStandardBreedingEggTransaction(state, {
     || !Number.isSafeInteger(genderSeed)) {
     return transactionResult(false, 'invalid_state', state);
   }
+  const requestLedgerSnapshot = skillMemoryRequestLedgerSnapshot(state);
+  if (!requestLedgerSnapshot.ok) return transactionResult(false, 'invalid_state', state);
+  const requestedSkillMemoryId = normalizedSkillMemoryRequestId(inheritedSkillMemoryId);
 
   const duplicates = existingEggs(state, eggId);
   if (duplicates.length > 0) {
@@ -544,6 +619,7 @@ export function createStandardBreedingEggTransaction(state, {
     const replayHolder = replayHolders.length === 1 ? replayHolders[0] : null;
     const replayPartner = replayPartners.length === 1 ? replayPartners[0] : null;
     const parentsUnavailable = replayHolders.length === 0 && replayPartners.length === 0;
+    const requestSnapshot = existing ? skillMemoryRequestSnapshot(state, existing) : null;
     const identityMatches = existing
       && existing.eggId === eggId
       && existing.eggHolderOwnedMonsterId === eggHolderOwnedMonsterId
@@ -552,9 +628,12 @@ export function createStandardBreedingEggTransaction(state, {
       && existing.createdAt === now;
     if (existing && validateWorkbookEgg(existing).ok
       && identityMatches
+      && requestSnapshot?.ok
+      && requestSnapshot.skillId === requestedSkillMemoryId
       && (parentsUnavailable || eggCreationSnapshotMatches(existing, replayHolder, replayPartner, {
           eggId,
           now,
+          inheritedSkillMemoryId: requestedSkillMemoryId,
         }))) {
       return transactionResult(true, null, state, { egg: existing, replay: true });
     }
@@ -577,6 +656,7 @@ export function createStandardBreedingEggTransaction(state, {
 
   const inheritance = resolvePotentialInheritance(eggHolder, partner, { seed: eggId });
   if (!inheritance.ok) return transactionResult(false, inheritance.reason, state);
+  const skillMemory = resolveBreedingSkillMemory(eggHolder, partner, requestedSkillMemoryId);
 
   const hatchAt = now + holderProfile.hatchTimeMin * 60 * 1000;
   if (!Number.isSafeInteger(hatchAt) || hatchAt <= now) {
@@ -595,7 +675,7 @@ export function createStandardBreedingEggTransaction(state, {
     potentialInheritedStats: inheritance.inheritedStats,
     potentialValues: inheritance.potential,
     secondaryAffinity: resolveSecondaryAffinity(eggHolder),
-    inheritedSkillMemoryId: null,
+    inheritedSkillMemoryId: skillMemory.inheritedSkillMemoryId,
     recipeId: null,
     hatchedOwnedMonsterId: null,
   });
@@ -614,12 +694,14 @@ export function createStandardBreedingEggTransaction(state, {
     ...state,
     collection,
     eggs: [...(Array.isArray(state.eggs) ? state.eggs : []), egg],
+    [SKILL_MEMORY_REQUEST_LEDGER_FIELD]: appendSkillMemoryRequest(requestLedgerSnapshot.ledger, eggId, requestedSkillMemoryId),
   };
   return transactionResult(true, null, nextState, {
     egg,
     replay: false,
     parentCooldownUntil: cooldownUntil,
     inheritance,
+    skillMemory,
   });
 }
 
@@ -652,7 +734,9 @@ export function hatchBreedingEggTransaction(state, { eggId, now = Date.now() } =
       && child.parents?.a === egg.eggHolderOwnedMonsterId
       && child.parents?.b === egg.partnerOwnedMonsterId
       && samePotential(child.potential, egg.potentialValues);
-    return childMatches
+    const childSnapshotMatches = childMatches
+      && (child.inheritedSkillMemoryId ?? null) === (egg.inheritedSkillMemoryId ?? null);
+    return childSnapshotMatches
       ? transactionResult(false, 'egg_already_hatched', state, { child: hatchedMatches[0] })
       : transactionResult(false, 'hatch_state_conflict', state);
   }
