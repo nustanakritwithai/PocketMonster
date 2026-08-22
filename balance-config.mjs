@@ -89,7 +89,7 @@ export const WORKBOOK_CAPTURE_ADAPTER = Object.freeze({
   }),
   referenceLevelRule: 'HighestPartyLevelAtEncounterStart',
   statusStackRule: 'StrongestOnly',
-  activation: 'calculator_only',
+  activation: 'live_client_transaction',
   rollAuthority: 'future_server_boundary',
 });
 

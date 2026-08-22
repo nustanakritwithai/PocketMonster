@@ -18,6 +18,8 @@ import {
 } from './character-ui-controller.mjs';
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
+import { resolveWorkbookCapture, snapshotCaptureReferenceLevel } from './balance-capture.mjs';
+import { beginCaptureAttempt, cancelCaptureAttempt, clearCaptureAttemptLedger, commitCaptureAttempt, createCaptureAttemptLedger, resolveCaptureAttempt } from './capture-transaction.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
 import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, resolveOfflineTrainingWindow, simulateLife, deriveCondition, appendHistory, TRAINING_LINES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
@@ -34,7 +36,7 @@ import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
-import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveCaptureChance, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
   applySpeciesProgression,
@@ -47,7 +49,7 @@ import {
   equipmentById,
   foodById,
 } from './content-catalog.mjs';
-import { createSpeciesCatalogAdapter } from './monster-catalog.mjs';
+import { createSpeciesCatalogAdapter, monsterCatalogEntry } from './monster-catalog.mjs';
 import {
   RUNTIME_TYPES as TYPES,
   TYPE_LABEL_TH as TYPE_TH,
@@ -621,7 +623,7 @@ const MASTERY_NEXT_TH={novice:'คุ้นเคย',familiar:'ชำนาญ'
 const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spirit:'hp'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
-const BALANCE={eliteCaptureModifier:.34,bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4,grassMeadowBoss:{level:5,respawnMs:30000},grassMeadowNormal:{battleExpBase:8,battleExpPerLevel:4,captureExp:8,respawnMs:12000,captureBonus:.05},grassMeadowRare:{chance:.24,level:2,respawnMs:18000}};
+const BALANCE={bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4,grassMeadowBoss:{level:5,respawnMs:30000},grassMeadowNormal:{battleExpBase:8,battleExpPerLevel:4,captureExp:8,respawnMs:12000},grassMeadowRare:{chance:.24,level:2,respawnMs:18000}};
 
 function rollGender(sp){
   const profile=workbookBreedingProfile(sp?.id);
@@ -710,7 +712,7 @@ function makeInstance(sp,level=1,opts={}){
   const inst=createInstance({
     instanceId:'m'+Date.now()+'-'+Math.floor(Math.random()*999999),
     speciesId:sp.id,
-    formId:opts.evolutionPath||sp.id,
+    formId:opts.formId??opts.evolutionPath??sp.id,
     level,
     growthExp:opts.growthExp??growthExpForLevel(level),
     origin:opts.origin||'captured',
@@ -2564,7 +2566,7 @@ function createWild(sp,x,z,level=1,opts={}){
   scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),maxHp=Math.round(statValue(sp.base.hp,level,genes.hp,.14,0)*(boss?2.0:(elite?1.3:1)));
   const capturePolicy=encounterProfile.capturePolicy;
   const wildId='w'+nextId++;
-  const w={id:wildId,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
+  const w={id:wildId,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');
   if(boss)markBossProgress(w,'found');
@@ -2572,6 +2574,7 @@ function createWild(sp,x,z,level=1,opts={}){
 }
 function clearWilds(){
   abortCaptureSequence();
+  clearCaptureAttemptLedger(captureAttemptLedger);
   for(const w of wilds){w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});removeAndDispose(scene,w.mesh);removeWildLabel(w);}
   wilds.length=0;
   distanceTickScheduler.clearAll();
@@ -2611,7 +2614,7 @@ function spawnZone(zone){
   if(objective.encounter==='elite')ensureProgressionEncounter(zone);
   else if(objective.complete&&cfg.eliteSpawn?.length&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance)spawnRecords(cfg.eliteSpawn);
 }
-function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
+function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.captureReferenceLevel=null;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
   const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead||w.capturing)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
@@ -2623,7 +2626,7 @@ function respawnWild(w,delay=6000){
     createWild(spById[id],x,z,level,{boss,elite,rare,evolutionPath});
   },delay);
 }
-function clearProjectiles(){ while(projectiles.length){ const p=projectiles.pop(); removeAndDispose(scene, p.mesh); } pendingSummon=null; }
+function clearProjectiles(){ abortCaptureSequence();while(projectiles.length){const p=projectiles.pop();removeAndDispose(scene,p.mesh);}pendingSummon=null; }
 function removeSceneRole(role,instanceId=null){
   for(let i=scene.children.length-1;i>=0;i--){
     const obj=scene.children[i];
@@ -2794,7 +2797,19 @@ function updateWorldLabels(dt){
 
 // ---------- Combat / capture ----------
 function hitFlashGroup(group){if(!group||!group.traverse)return;const backups=[];group.traverse(child=>{if(child.isMesh&&child.material){backups.push({mesh:child,color:child.material.color.clone(),emissive:child.material.emissive?child.material.emissive.clone():null});child.material.color.setHex(0xffffff);if(child.material.emissive)child.material.emissive.setHex(0xffffff);}});setTimeout(()=>{for(const b of backups){if(b.mesh.material){b.mesh.material.color.copy(b.color);if(b.emissive&&b.mesh.material.emissive)b.mesh.material.emissive.copy(b.emissive);}}},80);}
-function damageWild(w,dmg,meta={}){if(w.dead)return;w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
+const captureAttemptLedger=createCaptureAttemptLedger();
+let captureAttemptSequence=0,activeCaptureAttempt=null;
+function nextCaptureAttemptId(){captureAttemptSequence+=1;return`capture:${Date.now()}:${captureAttemptSequence}`;}
+function currentCaptureReferenceLevel(){return snapshotCaptureReferenceLevel((state.party||[]).map(id=>getInst(id)?.level));}
+function ensureCaptureReferenceLevel(w){if(!w)return null;if(Number.isInteger(w.captureReferenceLevel)&&w.captureReferenceLevel>=1)return w.captureReferenceLevel;const referenceLevel=currentCaptureReferenceLevel();if(referenceLevel!==null)w.captureReferenceLevel=referenceLevel;return referenceLevel;}
+function captureWorkbookType(runtimeType){if(!TYPES.includes(runtimeType))return undefined;return runtimeType==='Fairy'?'LIGHT':runtimeType.toUpperCase();}
+function captureIdentityForWild(w){const mapping=monsterCatalogEntry(w?.speciesId);if(!mapping)return null;if(w?.evolutionPath!==null&&w?.evolutionPath!==undefined&&(typeof w.evolutionPath!=='string'||!w.evolutionPath))return null;const stage=w?.evolutionPath?2:1,path=stage===2?wildPath(w):null;const runtimeSecondary=stage===2?(path?.secondaryType??spById[w.speciesId]?.types?.[1]??null):null;const targetSecondaryType=runtimeSecondary===null?null:captureWorkbookType(runtimeSecondary);if(targetSecondaryType===undefined)return null;return Object.freeze({stage,monsterId:stage===2?mapping.workbookStage2MonsterId:mapping.workbookBaseMonsterId,runtimeSecondary,targetSecondaryType});}
+function captureWorkbookMonsterId(w){return captureIdentityForWild(w)?.monsterId??null;}
+function captureWorkbookVariant(w){return encounterVariantFromFlags({boss:!!w?.boss,elite:!!w?.elite,rare:!!w?.rare});}
+function validCapturePolicyForWild(w){const variant=captureWorkbookVariant(w),expected=variant==='elite'?'elite':variant==='boss'?'disabled':'normal';return w?.capturePolicy===expected;}
+function captureActiveStatusIds(w){const status=w?.statusState;if(!status||status.ended||!Array.isArray(status.statuses)||!Number.isFinite(status.currentTimeSec))return null;return status.statuses.filter(entry=>entry&&typeof entry.statusId==='string'&&Number.isFinite(entry.expiresAtSec)&&entry.expiresAtSec>status.currentTimeSec).map(entry=>entry.statusId);}
+function captureCalculatorInput(w,{referenceLevel=w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit=true}={}){const identity=captureIdentityForWild(w),activeStatusIds=captureActiveStatusIds(w);if(!identity||!activeStatusIds||!validCapturePolicyForWild(w))return null;return{targetId:w.id,monsterId:captureWorkbookMonsterId(w),currentHp:w.hp,maxHp:w.maxHp,activeStatusIds,ballClass:'Basic',ballTargetType:null,targetSecondaryType:identity.targetSecondaryType,targetLevel:w.level,referenceLevel,variant:captureWorkbookVariant(w),ownedMonsterActive:!!(activeSummon||pendingSummon),ballQuantity:state.inventory.captureBalls,projectileHit,targetAlive:!w.dead&&w.hp>0};}
+function damageWild(w,dmg,meta={}){if(w.dead)return;ensureCaptureReferenceLevel(w);w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
 function monsterExpNeed(level){return 24+level*18;}
 function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+amount;let ups=0;while(inst.exp>=monsterExpNeed(inst.level)){inst.exp-=monsterExpNeed(inst.level);levelUpInstance(inst);ups++;}inst.bond=clamp(inst.bond+Math.min(2,amount*.04));return ups;}
 // V7.3: Battle event tracking for growth/training (per-encounter, cleared on defeat)
@@ -2914,26 +2929,20 @@ function wildDamage(w,inst){
 }
 function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
 function captureChance(w){
-  if(w.capturePolicy==='disabled')return 0;
-  const sp=spById[w.speciesId];
-  const captureBonus=state.currentZone==='grass-meadow'&&!w.elite&&!w.boss?BALANCE.grassMeadowNormal.captureBonus:0;
-  return liveCaptureChance({
-    speciesRate:Math.min(.95,sp.capture+captureBonus),
-    hpRatio:w.maxHp>0?w.hp/w.maxHp:1,
-    elite:w.capturePolicy==='elite'||!!w.elite,
-    uncapturable:w.boss||w.capturePolicy==='disabled',
-    eliteModifier:BALANCE.eliteCaptureModifier
-  });
+  const input=captureCalculatorInput(w,{referenceLevel:w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit:true});
+  if(!input)return 0;
+  const result=resolveWorkbookCapture(input);
+  return result.ok?result.finalChancePct/100:0;
 }
 let captureAimActive=false;
 const captureAimMat=new THREE.LineBasicMaterial({color:0x60a5fa,transparent:true,opacity:.8});
 const captureAimGeom=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
 const captureAimLine=new THREE.Line(captureAimGeom,captureAimMat);captureAimLine.visible=false;scene.add(captureAimLine);
-function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้องไป Wild Zone เพื่อจับมอน');return false;}if(activeSummon){msg('ต้อง Recall มอนของเราก่อนเข้าสู่ Capture Aim');return false;}if(captureSequence||projectiles.some(p=>p.type==='capture')||wilds.some(w=>w.capturing)){msg('รอผลจับก่อน');return false;}if((state.inventory.captureBalls||0)<=0){msg('Capture Ball หมด • กลับ Ranch แล้ว Keeper จะเติม Starter Kit +5');return false;}return true;}
+function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้องไป Wild Zone เพื่อจับมอน');return false;}if(activeSummon){msg('ต้อง Recall มอนของเราก่อนเข้าสู่ Capture Aim');return false;}if(pendingSummon||projectiles.some(p=>p.type==='summon')){msg('รอ Summon ให้ลงสนามแล้ว Recall ก่อน Capture');return false;}if(activeCaptureAttempt||captureSequence||projectiles.some(p=>p.type==='capture')||wilds.some(w=>w.capturing)){msg('รอผลจับก่อน');return false;}if((state.inventory.captureBalls||0)<=0){msg('Capture Ball หมด • กลับ Ranch แล้ว Keeper จะเติม Starter Kit +5');return false;}return true;}
 function beginCaptureAim(){if(!capturePrerequisite())return false;captureAimActive=true;captureAimLine.visible=true;el('captureBtn').classList.add('aiming');renderSkillButtons();msg('Capture Aim • ลากด้านขวาหมุนกล้อง แล้วปล่อยปุ่มเพื่อขว้าง');return true;}
 function cancelCaptureAim(){captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');renderSkillButtons();}
 function updateCaptureAimVisual(){if(!captureAimActive)return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),start=playerThrowOrigin().clone(),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0)),pts=[];for(let i=0;i<=18;i++){const u=i/18,p=start.clone().lerp(end,u);p.y+=Math.sin(u*Math.PI)*2.2;pts.push(p);}captureAimGeom.setFromPoints(pts);}
-function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');state.inventory.captureBalls--;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius);if(t)t.capturing=true;const end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,ballMesh=>{if(!t||t.dead){if(t)t.capturing=false;if(ballMesh)removeAndDispose(scene,ballMesh);spawnBurst(safeVec3(end),0x3b82f6,{count:6,life:.16,size:.04});msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}resolveCapture(t,ballMesh);});if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
+function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),referenceLevel=t?ensureCaptureReferenceLevel(t):null,targetMonsterId=t?captureWorkbookMonsterId(t):null,attemptId=nextCaptureAttemptId();const begun=beginCaptureAttempt(captureAttemptLedger,{attemptId:attemptId,inventory:state.inventory,targetId:t?.id??null,targetMonsterId,ballClass:'Basic',ballTargetType:null,referenceLevel,ownedMonsterActive:!!(activeSummon||pendingSummon)});if(!begun.ok){msg(begun.reason==='no_capture_ball'?'Capture Ball หมด':'เริ่มการจับไม่ได้ • ข้อมูล encounter ไม่สมบูรณ์');renderHUD();return;}playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');if(t)t.capturing=true;activeCaptureAttempt={attemptId,wild:t};const end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,ballMesh=>resolveCapture(t,ballMesh,attemptId,end));if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
 function captureThrow(){if(beginCaptureAim())executeCaptureThrow();}
 let captureSequence=null;
 function spawnCaptureResultEffect(pos,success){
@@ -2948,20 +2957,22 @@ function spawnCaptureResultEffect(pos,success){
   }
 }
 function abortCaptureSequence(){
-  if(!captureSequence)return;
-  const cs=captureSequence;
+  const cs=captureSequence,active=activeCaptureAttempt;
+  if(!cs&&!active)return;
   captureSequence=null;
-  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
-  if(cs.wild?.mesh){
-    cs.wild.capturing=false;
-    if(!cs.wild.dead)cs.wild.mesh.visible=true;
+  activeCaptureAttempt=null;
+  const attemptId=cs?.attemptId??active?.attemptId;
+  if(attemptId)cancelCaptureAttempt(captureAttemptLedger,attemptId);
+  if(cs?.ballMesh)removeAndDispose(scene,cs.ballMesh);
+  const w=cs?.wild??active?.wild;
+  if(w?.mesh){
+    w.capturing=false;
+    if(!w.dead)w.mesh.visible=true;
   }
 }
-function startCaptureSequence(w,ballMesh){
-  if(!w||w.dead){if(w)w.capturing=false;if(ballMesh)removeAndDispose(scene,ballMesh);msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}
+function startCaptureSequence(w,ballMesh,attemptId,resolution){
+  if(!w||w.dead||!resolution){if(w)w.capturing=false;if(ballMesh)removeAndDispose(scene,ballMesh);cancelCaptureAttempt(captureAttemptLedger,attemptId);activeCaptureAttempt=null;msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}
   const sp=spById[w.speciesId],name=wildDisplayName(w);
-  if(w.capturePolicy==='disabled'){w.capturing=false;if(ballMesh)removeAndDispose(scene,ballMesh);msg(`Boss ${name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);return;}
-  abortCaptureSequence();
   const pos=w.mesh.position.clone();
   w.capturing=true;
   w.mesh.visible=false;
@@ -2976,19 +2987,21 @@ function startCaptureSequence(w,ballMesh){
   playSFX('sfx_capture_tension');
   spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05});
   spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1});
-  const chance=captureChance(w);
-  captureSequence={wild:w,ballMesh,pos,sp,name,chance,success:Math.random()<chance,phaseTime:0,phase:'tension'};
+  const chance=resolution.finalChancePct/100;
+  captureSequence={attemptId,wild:w,ballMesh,pos,sp,name,chance,resolution,success:resolution.captureSucceeded,phaseTime:0,phase:'tension'};
 }
 function finishCaptureSuccess(cs){
+  const w=cs.wild,captureProfile=cs.resolution?.captureProfile,identity=captureIdentityForWild(w);
+  if(!captureProfile||!identity||captureProfile.monsterId!==identity.monsterId||captureProfile.stage!==identity.stage)throw new Error('capture identity drift');
   playSFX('sfx_capture_success');
-  const w=cs.wild;
+  w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
   if(w.rare)markRareDiscovery(w,'captured');
   if(w.elite)markEliteProgress(w,'captured');
   spawnCaptureResultEffect(cs.pos,true);
   spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.2,duration:.8,intensity:.85});
   triggerCameraShake(.1,.2);
   if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
-  const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??cs.sp.types[1]??null});
+  const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:captureProfile.baseBond,formId:captureProfile.stage===2?captureProfile.monsterId:undefined,evolutionPath:w.evolutionPath,secondaryType:identity.runtimeSecondary});
   if(state.currentZone==='grass-meadow')markStarterJourney('captured');
   state.collection.push(inst);
   const empty=state.party.findIndex(x=>x===null);
@@ -3009,20 +3022,28 @@ function finishCaptureSuccess(cs){
   if(!replacesProgressionElite)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
   ensureProgressionEncounter(state.currentZone);
+  return{ownedMonsterId:inst.instanceId,destination:empty>=0?'party':'storage',playerExp};
 }
 function finishCaptureFail(cs){
   playSFX('sfx_capture_fail');
   spawnCaptureResultEffect(cs.pos,false);
   if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
   if(cs.wild)cs.wild.capturing=false;
-  if(cs.wild?.mesh){
+  if(cs.wild?.mesh&&!cs.wild.dead){
     cs.wild.mesh.visible=true;
     cs.wild.mesh.position.copy(cs.pos);
     cs.wild.mesh.rotation.z=0;
     cs.wild.engaged=true;
     cs.wild.state='chase';
   }
-  msg(`จับ ${cs.name} ไม่สำเร็จ (${Math.round(cs.chance*100)}%) • บอลแตก!`);
+  const reason=cs.resolution?.reason;
+  if(reason==='projectile_miss')msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');
+  else if(reason==='capture_disabled')msg(`Boss ${cs.name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);
+  else if(reason==='invalid_roll')msg('ผลสุ่มจับไม่ถูกต้อง • การจับล้มเหลวแบบปลอดภัย');
+  else msg(`จับ ${cs.name} ไม่สำเร็จ (${Math.round(cs.chance*100)}%) • บอลแตก!`);
+  renderHUD();
+  saveGame(false);
+  return{ownedMonsterId:null,destination:null,playerExp:0};
 }
 function updateCaptureSequence(dt){
   if(!captureSequence)return;
@@ -3050,12 +3071,17 @@ function updateCaptureSequence(dt){
   }
   if(cs.phaseTime>=1.7){
     captureSequence=null;
-    if(cs.success)finishCaptureSuccess(cs);
-    else finishCaptureFail(cs);
+    const committed=commitCaptureAttempt(captureAttemptLedger,{attemptId:cs.attemptId,onSuccess:()=>finishCaptureSuccess(cs),onFailure:()=>finishCaptureFail(cs)});
+    if(activeCaptureAttempt?.attemptId===cs.attemptId)activeCaptureAttempt=null;
+    if(!committed.ok){
+      console.warn('Capture commit failed closed',committed.reason);
+      if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
+      if(cs.wild?.mesh&&!cs.wild.dead){cs.wild.capturing=false;cs.wild.mesh.visible=true;}
+    }
   }
 }
-function resolveCapture(w,ballMesh){startCaptureSequence(w,ballMesh);}
-function summonThrow(){const inst=selectedInstance();if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;playerVisual.play('throw',{duration:.34});pendingSummon={instanceId:inst.instanceId};clearHubCompanion();throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return;pendingSummon=null;spawnOwned(inst,end);});msg(`ปาเรียก ${displayName(inst)}`);}
+function resolveCapture(w,ballMesh,attemptId,end){const projectileHit=!!w&&!w.dead,calculatorInput=projectileHit?captureCalculatorInput(w,{referenceLevel:w.captureReferenceLevel,projectileHit:true}):null;if(projectileHit&&!calculatorInput){cancelCaptureAttempt(captureAttemptLedger,attemptId);if(ballMesh)removeAndDispose(scene,ballMesh);w.capturing=false;w.mesh.visible=true;if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;msg('ข้อมูลมอนหรือ encounter ไม่ตรง Workbook • ยกเลิกผลจับแบบปลอดภัย');renderHUD();saveGame(false);return;}const resolved=resolveCaptureAttempt(captureAttemptLedger,{attemptId,projectileHit,calculatorInput,rng:Math.random});if(!resolved.ok){if(ballMesh)removeAndDispose(scene,ballMesh);if(w?.mesh&&!w.dead){w.capturing=false;w.mesh.visible=true;}if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;if(resolved.reason!=='attempt_cancelled')msg('ผลจับถูกปฏิเสธ • '+resolved.reason);return;}if(resolved.replay)return;const resolution=resolved.attempt.resolution,cs={attemptId,wild:w,ballMesh,pos:w?.mesh?.position?.clone?.()??safeVec3(end),sp:w?spById[w.speciesId]:null,name:w?wildDisplayName(w):'เป้าหมาย',chance:resolution.finalChancePct/100,resolution,success:resolution.captureSucceeded};if(!projectileHit||!resolution.shouldRoll){const committed=commitCaptureAttempt(captureAttemptLedger,{attemptId,onSuccess:()=>finishCaptureSuccess(cs),onFailure:()=>finishCaptureFail(cs)});if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;if(!committed.ok)console.warn('Capture rejection commit failed closed',committed.reason);return;}startCaptureSequence(w,ballMesh,attemptId,resolution);}
+function summonThrow(){const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;playerVisual.play('throw',{duration:.34});pendingSummon={instanceId:inst.instanceId};clearHubCompanion();throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return;pendingSummon=null;spawnOwned(inst,end);});msg(`ปาเรียก ${displayName(inst)}`);}
 function spawnOwned(inst,pos){
   clearHubCompanion();
   removeSceneRole('activeSummon');
@@ -3435,6 +3461,7 @@ function updateWild(w,dt,canEngage=false){
     return;
   }
 
+  ensureCaptureReferenceLevel(w);
   w.engaged=true;
   w.state='chase';
   let moving=false;

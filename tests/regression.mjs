@@ -9,10 +9,11 @@ assert.ok(!js.includes('function playerAttack'),'player direct attack implementa
 must('RANCH_ACTIVE_MAX=6','Ranch rendered cap must remain 6');
 must("targetType:'enemy'"); must("targetType:'area'"); must("targetType:'self'");
 must("if(activeSummon){msg('ต้อง Recall มอนของเราก่อนเข้าสู่ Capture Aim')",'capture must be blocked while owned monster is active');
-must('state.inventory.captureBalls--','a real throw attempt must consume a ball');
-must("capturePolicy==='disabled'",'boss capture policy must support disabled');
-must("capturePolicy==='elite'",'elite capture policy must use central policy');
-must('BALANCE.eliteCaptureModifier','elite capture modifier must be data/config driven');
+must('beginCaptureAttempt(captureAttemptLedger','a real throw attempt must consume through the transaction');
+assert.doesNotMatch(js,/captureBalls\s*--|captureBalls\s*-=\s*1/,'scene code must not consume capture balls outside the transaction');
+must('captureWorkbookVariant(w)','boss/elite capture variants must enter the workbook resolver');
+must('resolveWorkbookCapture(input)','live capture coefficients must come from CAP_v1.0');
+must('commitCaptureAttempt(captureAttemptLedger','capture completion must be idempotent');
 must('resetWild(w)','wild encounter reset must exist');
 must('inst.fainted=true','Fainted state must exist');
 must('faintActive()','Fainted auto recall path must exist');

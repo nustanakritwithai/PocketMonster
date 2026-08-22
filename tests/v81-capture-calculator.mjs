@@ -38,7 +38,7 @@ const VALID_INPUT = Object.freeze({
 });
 
 assert.equal(WORKBOOK_CAPTURE_ADAPTER.formulaVersion, 'CAP_v1.0');
-assert.equal(WORKBOOK_CAPTURE_ADAPTER.activation, 'calculator_only', 'A26 must not activate live capture coefficients');
+assert.equal(WORKBOOK_CAPTURE_ADAPTER.activation, 'live_client_transaction', 'A27 activates CAP_v1.0 only behind the client transaction guard');
 assert.equal(WORKBOOK_CAPTURE_ADAPTER.rollAuthority, 'future_server_boundary', 'browser calculator must not claim server authority');
 assert.equal(WORKBOOK_CAPTURE_ADAPTER.minChancePct, 1);
 assert.equal(WORKBOOK_CAPTURE_ADAPTER.maxChancePct, 95);
