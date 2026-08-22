@@ -4144,6 +4144,15 @@ bindMobileNpcSheet(el('merchantShop'),closeMerchant);
 bindMobileNpcSheet(el('trainerPanel'),closeTrainer);
 bindMobileNpcSheet(el('evolutionPanel'),closeEvolutionGuide);
 bindMobileNpcSheet(el('breedingPanel'),closeBreedingCaretaker);
+bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
+const ranchStorageSheet=el('ranchStoragePage'),ranchStorageHandle=ranchStorageSheet?.querySelector('[data-npc-sheet-handle]');
+if(ranchStorageSheet&&ranchStorageHandle){
+  let ranchStorageStartY=0,ranchStorageDragging=false;
+  ranchStorageHandle.addEventListener('pointerdown',event=>{ranchStorageStartY=event.clientY;ranchStorageDragging=true;ranchStorageHandle.setPointerCapture?.(event.pointerId);ranchStorageSheet.style.transition='none';});
+  ranchStorageHandle.addEventListener('pointermove',event=>{if(ranchStorageDragging)ranchStorageSheet.style.transform=`translateY(${Math.max(0,event.clientY-ranchStorageStartY)}px)`;});
+  const finishRanchStorageDrag=event=>{if(!ranchStorageDragging)return;ranchStorageDragging=false;const delta=Math.max(0,event.clientY-ranchStorageStartY);ranchStorageSheet.style.removeProperty('transform');ranchStorageSheet.style.removeProperty('transition');if(delta>72)closeRanchSurface();};
+  ranchStorageHandle.addEventListener('pointerup',finishRanchStorageDrag);ranchStorageHandle.addEventListener('pointercancel',finishRanchStorageDrag);
+}
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
