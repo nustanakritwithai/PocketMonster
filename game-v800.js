@@ -475,7 +475,7 @@ const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spir
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
 const BREEDING_RECIPES=[]; // future explicit Hybrid recipes only
-const BALANCE={eliteCaptureModifier:.34,bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4};
+const BALANCE={eliteCaptureModifier:.34,bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4,grassMeadowNormal:{battleExpBase:8,battleExpPerLevel:4,captureExp:8,respawnMs:12000,captureBonus:.05}};
 
 function rollGender(sp){ return sp.genderMode==='genderless'?'Genderless':(Math.random()<.5?'Male':'Female'); }
 function getEvolutionPath(inst){ const sp=spById[inst?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===inst.formId||p.id===inst.evolutionPath)||null; }
@@ -2196,7 +2196,7 @@ const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
   'grass-meadow':{label:'Grass Meadow • Normal Encounters',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
     ['mossbun',-11,2,1,{}],['mossbun',11,2,1,{}],['buglet',-11,-8,1,{}],['buglet',11,-8,1,{}],['normalooze',-6,-14,1,{}],['normalooze',6,-14,1,{}],['mossbun',-16,14,2,{}],['buglet',16,14,2,{}]
-  ],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:2},sceneStatus:'normal-encounters'},
+  ],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:2},sceneStatus:'normal-encounters'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2398,6 +2398,14 @@ function animateEntity(mesh,dt,moving=false,intensity=1){
   mesh.rotation.z+=(Math.sin(p*.5)*(moving?.015:.006)*intensity-mesh.rotation.z)*Math.min(1,dt*7);
 }
 function healthyPartyCount(){return state.party.filter(Boolean).map(getInst).filter(i=>i&&i.hp>0&&!i.fainted).length;}
+function playerExpReward(source,w){
+  if(state.currentZone==='grass-meadow'&&!w.elite&&!w.boss){
+    const cfg=BALANCE.grassMeadowNormal;
+    return source==='capture'?cfg.captureExp:cfg.battleExpBase+(w.level||1)*cfg.battleExpPerLevel;
+  }
+  return source==='capture'?5:12*(w.level||1);
+}
+function wildRespawnDelay(w){return state.currentZone==='grass-meadow'&&!w.elite&&!w.boss?BALANCE.grassMeadowNormal.respawnMs:(w.boss?BALANCE.bossRespawnMs:BALANCE.wildRespawnMs);}
 // regression guard: healthyPartyCount()===0 blocks departure when every monster is fainted
 function ensureCaptureBallSafety(){
   if((state.inventory.captureBalls||0)>0)return false;
@@ -2443,7 +2451,8 @@ function defeatWild(w){
   if(state.currentZone==='grass-meadow')markStarterJourney('battled');
   removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
-  state.exp+=12*w.level;
+  const playerExp=playerExpReward('battle',w);
+  state.exp+=playerExp;
   // V7.3: Use resolveBattleGrowth + applyBattleGrowth instead of legacy grantMonsterExp
   const tier=getEnemyTier(w);
   const enemy={level:w.level,tier};
@@ -2468,7 +2477,7 @@ function defeatWild(w){
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':'';
-  let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${12*w.level} Player EXP`;
+  let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${playerExp} Player EXP`;
   if(activeSummon){
     battleMsg+=`\n  ${displayName(activeSummon.inst)}: +${monGain} Growth EXP`;
     if(ups)battleMsg+=` • Lv.Up +${ups}!`;
@@ -2478,7 +2487,7 @@ function defeatWild(w){
   msg(battleMsg);
   renderAll();
   saveGame(false);
-  respawnWild(w,w.boss?BALANCE.bossRespawnMs:BALANCE.wildRespawnMs);
+  respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
 }
 function monsterDamage(attackerInst,move,defender,atkBuff=1){
@@ -2526,8 +2535,9 @@ function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b
 function captureChance(w){
   if(w.capturePolicy==='disabled')return 0;
   const sp=spById[w.speciesId];
+  const captureBonus=state.currentZone==='grass-meadow'&&!w.elite&&!w.boss?BALANCE.grassMeadowNormal.captureBonus:0;
   return liveCaptureChance({
-    speciesRate:sp.capture,
+    speciesRate:Math.min(.95,sp.capture+captureBonus),
     hpRatio:w.maxHp>0?w.hp/w.maxHp:1,
     elite:w.capturePolicy==='elite'||!!w.elite,
     uncapturable:w.boss||w.capturePolicy==='disabled',
@@ -2605,11 +2615,12 @@ function finishCaptureSuccess(cs){
   w.capturing=false;
   if(w.mesh)removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
-  state.exp+=5;
-  msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''} (${Math.round(cs.chance*100)}%)`);
+  const playerExp=playerExpReward('capture',w);
+  state.exp+=playerExp;
+  msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':''} • +${playerExp} Player EXP (${Math.round(cs.chance*100)}%)`);
   renderAll();
   saveGame(false);
-  respawnWild(w,8000);
+  respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
 }
 function finishCaptureFail(cs){

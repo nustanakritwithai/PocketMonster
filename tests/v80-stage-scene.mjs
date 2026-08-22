@@ -8,6 +8,7 @@ const grassStage=js.match(/['"]grass-meadow['"]\s*:\s*\{[\s\S]*?\n  grassland:/)
 assert.ok(grassStage,'Grass Meadow stage config is bounded before the next zone');
 assert.match(grassStage,/sceneStatus:'normal-encounters'/,'Grass Meadow normal encounter stage exists');
 assert.match(grassStage,/encounterTableId:'grass-meadow-normal-v1'/,'Grass Meadow encounter table is explicit');
+assert.match(grassStage,/balanceProfileId:'grass-meadow-normal-v1'/,'Grass Meadow balance profile is explicit');
 assert.match(grassStage,/spawn:\[[\s\S]*mossbun[\s\S]*buglet[\s\S]*normalooze/,'Grass Meadow uses the planned normal species');
 assert.doesNotMatch(grassStage,/\{elite:true|\{boss:true/,'Grass Meadow normal stage has no Elite/Boss spawn');
 assert.match(js,/function makeStageBeacon\(/,'scene traversal markers exist');
