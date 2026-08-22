@@ -7,8 +7,11 @@
 import { BALANCE_CONFIG, SKILL_MASTERY } from './balance-config.mjs';
 import { clamp } from './balance-formulas.mjs';
 import { evaluateEligibility, MASTERY_RANK_ORDER } from './requirements.mjs';
+import { skillCatalogEntry } from './skill-catalog.mjs';
 
-export const SKILL_SLOTS = Object.freeze(['basicAI', 's1', 's2', 's3', 'passive', 'evolutionTrait']);
+export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3']);
+export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
+export const SKILL_SLOTS = Object.freeze([...SYSTEM_SKILL_SLOTS.slice(0, 1), ...MANUAL_SKILL_SLOTS, ...SYSTEM_SKILL_SLOTS.slice(1)]);
 
 function num(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
@@ -52,10 +55,68 @@ export function getSkill(instance, skillId) {
 // Learn a skill into a slot (candidate → owned). No-op if already known.
 export function learnSkill(instance, { skillId, slot = 's1' }) {
   if (!Array.isArray(instance.skills)) instance.skills = [];
+  if (slot !== null && !SKILL_SLOTS.includes(slot)) return null;
   if (getSkill(instance, skillId)) return getSkill(instance, skillId);
   const record = { skillId, slot, masteryExp: 0, masteryRank: 'novice', mutationId: null };
   instance.skills.push(record);
   return record;
+}
+
+function equipResult(ok, reason, detail = {}) {
+  return Object.freeze({ ok, reason, ...detail });
+}
+
+export function manualSkillLoadout(instance) {
+  const skills = Array.isArray(instance?.skills) ? instance.skills : [];
+  return Object.freeze(MANUAL_SKILL_SLOTS.map(slot => {
+    const equipped = skills.find(skill => skill?.slot === slot) ?? null;
+    return Object.freeze({ slot, skillId: equipped?.skillId ?? null, skill: equipped });
+  }));
+}
+
+export function basicAiSkill(instance) {
+  return (Array.isArray(instance?.skills) ? instance.skills : [])
+    .find(skill => skill?.slot === 'basicAI') ?? null;
+}
+
+export function validateSkillSlotState(instance) {
+  const skills = Array.isArray(instance?.skills) ? instance.skills : [];
+  const issues = [];
+  const occupied = new Map();
+  const skillIds = new Set();
+  for (let index = 0; index < skills.length; index += 1) {
+    const skill = skills[index];
+    if (typeof skill?.skillId === 'string') {
+      if (skillIds.has(skill.skillId)) issues.push(Object.freeze({ code: 'duplicate_skill', index, skillId: skill.skillId }));
+      else skillIds.add(skill.skillId);
+    }
+    const slot = skill?.slot ?? null;
+    if (slot !== null && !SKILL_SLOTS.includes(slot)) {
+      issues.push(Object.freeze({ code: 'slot_locked', index, slot }));
+      continue;
+    }
+    if (!MANUAL_SKILL_SLOTS.includes(slot)) continue;
+    if (occupied.has(slot)) issues.push(Object.freeze({ code: 'duplicate_slot', index, slot }));
+    else occupied.set(slot, index);
+  }
+  return Object.freeze({ ok: issues.length === 0, issues: Object.freeze(issues) });
+}
+
+export function equipSkill(instance, { skillId, slot } = {}) {
+  if (!instance || typeof instance !== 'object' || !Array.isArray(instance.skills)) {
+    return equipResult(false, 'invalid_state');
+  }
+  if (!MANUAL_SKILL_SLOTS.includes(slot)) {
+    return equipResult(false, 'slot_locked', { slot: slot ?? null });
+  }
+  const definition = skillCatalogEntry(skillId);
+  if (!definition) return equipResult(false, 'unknown_id', { skillId: skillId ?? null });
+  const learned = getSkill(instance, skillId);
+  if (!learned) return equipResult(false, 'not_learned', { skillId });
+  const occupant = instance.skills.find(skill => skill !== learned && skill?.slot === slot);
+  if (occupant) return equipResult(false, 'duplicate_slot', { slot, occupiedBy: occupant.skillId });
+  learned.slot = slot;
+  return equipResult(true, null, { skillId, slot, definition });
 }
 
 // Add Skill EXP from a use event and recompute mastery rank.
