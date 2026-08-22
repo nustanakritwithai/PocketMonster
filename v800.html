@@ -11,6 +11,18 @@
   <link rel="stylesheet" href="./style-v800.css?v=810" />
 </head>
 <body>
+  <div id="accountGate" class="account-gate">
+    <div id="loginPage" class="account-card auth-page">
+      <div class="account-logo">🐾</div><h1>Monster Life RPG</h1><p>เข้าสู่ระบบเพื่อเริ่มการผจญภัย</p>
+      <form id="loginForm"><label>อีเมล<input id="loginEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>รหัสผ่าน<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="รหัสผ่าน" /></label><button id="loginAccountBtn" class="auth-primary" type="submit">เข้าสู่ระบบ</button></form><button id="googleLoginBtn" class="auth-google" type="button">เข้าสู่ระบบด้วย Google</button>
+      <div id="loginStatus" class="account-status"></div><div class="auth-switch">ยังไม่มีบัญชี? <button id="showRegisterBtn" type="button">สมัครไอดีใหม่</button></div>
+    </div>
+    <div id="registerPage" class="account-card auth-page hidden">
+      <button id="backToLoginBtn" class="auth-back" type="button">← กลับหน้าเข้าสู่ระบบ</button><div class="account-logo">🐾</div><h1>สมัครไอดีใหม่</h1><p>สร้างบัญชี Monster Life RPG</p>
+      <form id="registerForm"><label>อีเมล<input id="registerEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>ชื่อในเกม<input id="registerDisplayName" maxlength="30" placeholder="ชื่อที่แสดงในเกม" /></label><label>รหัสผ่าน<input id="registerPassword" type="password" autocomplete="new-password" required placeholder="อย่างน้อย 8 ตัว" /></label><label>ยืนยันรหัสผ่าน<input id="registerConfirm" type="password" autocomplete="new-password" required placeholder="กรอกรหัสผ่านอีกครั้ง" /></label><button id="registerAccountBtn" class="auth-primary register" type="submit">สร้างบัญชี</button></form>
+      <div id="registerStatus" class="account-status"></div>
+    </div>
+  </div>
   <div id="startupStatus" class="startup-status">กำลังเริ่มเกม…</div>
   <div id="immersiveGate" class="immersive-gate hidden">
     <div class="immersive-card">
