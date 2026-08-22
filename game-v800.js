@@ -23,7 +23,7 @@ import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrain
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
-import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, SKILL_SLOTS } from './skill-progression.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -642,7 +642,7 @@ function getMonsterSkills(inst){
   const moves=(sp?.skills||[]).map(m=>({...m}));
   for(const rec of inst.skills||[]){
     const cand=(SKILL_CANDIDATES[inst.speciesId]||[]).find(c=>c.id===rec.skillId);
-    if(cand?.replaces){
+    if(cand?.replaces&&rec.slot===cand.slot){
       const idx=moves.findIndex(m=>m.name===cand.replaces);
       if(idx>=0)moves[idx]={...moves[idx],...cand.move};
     }
@@ -706,6 +706,7 @@ function makeInstance(sp,level=1,opts={}){
   inst.trainingExp=opts.trainingExp||0;
   inst.trainingBonus=opts.trainingBonus||{hp:0,atk:0,def:0,spd:0};
   inst.exp=inst.growthExp;
+  synchronizeStage1Learnset(inst);
   syncFromBodyMind(inst);
   refreshStats(inst,true);
   return inst;
@@ -2808,13 +2809,14 @@ function defeatWild(w){
     const result=resolveBattleGrowth({monster:inst,enemy:{...enemy,milestoneId:w.boss?'first_boss':undefined},events,outcome:'win'});
     const applied=applyBattleGrowth(inst,result);
     monGain=result.growthExp;ups=applied.growth.leveledUp?applied.growth.toLevel-applied.growth.fromLevel:0;
+    synchronizeStage1Learnset(inst);
     refreshStats(inst,false);
     if(ups>0)spawnLevelUpEffect(activeSummon.mesh.position.clone());
     const trainLines=TRAINING_LINES.filter(l=>result.trainingExp[l]>0);
     if(trainLines.length)trainSummary=' • Training: '+trainLines.map(l=>`${l[0].toUpperCase()+l.slice(1)} +${result.trainingExp[l]}`).join(' ');
     // Party share growth (non-active members get 35% of active's growth EXP)
     const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
-    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);if(grown.leveledUp)spawnLevelUpEffect(fxWorldPos(pm.instanceId));}}}
+    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);synchronizeStage1Learnset(pm);if(grown.leveledUp)spawnLevelUpEffect(fxWorldPos(pm.instanceId));}}}
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
@@ -3211,12 +3213,11 @@ function useSkill(index){
   // V7.5: Award Skill EXP for skill usage (mastery progression)
   if(move&&a.inst){
     if(!Array.isArray(a.inst.skills))a.inst.skills=[];
-    let skillRec=getSkill(a.inst,move.name);
-    if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.name,slot:'s'+(index+1)});
+    const skillRec=a.inst.skills.find(skill=>skill?.slot==='s'+(index+1))||getSkill(a.inst,move.name);
     const hitQuality=res&&res.eff?res.eff:1;const spamCount=(a._skillSpam=a._skillSpam||{})[move.name]||0;
     a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
     const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
-    if(sExp>0){const sResult=addSkillExp(a.inst,move.name,sExp);
+    if(sExp>0&&skillRec){const sResult=addSkillExp(a.inst,skillRec.skillId,sExp);
       if(sResult&&sResult.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}}
   }
   renderParty();renderSkillButtons();
@@ -3325,6 +3326,7 @@ function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){
   const need=Math.max(1,growthExpForLevel((inst.level||1)+1)-(inst.growthExp||0));
   addGrowthExp(inst,need);
+  synchronizeStage1Learnset(inst);
   refreshStats(inst,true);
   if(inst?.instanceId)spawnLevelUpEffect(fxWorldPos(inst.instanceId));
 }
@@ -3461,7 +3463,7 @@ function resolveRaisingEvent(choiceId){
   syncToBodyMind(inst);
   const result=applyChoice(inst,pendingEvent.eventDef,choiceId,{now:Date.now()});
   syncFromBodyMind(inst);
-  if(result.ok){refreshStats(inst,false);msg(`${displayName(inst)} • ${pendingEvent.eventDef.id}:${choiceId}`);}
+  if(result.ok){synchronizeStage1Learnset(inst);refreshStats(inst,false);msg(`${displayName(inst)} • ${pendingEvent.eventDef.id}:${choiceId}`);}
   pendingEvent=null;
   renderRaisingEventBanner();
   el('eventPopup')?.classList.add('hidden');
@@ -3551,6 +3553,7 @@ function createEgg(){if(!assertRanchOperation())return;const a=getInst(state.bre
 function hatchEgg(eggId){if(!assertRanchOperation())return;const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
   const child=egg.child?ensureInstanceShape({...egg.child,origin:'bred',parentAId:a.instanceId,parentBId:b.instanceId}):makeChild(a,b,holder);
   if(!child){msg('ฟักไข่ไม่สำเร็จ');return;}
+  synchronizeStage1Learnset(child);
   refreshStats(child,true);
   state.collection.push(child);state.storage.push(child.instanceId);state.eggs=state.eggs.filter(e=>e.eggId!==eggId);
   appendHistory(child,{type:'birth',origin:'bred',parentA:a.instanceId,parentB:b.instanceId});
@@ -3904,8 +3907,8 @@ function learnCandidateSkill(id,skillId){
   const def=(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===skillId);if(!def)return;
   const ev=evaluateSkillCandidate(def,inst);
   if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
-  learnSkill(inst,{skillId:def.id,slot:def.slot||'s1'});
-  msg(`${displayName(inst)} เรียน ${def.id}`);
+  learnSkill(inst,{skillId:def.id,slot:null});
+  msg(`${displayName(inst)} เรียน ${def.id} • ยังไม่ติดตั้งในสล็อต`);
   renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
 }
 function mutateOwnedSkill(id,skillId){
@@ -4552,6 +4555,7 @@ function migrateLoadedState(s){
   const clean=normalizeSavedState(s,{ranchCap:RANCH_ACTIVE_MAX,now:Date.now()});
   const migrated=migrateState(clean,{now:Date.now()});
   state.collection=migrated.collection.map(ensureInstanceShape);
+  state.collection.forEach(synchronizeStage1Learnset);
   state.party=clean.party;
   state.storage=clean.storage;
   state.ranchActive=clean.ranchActive;
