@@ -2040,6 +2040,12 @@ function startGameInteraction(){
   if(gate){ gate.classList.add('hidden'); gate.style.display='none'; gate.style.pointerEvents='none'; }
   syncOrientationLock();
 }
+function requestLandscapeOrientation(){
+  try{
+    const lock=screen.orientation?.lock?.('landscape');
+    if(lock?.catch)lock.catch(err=>console.warn('orientation lock rejected',err));
+  }catch(err){console.warn('orientation lock rejected',err);}
+}
 function requestImmersiveMode(e){
   e?.preventDefault?.();
   e?.stopPropagation?.();
@@ -2049,10 +2055,7 @@ function requestImmersiveMode(e){
     const fs=document.documentElement.requestFullscreen?.();
     if(fs?.catch) fs.catch(err=>console.warn('fullscreen rejected',err));
   }catch(err){ console.warn('fullscreen rejected',err); }
-  try{
-    const lock=screen.orientation?.lock?.('landscape');
-    if(lock?.catch) lock.catch(err=>console.warn('orientation lock rejected',err));
-  }catch(err){ console.warn('orientation lock rejected',err); }
+  requestLandscapeOrientation();
   setTimeout(syncOrientationLock,120);
 }
 function syncOrientationLock(){
@@ -3785,6 +3788,7 @@ function renderCharacterAccess(){
   setClassTokenIfChanged(entry,'readonly',snap.readOnly);
 }
 function openCharacterAccess(source='global-button'){
+  requestLandscapeOrientation();
   const zoneDropdown=el('zoneDropdown');
   zoneDropdown?.classList.add('hidden');
   const result=characterUI.requestGlobalAccess({
