@@ -2,6 +2,7 @@ import { STAGE_BY_ID } from './stage-catalog.mjs';
 
 export const WARP_ROUTES=Object.freeze([
   {id:'hub-to-grass',from:'hub',to:'grass-meadow',label:'Grass Meadow',position:[0,18],spawn:[0,0,16],kind:'forward'},
+  {id:'grassland-to-hub',from:'grassland',to:'hub',label:'Ranch Hub',position:[0,18],spawn:[0,0,7],kind:'return'},
   {id:'grass-to-hub',from:'grass-meadow',to:'hub',label:'Ranch Hub',position:[0,19],spawn:[0,0,7],kind:'return'},
   {id:'grass-to-ember',from:'grass-meadow',to:'ember-valley',label:'Ember Valley',position:[20,0],spawn:[-19,0,0],kind:'forward'},
   {id:'ember-to-grass',from:'ember-valley',to:'grass-meadow',label:'Grass Meadow',position:[-20,0],spawn:[19,0,0],kind:'return'},
@@ -30,7 +31,7 @@ export const WARP_ROUTES=Object.freeze([
   {id:'storm-to-hub',from:'storm-field',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
 ]);
 
-export function validateWarpRoutes(routes=WARP_ROUTES,{knownZoneIds=['hub',...Object.keys(STAGE_BY_ID)]}={}){
+export function validateWarpRoutes(routes=WARP_ROUTES,{knownZoneIds=['hub','grassland',...Object.keys(STAGE_BY_ID)]}={}){
   const issues=[],known=new Set(knownZoneIds),ids=new Set();
   if(!Array.isArray(routes))return Object.freeze({ok:false,issues:Object.freeze([{code:'invalid_route_catalog'}])});
   routes.forEach((route,index)=>{
