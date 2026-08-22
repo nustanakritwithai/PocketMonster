@@ -23,6 +23,7 @@ import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from 
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
+import { recoverSkillUses } from './skill-recovery.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
@@ -3416,7 +3417,8 @@ function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!assert
   spawnTrainingEffect(fxWorldPos(id),focus);
   msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
   renderManager();if(currentManagerTab==='training')renderTraining();if(!el('trainerPanel').classList.contains('hidden'))renderTrainerPanel();saveGame(false);}
-function healAll(){if(!assertRanchOperation())return;for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • Party และ Storage ฟื้น HP เต็มทั้งหมด');renderAll();renderManager();saveGame(false);}
+let keeperRecoveryCommandSequence=0;
+function healAll(){if(!assertRanchOperation())return;const recovery=recoverSkillUses(state.collection,{routeId:'REC_NPC',commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence)});if(!recovery.ok){msg('Keeper Recovery ไม่สำเร็จ • '+recovery.reason);return;}for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){
   for(const [id,obj] of ranchVisuals){removeAndDispose(scene, obj.mesh);ranchVisuals.delete(id);}
