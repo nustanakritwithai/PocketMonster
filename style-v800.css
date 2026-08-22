@@ -599,6 +599,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 @media(max-width:380px){
   .ranch-storage-page{padding:8px}.ranch-storage-head h2{font-size:15px}.ranch-storage-head span{font-size:8px}.ranch-storage-roster .manager-item{min-width:104px;font-size:10px}.ranch-storage-preview .focused-name{font-size:16px}
 }
+.world-monster-label.rare{border-color:#f0abfccc;background:rgba(76,29,78,.84);box-shadow:0 0 0 1px #f0abfc55,0 0 16px #e879f955}
 /* Character UI Full Manager: force the reference three-column layout on every landscape browser.
    This intentionally does not depend on pointer:coarse because Android browsers can report fine input. */
 @media (orientation:landscape){
