@@ -1,12 +1,14 @@
 import {
   INSTANCE_SAVE_VERSION,
+  TRANSIENT_COOLDOWN_FIELDS,
   catalogIdentityDiagnostics,
   migrateState,
+  sanitizeMonsterInstanceForPersistence,
 } from './monster-instance.mjs';
 
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
-export const SAVE_SCHEMA_VERSION = 8;
+export const SAVE_SCHEMA_VERSION = 9;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
@@ -20,11 +22,22 @@ if (INSTANCE_SAVE_VERSION !== SAVE_SCHEMA_VERSION) {
 
 export const SAVE_MIGRATION_REGISTRY = Object.freeze([
   Object.freeze({
-    id: 'monster-instance-v8',
+    id: 'monster-instance-v9-skill-runtime',
     targetVersion: INSTANCE_SAVE_VERSION,
     migrate: migrateState,
   }),
 ]);
+
+export function sanitizeStateForPersistence(input) {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const state = { ...source };
+  for (const field of TRANSIENT_COOLDOWN_FIELDS) delete state[field];
+  state.collection = Array.isArray(source.collection)
+    ? source.collection.map(sanitizeMonsterInstanceForPersistence)
+    : [];
+  state.saveVersion = SAVE_SCHEMA_VERSION;
+  return state;
+}
 
 export function applySaveMigrations(input, { now = Date.now() } = {}) {
   let state = input && typeof input === 'object' ? input : {};
@@ -136,11 +149,13 @@ export function readStoredSave(storage) {
 
 export function writeStoredSave(storage, envelope, { onDiagnostic } = {}) {
   if (!envelope?.state || typeof envelope.state !== 'object') throw new TypeError('save envelope state is required');
-  reportCatalogDiagnostics(envelope.state, onDiagnostic);
+  const persistentState = sanitizeStateForPersistence(envelope.state);
+  reportCatalogDiagnostics(persistentState, onDiagnostic);
   const previousRaw = storage.getItem(SAVE_KEY);
   if (parseEnvelope(previousRaw)) storage.setItem(SAVE_BACKUP_KEY, previousRaw);
   const next = {
     ...envelope,
+    state: persistentState,
     appVersion: APP_VERSION,
     saveSchemaVersion: SAVE_SCHEMA_VERSION,
   };

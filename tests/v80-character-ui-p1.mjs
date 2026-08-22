@@ -54,7 +54,7 @@ function makeGame({ party = ['alpha', 'beta', null], selectedSlot = 1, zone = 'h
 }
 
 assert.equal(PARTY_SLOT_COUNT, 3, 'party stays 3 slots');
-assert.equal(SAVE_SCHEMA_VERSION, 8, 'character UI must not bump the save schema');
+assert.equal(SAVE_SCHEMA_VERSION, 9, 'Character UI uses the current skill-runtime save schema');
 
 const uiKeys = Object.keys(createCharacterUiState());
 assert.deepEqual(uiKeys.sort(), [
