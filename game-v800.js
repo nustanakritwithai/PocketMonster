@@ -1864,8 +1864,8 @@ function setFullCharacterInfoTab(tab){
   characterUI?.setTab(tab);
   document.querySelectorAll('.character-info-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.characterTab===tab));
   if(tab==='info')renderFullCharacterStatus();
-  if(tab==='skills')renderSkills();
-  if(tab==='equipment')renderEquipment();
+  if(tab==='skills')renderSkills(el('characterInfoBody'));
+  if(tab==='equipment')renderEquipment(el('characterInfoBody'));
   if(tab==='training')renderTraining();
   if(tab==='evolution')renderEvolution();
 }
@@ -1945,8 +1945,8 @@ function renderFocusedSkillLoadoutV2(){
   const evolutionTrait=path?.trait||path?.evolutionTrait||'—';
   return `<section class="focused-skill-loadout"><div class="skills-section-title">Skill Loadout • ${presentation.name}</div><div class="skill-loadout-slots">${slots}</div><div class="skill-card skill-passive"><b>Passive</b><div class="skill-detail">${passive}</div></div><div class="skill-card skill-evolution-trait"><b>Evolution Trait</b><div class="skill-detail">${evolutionTrait}</div></div></section>`;
 }
-function renderSkills(){
-  const panel=characterSystemPanel('skills','skillsPanel');
+function renderSkills(targetPanel=null){
+  const panel=targetPanel||characterSystemPanel('skills','skillsPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
@@ -1998,8 +1998,8 @@ function renderFocusedEquipmentLoadout(){
   const deltas=['hp','atk','def','spd'].map(stat=>`${stat.toUpperCase()} ${preview.statDelta[stat]>=0?'+':''}${Math.round(preview.statDelta[stat])}`).join(' • ');
   return `<section class="focused-equipment-loadout"><div class="skills-section-title">Equipment Loadout • ${presentation.name}</div><div class="equipment-slots">${slots}</div><div class="equip-summary-stats">${stats}</div><div class="skill-detail">Preview: ${deltas} • CR ${preview.crDelta>=0?'+':''}${Math.round(preview.crDelta)}</div>${active?`<div class="skill-req">${ACTIVE_SUMMON_READONLY_REASON}</div>`:''}</section>`;
 }
-function renderEquipment(){
-  const panel=characterSystemPanel('equipment','equipmentPanel');
+function renderEquipment(targetPanel=null){
+  const panel=targetPanel||characterSystemPanel('equipment','equipmentPanel');
   if(!panel)return;
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
