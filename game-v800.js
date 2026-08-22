@@ -1,4 +1,5 @@
-import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
+import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
+import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
@@ -2889,11 +2890,11 @@ function defeatWild(w){
   retireWild(w);
   ensureProgressionEncounter(w.zone);
 }
-function monsterDamage(attackerInst,move,defender,atkBuff=1){
+function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=true}={}){
   const stab=monsterTypes(attackerInst).includes(move.type)?1.5:1;
   const defTypes=defender?.instanceId?monsterTypes(defender):wildTypes(defender);
   const eff=typeEffectiveness(move.type,defTypes);
-  const skillRec=getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0]);
+  const skillRec=allowSkillMastery?(getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0])):null;
   const mastery=skillRec?masteryRawPower(skillRec.masteryRank):0;
   const derived=derivedStats(instanceCombatBuildSafe(attackerInst));
   return liveMoveDamage({
@@ -3402,9 +3403,46 @@ function useSkill(index,intent={}){
   if(!result.ok){msg(skillFailureMessage(move,result));renderSkillButtons();}
   return result;
 }
+function ownedBasicAiActorSnapshot(a){
+  return Object.freeze({
+    id:a?.inst?.instanceId,
+    speciesId:a?.inst?.speciesId,
+    alive:(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0,
+    position:Object.freeze({x:a?.mesh?.position?.x,z:a?.mesh?.position?.z}),
+  });
+}
+function ownedBasicAiEnemySnapshots(){
+  return Object.freeze(wilds.map(wild=>Object.freeze({
+    id:wild?.id,
+    alive:wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0,
+    targetable:wild?.capturing===undefined||wild.capturing===false,
+    position:Object.freeze({x:wild?.mesh?.position?.x,z:wild?.mesh?.position?.z}),
+  })));
+}
+function materializeOwnedBasicAiTarget(a,decision){
+  if(!decision?.ok||decision.targetId===null)return null;
+  const matches=wilds.filter(wild=>wild?.id===decision.targetId);
+  if(matches.length!==1)return null;
+  const target=matches[0],actorPosition=a?.mesh?.position,targetPosition=target?.mesh?.position;
+  if(target.dead!==false||!Number.isFinite(target.hp)||target.hp<=0
+    ||!(target.capturing===undefined||target.capturing===false)
+    ||!Number.isFinite(actorPosition?.x)||!Number.isFinite(actorPosition?.z)
+    ||!Number.isFinite(targetPosition?.x)||!Number.isFinite(targetPosition?.z))return null;
+  const distanceM=distXZ(actorPosition,targetPosition);
+  if(!Number.isFinite(distanceM)||distanceM>OWNED_BASIC_AI_POLICY.retainRangeM)return null;
+  if(decision.action==='basic_attack'&&distanceM>OWNED_BASIC_AI_POLICY.basicAttackRangeM)return null;
+  return target;
+}
 function updateOwned(dt){
-  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=Math.max(0,a.attackCd-dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){const cd=a.skillCds[i];const btn=el(`skill${i+1}Btn`);if(!btn)continue;if(cd>0){if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');let cdEl=btn.querySelector('.cd-overlay');if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}cdEl.textContent=cd.toFixed(1)+'s';}else{if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();}}if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
-  let t=a.target;if(!t||t.dead||distXZ(a.mesh.position,t.mesh.position)>12)t=nearestWild(9,a.mesh.position);a.target=t;let moving=false;if(t){const d=distXZ(a.mesh.position,t.mesh.position);if(d>1.35){moving=true;const dir=t.mesh.position.clone().sub(a.mesh.position);dir.y=0;dir.normalize();a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);}else if(a.attackCd<=0){a.attackCd=.9;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:15};const res=monsterDamage(a.inst,basic,t,a.attackBuff);damageWild(t,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}}
+  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=tickCooldown(a.attackCd,dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){const cd=a.skillCds[i];const btn=el(`skill${i+1}Btn`);if(!btn)continue;if(cd>0){if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');let cdEl=btn.querySelector('.cd-overlay');if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}cdEl.textContent=cd.toFixed(1)+'s';}else{if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();}}if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
+  const decision=resolveOwnedBasicAiAction({actor:ownedBasicAiActorSnapshot(a),enemies:ownedBasicAiEnemySnapshots(),currentTargetId:a.target?.id??null,attackReady:a.attackCd<=0});
+  const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;let moving=false;
+  if(t&&decision.action==='move'){
+    moving=true;const dir=new THREE.Vector3(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
+  }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0){
+    const liveTarget=materializeOwnedBasicAiTarget(a,decision);
+    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],liveTarget.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,a.attackBuff,{allowSkillMastery:false});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
+  }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
 function selectWildAggressors(){
