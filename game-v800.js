@@ -2,8 +2,8 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason } from './stage-catalog.mjs';
-import { nearestRoute, routesFrom, warpAvailability } from './warp-routes.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
+import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -2406,6 +2406,11 @@ const ZONES={
     ['flameling',20,-12,5,{elite:true,evolutionPath:'flame_wolf'}],['flameling',-20,12,5,{evolutionPath:'magma_bear'}]
   ]}
 };
+const zoneContentValidation=validateZoneEncounterConfig(ZONES);
+const warpContentValidation=validateWarpRoutes();
+if(!zoneContentValidation.ok||!warpContentValidation.ok){
+  throw new Error(`World content validation failed: ${JSON.stringify([...zoneContentValidation.issues,...warpContentValidation.issues])}`);
+}
 function setZoneLighting(zone){
   if(zone==='cave'){
     hemi.intensity=0.6;
