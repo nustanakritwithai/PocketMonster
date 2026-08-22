@@ -8,6 +8,7 @@ const NOW = 1_780_000_000_000;
 const EGG_ID = '32345678-1234-4123-8123-123456789abc';
 const INVALID_MEMORY_EGG_ID = '42345678-1234-4123-8123-123456789abc';
 const NULL_MEMORY_EGG_ID = '52345678-1234-4123-8123-123456789abc';
+const MUTABLE_PARTNER_EGG_ID = '72345678-1234-4123-8123-123456789abc';
 
 async function loadSource(source, filename, tag) {
   const withAbsoluteImports = source.replaceAll(
@@ -174,6 +175,13 @@ function breedingContract(module) {
   assert.equal(created.egg.inheritedSkillMemoryId, 'SK_DARK_02');
   assert.equal(module.validateWorkbookEgg({ ...created.egg, inheritedSkillMemoryId: 'SK_FIRE_06' }).ok, false);
   assert.equal(module.createStandardBreedingEggTransaction(created.state, command).replay, true);
+  const regressedPartnerState = {
+    ...created.state,
+    collection: created.state.collection.map(monster => monster.instanceId === partner.instanceId
+      ? { ...monster, level: 1, mind: { ...monster.mind, bond: 0 }, skills: [] }
+      : monster),
+  };
+  assert.equal(module.createStandardBreedingEggTransaction(regressedPartnerState, command).replay, true);
   const tamperedReplayState = {
     ...created.state,
     eggs: [{ ...created.egg, inheritedSkillMemoryId: 'SK_DARK_01' }],
@@ -246,6 +254,102 @@ function breedingContract(module) {
       [INVALID_MEMORY_EGG_ID]: 42,
     },
   }, invalidCommand).reason, 'egg_id_conflict');
+  const mismatchedOutcomeState = {
+    ...created.state,
+    eggs: [{ ...created.egg, inheritedSkillMemoryId: 'SK_DARK_01' }],
+    breedingSkillMemoryRequestByEggId: {
+      ...created.state.breedingSkillMemoryRequestByEggId,
+      [EGG_ID]: {
+        requestedSkillMemoryId: 'SK_DARK_02',
+        resolvedSkillMemoryId: 'SK_DARK_01',
+      },
+    },
+  };
+  assert.equal(module.validateWorkbookEgg(mismatchedOutcomeState.eggs[0]).ok, true);
+  assert.equal(module.createStandardBreedingEggTransaction(mismatchedOutcomeState, command).reason, 'egg_id_conflict');
+  assert.equal(module.createStandardBreedingEggTransaction({
+    ...created.state,
+    breedingSkillMemoryRequestByEggId: {
+      ...created.state.breedingSkillMemoryRequestByEggId,
+      [EGG_ID]: 'SK_DARK_02',
+    },
+  }, command).reason, 'egg_id_conflict');
+  const scalarTamperedNull = {
+    ...created.state,
+    eggs: [{ ...created.egg, inheritedSkillMemoryId: null }],
+    breedingSkillMemoryRequestByEggId: {
+      ...created.state.breedingSkillMemoryRequestByEggId,
+      [EGG_ID]: 'SK_DARK_02',
+    },
+  };
+  assert.equal(module.validateWorkbookEgg(scalarTamperedNull.eggs[0]).ok, true);
+  assert.equal(module.createStandardBreedingEggTransaction(scalarTamperedNull, command).reason, 'egg_id_conflict');
+  assert.equal(module.createStandardBreedingEggTransaction({
+    ...scalarTamperedNull,
+    collection: [],
+  }, command).reason, 'egg_id_conflict');
+
+  const snapshotHolder = adult({
+    instanceId: 'holder-normal-snapshot', speciesId: 'normalooze', formId: 'MON_019',
+    gender: 'Female', level: 20, bond: 50, skillIds: [],
+  });
+  const snapshotPartner = adult({
+    instanceId: 'partner-normal-snapshot', speciesId: 'normalooze', formId: 'MON_019',
+    gender: 'Male', level: 20, bond: 50, secondaryType: null, skillIds: ['SK_FIGHTING_01'],
+  });
+  const snapshotCommand = {
+    eggId: MUTABLE_PARTNER_EGG_ID,
+    eggHolderOwnedMonsterId: snapshotHolder.instanceId,
+    partnerOwnedMonsterId: snapshotPartner.instanceId,
+    genderSeed: 9,
+    inheritedSkillMemoryId: 'SK_FIGHTING_01',
+    now: NOW,
+  };
+  const snapshotCreated = module.createStandardBreedingEggTransaction({
+    collection: [snapshotHolder, snapshotPartner],
+    storage: [snapshotHolder.instanceId, snapshotPartner.instanceId],
+    eggs: [],
+    breedingSkillMemoryRequestByEggId: {},
+  }, snapshotCommand);
+  assert.equal(snapshotCreated.ok, true, snapshotCreated.reason);
+  assert.equal(snapshotCreated.egg.inheritedSkillMemoryId, null);
+  assert.deepEqual(snapshotCreated.state.breedingSkillMemoryRequestByEggId[MUTABLE_PARTNER_EGG_ID], {
+    requestedSkillMemoryId: 'SK_FIGHTING_01',
+    resolvedSkillMemoryId: null,
+  });
+  const progressedPartnerState = {
+    ...snapshotCreated.state,
+    collection: snapshotCreated.state.collection.map(monster => monster.instanceId === snapshotPartner.instanceId
+      ? { ...monster, secondaryType: 'Fighting' }
+      : monster),
+  };
+  assert.equal(module.createStandardBreedingEggTransaction(progressedPartnerState, snapshotCommand).replay, true);
+  const tamperedProgressedState = {
+    ...progressedPartnerState,
+    eggs: [{ ...snapshotCreated.egg, inheritedSkillMemoryId: 'SK_FIGHTING_01' }],
+  };
+  assert.equal(module.validateWorkbookEgg(tamperedProgressedState.eggs[0]).ok, true);
+  assert.equal(module.createStandardBreedingEggTransaction(tamperedProgressedState, snapshotCommand).reason, 'egg_id_conflict');
+  assert.equal(module.createStandardBreedingEggTransaction({
+    ...progressedPartnerState,
+    collection: [],
+  }, snapshotCommand).replay, true);
+  assert.equal(module.createStandardBreedingEggTransaction({
+    ...tamperedProgressedState,
+    collection: [],
+  }, snapshotCommand).reason, 'egg_id_conflict');
+  const scalarLedgerState = {
+    ...progressedPartnerState,
+    breedingSkillMemoryRequestByEggId: {
+      ...progressedPartnerState.breedingSkillMemoryRequestByEggId,
+      [MUTABLE_PARTNER_EGG_ID]: 'SK_FIGHTING_01',
+    },
+  };
+  assert.equal(module.createStandardBreedingEggTransaction(scalarLedgerState, snapshotCommand).reason, 'egg_id_conflict');
+  assert.equal(module.createStandardBreedingEggTransaction({
+    ...scalarLedgerState,
+    eggs: [{ ...snapshotCreated.egg, inheritedSkillMemoryId: 'SK_FIGHTING_01' }],
+  }, snapshotCommand).reason, 'egg_id_conflict');
 
   const nullCommand = {
     ...command,
@@ -316,10 +420,14 @@ for (const [name, before, after] of progressionMutants) {
 
 const breedingMutants = [
   ['drop selected memory at create', 'inheritedSkillMemoryId: skillMemory.inheritedSkillMemoryId,', 'inheritedSkillMemoryId: null,'],
-  ['ignore memory in replay snapshot', '&& (egg.inheritedSkillMemoryId ?? null) === skillMemory.inheritedSkillMemoryId', '&& true'],
+  ['ignore resolved outcome in replay snapshot', '&& requestSnapshot.resolvedSkillMemoryId === (existing.inheritedSkillMemoryId ?? null)', '&& true'],
   ['accept invalid family memory in schema', 'if (!memoryTarget.ok) {', 'if (false) {'],
-  ['store canonical output instead of caller request', '[SKILL_MEMORY_REQUEST_LEDGER_FIELD]: appendSkillMemoryRequest(requestLedgerSnapshot.ledger, eggId, requestedSkillMemoryId),', '[SKILL_MEMORY_REQUEST_LEDGER_FIELD]: appendSkillMemoryRequest(requestLedgerSnapshot.ledger, eggId, skillMemory.inheritedSkillMemoryId),'],
-  ['ignore exact caller request identity', '&& requestSnapshot.skillId === requestedSkillMemoryId', '&& true'],
+  ['store canonical output instead of caller request', '      requestedSkillMemoryId,\n      skillMemory.inheritedSkillMemoryId,', '      skillMemory.inheritedSkillMemoryId,\n      skillMemory.inheritedSkillMemoryId,'],
+  ['store raw request without resolved outcome', '[eggId]: Object.freeze({ requestedSkillMemoryId, resolvedSkillMemoryId }),', '[eggId]: requestedSkillMemoryId,'],
+  ['infer non-null scalar as null outcome', "if (nonEmptyString(entry)) {\n      // PR #236 briefly persisted only the raw request. A non-null scalar\n      // cannot prove either a null or non-null creation-time outcome after\n      // mutable Partner gates change, so every replay fails closed.\n      return Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });\n    }", "if (nonEmptyString(entry)) {\n      return Object.freeze({ ok: true, requestedSkillMemoryId: entry, resolvedSkillMemoryId: null, legacy: true });\n    }"],
+  ['allow mismatched non-null request and outcome', 'if (resolvedSkillMemoryId !== null && resolvedSkillMemoryId !== requestedSkillMemoryId) {', 'if (false) {'],
+  ['ignore exact caller request identity', '&& requestSnapshot.requestedSkillMemoryId === requestedSkillMemoryId', '&& true'],
+  ['re-resolve mutable Partner state during replay', '&& requestSnapshot.resolvedSkillMemoryId === (existing.inheritedSkillMemoryId ?? null)', '&& resolveBreedingSkillMemory(replayHolder, replayPartner, requestedSkillMemoryId).inheritedSkillMemoryId === (existing.inheritedSkillMemoryId ?? null)'],
   ['drop source ledger at live boundary', "const sourceLedger = sourceHasLedger ? sourceState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] : {};", 'const sourceLedger = {};'],
   ['retain stale ledger for pre-A33 load', "const sourceLedger = sourceHasLedger ? sourceState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] : {};", 'const sourceLedger = sourceHasLedger ? sourceState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] : targetState[SKILL_MEMORY_REQUEST_LEDGER_FIELD];'],
   ['accept malformed ledger root', "if (!requestLedgerSnapshot.ok) return transactionResult(false, 'invalid_state', state);", "if (false) return transactionResult(false, 'invalid_state', state);"],

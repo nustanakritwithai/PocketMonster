@@ -356,23 +356,50 @@ function skillMemoryRequestSnapshot(state, egg) {
   const ledgerSnapshot = skillMemoryRequestLedgerSnapshot(state);
   if (!ledgerSnapshot.ok) return Object.freeze({ ok: false, skillId: null });
   if (Object.prototype.hasOwnProperty.call(ledgerSnapshot.ledger, egg.eggId)) {
-    const skillId = ledgerSnapshot.ledger[egg.eggId];
-    if (skillId !== null && !nonEmptyString(skillId)) return Object.freeze({ ok: false, skillId: null });
-    return Object.freeze({ ok: true, skillId, legacy: false });
+    const entry = ledgerSnapshot.ledger[egg.eggId];
+    if (entry === null) {
+      return egg.inheritedSkillMemoryId == null
+        ? Object.freeze({ ok: true, requestedSkillMemoryId: null, resolvedSkillMemoryId: null, legacy: true })
+        : Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
+    }
+    if (nonEmptyString(entry)) {
+      // PR #236 briefly persisted only the raw request. A non-null scalar
+      // cannot prove either a null or non-null creation-time outcome after
+      // mutable Partner gates change, so every replay fails closed.
+      return Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
+    }
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+      || !Object.prototype.hasOwnProperty.call(entry, 'requestedSkillMemoryId')
+      || !Object.prototype.hasOwnProperty.call(entry, 'resolvedSkillMemoryId')) {
+      return Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
+    }
+    const requestedSkillMemoryId = entry.requestedSkillMemoryId;
+    const resolvedSkillMemoryId = entry.resolvedSkillMemoryId;
+    if ((requestedSkillMemoryId !== null && !nonEmptyString(requestedSkillMemoryId))
+      || (resolvedSkillMemoryId !== null && !nonEmptyString(resolvedSkillMemoryId))) {
+      return Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
+    }
+    if (resolvedSkillMemoryId !== null && resolvedSkillMemoryId !== requestedSkillMemoryId) {
+      return Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
+    }
+    return Object.freeze({
+      ok: true,
+      requestedSkillMemoryId,
+      resolvedSkillMemoryId,
+      legacy: false,
+    });
   }
   // Eggs created before A33 have no separate caller-command ledger. Their
-  // canonical output is the only recoverable request identity.
-  return Object.freeze({
-    ok: true,
-    skillId: egg.inheritedSkillMemoryId ?? null,
-    legacy: true,
-  });
+  // memory output was contractually null; a non-null value fails closed.
+  return egg.inheritedSkillMemoryId == null
+    ? Object.freeze({ ok: true, requestedSkillMemoryId: null, resolvedSkillMemoryId: null, legacy: true })
+    : Object.freeze({ ok: false, requestedSkillMemoryId: null, resolvedSkillMemoryId: null });
 }
 
-function appendSkillMemoryRequest(ledger, eggId, skillId) {
+function appendSkillMemoryRequest(ledger, eggId, requestedSkillMemoryId, resolvedSkillMemoryId) {
   return {
     ...ledger,
-    [eggId]: skillId,
+    [eggId]: Object.freeze({ requestedSkillMemoryId, resolvedSkillMemoryId }),
   };
 }
 
@@ -386,7 +413,10 @@ export function applyBreedingSkillMemoryRequestLedger(targetState, sourceState) 
   const sourceLedger = sourceHasLedger ? sourceState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] : {};
   targetState[SKILL_MEMORY_REQUEST_LEDGER_FIELD] = sourceLedger && typeof sourceLedger === 'object'
     && !Array.isArray(sourceLedger)
-    ? { ...sourceLedger }
+    ? Object.fromEntries(Object.entries(sourceLedger).map(([eggId, entry]) => [
+        eggId,
+        entry && typeof entry === 'object' && !Array.isArray(entry) ? { ...entry } : entry,
+      ]))
     : sourceLedger;
   return true;
 }
@@ -435,7 +465,6 @@ function sameOrderedValues(left, right) {
 function eggCreationSnapshotMatches(egg, eggHolder, partner, {
   eggId,
   now,
-  inheritedSkillMemoryId,
 }) {
   if (!eggHolder || !partner) return false;
   const holderStage = resolveWorkbookEvolutionStage(eggHolder);
@@ -444,14 +473,12 @@ function eggCreationSnapshotMatches(egg, eggHolder, partner, {
     || holderStage.path?.fromWorkbookMonsterId !== holderProfile.childMonsterId) return false;
   const inheritance = resolvePotentialInheritance(eggHolder, partner, { seed: eggId });
   if (!inheritance.ok) return false;
-  const skillMemory = resolveBreedingSkillMemory(eggHolder, partner, inheritedSkillMemoryId);
   return egg.breedingVersion === BREEDING_VERSION
     && egg.childMonsterId === holderProfile.childMonsterId
     && egg.hatchAt === now + holderProfile.hatchTimeMin * 60 * 1000
     && sameOrderedValues(egg.potentialInheritedStats, inheritance.inheritedStats)
     && samePotential(egg.potentialValues, inheritance.potential)
     && (egg.secondaryAffinity ?? null) === resolveSecondaryAffinity(eggHolder)
-    && (egg.inheritedSkillMemoryId ?? null) === skillMemory.inheritedSkillMemoryId
     && egg.recipeId == null;
 }
 
@@ -629,11 +656,11 @@ export function createStandardBreedingEggTransaction(state, {
     if (existing && validateWorkbookEgg(existing).ok
       && identityMatches
       && requestSnapshot?.ok
-      && requestSnapshot.skillId === requestedSkillMemoryId
+      && requestSnapshot.requestedSkillMemoryId === requestedSkillMemoryId
+      && requestSnapshot.resolvedSkillMemoryId === (existing.inheritedSkillMemoryId ?? null)
       && (parentsUnavailable || eggCreationSnapshotMatches(existing, replayHolder, replayPartner, {
           eggId,
           now,
-          inheritedSkillMemoryId: requestedSkillMemoryId,
         }))) {
       return transactionResult(true, null, state, { egg: existing, replay: true });
     }
@@ -694,7 +721,12 @@ export function createStandardBreedingEggTransaction(state, {
     ...state,
     collection,
     eggs: [...(Array.isArray(state.eggs) ? state.eggs : []), egg],
-    [SKILL_MEMORY_REQUEST_LEDGER_FIELD]: appendSkillMemoryRequest(requestLedgerSnapshot.ledger, eggId, requestedSkillMemoryId),
+    [SKILL_MEMORY_REQUEST_LEDGER_FIELD]: appendSkillMemoryRequest(
+      requestLedgerSnapshot.ledger,
+      eggId,
+      requestedSkillMemoryId,
+      skillMemory.inheritedSkillMemoryId,
+    ),
   };
   return transactionResult(true, null, nextState, {
     egg,
