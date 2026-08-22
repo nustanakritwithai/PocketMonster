@@ -72,6 +72,7 @@
 
     <div id="zoneTravel" class="zone-travel">
       <button id="zoneToggleBtn" class="zone-toggle-btn">🗺 ด่าน</button>
+      <button id="stageSelectBtn" class="stage-select-btn">🎯 เลือกด่าน</button>
       <div id="zoneDropdown" class="zone-dropdown hidden">
         <button data-zone="hub">🏠 Ranch Hub</button>
         <button data-zone="grass-meadow">🌿 Grass Meadow • Scene</button>
@@ -79,6 +80,14 @@
         <button data-zone="cave">🕳 ถ้ำ • Wild</button>
       </div>
     </div>
+
+    <section id="stageSelect" class="stage-select hidden" role="dialog" aria-modal="true" aria-labelledby="stageSelectTitle">
+      <div class="stage-select-card">
+        <div class="stage-select-handle" aria-hidden="true"></div>
+        <header class="stage-select-head"><div><span class="stage-select-kicker">WORLD MAP</span><h2 id="stageSelectTitle">เลือกด่าน</h2><p>เลือกพื้นที่ตามระดับและความคืบหน้าของคุณ</p></div><button id="stageSelectClose" type="button" aria-label="ปิดเลือกด่าน">✕</button></header>
+        <div id="stageList" class="stage-list"></div>
+      </div>
+    </section>
 
     <button id="huntBtn" class="hunt-btn">ออกล่า → ทุ่ง • Wild 6</button>
 

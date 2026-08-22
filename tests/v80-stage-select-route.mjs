@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+
+assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.match(html,/id="stageSelect"/,'Stage Select overlay exists');
+assert.match(html,/id="stageList"/,'Stage list mount exists');
+assert.match(html,/id="stageSelectBtn"/,'Stage Select entry exists');
+assert.match(css,/\.stage-select-card/,'Stage Select uses a bottom-sheet layout');
+assert.match(css,/\.stage-enter:disabled/,'Unavailable stages have disabled actions');
+assert.match(js,/function renderStageSelect\(/,'Stage Select renderer exists');
+assert.match(js,/stageRouteState\(definition\)/,'Cards use a shared route status resolver');
+assert.match(js,/stageUnlockReason\(state\.stageProgress,definition\.id\)/,'Unlock state uses the catalog resolver');
+assert.match(js,/if\(!active\)return \{key:'planned'/,'Planned stages remain visibly unavailable');
+assert.match(js,/if\(!unlocked\)return \{key:'locked'/,'Locked stages show a lock state');
+assert.match(js,/switchZone\(definition\.id\)/,'Available cards route into runtime zones');
+assert.match(js,/function openStageSelect\(/,'Stage Select open path exists');
+assert.match(js,/el\('stageSelectBtn'\)\.onclick/,'Stage Select button is wired');
+assert.match(js,/closeStageSelect\(\);/,'Leaving a zone closes Stage Select');
+console.log('V8 Stage Select route: PASS');

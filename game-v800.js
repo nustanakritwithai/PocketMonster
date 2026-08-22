@@ -2,7 +2,7 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
-import { createStageProgress, normalizeStageProgress } from './stage-catalog.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, stageUnlockReason } from './stage-catalog.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -2364,6 +2364,7 @@ function switchZone(zone,silent=false){
   summonCooldownUntil=0;
   clearWilds();
   clearTransientEffects();
+  closeStageSelect();
   el('monsterManager').classList.add('hidden');
   characterUI.closeAll();
   state.currentZone=zone;
@@ -4143,7 +4144,40 @@ function updateTarget(){
   setTextIfChanged(hint,hintText);
   setClassNameIfChanged(hint,`tiny effect ${hintClass}`);
 }
-function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ออกล่า → ทุ่ง • Wild 6';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderHUD();}
+function stageRouteState(definition){
+  const active=Boolean(ZONES[definition.id]);
+  if(!active)return {key:'planned',label:'กำลังเตรียมด่าน',enabled:false};
+  const unlocked=stageUnlockReason(state.stageProgress,definition.id).ok;
+  if(!unlocked)return {key:'locked',label:'ล็อกอยู่',enabled:false};
+  if(state.stageProgress?.cleared?.includes(definition.id))return {key:'cleared',label:'เคลียร์แล้ว',enabled:true};
+  return {key:'available',label:'พร้อมเข้า',enabled:true};
+}
+function renderStageSelect(){
+  const list=el('stageList');
+  if(!list)return;
+  list.replaceChildren();
+  for(const definition of STAGE_CATALOG){
+    const status=stageRouteState(definition),card=document.createElement('article');
+    card.className=`stage-card ${status.key}${state.currentZone===definition.id?' active':''}`;
+    const body=document.createElement('div'),title=document.createElement('h3'),desc=document.createElement('p'),meta=document.createElement('div');
+    title.textContent=definition.displayName;
+    desc.textContent=`${definition.primaryTypes.join(' / ')} • แนะนำ Lv.${definition.recommendedLevel.min}–${definition.recommendedLevel.max}`;
+    meta.className='stage-card-meta';
+    for(const text of [`ธาตุรอง ${definition.secondaryTypes.slice(0,3).join(' / ')}`,definition.id==='grass-meadow'?'Normal • Rare • Elite • Boss':'Elite • Boss']){const chip=document.createElement('span');chip.className='stage-chip';chip.textContent=text;meta.append(chip);}
+    body.append(title,desc,meta);
+    const action=document.createElement('button');action.type='button';action.className='stage-enter';action.textContent=status.key==='planned'?'เร็วๆ นี้':status.key==='locked'?'🔒 ล็อก':status.key==='cleared'?'เข้าอีกครั้ง':'เข้าเล่น';action.disabled=!status.enabled;action.setAttribute('aria-label',`${action.textContent} ${definition.displayName}`);
+    if(status.enabled)action.onclick=()=>{playSFX('sfx_ui_click');switchZone(definition.id);};
+    const statusText=document.createElement('small');statusText.className=`stage-status ${status.key}`;statusText.textContent=status.label;body.append(statusText);
+    card.append(body,action);list.append(card);
+  }
+}
+function openStageSelect(){
+  el('zoneDropdown')?.classList.add('hidden');
+  renderStageSelect();
+  el('stageSelect')?.classList.remove('hidden');
+}
+function closeStageSelect(){el('stageSelect')?.classList.add('hidden');}
+function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ออกล่า → ทุ่ง • Wild 6';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
 // ---------- Save migration ----------
@@ -4343,6 +4377,8 @@ el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'�
 el('volumeSlider').oninput=(e)=>{const v=parseFloat(e.target.value)/100;setVolume(v);localStorage.setItem('mlr-audio-volume',String(v));};
 el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};
 el('zoneToggleBtn').onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.toggle('hidden');};
+el('stageSelectBtn').onclick=()=>{playSFX('sfx_ui_click');openStageSelect();};
+el('stageSelectClose').onclick=()=>{playSFX('sfx_ui_click');closeStageSelect();};
 document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
 addEventListener('pointerdown',e=>{const dd=el('zoneDropdown');if(!dd.classList.contains('hidden')&&!el('zoneTravel').contains(e.target))dd.classList.add('hidden');});
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
