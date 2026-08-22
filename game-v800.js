@@ -405,6 +405,10 @@ function makeStageBeacon(x,z,color=0x86efac){
 function makeWarpBeacon(route){
   const color=route.kind==='return'?0x67e8f9:0xfacc15;
   const g=makeStageBeacon(route.position[0],route.position[1],color);
+  const portal=new THREE.Mesh(new THREE.TorusGeometry(.82,.07,8,28),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.92}));
+  portal.position.y=1.05; g.add(portal);
+  const beam=new THREE.Mesh(boxGeometry(.18,1.8,.18),glowMat(color,color,.14,.62,.04));
+  beam.position.y=.9; g.add(beam);
   g.userData.warpRouteId=route.id;
   g.userData.warpPulse=Math.random()*Math.PI*2;
   return g;
@@ -4474,7 +4478,7 @@ function updateWarpPrompt(dt){
   if(found?.id!==nearbyWarp?.id){nearbyWarp=found;renderWarpPrompt();}
   if(!found&&nearbyWarp){closeWarpPrompt();}
 }
-function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ออกล่า → ทุ่ง • Wild 6';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
+function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
 // ---------- Save migration ----------
@@ -4677,7 +4681,7 @@ el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();}
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('warpPromptAction').onclick=()=>startWarp();
 el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');closeWarpPrompt();warpPromptCooldown=.35;};
-el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
+el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;

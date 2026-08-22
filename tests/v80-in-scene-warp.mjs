@@ -7,6 +7,7 @@ const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const progress={unlocked:['grass-meadow','ember-valley'],cleared:['grass-meadow']};
 const unlock=(value,id)=>({ok:value.unlocked.includes(id),reason:value.unlocked.includes(id)?'unlocked':'requires-stage-clear'});
 
+assert.deepEqual(routesFrom('grassland').map(route=>route.to),['hub'],'Legacy Grassland saves have a visible escape warp instead of a route dead end');
 assert.deepEqual(routesFrom('grass-meadow').map(route=>route.to),['hub','ember-valley'],'Grass has return and forward warp points');
 assert.deepEqual(routesFrom('ember-valley').map(route=>route.to),['grass-meadow','misty-lake'],'Ember has return and forward warp points');
 assert.deepEqual(routesFrom('misty-lake').map(route=>route.to),['ember-valley','storm-field'],'Misty has return and forward warp points');
@@ -20,6 +21,11 @@ assert.equal(nearestRoute(routesFrom('grass-meadow'),{x:-20,z:0},3.2).route,null
 assert.match(html,/id="warpPrompt"/,'Mobile warp prompt exists');
 assert.match(html,/id="warpPromptAction"/,'Warp confirmation action exists');
 assert.match(js,/updateWarpPrompt\(dt\)/,'Player movement checks in-scene warp proximity');
+const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
+assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');
+assert.match(warpBeacon,/boxGeometry\(\.18,1\.8,\.18\)/,'Warp point has a visible vertical light beam');
+assert.match(js,/state\.currentZone==='hub'\?msg\('เดินไปที่ประตูวาปสีทอง/,'Hunt button guides players to the in-scene warp instead of the route-less legacy zone');
+assert.match(js,/hunt\.textContent='ประตูวาป → Grass Meadow'/,'Hub action label names the warp destination instead of promising a direct Hunt teleport');
 assert.match(js,/warpSpawnOverride=route\.spawn/,'Warp selects the destination spawn point');
 assert.match(js,/ต้องเดินทางผ่านจุดวาปในฉากตามเส้นทาง/,'Stage Select no longer directly loads active stages');
 assert.doesNotMatch(html,/data-zone="grass-meadow"/,'Stage zone menu no longer directly warps to Set 1');
