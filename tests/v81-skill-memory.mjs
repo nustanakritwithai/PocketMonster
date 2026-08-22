@@ -24,6 +24,7 @@ const NOW = 1_780_000_000_000;
 const EGG_ID = '12345678-1234-4123-8123-123456789abc';
 const INVALID_MEMORY_EGG_ID = '22345678-1234-4123-8123-123456789abc';
 const NULL_MEMORY_EGG_ID = '32345678-1234-4123-8123-123456789abc';
+const MUTABLE_PARTNER_EGG_ID = '62345678-1234-4123-8123-123456789abc';
 
 function adult({
   instanceId,
@@ -205,6 +206,14 @@ function transactionState(pair = firePair()) {
   assert.equal(replay.ok, true);
   assert.equal(replay.replay, true);
   assert.equal(replay.state, created.state);
+  const regressedPartnerState = {
+    ...created.state,
+    collection: created.state.collection.map(monster => monster.instanceId === pair.partner.instanceId
+      ? { ...monster, level: 1, mind: { ...monster.mind, bond: 0 }, skills: [] }
+      : monster),
+  };
+  assert.equal(createStandardBreedingEggTransaction(regressedPartnerState, command).replay, true,
+    'later loss of Partner eligibility cannot invalidate a successful creation-time outcome');
   const tamperedReplayState = {
     ...created.state,
     eggs: [{ ...created.egg, inheritedSkillMemoryId: 'SK_DARK_01' }],
@@ -325,6 +334,111 @@ function transactionState(pair = firePair()) {
     },
   };
   assert.equal(createStandardBreedingEggTransaction(malformedEntry, invalidCommand).reason, 'egg_id_conflict');
+
+  const mismatchedOutcomeState = {
+    ...created.state,
+    eggs: [{ ...created.egg, inheritedSkillMemoryId: 'SK_DARK_01' }],
+    breedingSkillMemoryRequestByEggId: {
+      ...created.state.breedingSkillMemoryRequestByEggId,
+      [EGG_ID]: {
+        requestedSkillMemoryId: 'SK_DARK_02',
+        resolvedSkillMemoryId: 'SK_DARK_01',
+      },
+    },
+  };
+  assert.equal(validateWorkbookEgg(mismatchedOutcomeState.eggs[0]).ok, true);
+  assert.equal(createStandardBreedingEggTransaction(mismatchedOutcomeState, command).reason, 'egg_id_conflict',
+    'a non-null resolved outcome must be the exact requested SkillID');
+
+  const deployedValidScalarState = {
+    ...created.state,
+    breedingSkillMemoryRequestByEggId: {
+      ...created.state.breedingSkillMemoryRequestByEggId,
+      [EGG_ID]: 'SK_DARK_02',
+    },
+  };
+  assert.equal(createStandardBreedingEggTransaction(deployedValidScalarState, command).reason, 'egg_id_conflict',
+    'the deployed scalar format fails closed when it cannot prove a non-null creation outcome');
+  const deployedScalarTamperedNull = {
+    ...deployedValidScalarState,
+    eggs: [{ ...created.egg, inheritedSkillMemoryId: null }],
+  };
+  assert.equal(validateWorkbookEgg(deployedScalarTamperedNull.eggs[0]).ok, true);
+  assert.equal(createStandardBreedingEggTransaction(deployedScalarTamperedNull, command).reason, 'egg_id_conflict',
+    'a non-null scalar cannot reinterpret a formerly valid outcome as null');
+  assert.equal(createStandardBreedingEggTransaction({
+    ...deployedScalarTamperedNull,
+    collection: [],
+  }, command).reason, 'egg_id_conflict');
+
+  const snapshotPair = {
+    holder: adult({
+      instanceId: 'holder-normal-snapshot', speciesId: 'normalooze', formId: 'MON_019',
+      gender: 'Female', level: 20, bond: 50, skillIds: [],
+    }),
+    partner: adult({
+      instanceId: 'partner-normal-snapshot', speciesId: 'normalooze', formId: 'MON_019',
+      gender: 'Male', level: 20, bond: 50, secondaryType: null, skillIds: ['SK_FIGHTING_01'],
+    }),
+  };
+  const snapshotCommand = {
+    eggId: MUTABLE_PARTNER_EGG_ID,
+    eggHolderOwnedMonsterId: snapshotPair.holder.instanceId,
+    partnerOwnedMonsterId: snapshotPair.partner.instanceId,
+    genderSeed: 9,
+    inheritedSkillMemoryId: 'SK_FIGHTING_01',
+    now: NOW,
+  };
+  assert.equal(
+    resolveBreedingSkillMemory(snapshotPair.holder, snapshotPair.partner, 'SK_FIGHTING_01').reason,
+    'partner_secondary_required',
+  );
+  const snapshotCreated = createStandardBreedingEggTransaction(transactionState(snapshotPair), snapshotCommand);
+  assert.equal(snapshotCreated.ok, true, snapshotCreated.reason);
+  assert.equal(snapshotCreated.egg.inheritedSkillMemoryId, null);
+  assert.deepEqual(
+    snapshotCreated.state.breedingSkillMemoryRequestByEggId[MUTABLE_PARTNER_EGG_ID],
+    { requestedSkillMemoryId: 'SK_FIGHTING_01', resolvedSkillMemoryId: null },
+    'the replay ledger binds both raw request and creation-time outcome',
+  );
+
+  const progressedPartnerState = {
+    ...snapshotCreated.state,
+    collection: snapshotCreated.state.collection.map(monster => monster.instanceId === snapshotPair.partner.instanceId
+      ? { ...monster, secondaryType: 'Fighting' }
+      : monster),
+  };
+  assert.equal(createStandardBreedingEggTransaction(progressedPartnerState, snapshotCommand).replay, true,
+    'later Partner eligibility cannot invalidate the exact creation-time outcome');
+  const tamperedProgressedState = {
+    ...progressedPartnerState,
+    eggs: [{ ...snapshotCreated.egg, inheritedSkillMemoryId: 'SK_FIGHTING_01' }],
+  };
+  assert.equal(validateWorkbookEgg(tamperedProgressedState.eggs[0]).ok, true);
+  assert.equal(createStandardBreedingEggTransaction(tamperedProgressedState, snapshotCommand).reason, 'egg_id_conflict',
+    'later Partner eligibility cannot retroactively bless a tampered egg outcome');
+
+  const progressedParentsUnavailable = { ...progressedPartnerState, collection: [] };
+  assert.equal(createStandardBreedingEggTransaction(progressedParentsUnavailable, snapshotCommand).replay, true);
+  assert.equal(createStandardBreedingEggTransaction({
+    ...tamperedProgressedState,
+    collection: [],
+  }, snapshotCommand).reason, 'egg_id_conflict',
+  'parents-present and parents-absent replay use the same immutable memory outcome');
+
+  const deployedScalarLedgerState = {
+    ...progressedPartnerState,
+    breedingSkillMemoryRequestByEggId: {
+      ...progressedPartnerState.breedingSkillMemoryRequestByEggId,
+      [MUTABLE_PARTNER_EGG_ID]: 'SK_FIGHTING_01',
+    },
+  };
+  assert.equal(createStandardBreedingEggTransaction(deployedScalarLedgerState, snapshotCommand).reason, 'egg_id_conflict',
+    'a non-null scalar cannot prove even a null creation outcome from mutable Partner gates');
+  assert.equal(createStandardBreedingEggTransaction({
+    ...deployedScalarLedgerState,
+    eggs: [{ ...snapshotCreated.egg, inheritedSkillMemoryId: 'SK_FIGHTING_01' }],
+  }, snapshotCommand).reason, 'egg_id_conflict', 'the scalar compatibility path stays fail-closed');
 
   assert.equal(validateWorkbookEgg({ ...created.egg, inheritedSkillMemoryId: 'SK_FIRE_06' }).ok, false);
   assert.equal(validateWorkbookEgg({ ...created.egg, inheritedSkillMemoryId: 'SK_FIGHTING_04' }).ok, false);
