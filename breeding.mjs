@@ -8,6 +8,8 @@ import { clamp } from './balance-formulas.mjs';
 import { normalizeInstance, CORE_GENES } from './monster-instance.mjs';
 
 export const GENE_RANKS = Object.freeze(['D', 'C', 'B', 'A', 'S']);
+export const BREEDING_ADULT_STAGES = Object.freeze(['Adult', 'Mature']);
+export const BREEDING_MIN_BOND = 50;
 
 // R13 inheritance baselines (tunable rules, not content).
 export const INHERITANCE = Object.freeze({
@@ -38,10 +40,81 @@ export function isCloseRelative(a, b) {
 }
 
 export function canBreed(a, b) {
-  if (!a || !b) return { ok: false, reason: 'two parents required' };
-  if (a.instanceId === b.instanceId) return { ok: false, reason: 'must be two different monsters' };
-  if (isCloseRelative(a, b)) return { ok: false, reason: 'close relatives cannot breed' };
-  return { ok: true };
+  if (!a || !b) return { ok: false, reason: 'invalid_state' };
+  if (a.instanceId === b.instanceId) return { ok: false, reason: 'breeding_same_instance' };
+  if (isCloseRelative(a, b)) return { ok: false, reason: 'breeding_relative_gate' };
+  return { ok: true, reason: null };
+}
+
+function compatibilityResult(ok, reason, detail = {}) {
+  return Object.freeze({ ok, reason, ...detail });
+}
+
+function speciesProfile(speciesById, speciesId) {
+  if (typeof speciesById === 'function') return speciesById(speciesId) ?? null;
+  if (speciesById instanceof Map) return speciesById.get(speciesId) ?? null;
+  return speciesById && typeof speciesById === 'object' ? speciesById[speciesId] ?? null : null;
+}
+
+function breedingBond(instance) {
+  const value = instance?.mind?.bond ?? instance?.bond;
+  return Number.isFinite(value) ? value : 0;
+}
+
+function cooldownUntil(instance) {
+  const value = instance?.breedingCooldownUntil;
+  return Number.isFinite(value) ? value : 0;
+}
+
+export function genderCompatible(a, b) {
+  if (!a || !b) return false;
+  if (a.gender === 'Genderless' || b.gender === 'Genderless') return true;
+  return (a.gender === 'Male' && b.gender === 'Female')
+    || (a.gender === 'Female' && b.gender === 'Male');
+}
+
+export function evaluateBreedingCompatibility(a, b, {
+  speciesById,
+  now = Date.now(),
+  adultStages = BREEDING_ADULT_STAGES,
+  minBond = BREEDING_MIN_BOND,
+} = {}) {
+  const base = canBreed(a, b);
+  if (!base.ok) return compatibilityResult(false, base.reason);
+  if (!adultStages.includes(a.lifeStage) || !adultStages.includes(b.lifeStage)) {
+    return compatibilityResult(false, 'breeding_stage_gate', {
+      stages: Object.freeze([a.lifeStage ?? null, b.lifeStage ?? null]),
+    });
+  }
+  const profileA = speciesProfile(speciesById, a.speciesId);
+  const profileB = speciesProfile(speciesById, b.speciesId);
+  if (!profileA || !profileB) {
+    return compatibilityResult(false, 'unknown_id', {
+      speciesIds: Object.freeze([a.speciesId ?? null, b.speciesId ?? null]),
+    });
+  }
+  if (!profileA.breedingGroup || profileA.breedingGroup !== profileB.breedingGroup) {
+    return compatibilityResult(false, 'breeding_group_gate', {
+      groups: Object.freeze([profileA.breedingGroup ?? null, profileB.breedingGroup ?? null]),
+    });
+  }
+  if (!genderCompatible(a, b)) {
+    return compatibilityResult(false, 'breeding_gender_gate', {
+      genders: Object.freeze([a.gender ?? null, b.gender ?? null]),
+    });
+  }
+  const bonds = Object.freeze([breedingBond(a), breedingBond(b)]);
+  if (bonds.some(value => value < minBond)) {
+    return compatibilityResult(false, 'breeding_bond_gate', { bonds, minBond });
+  }
+  const cooldowns = Object.freeze([cooldownUntil(a), cooldownUntil(b)]);
+  if (cooldowns.some(value => value > now)) {
+    return compatibilityResult(false, 'breeding_cooldown', { cooldowns, now });
+  }
+  return compatibilityResult(true, null, {
+    breedingGroup: profileA.breedingGroup,
+    minBond,
+  });
 }
 
 // One gene: 45% parent A rank, 45% parent B, 10% mutation (70% same / 15% up / 15% down).
@@ -66,8 +139,10 @@ export function inheritAptitude(aptA, aptB, speciesBase, rng) {
 }
 
 // Produce a child instance from two parents. Deterministic under `seed`.
-export function breed(parentA, parentB, { species = {}, seed = 0, now = Date.now(), personalityPool = [] } = {}) {
-  const check = canBreed(parentA, parentB);
+export function breed(parentA, parentB, { species = {}, seed = 0, now = Date.now(), personalityPool = [], compatibility = null } = {}) {
+  const check = compatibility
+    ? evaluateBreedingCompatibility(parentA, parentB, { ...compatibility, now })
+    : canBreed(parentA, parentB);
   if (!check.ok) return { ok: false, reason: check.reason };
 
   const rng = createRng(seed);
