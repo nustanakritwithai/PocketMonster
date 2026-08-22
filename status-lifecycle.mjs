@@ -13,6 +13,13 @@ export const STATUS_LIFECYCLE_POLICY = Object.freeze({
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
 });
 
+export const HARD_CC_DR_POLICY = Object.freeze({
+  windowSec: 6,
+  durationMultipliers: Object.freeze([1, 0.65, 0.4]),
+  minimumDurationSec: 0.25,
+  scope: 'central_per_encounter_target',
+});
+
 const RAW_INTERACTIONS = [
   [100, 'ST_BURN', 'ST_FREEZE', 'RemoveExistingThenApply'],
   [100, 'ST_FREEZE', 'ST_BURN', 'RemoveExistingThenApply'],
@@ -37,8 +44,42 @@ function frozenStatuses(statuses) {
   return Object.freeze(statuses.map(status => Object.freeze({ ...status })));
 }
 
-function statusState({ encounterId, currentTimeSec, ended, statuses }) {
-  return Object.freeze({ encounterId, currentTimeSec, ended, statuses: frozenStatuses(statuses) });
+function emptyControlDr() {
+  return Object.freeze({
+    windowStartedAtSec: null,
+    lastAppliedAtSec: null,
+    count: 0,
+    history: Object.freeze([]),
+  });
+}
+
+function frozenControlDr(controlDr = emptyControlDr()) {
+  const history = Array.isArray(controlDr?.history)
+    ? controlDr.history.map(entry => Object.freeze({ statusId: entry.statusId, atSec: entry.atSec }))
+    : [];
+  return Object.freeze({
+    windowStartedAtSec: history[0]?.atSec ?? null,
+    lastAppliedAtSec: history.at(-1)?.atSec ?? null,
+    count: history.length,
+    history: Object.freeze(history),
+  });
+}
+
+function activeControlDr(controlDr, nowSec) {
+  const history = frozenControlDr(controlDr).history.filter(
+    entry => nowSec - entry.atSec < HARD_CC_DR_POLICY.windowSec,
+  );
+  return frozenControlDr({ history });
+}
+
+function statusState({ encounterId, currentTimeSec, ended, statuses, controlDr }) {
+  return Object.freeze({
+    encounterId,
+    currentTimeSec,
+    ended,
+    statuses: frozenStatuses(statuses),
+    controlDr: frozenControlDr(controlDr),
+  });
 }
 
 function result(ok, reason, detail = {}) {
@@ -46,8 +87,21 @@ function result(ok, reason, detail = {}) {
 }
 
 function validState(state) {
-  return state && typeof state.encounterId === 'string' && state.encounterId.length > 0
-    && Number.isFinite(state.currentTimeSec) && typeof state.ended === 'boolean' && Array.isArray(state.statuses);
+  if (!state || typeof state.encounterId !== 'string' || state.encounterId.length === 0
+    || !Number.isFinite(state.currentTimeSec) || typeof state.ended !== 'boolean' || !Array.isArray(state.statuses)) {
+    return false;
+  }
+  if (state.controlDr == null) return true;
+  if (!Array.isArray(state.controlDr.history)
+    || state.controlDr.history.some((entry, index, history) => {
+      const definition = entry && statusCatalogEntry(entry.statusId);
+      return !definition?.hardCC || !Number.isFinite(entry.atSec) || entry.atSec < 0
+        || entry.atSec > state.currentTimeSec || (index > 0 && entry.atSec < history[index - 1].atSec);
+    })) return false;
+  const history = state.controlDr.history;
+  return state.controlDr.count === history.length
+    && state.controlDr.windowStartedAtSec === (history[0]?.atSec ?? null)
+    && state.controlDr.lastAppliedAtSec === (history.at(-1)?.atSec ?? null);
 }
 
 function interactionFor(incomingStatusId, existingStatusId) {
@@ -74,7 +128,37 @@ export function createEncounterStatusState({ encounterId, nowSec = 0 } = {}) {
   if (typeof encounterId !== 'string' || encounterId.length === 0 || !Number.isFinite(nowSec) || nowSec < 0) {
     throw new TypeError('Invalid encounter status state');
   }
-  return statusState({ encounterId, currentTimeSec: nowSec, ended: false, statuses: [] });
+  return statusState({ encounterId, currentTimeSec: nowSec, ended: false, statuses: [], controlDr: emptyControlDr() });
+}
+
+function hardCcDuration(controlDr, definition, requestedDurationSec, nowSec) {
+  const activeDr = activeControlDr(controlDr, nowSec);
+  if (!definition.hardCC) {
+    return Object.freeze({
+      durationSec: requestedDurationSec,
+      controlDr: activeDr,
+      detail: null,
+    });
+  }
+  const count = activeDr.history.length + 1;
+  const stage = Math.min(count, HARD_CC_DR_POLICY.durationMultipliers.length);
+  const multiplier = HARD_CC_DR_POLICY.durationMultipliers[stage - 1];
+  const durationSec = Math.max(
+    HARD_CC_DR_POLICY.minimumDurationSec,
+    Math.round(requestedDurationSec * multiplier * 1_000_000) / 1_000_000,
+  );
+  const history = [...activeDr.history, Object.freeze({ statusId: definition.id, atSec: nowSec })];
+  const nextControlDr = frozenControlDr({ history });
+  return Object.freeze({
+    durationSec,
+    controlDr: nextControlDr,
+    detail: Object.freeze({
+      stage,
+      multiplier,
+      windowStartedAtSec: nextControlDr.windowStartedAtSec,
+      applicationsInWindow: activeDr.history.length,
+    }),
+  });
 }
 
 export function applyEncounterStatus(state, proposed, { nowSec } = {}) {
@@ -90,7 +174,9 @@ export function applyEncounterStatus(state, proposed, { nowSec } = {}) {
   }
 
   const liveStatuses = state.statuses.filter(status => status.expiresAtSec > nowSec);
-  const incoming = runtimeStatus(proposed, definition, nowSec);
+  const hardCc = hardCcDuration(state.controlDr, definition, proposed.durationSec, nowSec);
+  const retainedControlDr = activeControlDr(state.controlDr, nowSec);
+  const incoming = runtimeStatus({ ...proposed, durationSec: hardCc.durationSec }, definition, nowSec);
   const sameIndex = liveStatuses.findIndex(status => status.statusId === definition.id);
   if (sameIndex >= 0) {
     const existing = liveStatuses[sameIndex];
@@ -108,38 +194,55 @@ export function applyEncounterStatus(state, proposed, { nowSec } = {}) {
     }
     const statuses = [...liveStatuses];
     statuses[sameIndex] = replacement;
+    const applied = replacement !== existing;
     return result(true, null, {
-      applied: replacement !== existing,
-      state: statusState({ ...state, currentTimeSec: nowSec, statuses }),
+      applied,
+      state: statusState({
+        ...state,
+        currentTimeSec: nowSec,
+        statuses,
+        controlDr: applied ? hardCc.controlDr : retainedControlDr,
+      }),
       removedStatusIds: Object.freeze([]),
       interaction: definition.stackRule,
+      ccDr: applied ? hardCc.detail : null,
+      appliedDurationSec: applied ? hardCc.durationSec : null,
     });
   }
 
   const matching = liveStatuses
     .map((status, index) => ({ status, index, rule: interactionFor(incoming.statusId, status.statusId) }))
     .filter(match => match.rule)
-    .sort((a, b) => b.rule.priority - a.rule.priority)[0] ?? null;
-  if (matching?.rule.interaction === 'LongerRemainingWins'
-    && matching.status.expiresAtSec - nowSec >= proposed.durationSec) {
+    .sort((a, b) => b.rule.priority - a.rule.priority);
+  const blockingHardLock = matching.find(match => match.rule.interaction === 'LongerRemainingWins'
+    && match.status.expiresAtSec - nowSec >= hardCc.durationSec) ?? null;
+  if (blockingHardLock) {
     return result(true, 'existing_longer', {
       applied: false,
-      state: statusState({ ...state, currentTimeSec: nowSec, statuses: liveStatuses }),
+      state: statusState({ ...state, currentTimeSec: nowSec, statuses: liveStatuses, controlDr: retainedControlDr }),
       removedStatusIds: Object.freeze([]),
-      interaction: matching.rule.interaction,
+      interaction: blockingHardLock.rule.interaction,
+      ccDr: null,
+      appliedDurationSec: null,
     });
   }
 
-  const replace = matching && ['RemoveExistingThenApply', 'ReplaceExisting', 'LongerRemainingWins']
-    .includes(matching.rule.interaction);
-  const removedStatusIds = replace ? [matching.status.statusId] : [];
-  const statuses = liveStatuses.filter((_, index) => !replace || index !== matching.index);
+  const replaceIndexes = new Set(matching
+    .filter(match => ['RemoveExistingThenApply', 'ReplaceExisting', 'LongerRemainingWins']
+      .includes(match.rule.interaction))
+    .map(match => match.index));
+  const removedStatusIds = liveStatuses
+    .filter((_, index) => replaceIndexes.has(index))
+    .map(status => status.statusId);
+  const statuses = liveStatuses.filter((_, index) => !replaceIndexes.has(index));
   statuses.push(incoming);
   return result(true, null, {
     applied: true,
-    state: statusState({ ...state, currentTimeSec: nowSec, statuses }),
+    state: statusState({ ...state, currentTimeSec: nowSec, statuses, controlDr: hardCc.controlDr }),
     removedStatusIds: Object.freeze(removedStatusIds),
-    interaction: matching?.rule.interaction ?? 'Coexist',
+    interaction: matching[0]?.rule.interaction ?? 'Coexist',
+    ccDr: hardCc.detail,
+    appliedDurationSec: hardCc.durationSec,
   });
 }
 
@@ -177,7 +280,7 @@ export function advanceEncounterEffects(state, { toSec, targetHp, targetMaxHp } 
   }
   const nextHp = Math.max(0, targetHp - damage);
   return result(true, null, {
-    state: statusState({ ...state, currentTimeSec: toSec, statuses }),
+    state: statusState({ ...state, currentTimeSec: toSec, statuses, controlDr: activeControlDr(state.controlDr, toSec) }),
     damage,
     targetHp: nextHp,
     fainted: nextHp <= 0,
@@ -189,7 +292,7 @@ export function endEncounterEffects(state, { nowSec = state?.currentTimeSec } = 
   if (!validState(state) || !Number.isFinite(nowSec) || nowSec < state.currentTimeSec) {
     throw new TypeError('Invalid encounter end');
   }
-  return statusState({ ...state, currentTimeSec: nowSec, ended: true, statuses: [] });
+  return statusState({ ...state, currentTimeSec: nowSec, ended: true, statuses: [], controlDr: emptyControlDr() });
 }
 
 for (const rule of STATUS_INTERACTIONS) {
