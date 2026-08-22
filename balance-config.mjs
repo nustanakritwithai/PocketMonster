@@ -18,6 +18,36 @@ export const WORKBOOK_GROWTH_ADAPTER = Object.freeze({
   levelCapDecision: 'D7_RUNTIME_CAP_50_UNCHANGED',
 });
 
+export const WORKBOOK_EXP_ADAPTER = Object.freeze({
+  sourceLevel: Object.freeze({ min: 1, cap: 60 }),
+  curves: Object.freeze({
+    Fast: Object.freeze({ multiplier: 0.8, exponent: 3 }),
+    Medium: Object.freeze({ multiplier: 1.0, exponent: 3 }),
+    MediumSlow: Object.freeze({ multiplier: 1.15, exponent: 3 }),
+    Slow: Object.freeze({ multiplier: 1.35, exponent: 3 }),
+  }),
+  reward: Object.freeze({
+    baseExpDivisor: 7,
+    variants: Object.freeze({ Normal: 1.0, Elite: 1.4, Boss: 2.5 }),
+    participation: Object.freeze({ Active: 1.0, PartyAssist: 0.5, NoParticipation: 0.0 }),
+    bonusSources: Object.freeze({ None: 1.0, 'Food/Training': 1.1, Event: 1.25, Rested: 1.15 }),
+    extraMultiplier: Object.freeze({ min: 0, max: 3, default: 1 }),
+    levelDifferenceBands: Object.freeze([
+      Object.freeze({ minimum: 5, multiplier: 1.4 }),
+      Object.freeze({ minimum: 2, multiplier: 1.15 }),
+      Object.freeze({ minimum: -2, multiplier: 1.0 }),
+      Object.freeze({ minimum: -5, multiplier: 0.75 }),
+    ]),
+    levelDifferenceFallback: 0.5,
+  }),
+  curveRounding: 'round',
+  rewardRounding: 'floor',
+  activation: 'calculator_only',
+  runtimeEligible: false,
+  levelCapDecision: 'D7_RUNTIME_CAP_50_UNCHANGED',
+  curveDecision: 'D7_LIVE_CURVE_UNCHANGED',
+});
+
 export const BALANCE_CONFIG = Object.freeze({
   version: BALANCE_SCHEMA_VERSION,
 

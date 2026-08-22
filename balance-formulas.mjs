@@ -3,7 +3,7 @@
 // tunables from a balance config (defaults to BALANCE_CONFIG) so the engine can
 // stay content-agnostic (Master Plan R1 "data-driven", R23 formulas layer).
 
-import { BALANCE_CONFIG, WORKBOOK_GROWTH_ADAPTER } from './balance-config.mjs';
+import { BALANCE_CONFIG, WORKBOOK_EXP_ADAPTER, WORKBOOK_GROWTH_ADAPTER } from './balance-config.mjs';
 
 export function clamp(value, min, max) {
   if (!Number.isFinite(value)) return min;
@@ -64,6 +64,177 @@ export function relativeLevelExpModifier(enemyLevel, monsterLevel, config = BALA
   if (d <= cfg.floorAtOrBelow) return cfg.min;
   if (d >= cfg.capAtOrAbove) return cfg.max;
   return clamp(1 + cfg.slopePerLevel * d, cfg.min, cfg.max);
+}
+
+// Workbook v2.1 EXP curve and reward formulas exposed as a calculator-only
+// compatibility seam. They do not replace the live Lv.50 curve above.
+export function calculateWorkbookExpCurvePreview({
+  curve = 'Medium',
+  level = WORKBOOK_EXP_ADAPTER.sourceLevel.min,
+} = {}, adapter = WORKBOOK_EXP_ADAPTER) {
+  const definition = Object.hasOwn(adapter.curves, curve) ? adapter.curves[curve] : null;
+  if (!definition) return Object.freeze({ ok: false, reason: 'unknown_id', curve: curve ?? null });
+  const boundedLevel = clamp(Math.floor(level), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const rawCumulative = (boundedLevel ** definition.exponent - 1) * definition.multiplier;
+  const cumulative = Math.round(rawCumulative);
+  const atSourceCap = boundedLevel >= adapter.sourceLevel.cap;
+  const rawToNext = atSourceCap
+    ? 0
+    : (((boundedLevel + 1) ** definition.exponent - 1) * definition.multiplier) - rawCumulative;
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    curve,
+    level: boundedLevel,
+    cumulative,
+    toNext: atSourceCap ? 0 : Math.round(rawToNext),
+    atSourceCap,
+    activation: adapter.activation,
+    runtimeEligible: adapter.runtimeEligible,
+    levelCapDecision: adapter.levelCapDecision,
+    curveDecision: adapter.curveDecision,
+  });
+}
+
+export function workbookLevelDifferenceMultiplier(enemyLevel, monsterLevel, adapter = WORKBOOK_EXP_ADAPTER) {
+  const enemy = clamp(Math.floor(enemyLevel), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const monster = clamp(Math.floor(monsterLevel), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const difference = enemy - monster;
+  return adapter.reward.levelDifferenceBands.find(band => difference >= band.minimum)?.multiplier
+    ?? adapter.reward.levelDifferenceFallback;
+}
+
+export function calculateWorkbookBattleExpPreview({
+  baseExpYield = 0,
+  enemyLevel = WORKBOOK_EXP_ADAPTER.sourceLevel.min,
+  monsterLevel = WORKBOOK_EXP_ADAPTER.sourceLevel.min,
+  variant = 'Normal',
+  participation = 'Active',
+  extraMultiplier = WORKBOOK_EXP_ADAPTER.reward.extraMultiplier.default,
+} = {}, adapter = WORKBOOK_EXP_ADAPTER) {
+  if (!Object.hasOwn(adapter.reward.variants, variant)) {
+    return Object.freeze({ ok: false, reason: 'unknown_id', field: 'variant', value: variant ?? null });
+  }
+  if (!Object.hasOwn(adapter.reward.participation, participation)) {
+    return Object.freeze({ ok: false, reason: 'unknown_id', field: 'participation', value: participation ?? null });
+  }
+  const base = Math.max(0, Number.isFinite(baseExpYield) ? baseExpYield : 0);
+  const enemy = clamp(Math.floor(enemyLevel), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const monster = clamp(Math.floor(monsterLevel), adapter.sourceLevel.min, adapter.sourceLevel.cap);
+  const extra = clamp(
+    Number.isFinite(extraMultiplier) ? extraMultiplier : adapter.reward.extraMultiplier.default,
+    adapter.reward.extraMultiplier.min,
+    adapter.reward.extraMultiplier.max,
+  );
+  const levelDifference = enemy - monster;
+  const levelDifferenceMultiplier = workbookLevelDifferenceMultiplier(enemy, monster, adapter);
+  const variantMultiplier = adapter.reward.variants[variant];
+  const participationMultiplier = adapter.reward.participation[participation];
+  const rawReward = (base * enemy / adapter.reward.baseExpDivisor)
+    * levelDifferenceMultiplier
+    * variantMultiplier
+    * participationMultiplier
+    * extra;
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    reward: Math.floor(rawReward),
+    rawReward,
+    baseExpYield: base,
+    enemyLevel: enemy,
+    monsterLevel: monster,
+    levelDifference,
+    levelDifferenceMultiplier,
+    variant,
+    variantMultiplier,
+    participation,
+    participationMultiplier,
+    extraMultiplier: extra,
+    activation: adapter.activation,
+    runtimeEligible: adapter.runtimeEligible,
+  });
+}
+
+export function resolveWorkbookExpProgress({ curve = 'Medium', totalExp = 0 } = {}, adapter = WORKBOOK_EXP_ADAPTER) {
+  const curveCheck = calculateWorkbookExpCurvePreview({ curve, level: adapter.sourceLevel.min }, adapter);
+  if (!curveCheck.ok) return curveCheck;
+  const total = Math.max(0, Math.floor(Number.isFinite(totalExp) ? totalExp : 0));
+  let level = adapter.sourceLevel.min;
+  for (let candidate = adapter.sourceLevel.min + 1; candidate <= adapter.sourceLevel.cap; candidate += 1) {
+    const threshold = calculateWorkbookExpCurvePreview({ curve, level: candidate }, adapter).cumulative;
+    if (threshold > total) break;
+    level = candidate;
+  }
+  const current = calculateWorkbookExpCurvePreview({ curve, level }, adapter);
+  const atSourceCap = level >= adapter.sourceLevel.cap;
+  const nextCumulative = atSourceCap
+    ? current.cumulative
+    : calculateWorkbookExpCurvePreview({ curve, level: level + 1 }, adapter).cumulative;
+  const expIntoLevel = total - current.cumulative;
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    curve,
+    totalExp: total,
+    level,
+    cumulativeAtLevel: current.cumulative,
+    expIntoLevel,
+    expToNext: atSourceCap ? 0 : Math.max(0, nextCumulative - total),
+    atSourceCap,
+    overflowExp: atSourceCap ? expIntoLevel : 0,
+    activation: adapter.activation,
+    runtimeEligible: adapter.runtimeEligible,
+  });
+}
+
+export function resolveWorkbookExpAward({
+  awardId,
+  currentTotalExp = 0,
+  appliedAwardIds = [],
+  ...rewardInput
+} = {}, adapter = WORKBOOK_EXP_ADAPTER) {
+  const normalizedAwardId = typeof awardId === 'string' ? awardId.trim() : '';
+  if (!normalizedAwardId) {
+    return Object.freeze({ ok: false, reason: 'invalid_award_id', applied: false, reward: 0 });
+  }
+  if (!Array.isArray(appliedAwardIds)) {
+    return Object.freeze({ ok: false, reason: 'invalid_state', applied: false, reward: 0, awardId: normalizedAwardId });
+  }
+  const ledger = Object.freeze([...new Set(appliedAwardIds
+    .filter(id => typeof id === 'string' && id.trim())
+    .map(id => id.trim()))]);
+  const total = Math.max(0, Math.floor(Number.isFinite(currentTotalExp) ? currentTotalExp : 0));
+  if (ledger.includes(normalizedAwardId)) {
+    return Object.freeze({
+      ok: false,
+      reason: 'duplicate_award',
+      applied: false,
+      awardId: normalizedAwardId,
+      reward: 0,
+      previousTotalExp: total,
+      newTotalExp: total,
+      appliedAwardIds: ledger,
+    });
+  }
+  const preview = calculateWorkbookBattleExpPreview(rewardInput, adapter);
+  if (!preview.ok) return Object.freeze({ ...preview, applied: false, awardId: normalizedAwardId, reward: 0 });
+  const newTotalExp = total + preview.reward;
+  const progress = resolveWorkbookExpProgress({ curve: rewardInput.curve ?? 'Medium', totalExp: newTotalExp }, adapter);
+  if (!progress.ok) return Object.freeze({ ...progress, applied: false, awardId: normalizedAwardId, reward: 0 });
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    applied: true,
+    awardId: normalizedAwardId,
+    reward: preview.reward,
+    previousTotalExp: total,
+    newTotalExp,
+    appliedAwardIds: Object.freeze([...ledger, normalizedAwardId]),
+    preview,
+    progress,
+    activation: adapter.activation,
+    runtimeEligible: adapter.runtimeEligible,
+  });
 }
 
 // ---------------------------------------------------------------------------
