@@ -1,3 +1,9 @@
+import {
+  INSTANCE_SAVE_VERSION,
+  catalogIdentityDiagnostics,
+  migrateState,
+} from './monster-instance.mjs';
+
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
 export const SAVE_SCHEMA_VERSION = 8;
@@ -7,6 +13,34 @@ export const LEGACY_SAVE_KEYS = Object.freeze([
   'monster-life-rpg-proto-v5',
   'monster-capture-summon-proto-v4',
 ]);
+
+if (INSTANCE_SAVE_VERSION !== SAVE_SCHEMA_VERSION) {
+  throw new Error(`instance/save schema mismatch: ${INSTANCE_SAVE_VERSION}/${SAVE_SCHEMA_VERSION}`);
+}
+
+export const SAVE_MIGRATION_REGISTRY = Object.freeze([
+  Object.freeze({
+    id: 'monster-instance-v8',
+    targetVersion: INSTANCE_SAVE_VERSION,
+    migrate: migrateState,
+  }),
+]);
+
+export function applySaveMigrations(input, { now = Date.now() } = {}) {
+  let state = input && typeof input === 'object' ? input : {};
+  for (const migration of SAVE_MIGRATION_REGISTRY) {
+    state = migration.migrate(state, { now });
+  }
+  return state;
+}
+
+function reportCatalogDiagnostics(state, onDiagnostic) {
+  const diagnostics = catalogIdentityDiagnostics(state);
+  if (typeof onDiagnostic === 'function') {
+    for (const diagnostic of diagnostics) onDiagnostic(diagnostic);
+  }
+  return diagnostics;
+}
 
 function parseEnvelope(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return null;
@@ -31,7 +65,7 @@ function uniqueKnownIds(values, knownIds, excluded = new Set()) {
   return result;
 }
 
-export function normalizeSavedState(input, { ranchCap = 6, now = Date.now() } = {}) {
+export function normalizeSavedState(input, { ranchCap = 6, now = Date.now(), onDiagnostic } = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const collection = [];
   const knownIds = new Set();
@@ -56,7 +90,7 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now() } = 
     ? Math.max(0, Math.min(2, source.selectedSlot))
     : 0;
 
-  return {
+  const canonical = {
     ...source,
     collection,
     party,
@@ -81,6 +115,9 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now() } = 
     },
     saveVersion: SAVE_SCHEMA_VERSION,
   };
+  const migrated = applySaveMigrations(canonical, { now });
+  reportCatalogDiagnostics(migrated, onDiagnostic);
+  return migrated;
 }
 
 export function readStoredSave(storage) {
@@ -97,8 +134,9 @@ export function readStoredSave(storage) {
   return null;
 }
 
-export function writeStoredSave(storage, envelope) {
+export function writeStoredSave(storage, envelope, { onDiagnostic } = {}) {
   if (!envelope?.state || typeof envelope.state !== 'object') throw new TypeError('save envelope state is required');
+  reportCatalogDiagnostics(envelope.state, onDiagnostic);
   const previousRaw = storage.getItem(SAVE_KEY);
   if (parseEnvelope(previousRaw)) storage.setItem(SAVE_BACKUP_KEY, previousRaw);
   const next = {
