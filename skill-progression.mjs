@@ -12,9 +12,12 @@ import { learnsetEntriesForMonster } from './learnset-catalog.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
 import { resolveWorkbookEvolutionStage } from './evolution.mjs';
 
-export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3']);
+export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3', 's4']);
 export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
 export const SKILL_SLOTS = Object.freeze([...SYSTEM_SKILL_SLOTS.slice(0, 1), ...MANUAL_SKILL_SLOTS, ...SYSTEM_SKILL_SLOTS.slice(1)]);
+export const WORKBOOK_DEFAULT_SKILL_SUFFIXES = Object.freeze(['01', '02', '04', '03']);
+
+const EMPTY_SKILL_IDS = Object.freeze([]);
 
 const CONSUMED_SKILL_CASTS = new WeakMap();
 
@@ -55,6 +58,18 @@ export function masteryRawPower(rank) {
 
 export function getSkill(instance, skillId) {
   return (instance?.skills ?? []).find(s => s?.skillId === skillId) ?? null;
+}
+
+// Monster_Table.DefaultSkill1..4 and every Field Build_Preset use this exact
+// order. This is a read-only template: learning/equipping remains explicit and
+// must still satisfy the Learnset rules.
+export function workbookDefaultSkillIds(runtimeSpeciesId) {
+  const mapping = monsterCatalogEntry(runtimeSpeciesId);
+  if (!mapping) return EMPTY_SKILL_IDS;
+  const ids = WORKBOOK_DEFAULT_SKILL_SUFFIXES
+    .map(suffix => `SK_${mapping.workbookTypeCandidate}_${suffix}`);
+  if (ids.some(skillId => !skillCatalogEntry(skillId))) return EMPTY_SKILL_IDS;
+  return Object.freeze(ids);
 }
 
 // Learn a skill into a slot (candidate → owned). No-op if already known.
