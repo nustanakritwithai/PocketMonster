@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { activeJs as js } from './active-assets.mjs';
+const body=(name)=>{const start=js.indexOf(`function ${name}(`);assert.notEqual(start,-1,`${name} exists`);return js.slice(start,js.indexOf('\nfunction ',start+1));};
+const services=body('openRanchBreeding');
+assert.match(services,/assertRanchOperation\(\)/,'Breeding service rechecks NPC gate');
+assert.match(services,/el\('ranchServices'\)\.classList\.add\('hidden'\)/,'Breeding leaves Services surface');
+assert.match(services,/openManager\(\{source:'npc'\}\)/,'Breeding reuses NPC manager');
+assert.match(services,/setManagerTab\('breeding'\)/,'Breeding uses canonical tab route');
+assert.match(js,/data-ranch-service="heal"[\s\S]*healAll\(\)/,'Heal service calls canonical Heal');
+assert.match(js,/data-ranch-service="breeding"[\s\S]*openRanchBreeding\(\)/,'Breeding service is bound');
+console.log('V8.2 Ranch Services Heal/Breeding canonical routing: PASS');
