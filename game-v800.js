@@ -3,6 +3,7 @@ import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mj
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, recordStageClear, stageUnlockReason } from './stage-catalog.mjs';
+import { nearestRoute, routesFrom, warpAvailability } from './warp-routes.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -338,11 +339,19 @@ function makeStageBeacon(x,z,color=0x86efac){
   marker.position.y=.38; g.add(marker);
   g.position.set(x,0,z); g.userData.stageMarker=true; addDeco(g); return g;
 }
+function makeWarpBeacon(route){
+  const color=route.kind==='return'?0x67e8f9:0xfacc15;
+  const g=makeStageBeacon(route.position[0],route.position[1],color);
+  g.userData.warpRouteId=route.id;
+  g.userData.warpPulse=Math.random()*Math.PI*2;
+  return g;
+}
 function clearDecorations(){
   while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
 }
 function populateWorld(zone='hub'){
   clearDecorations();
+  for(const route of routesFrom(zone))makeWarpBeacon(route);
   if(zone==='hub'){
     [[8,7,1.35],[-11,8,1.05],[16,-10,1.5],[-17,-8,1.25],[3,-19,1.7],[-5,17,1.15]].forEach(v=>makeRock(...v));
     [[-7,-12,1,{fruit:0xef4444}],[10,-16,1.15],[14,13,.95,{fruit:0xfacc15}],[-15,14,1.05],[20,3,1],[-21,-2,1.15]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
@@ -2207,6 +2216,7 @@ function ensureStarter(){
 
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
+let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null;
 characterUI=createCharacterUIController({
   getState:()=>state,
   getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
@@ -2372,9 +2382,9 @@ function updateHubCompanion(dt){
 }
 
 function switchZone(zone,silent=false){
-  if(!ZONES[zone])return;
-  if(STAGE_BY_ID[zone]&&!stageUnlockReason(state.stageProgress,zone).ok){msg(`${STAGE_BY_ID[zone].displayName} ยังล็อกอยู่ • เคลียร์ด่านก่อนหน้า`);return;}
-  if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return;}
+  if(!ZONES[zone])return false;
+  if(STAGE_BY_ID[zone]&&!stageUnlockReason(state.stageProgress,zone).ok){msg(`${STAGE_BY_ID[zone].displayName} ยังล็อกอยู่ • เคลียร์ด่านก่อนหน้า`);return false;}
+  if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return false;}
   const safetyBalls=zone!=='hub'&&ensureCaptureBallSafety();
   zoneGeneration++;
   abortCaptureSequence();
@@ -2386,6 +2396,7 @@ function switchZone(zone,silent=false){
   summonCooldownUntil=0;
   clearWilds();
   clearTransientEffects();
+  closeWarpPrompt();
   closeStageSelect();
   closeStageReward();
   el('monsterManager').classList.add('hidden');
@@ -2403,7 +2414,8 @@ function switchZone(zone,silent=false){
   const cfg=ZONES[zone];
   setZoneGround(zone);
   populateWorld(zone);
-  const start=cfg.playerStart||[0,0,5];
+  const start=warpSpawnOverride||cfg.playerStart||[0,0,5];
+  warpSpawnOverride=null;
   player.position.set(...start);
   playerData.hp=Math.max(1,playerData.hp);
   setHubVisibility(zone==='hub');
@@ -2415,6 +2427,7 @@ function switchZone(zone,silent=false){
   renderStarterJourney();
   if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
+  return true;
 }
 
 // ---------- Camera / input ----------
@@ -4206,8 +4219,8 @@ function renderStageSelect(){
     meta.className='stage-card-meta';
     for(const text of [`ธาตุรอง ${definition.secondaryTypes.slice(0,3).join(' / ')}`,definition.id==='grass-meadow'?'Normal • Rare • Elite • Boss':'Elite • Boss']){const chip=document.createElement('span');chip.className='stage-chip';chip.textContent=text;meta.append(chip);}
     body.append(title,desc,meta);
-    const action=document.createElement('button');action.type='button';action.className='stage-enter';action.textContent=status.key==='planned'?'เร็วๆ นี้':status.key==='locked'?'🔒 ล็อก':status.key==='cleared'?'เข้าอีกครั้ง':'เข้าเล่น';action.disabled=!status.enabled;action.setAttribute('aria-label',`${action.textContent} ${definition.displayName}`);
-    if(status.enabled)action.onclick=()=>{playSFX('sfx_ui_click');switchZone(definition.id);};
+    const action=document.createElement('button');action.type='button';action.className='stage-enter';action.textContent=status.key==='planned'?'เร็วๆ นี้':status.key==='locked'?'🔒 ล็อก':status.enabled?'จุดวาปในฉาก':'ดูข้อมูล';action.disabled=!status.enabled;action.setAttribute('aria-label',`${action.textContent} ${definition.displayName}`);
+    if(status.enabled)action.onclick=()=>{playSFX('sfx_ui_click');closeStageSelect();msg(state.currentZone===definition.id?'เดินไปยังจุดวาปที่มีสัญลักษณ์ WARP POINT เพื่อเดินทาง':'ต้องเดินทางผ่านจุดวาปในฉากตามเส้นทาง');};
     const statusText=document.createElement('small');statusText.className=`stage-status ${status.key}`;statusText.textContent=status.label;body.append(statusText);
     card.append(body,action);list.append(card);
   }
@@ -4229,6 +4242,44 @@ function renderStageReward({definition,first,rewards,elapsed}){
   el('stageReward')?.classList.remove('hidden');
 }
 function closeStageReward(){el('stageReward')?.classList.add('hidden');}
+function warpLockText(availability){
+  if(availability.ok)return '';
+  if(availability.reason==='requires-stage-clear'&&availability.requires){
+    return `ต้องเคลียร์ ${STAGE_BY_ID[availability.requires]?.displayName||availability.requires} ก่อน`;
+  }
+  return 'เส้นทางนี้ยังล็อกอยู่';
+}
+function renderWarpPrompt(){
+  const panel=el('warpPrompt');
+  if(!panel)return;
+  if(!nearbyWarp){panel.classList.add('hidden');return;}
+  const availability=warpAvailability(state.stageProgress,nearbyWarp,stageUnlockReason);
+  const title=el('warpPromptTitle'),detail=el('warpPromptDetail'),action=el('warpPromptAction');
+  if(title)title.textContent=`ไป ${nearbyWarp.label}`;
+  if(detail)detail.textContent=availability.ok?'เดินทางไปพื้นที่ถัดไปได้ทันที':warpLockText(availability);
+  if(action){action.disabled=!availability.ok||warpBusy;action.textContent=availability.ok?'เดินทาง':'ยังล็อกอยู่';}
+  panel.classList.remove('hidden');
+}
+function closeWarpPrompt(){nearbyWarp=null;el('warpPrompt')?.classList.add('hidden');}
+function startWarp(route=nearbyWarp){
+  if(warpBusy||!route)return;
+  const availability=warpAvailability(state.stageProgress,route,stageUnlockReason);
+  if(!availability.ok){msg(warpLockText(availability));renderWarpPrompt();return;}
+  if(activeSummon?.target&&!activeSummon.target.dead||pendingSummon){msg('จบการต่อสู้หรือ Recall มอนก่อนเดินทาง');return;}
+  warpBusy=true;closeWarpPrompt();playSFX('sfx_ui_click');
+  warpSpawnOverride=route.spawn;
+  const moved=switchZone(route.to,false);
+  warpSpawnOverride=null;
+  warpBusy=false;warpPromptCooldown=1.2;saveGame(false);
+  if(!moved)renderWarpPrompt();
+}
+function updateWarpPrompt(dt){
+  warpPromptCooldown=Math.max(0,warpPromptCooldown-dt);
+  if(warpBusy||warpPromptCooldown>0){return;}
+  const found=nearestRoute(routesFrom(state.currentZone),player.position,3.2).route;
+  if(found?.id!==nearbyWarp?.id){nearbyWarp=found;renderWarpPrompt();}
+  if(!found&&nearbyWarp){closeWarpPrompt();}
+}
 function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ออกล่า → ทุ่ง • Wild 6';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
@@ -4433,6 +4484,8 @@ el('stageSelectBtn').onclick=()=>{playSFX('sfx_ui_click');openStageSelect();};
 el('stageSelectClose').onclick=()=>{playSFX('sfx_ui_click');closeStageSelect();};
 el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
+el('warpPromptAction').onclick=()=>startWarp();
+el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');closeWarpPrompt();warpPromptCooldown=.35;};
 document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
 addEventListener('pointerdown',e=>{const dd=el('zoneDropdown');if(!dd.classList.contains('hidden')&&!el('zoneTravel').contains(e.target))dd.classList.add('hidden');});
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
@@ -4479,6 +4532,7 @@ function loop(now){
     const dt=Math.min(.033,(now-last)/1000);
     last=now;
     updatePlayer(dt);
+    updateWarpPrompt(dt);
     updateCamera(dt);
     updateWorldLabels(dt);
     updateFloatingTexts(dt);

@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { WARP_ROUTES, nearestRoute, routesFrom, warpAvailability } from '../warp-routes.mjs';
+
+const html=fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8');
+const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
+const progress={unlocked:['grass-meadow','ember-valley'],cleared:['grass-meadow']};
+const unlock=(value,id)=>({ok:value.unlocked.includes(id),reason:value.unlocked.includes(id)?'unlocked':'requires-stage-clear'});
+
+assert.deepEqual(routesFrom('grass-meadow').map(route=>route.to),['hub','ember-valley'],'Grass has return and forward warp points');
+assert.deepEqual(routesFrom('ember-valley').map(route=>route.to),['grass-meadow','misty-lake'],'Ember has return and forward warp points');
+assert.deepEqual(routesFrom('misty-lake').map(route=>route.to),['ember-valley','storm-field'],'Misty has return and forward warp points');
+assert.deepEqual(routesFrom('storm-field').map(route=>route.to),['misty-lake','hub'],'Storm has return and Hub warp points');
+assert.equal(WARP_ROUTES.every(route=>Array.isArray(route.position)&&route.position.length===2&&Array.isArray(route.spawn)),true,'Every warp has scene and spawn coordinates');
+assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='grass-to-ember'),unlock).ok,true,'Unlocked stage can be entered from warp');
+assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='ember-to-misty'),unlock).ok,false,'Locked stage cannot be entered from warp');
+assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='grass-to-hub'),unlock).ok,true,'Hub return is always safe');
+assert.equal(nearestRoute(routesFrom('grass-meadow'),{x:20,z:0},3.2).route.id,'grass-to-ember','Walking into a warp radius selects the route');
+assert.equal(nearestRoute(routesFrom('grass-meadow'),{x:-20,z:0},3.2).route,null,'Outside warp radius does not prompt');
+assert.match(html,/id="warpPrompt"/,'Mobile warp prompt exists');
+assert.match(html,/id="warpPromptAction"/,'Warp confirmation action exists');
+assert.match(js,/updateWarpPrompt\(dt\)/,'Player movement checks in-scene warp proximity');
+assert.match(js,/warpSpawnOverride=route\.spawn/,'Warp selects the destination spawn point');
+assert.match(js,/ต้องเดินทางผ่านจุดวาปในฉากตามเส้นทาง/,'Stage Select no longer directly loads active stages');
+assert.doesNotMatch(html,/data-zone="grass-meadow"/,'Stage zone menu no longer directly warps to Set 1');
+console.log('V8 In-scene Warp Set 1: PASS');
