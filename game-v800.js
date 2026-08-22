@@ -3991,6 +3991,14 @@ document.querySelectorAll('.character-info-tab').forEach(btn=>{
     setFullCharacterInfoTab(btn.dataset.characterTab);
   };
 });
+el('monsterManager')?.addEventListener('pointerup',event=>{
+  const tab=event.target.closest?.('.character-info-tab');
+  if(!tab)return;
+  event.preventDefault();
+  event.stopPropagation();
+  playSFX('sfx_ui_click');
+  setFullCharacterInfoTab(tab.dataset.characterTab);
+},{capture:true,passive:false});
 const enterImmersiveBtn=el('enterImmersiveBtn');
 const retryImmersiveBtn=el('retryImmersiveBtn');
 const fullscreenBtn=el('fullscreenBtn');
