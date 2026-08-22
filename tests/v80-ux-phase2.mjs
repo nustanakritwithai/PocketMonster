@@ -11,7 +11,7 @@ assert.equal(html, versioned, 'index.html and v800.html must stay identical');
 assert.match(html, /data-manager-tab="training">ฝึก/, 'Training tab button missing');
 assert.match(html, /id="trainingPanel"/, 'Training pane missing');
 assert.match(html, /data-manager-tab="collection">มอน/, 'Collection tab should use the short label');
-assert.match(js, /function renderTraining\(\)/, 'renderTraining missing');
+assert.match(js, /function renderTraining\([^)]*\)/, 'renderTraining missing');
 assert.match(js, /trainingSelectedId/, 'training selected monster state missing');
 assert.match(js, /if\(tab==='training'\)renderTraining\(\)/, 'setManagerTab must render the Training tab');
 assert.match(js, /data-train-line/, 'Training tab must bind per-line train buttons');
