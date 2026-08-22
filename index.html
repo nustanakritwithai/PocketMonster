@@ -301,10 +301,6 @@
       if(x){x.textContent='เริ่มเกมไม่สำเร็จ: '+(e.reason?.message||e.reason||'ไม่ทราบสาเหตุ');x.className='startup-status error';}
     });
   </script>
-  <script type="module">
-    import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
-    await requireFirebaseLogin();
-    await import('./game-v800.js?v=810');
-  </script>
+  <script type="module" src="./game-v800.js?v=810"></script>
 </body>
 </html>

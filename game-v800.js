@@ -23,6 +23,7 @@ import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nut
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
+import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { canBreed as canBreedFn, breed as breedFn, createEgg as createEggFn, GENE_RANKS as BREED_GENE_RANKS } from './breeding.mjs';
@@ -81,6 +82,7 @@ async function loadThree(){
 }
 
 let THREE;
+await requireFirebaseLogin();
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
 startupText('กำลังสร้าง Monster Life RPG V8.2.0…');
