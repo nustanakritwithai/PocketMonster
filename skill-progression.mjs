@@ -8,6 +8,8 @@ import { BALANCE_CONFIG, SKILL_MASTERY } from './balance-config.mjs';
 import { clamp } from './balance-formulas.mjs';
 import { evaluateEligibility, MASTERY_RANK_ORDER } from './requirements.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
+import { learnsetEntriesForMonster } from './learnset-catalog.mjs';
+import { monsterCatalogEntry } from './monster-catalog.mjs';
 
 export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3']);
 export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
@@ -117,6 +119,44 @@ export function equipSkill(instance, { skillId, slot } = {}) {
   if (occupant) return equipResult(false, 'duplicate_slot', { slot, occupiedBy: occupant.skillId });
   learned.slot = slot;
   return equipResult(true, null, { skillId, slot, definition });
+}
+
+export function resolveStage1Learnset(instance) {
+  if (!instance || typeof instance !== 'object') {
+    return Object.freeze({ ok: false, reason: 'invalid_state', entries: Object.freeze([]), candidates: Object.freeze([]) });
+  }
+  const mapping = monsterCatalogEntry(instance.speciesId);
+  if (!mapping) {
+    return Object.freeze({ ok: false, reason: 'unknown_id', entries: Object.freeze([]), candidates: Object.freeze([]) });
+  }
+  const level = Number.isFinite(instance.level) ? Math.max(1, Math.floor(instance.level)) : 1;
+  const entries = learnsetEntriesForMonster(mapping.workbookBaseMonsterId)
+    .filter(entry => entry.stage === 1 && entry.requiredStage === 1 && entry.method === 'LevelUp')
+    .map(entry => Object.freeze({
+      entry,
+      skillId: entry.skillId,
+      learnLevel: entry.learnLevel,
+      eligible: level >= entry.learnLevel,
+      learned: Boolean(getSkill(instance, entry.skillId)),
+      reason: level < entry.learnLevel ? 'level_required' : getSkill(instance, entry.skillId) ? 'already_learned' : null,
+    }));
+  const candidates = Object.freeze(entries
+    .filter(result => result.eligible && !result.learned)
+    .map(result => result.skillId));
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    runtimeSpeciesId: instance.speciesId,
+    workbookMonsterId: mapping.workbookBaseMonsterId,
+    level,
+    entries: Object.freeze(entries),
+    candidates,
+    autoGrant: false,
+  });
+}
+
+export function listStage1SkillCandidates(instance) {
+  return resolveStage1Learnset(instance).candidates;
 }
 
 // Add Skill EXP from a use event and recompute mastery rank.
