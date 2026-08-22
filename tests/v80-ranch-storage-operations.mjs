@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { activeJs as js } from './active-assets.mjs';
+const body=(name)=>{const start=js.indexOf(`function ${name}(`);assert.notEqual(start,-1,`${name} exists`);return js.slice(start,js.indexOf('\nfunction ',start+1));};
+const deposit=body('depositMonster'),withdraw=body('withdrawMonster'),toggle=body('toggleRanchActive'),render=body('renderRanchStoragePage');
+assert.match(deposit,/assertRanchOperation\(\)/,'Deposit rechecks NPC gate');
+assert.match(deposit,/state\.party\.filter\(Boolean\)\.length<=1/,'Deposit cannot empty Party');
+assert.match(withdraw,/assertRanchOperation\(\)/,'Withdraw rechecks NPC gate');
+assert.match(withdraw,/const empty=state\.party\.findIndex\(x=>x===null\)/,'Withdraw needs an empty Party slot');
+assert.doesNotMatch(withdraw,/state\.selectedSlot\s*=/,'Withdraw cannot change combat Party selection');
+assert.match(toggle,/state\.ranchActive\.length>=RANCH_ACTIVE_MAX/,'Ranch Active cap is enforced');
+assert.match(render,/depositMonster\(focused\.instanceId\)/,'Storage detail owns Deposit action');
+assert.match(render,/withdrawMonster\(focused\.instanceId\)/,'Storage detail owns Withdraw action');
+assert.match(render,/toggleRanchActive\(focused\.instanceId\)/,'Storage detail owns Ranch Active action');
+console.log('V8.2 Ranch Storage operations invariants: PASS');
