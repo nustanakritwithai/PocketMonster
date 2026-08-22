@@ -47,7 +47,9 @@ function liveProbe(module) {
   });
   const opened = controller.requestGlobalAccess({ source: 'global-button' });
   assert.equal(opened.ok, true);
-  assert.equal(opened.openedManager, false);
+  assert.equal(opened.openedManager, true);
+  assert.equal(opened.panel, 'full');
+  assert.equal(opened.characterTab, 'info');
   assert.equal(opened.switched, false);
   assert.equal(opened.readOnly, true);
   assert.equal(controller.canMutate(), false);
@@ -67,12 +69,16 @@ async function expectKilled(label, mutant) {
 }
 
 await expectKilled(
-  'global-opens-manager',
-  mutate(controllerSource, 'openedManager: false,\n      reason: null,\n      panel: \'quick\',', 'openedManager: true,\n      reason: null,\n      panel: \'quick\',', 'global-opens-manager'),
+  'global-opens-legacy-quick',
+  mutate(controllerSource, "requestOpenFull({\n      source: 'character',\n      monsterId: id ?? null,\n      tab: 'info',\n    })", "(openPanel('quick', { source, monsterId: id ?? null, partySlot: slot }), { ok: true, openedManager: false, panel: 'quick', characterTab: 'collection' })", 'global-opens-legacy-quick'),
+);
+await expectKilled(
+  'global-opens-wrong-default-tab',
+  mutate(controllerSource, "tab: 'info',", "tab: 'skills',", 'global-opens-wrong-default-tab'),
 );
 await expectKilled(
   'global-flags-switch',
-  mutate(controllerSource, 'ok: true,\n      switched: false,\n      openedManager: false,', 'ok: true,\n      switched: true,\n      openedManager: false,', 'global-flags-switch'),
+  mutate(controllerSource, "return {\n      ...opened,\n      switched: false,", "return {\n      ...opened,\n      switched: true,", 'global-flags-switch'),
 );
 await expectKilled(
   'field-unlocks-manager',

@@ -72,9 +72,9 @@ for (const zone of ['hub', 'grassland', 'cave']) {
   const game = makeGame({ zone, selectedSlot: 1 });
   const opened = game.controller.requestGlobalAccess({ source: 'global-button' });
   assert.equal(opened.ok, true, `${zone}: global access must open`);
-  assert.equal(opened.openedManager, false, `${zone}: must not open the full manager`);
-  assert.equal(opened.switched, false, `${zone}: must not switch party`);
-  assert.equal(opened.panel, 'quick', `${zone}: entry uses the quick state`);
+  assert.equal(opened.openedManager, true, `${zone}: HUD entry must open the Full Manager`);
+  assert.equal(opened.panel, 'full', `${zone}: entry bypasses the quick state`);
+  assert.equal(opened.characterTab, 'info', `${zone}: entry opens the Info tab`);
   assert.equal(opened.zone, zone, `${zone}: context zone is preserved`);
   assert.equal(game.state.selectedSlot, 1, `${zone}: selectedSlot stays put`);
   assert.equal(game.state.ui.focusedMonsterId, 'beta', `${zone}: focuses the selected party monster`);

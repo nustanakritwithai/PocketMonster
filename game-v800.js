@@ -3792,7 +3792,7 @@ function openCharacterAccess(source='global-button'){
   });
   if(!result.ok){if(result.reasonText)msg(result.reasonText);renderCharacterAccess();return result;}
   rememberCharacterAccessHistory();
-  renderCharacterAccess();
+  revealMonsterManager('collection');
   renderParty();
   return result;
 }

@@ -150,7 +150,8 @@ assert.equal(stack.state.ui.characterPanel, 'closed');
 
 assert.match(js, /from '\.\/character-ui-controller\.mjs'/, 'live runtime must import the shared controller');
 assert.match(js, /attachCharacterUi\(state\)/, 'session UI is attached to the live state object');
-assert.match(extractFn('saveGame'), /persistableState\(state\)/, 'saves must strip session UI');
+assert.match(js, /function currentSaveEnvelope\(\)\{\s*return \{state:persistableState\(state\),playerHp:playerData\.hp\};/, 'save envelope must strip session UI');
+assert.match(extractFn('saveGame'), /currentSaveEnvelope\(\)/, 'saveGame must write the sanitized envelope');
 assert.equal(extractFn('saveGame').includes('writeStoredSave(localStorage,{state,playerHp'), false, 'raw state with ui must not be written');
 assert.match(extractFn('openManager'), /isNearNpc/, 'full manager stays NPC-gated');
 assert.match(extractFn('openManager'), /requestOpenFull/, 'full manager opens through the controller');
