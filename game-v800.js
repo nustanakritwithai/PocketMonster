@@ -18,7 +18,7 @@ import {
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
-import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
+import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, resolveOfflineTrainingWindow, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
@@ -3269,7 +3269,7 @@ function syncToBodyMind(inst){inst.body=inst.body||{};inst.mind=inst.mind||{};
 function syncFromBodyMind(inst){if(!inst.body||!inst.mind)return;
   inst.hunger=inst.body.hunger;inst.energy=inst.body.energy;inst.fitness=inst.body.fitness;
   inst.mood=inst.mind.mood;inst.bond=inst.mind.bond??inst.bond;inst.body.health=inst.body.health;}
-function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLastAt||now,elapsed=Math.max(0,now-last);if(elapsed<1000)return;state.lifeLastAt=now;const minutes=elapsed/60000;let trained=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;
+function applyLifeSimulation(now=Date.now(),show=false){const window=resolveOfflineTrainingWindow({lastClaimAt:state.lifeLastAt||now,now});if(!window.ok||window.elapsedMs<1000)return window;state.lifeLastAt=window.nextClaimAt;let trained=0;for(const id of state.storage){const inst=getInst(id);if(!inst)continue;
   syncToBodyMind(inst);
   const beforeCond=deriveCondition(inst);
   simulateLife(inst,now);
@@ -3277,13 +3277,13 @@ function applyLifeSimulation(now=Date.now(),show=false){const last=state.lifeLas
   const afterCond=deriveCondition(inst);
   if(['tired','fatigued','bad'].includes(afterCond)&&afterCond!==beforeCond)spawnConditionBadEffect(fxWorldPos(id));
   const focus=inst.trainingFocus||'power';
-  const baseGain=minutes*1.8;
+  const baseGain=window.hours*60*1.8;
   const trainGain=ranchTrainingGain(inst,focus,baseGain);
   const applied=addTrainingExp(inst,focus,trainGain);
   inst.trainingExp=(inst.trainingExp||0)+applied;
   if(applied>0){trained++;refreshStats(inst,false);}
   if(!pendingEvent)triggerRaisingEvent(inst);
-}if(show&&trained>0)msg(`Ranch Training • เติม Training Pool ${trained} ตัว`);}
+}if(show&&trained>0)msg(`Ranch Training • เติม Training Pool ${trained} ตัว`);return {...window,trained};}
 // V7.4: Food definitions mapped to resolveFeed categories
 const FOOD_DEFS=FOOD_CATALOG;
 function feedMonster(id,food){

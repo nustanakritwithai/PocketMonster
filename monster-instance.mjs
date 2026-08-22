@@ -64,9 +64,15 @@ function normalizeAptitude(raw = {}) {
   return apt;
 }
 
-function normalizeTraining(raw = {}) {
+export function normalizeTraining(raw = {}, config = BALANCE_CONFIG) {
   const training = {};
-  for (const line of TRAINING_LINES) training[line] = Math.max(0, num(raw[line], 0));
+  const limits = config.training.allocationLimits;
+  let remaining = limits.totalMax;
+  for (const line of TRAINING_LINES) {
+    const bounded = clamp(num(raw?.[line], 0), 0, limits.perLineMax);
+    training[line] = Math.min(bounded, remaining);
+    remaining -= training[line];
+  }
   return training;
 }
 
@@ -227,16 +233,57 @@ export function trainingUsed(instance, config = BALANCE_CONFIG) {
 }
 
 export function trainingRemaining(instance, config = BALANCE_CONFIG) {
-  return trainingCapacity(instance.level, config) - trainingUsed(instance, config);
+  const capacity = Math.min(trainingCapacity(instance.level, config), config.training.allocationLimits.totalMax);
+  return Math.max(0, capacity - trainingUsed(instance, config));
 }
 
 // Add already-computed training gain to a line, clamped to the shared capacity.
 export function addTrainingExp(instance, line, gain, config = BALANCE_CONFIG) {
   if (!TRAINING_LINES.includes(line)) return 0;
+  if (!instance.training || typeof instance.training !== 'object') instance.training = normalizeTraining({}, config);
   const remaining = Math.max(0, trainingRemaining(instance, config));
-  const applied = Math.min(Math.max(0, num(gain, 0)), remaining);
-  instance.training[line] = num(instance.training[line], 0) + applied;
+  const perLineMax = config.training.allocationLimits.perLineMax;
+  const current = clamp(num(instance.training[line], 0), 0, perLineMax);
+  const lineRemaining = perLineMax - current;
+  const applied = Math.min(Math.max(0, num(gain, 0)), remaining, lineRemaining);
+  instance.training[line] = current + applied;
   return applied;
+}
+
+// Pure timestamp window shared by offline life and Ranch training claims.
+// Missing timestamps default to `now`, preventing free retroactive rewards.
+export function resolveOfflineTrainingWindow({
+  lastClaimAt,
+  now,
+  capHours = LIFE_RATES.offlineCapHours,
+} = {}) {
+  if (!Number.isFinite(now)) {
+    return Object.freeze({ ok: false, reason: 'invalid_timestamp', elapsedMs: 0, hours: 0, capped: false });
+  }
+  const previousClaimAt = num(lastClaimAt, now);
+  if (now <= previousClaimAt) {
+    return Object.freeze({
+      ok: false,
+      reason: 'duplicate_claim',
+      previousClaimAt,
+      nextClaimAt: previousClaimAt,
+      elapsedMs: 0,
+      hours: 0,
+      capped: false,
+    });
+  }
+  const elapsedMs = now - previousClaimAt;
+  const boundedCapHours = Math.max(0, num(capHours, LIFE_RATES.offlineCapHours));
+  const cappedMs = Math.min(elapsedMs, boundedCapHours * 3600 * 1000);
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    previousClaimAt,
+    nextClaimAt: now,
+    elapsedMs,
+    hours: cappedMs / (3600 * 1000),
+    capped: elapsedMs > cappedMs,
+  });
 }
 
 // ---------------------------------------------------------------------------
