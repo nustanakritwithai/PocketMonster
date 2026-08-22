@@ -357,7 +357,7 @@ function populateWorld(zone='hub'){
     for(const [x,z] of [[-5,-5],[2,-8],[8,-3],[-8,4],[5,6],[-2,-14],[10,3],[-12,-2]]) makeGrassTuft(x,z,1+((x+z)&1)*.2);
     makeFlower(-1,-6,0xfacc15); makeFlower(4,-11,0xfb7185); makeFlower(-7,2,0xa78bfa);
   }else if(zone==='grass-meadow'){
-    // Scene-first blockout: landmarks and traversal markers are ready before monsters are added.
+    // Scene-first layout remains the source of truth; normal encounters are layered on top.
     [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.35],[-8,-17,1.15]].forEach(v=>makeRock(...v));
     [[-14,5,1.05,{leaf:0x22c55e}],[14,5,1.1,{leaf:0x16a34a}],[15,-14,1.25,{fruit:0xf97316}],[-15,-14,1.15],[4,15,1.1],[-5,-15,1.2]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
     for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeGrassTuft(x,z,.9+((x+z)&1)*.15);
@@ -2179,7 +2179,9 @@ characterUI=createCharacterUIController({
 let hubCompanion=null;
 const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
-  'grass-meadow':{label:'Grass Meadow • Scene Preview',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],sceneStatus:'blockout'},
+  'grass-meadow':{label:'Grass Meadow • Normal Encounters',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
+    ['mossbun',-11,2,1,{}],['mossbun',11,2,1,{}],['buglet',-11,-8,1,{}],['buglet',11,-8,1,{}],['normalooze',-6,-14,1,{}],['normalooze',6,-14,1,{}],['mossbun',-16,14,2,{}],['buglet',16,14,2,{}]
+  ],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:2},sceneStatus:'normal-encounters'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
