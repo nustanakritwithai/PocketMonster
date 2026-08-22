@@ -31,6 +31,17 @@ export const STAGE_CATALOG=Object.freeze([
 
 export const STAGE_BY_ID=Object.freeze(Object.fromEntries(STAGE_CATALOG.map(definition=>[definition.id,definition])));
 
+export const STAGE_SET_MEMBERS=Object.freeze({
+  'set-1':Object.freeze(['grass-meadow','ember-valley','misty-lake','storm-field']),
+  'set-2':Object.freeze(['frozen-pass','rocky-canyon','sky-ruins','poison-marsh']),
+  'set-3':Object.freeze(['dream-shrine','haunted-woods','shadow-city','steel-factory']),
+});
+
+export function stageIdsForSet(setId){
+  const ids=STAGE_SET_MEMBERS[setId];
+  return ids? [...ids] : [];
+}
+
 export const STAGE_REWARD_PROFILES=Object.freeze({
   'stage-grass-meadow-v1':Object.freeze({captureBalls:5,healthy:2,mineralBite:1}),
   'stage-ember-valley-v1':Object.freeze({captureBalls:5,protein:2,emberFruit:1}),
@@ -40,6 +51,10 @@ export const STAGE_REWARD_PROFILES=Object.freeze({
   'stage-rocky-canyon-v1':Object.freeze({captureBalls:5,mineralBite:2,protein:1}),
   'stage-sky-ruins-v1':Object.freeze({captureBalls:5,trainingChow:2,mineralBite:1}),
   'stage-poison-marsh-v1':Object.freeze({captureBalls:5,healthy:2,mineralBite:1}),
+  'stage-dream-shrine-v1':Object.freeze({captureBalls:5,trainingChow:2,moonFruit:1}),
+  'stage-haunted-woods-v1':Object.freeze({captureBalls:5,healthy:2,shadowBerry:1}),
+  'stage-shadow-city-v1':Object.freeze({captureBalls:5,protein:2,mineralBite:1}),
+  'stage-steel-factory-v1':Object.freeze({captureBalls:5,mineralBite:2,trainingChow:1}),
 });
 
 export function stageRewards(stageId){
@@ -72,7 +87,11 @@ export function stageUnlockReason(progress,stageId){
   const rule=definition.unlockRule||{};
   if(rule.type==='hub')return {ok:true,reason:'hub'};
   if(rule.type==='clearStage')return {ok:current.cleared.includes(rule.stageId),reason:current.cleared.includes(rule.stageId)?'prerequisite-cleared':'requires-stage-clear',requires:rule.stageId};
-  if(rule.type==='clearSet')return {ok:false,reason:'requires-set-clear',requires:rule.setId};
+  if(rule.type==='clearSet'){
+    const members=stageIdsForSet(rule.setId);
+    const ok=members.length>0&&members.every(id=>current.cleared.includes(id));
+    return {ok,reason:ok?'set-cleared':'requires-set-clear',requires:rule.setId};
+  }
   return {ok:false,reason:'locked'};
 }
 
