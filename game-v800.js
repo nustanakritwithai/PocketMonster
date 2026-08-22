@@ -317,6 +317,16 @@ function makeStalagmite(x,z,s=1){
   tip.position.y=1.2*s; g.add(tip);
   g.position.set(x,0,z); addDeco(g); return g;
 }
+function makeIceCrystal(x,z,s=1){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(boxGeometry(.72*s,.12*s,.72*s),mat(0xcbd5e1,.7,.08));
+  base.position.y=.06*s; g.add(base);
+  for(const [dx,dz,height,rot] of [[-.22,-.06,1.15,-.12],[.12,.08,1.5,.08],[.3,-.14,.9,.18]]){
+    const shard=new THREE.Mesh(coneGeometry(.18*s,height*s,5),glowMat(0xe0f2fe,0x7dd3fc,.08,.72,.08));
+    shard.position.set(dx*s,height*.5*s,dz*s); shard.rotation.z=rot; g.add(shard);
+  }
+  g.position.set(x,0,z); addDeco(g); return g;
+}
 function makeFencePost(x,z){
   const post=new THREE.Mesh(boxGeometry(.1,.7,.1),mat(0x8b5e34,.86,.02));
   post.position.set(x,.35,z); addDeco(post); return post;
@@ -377,6 +387,14 @@ function populateWorld(zone='hub'){
       const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xb99a62,transparent:true,opacity:.3}));
       tile.position.set(0,.025,z); addDeco(tile);
     }
+  }else if(zone==='frozen-pass'){
+    [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.25],[-8,-17,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x94a3b8));
+    [[-15,5,1.2],[15,5,1.1],[15,-14,1.35],[-15,-14,1.2],[5,15,1.15],[-5,-15,1.2],[-4,-5,1],[8,-8,1.1]].forEach(([x,z,s])=>makeIceCrystal(x,z,s));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xe0f2fe,transparent:true,opacity:.34}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xbae6fd);
   }else if(zone==='cave'){
     [[-10,6,1.4,0x57534e],[9,-7,1.6,0x44403c],[14,4,1.2,0x78716c],[-15,-5,1.5,0x57534e],[3,-15,1.8,0x3f3f46],[-4,16,1.3,0x52525b]].forEach(v=>makeRock(...v));
     [[-8,-4,1.1],[6,-9,1.3],[-12,9,1.4],[11,8,1.2],[0,-12,1.6],[15,-2,1],[-6,12,1.25]].forEach(v=>makeStalagmite(...v));
@@ -2244,6 +2262,9 @@ const ZONES={
   'storm-field':{label:'Storm Field • Electric + Flying + Steel',stageId:'storm-field',biomeId:'storm-field',bg:0x1e40af,ground:0x1e3a8a,spawn:[
     ['voltkit',-11,2,12,{}],['voltkit',11,2,12,{}],['galebird',-11,-8,12,{}],['galebird',11,-8,12,{}],['ironbug',-7,-14,13,{}],['ironbug',7,-14,13,{}]
   ],eliteSpawn:[['voltkit',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,18,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:{min:12,max:18},sceneStatus:'stage-ready'},
+  'frozen-pass':{label:'Frozen Pass • Ice + Flying + Water',stageId:'frozen-pass',biomeId:'frozen-pass',bg:0xbfe8ff,ground:0xdbeafe,spawn:[
+    ['frostowl',-11,2,16,{}],['frostowl',11,2,16,{}],['aquapuff',-11,-8,16,{}],['aquapuff',11,-8,16,{}],['frostowl',-7,-14,17,{}],['aquapuff',7,-14,17,{}]
+  ],eliteSpawn:[['frostowl',0,-16,19,{elite:true}]],eliteChance:.16,bossSpawn:[['frostowl',0,-18,22,{boss:true}]],progressionBossSpeciesId:'frostowl',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ice'],secondaryTypes:['Flying','Water'],encounterTableId:'encounter-frozen-pass-v1',eliteEncounterTableId:'elite-frozen-pass-v1',bossEncounterTableId:'boss-frozen-pass-v1',balanceProfileId:'stage-frozen-pass-v1',recommendedLevel:{min:16,max:22},sceneStatus:'stage-ready'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2275,6 +2296,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.05;
     sun.intensity=1.45;
     sun.color.setHex(0x9db8ff);
+  }else if(zone==='frozen-pass'){
+    hemi.intensity=1.45;
+    sun.intensity=1.55;
+    sun.color.setHex(0xe0f2fe);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2284,14 +2309,14 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
   scene.background=makeSkyTexture(z.bg);
   scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
-  scene.fog.near=zone==='cave'?15:30;
-  scene.fog.far=zone==='cave'?50:76;
+  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:30;
+  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:76;
   setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){

@@ -41,18 +41,22 @@ assert.doesNotMatch(lighting, /scene\.children\.find/, 'lighting uses the named 
 
 assert.match(ground, /setZoneLighting\(zone\)/, 'ground swap also applies zone lighting');
 assert.match(ground, /scene\.fog\.color\.setHex\(zone==='cave'\?0x1e293b:\(zone==='hub'\?0x65c9f5:z\.bg\)\)/, 'hub fog is table 0x65c9f5, cave 0x1e293b, meadow uses sky');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:30/, 'cave fog starts at 15, outdoors at 30');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:76/, 'cave fog ends at 50, outdoors at 76');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:30/, 'cave and Frozen Pass fog use readable near distances');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:76/, 'cave and Frozen Pass fog use readable far distances');
 assert.match(ground, /makeGroundTexture\(z\.ground,type\)/, 'zone still swaps the tiled ground map');
 assert.match(ground, /makeSkyTexture\(z\.bg\)/, 'zone still swaps the sky gradient');
 
 assert.match(switchZone, /setZoneGround\(zone\)/, 'switchZone still routes atmosphere through setZoneGround');
 
 assert.match(painterSrc, /scatter\(img, 36, 3, 3, \[0, 0, 0\]/, 'cave grid uses extra black speckles');
+assert.match(painterSrc, /scatter\(img, 34, 2, 3, \[125, 211, 252\]/, 'Frozen Pass grid uses blue ice speckles');
 assert.match(painterSrc, /scatter\(img, 30, 2, 4, \[0, 100, 0\]/, 'grass grid keeps green marks');
 
 const cave = paintGroundGrid(0x57606f, 'cave');
 const grassOnCaveFill = paintGroundGrid(0x57606f, 'grass');
 assert.ok(pixelDiffRatio(cave, grassOnCaveFill) > 0.002, 'cave black speckles still differ from grass marks');
+const frozen = paintGroundGrid(0xdbeafe, 'frozen');
+const frozenAsGrass = paintGroundGrid(0xdbeafe, 'grass');
+assert.ok(pixelDiffRatio(frozen, frozenAsGrass) > 0.002, 'Frozen Pass ice speckles differ from grass marks');
 
 console.log('V8.0 blocky atmosphere: PASS');

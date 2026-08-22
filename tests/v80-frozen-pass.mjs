@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { STAGE_BY_ID, createStageProgress, recordStageClear, stageUnlockReason } from '../stage-catalog.mjs';
+import { routesFrom } from '../warp-routes.mjs';
+import { activeJs as js } from './active-assets.mjs';
+
+const stage=STAGE_BY_ID['frozen-pass'];
+assert.ok(stage,'Frozen Pass catalog definition exists');
+assert.equal(stage.unlockRule.stageId,'storm-field','Frozen Pass follows Storm Field');
+assert.equal(stage.primaryTypes[0],'Ice','Frozen Pass is Ice-led');
+assert.equal(stage.capturePolicy,'normal-wild-only','Frozen Pass keeps Boss capture disabled policy');
+assert.equal(routesFrom('storm-field').some(route=>route.to==='frozen-pass'),true,'Storm Field has Frozen Pass warp');
+assert.equal(routesFrom('frozen-pass').some(route=>route.to==='storm-field'),true,'Frozen Pass has return warp');
+const progress=createStageProgress();
+assert.equal(stageUnlockReason(progress,'frozen-pass').ok,false,'Frozen Pass starts locked');
+Object.assign(progress,recordStageClear(progress,'storm-field'));
+assert.equal(stageUnlockReason(progress,'frozen-pass').ok,true,'Storm clear unlocks Frozen Pass');
+const zoneBlock=js.match(/['"]frozen-pass['"]\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
+assert.match(zoneBlock,/stageId:'frozen-pass'/,'Frozen Pass runtime zone is catalog-linked');
+assert.match(zoneBlock,/spawn:\[/,'Frozen Pass has Normal encounter spawn data');
+assert.match(zoneBlock,/eliteSpawn:\[/,'Frozen Pass has Elite encounter data');
+assert.match(zoneBlock,/bossSpawn:\[/,'Frozen Pass has Boss encounter data');
+assert.match(zoneBlock,/progressionBossSpeciesId:/,'Frozen Pass has deterministic Boss progression');
+assert.match(zoneBlock,/sceneStatus:'stage-ready'/,'Frozen Pass is a presentation-only stage baseline');
+assert.match(js,/zone==='frozen-pass'\?'frozen'/,'Frozen Pass uses its own ground presentation');
+assert.doesNotMatch(zoneBlock,/playerData\.hp|status|damage/,'Frozen Pass has no environment damage/status logic');
+console.log('V8 Frozen Pass: PASS');

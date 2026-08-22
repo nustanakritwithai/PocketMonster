@@ -29,8 +29,8 @@ const flower = extractFn('makeFlower');
 
 assert.doesNotMatch(lighting, /scene\.children\.find/, 'mutant 3: do not look up hemi by scanning the scene');
 assert.match(js, /const hemi=new THREE\.HemisphereLight/, 'mutant 4: hemisphere stays a named light');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:30/, 'mutant 5: cave fog near must shorten to 15');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:76/, 'mutant 6: cave fog far must shorten to 50');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:30/, 'mutant 5: cave and Frozen Pass fog near distances stay intentional');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:76/, 'mutant 6: cave and Frozen Pass fog far distances stay intentional');
 assert.match(ground, /zone==='hub'\?0x65c9f5/, 'mutant 7: hub fog must not reuse the sky hex');
 assert.match(lighting, /sun\.color\.setHex\(0xb0c4de\)/, 'mutant 8: cave sun color must cool down');
 assert.match(lighting, /sun\.color\.setHex\(0xfff4e0\)/, 'mutant 9: hub sun color must warm up');
