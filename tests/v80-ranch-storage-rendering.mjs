@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { activeJs as js } from './active-assets.mjs';
+const body=(name)=>{const start=js.indexOf(`function ${name}(`);assert.notEqual(start,-1,`${name} exists`);return js.slice(start,js.indexOf('\nfunction ',start+1));};
+const manager=body('renderManager');
+const storage=body('renderRanchStoragePage');
+assert.match(storage,/state\.storage\.filter\(Boolean\)/,'Storage renderer uses canonical Storage IDs');
+assert.match(storage,/getInst\(id\)/,'Storage renderer resolves canonical instance IDs');
+assert.match(storage,/ranchStorageRoster/,'Storage renderer owns dedicated roster mount');
+assert.match(storage,/Storage ว่าง/,'Storage renderer explains empty Storage');
+assert.doesNotMatch(storage,/state\.party\s*=|state\.storage\s*=|state\.selectedSlot\s*=|activeSummon\s*=/,'read-only selection cannot mutate gameplay/combat state');
+assert.doesNotMatch(manager,/storageBox|managerStorage|state\.storage\.forEach/,'Full Character renderer is Party-only');
+assert.match(js,/showRanchStorageShell\(\)[\s\S]*renderRanchStoragePage\(\)/,'Storage route renders dedicated page');
+console.log('V8.2 Ranch Storage read-only renderer migration: PASS');
