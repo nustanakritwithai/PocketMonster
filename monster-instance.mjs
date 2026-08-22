@@ -7,6 +7,7 @@
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
+import { createRng } from './rng.mjs';
 import {
   levelFromTotalExp,
   trainingCapacity,
@@ -14,9 +15,12 @@ import {
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 9;
+export const INSTANCE_SAVE_VERSION = 10;
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);
 export const CORE_GENES = Object.freeze(['hp', 'atk', 'def', 'spd']);
+export const INSTANCE_POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
+export const INSTANCE_POTENTIAL_LIMITS = Object.freeze({ min: 0, max: 31 });
+export const INSTANCE_BREEDING_VERSION = 'BRD_v1.0';
 export const TRANSIENT_COOLDOWN_FIELDS = Object.freeze([
   'cooldownRemaining',
   'cooldownRemainingMs',
@@ -55,6 +59,46 @@ function clamp100(value, fallback = 0) {
   return clamp(num(value, fallback), 0, 100);
 }
 
+function persistedPotentialValue(raw, stat) {
+  if (stat === 'spAtk') return raw?.spAtk ?? raw?.spatk;
+  if (stat === 'spDef') return raw?.spDef ?? raw?.spdef;
+  return raw?.[stat];
+}
+
+function deterministicPotentialRoll(instanceId, stat) {
+  return createRng(`monster-instance-v10:${String(instanceId)}:${stat}`)
+    .int(INSTANCE_POTENTIAL_LIMITS.min, INSTANCE_POTENTIAL_LIMITS.max);
+}
+
+// Runtime uses camel-case special-stat keys while Workbook persistence uses
+// `spatk`/`spdef`. Missing legacy values receive a stable per-instance roll so
+// repeated migration/reload can never reroll a monster's immutable Potential.
+export function normalizeInstancePotential(raw, instanceId) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const potential = {};
+  for (const stat of INSTANCE_POTENTIAL_STATS) {
+    const value = persistedPotentialValue(source, stat);
+    potential[stat] = Number.isInteger(value)
+      && value >= INSTANCE_POTENTIAL_LIMITS.min
+      && value <= INSTANCE_POTENTIAL_LIMITS.max
+      ? value
+      : deterministicPotentialRoll(instanceId, stat);
+  }
+  return potential;
+}
+
+export function potentialForPersistence(raw, instanceId) {
+  const potential = normalizeInstancePotential(raw, instanceId);
+  return {
+    hp: potential.hp,
+    atk: potential.atk,
+    def: potential.def,
+    spatk: potential.spAtk,
+    spdef: potential.spDef,
+    spd: potential.spd,
+  };
+}
+
 function withoutTransientCooldownFields(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
   const copy = { ...raw };
@@ -87,6 +131,7 @@ export function sanitizeMonsterInstanceForPersistence(raw) {
   instance.skills = Array.isArray(raw.skills)
     ? raw.skills.map(normalizeOwnedSkillRecord)
     : [];
+  instance.potential = potentialForPersistence(raw.potential, raw.instanceId);
   return instance;
 }
 
@@ -127,6 +172,9 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
   const growthExp = Math.max(0, num(source.growthExp, num(source.exp, 0)));
   const legacyTrait = typeof source.genes?.trait === 'string' ? [source.genes.trait] : [];
   const traitIds = Array.isArray(source.traitIds) && source.traitIds.length ? source.traitIds.slice() : legacyTrait;
+  const instanceId = typeof source.instanceId === 'string' && source.instanceId.trim().length > 0
+    ? source.instanceId
+    : `m${now}-${Math.floor(Math.random() * 1e6)}`;
 
   const body = {
     hp: clamp100(source.body?.hp, num(source.hp, 100)),
@@ -145,11 +193,12 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
 
   return {
     ...persistentSource,
-    instanceId: typeof source.instanceId === 'string' ? source.instanceId : `m${now}-${Math.floor(Math.random() * 1e6)}`,
+    instanceId,
     speciesId: source.speciesId ?? null,
     formId: source.formId ?? null,
     level,
     growthExp,
+    potential: normalizeInstancePotential(source.potential, instanceId),
     genes: normalizeGenes(source.genes),
     aptitude: normalizeAptitude(source.aptitude),
     training: normalizeTraining(source.training),
@@ -185,6 +234,15 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
       milestones: Array.isArray(source.career?.milestones) ? source.career.milestones.slice() : [],
     },
     evolutionHistory: Array.isArray(source.evolutionHistory) ? source.evolutionHistory.slice() : [],
+    breedingCooldownUntil: Number.isFinite(source.breedingCooldownUntil)
+      ? source.breedingCooldownUntil
+      : null,
+    breedingVersion: typeof source.breedingVersion === 'string' && source.breedingVersion.length > 0
+      ? source.breedingVersion
+      : INSTANCE_BREEDING_VERSION,
+    inheritedSkillMemoryId: typeof source.inheritedSkillMemoryId === 'string' && source.inheritedSkillMemoryId.length > 0
+      ? source.inheritedSkillMemoryId
+      : null,
     lastSimulationAt: num(source.lastSimulationAt, now),
     saveVersion: INSTANCE_SAVE_VERSION,
   };

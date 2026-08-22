@@ -104,8 +104,9 @@ assert.equal(actor.body.energy, 28, 'event choices can restore body energy');
 for (const needle of [
   'migrateState(',
   'commitEvolution(',
-  'breedFn(',
-  'createEggFn(',
+  'evaluateStandardBreedingCompatibility(',
+  'createStandardBreedingEggTransaction(',
+  'hatchBreedingEggTransaction(',
   'liveCaptureChance(',
   'liveMoveDamage(',
   'computeCoreStats(',

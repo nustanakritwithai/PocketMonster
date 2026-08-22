@@ -16,10 +16,10 @@ must('BALANCE.eliteCaptureModifier','elite capture modifier must be data/config 
 must('resetWild(w)','wild encounter reset must exist');
 must('inst.fainted=true','Fainted state must exist');
 must('faintActive()','Fainted auto recall path must exist');
-must("a.bond<50||b.bond<50",'breeding requires Bond >= 50');
-must('genderCompatible(a,b)','breeding requires gender compatibility');
-must('return spById[holder.speciesId]','offspring defaults to egg-holder species');
-must('BREEDING_RECIPES=[]','hybrids must be explicit recipes');
+must('evaluateStandardBreedingCompatibility(roles.eggHolder,roles.partner','breeding enters the canonical Stage2/Level/Bond/gender/group gate');
+must('createStandardBreedingEggTransaction(state','offspring is snapshotted by the canonical egg transaction');
+must('hatchBreedingEggTransaction(state','hatching enters the idempotent canonical transaction');
+must('workbookBreedingProfile(holder?.speciesId)','live offspring preview uses the canonical egg-holder family');
 must('if(!confirm(`Evolution ย้อนกลับไม่ได้','evolution must confirm irreversibility');
 must("hub:{label:'Ranch Hub'"); must("grassland:{label:'Green Meadow'"); must("cave:{label:'Echo Cave'");
 const expected=['flameling','mossbun','voltkit','aquapuff','frostowl','ironbug','emberdrake','voidhorn'];

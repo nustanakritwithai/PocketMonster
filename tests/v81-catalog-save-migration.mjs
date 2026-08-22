@@ -32,7 +32,10 @@ const legacy = {
 assert.equal(Object.isFrozen(SAVE_MIGRATION_REGISTRY), true, 'migration registry is immutable');
 assert.deepEqual(
   SAVE_MIGRATION_REGISTRY.map(entry => [entry.id, entry.targetVersion]),
-  [['monster-instance-v9-skill-runtime', 9]],
+  [
+    ['monster-instance-v9-skill-runtime', 9],
+    ['breeding-egg-v10', 10],
+  ],
   'the supported instance migration is explicit and versioned',
 );
 

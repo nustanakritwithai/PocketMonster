@@ -23,6 +23,8 @@ function assertRuntimeLearnsetHooks(source){
   const defeatWild=sourceSection(source,'function defeatWild(', '\nfunction monsterDamage(');
   const levelUp=sourceSection(source,'function levelUpInstance(', '\n// V7.2: simulateLife adapter');
   const raisingEvent=sourceSection(source,'function resolveRaisingEvent(', '\nfunction renderRaisingEventBanner(');
+  const prepareHatched=sourceSection(source,'function prepareHatchedChildForLive(', '\nfunction hatchLegacyEgg(');
+  const hatchLegacy=sourceSection(source,'function hatchLegacyEgg(', '\nfunction hatchEgg(');
   const hatchEgg=sourceSection(source,'function hatchEgg(', '\n// ---------- Evolution ----------');
   const migration=sourceSection(source,'function migrateLoadedState(', '\nlet remoteSaveReady=');
   const monsterSkills=sourceSection(source,'function getMonsterSkills(', '\nfunction randomGenes(');
@@ -34,7 +36,9 @@ function assertRuntimeLearnsetHooks(source){
   assert.match(defeatWild,/addGrowthExp\(pm,share\);synchronizeStage1Learnset\(pm\);/,'party-share growth synchronizes skills');
   assert.match(levelUp,/addGrowthExp\(inst,need\);\s*synchronizeStage1Learnset\(inst\);/,'manual level gain synchronizes skills');
   assert.match(raisingEvent,/applyChoice\([\s\S]*?if\(result\.ok\)\{synchronizeStage1Learnset\(inst\);/,'raising-event growth synchronizes skills');
-  assert.match(hatchEgg,/const child=[\s\S]*?synchronizeStage1Learnset\(child\);\s*refreshStats\(child,true\);/,'saved and legacy eggs synchronize on hatch');
+  assert.match(prepareHatched,/synchronizeStage1Learnset\(child\);\s*refreshStats\(child,true\);/,'the shared hatch hydrator synchronizes Stage1 skills');
+  assert.match(hatchLegacy,/prepareHatchedChildForLive\(ensureInstanceShape\(/,'legacy saved eggs enter the shared hatch hydrator');
+  assert.match(hatchEgg,/prepareHatchedChildForLive\(result\.child\)/,'canonical eggs enter the shared hatch hydrator');
   assert.match(migration,/state\.collection\.forEach\(synchronizeStage1Learnset\);/,'loaded saves synchronize eligible skills once');
   assert.match(monsterSkills,/if\(cand\?\.replaces&&rec\.slot===cand\.slot\)/,'unequipped legacy candidates cannot alter the live field moves');
   assert.doesNotMatch(useSkill,/learnSkill\(a\.inst/,'live casting never lazy-learns or creates a duplicate manual slot');

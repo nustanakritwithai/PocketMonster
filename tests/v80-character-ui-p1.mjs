@@ -54,7 +54,7 @@ function makeGame({ party = ['alpha', 'beta', null], selectedSlot = 1, zone = 'h
 }
 
 assert.equal(PARTY_SLOT_COUNT, 3, 'party stays 3 slots');
-assert.equal(SAVE_SCHEMA_VERSION, 9, 'Character UI uses the current skill-runtime save schema');
+assert.equal(SAVE_SCHEMA_VERSION, 10, 'Character UI uses the current breeding-egg save schema');
 
 const uiKeys = Object.keys(createCharacterUiState());
 assert.deepEqual(uiKeys.sort(), [
@@ -152,7 +152,7 @@ assert.equal(stack.state.ui.characterPanel, 'closed');
 
 assert.match(js, /from '\.\/character-ui-controller\.mjs'/, 'live runtime must import the shared controller');
 assert.match(js, /attachCharacterUi\(state\)/, 'session UI is attached to the live state object');
-assert.match(js, /function currentSaveEnvelope\(\)\{\s*return \{state:persistableState\(state\),playerHp:playerData\.hp\};/, 'save envelope must strip session UI');
+assert.match(js, /function currentSaveEnvelope\(\)\{\s*return \{state:sanitizeStateForPersistence\(persistableState\(state\)\),playerHp:playerData\.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION\};/, 'save envelope must strip session UI and use the canonical local\/Firebase persistence adapter');
 assert.match(extractFn('saveGame'), /currentSaveEnvelope\(\)/, 'saveGame must write the sanitized envelope');
 assert.equal(extractFn('saveGame').includes('writeStoredSave(localStorage,{state,playerHp'), false, 'raw state with ui must not be written');
 assert.match(extractFn('openManager'), /isNearNpc/, 'full manager stays NPC-gated');
