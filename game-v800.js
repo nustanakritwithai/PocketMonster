@@ -327,6 +327,16 @@ function makeFlower(x,z,color=0xf472b6){
   bloom.position.y=.24; g.add(bloom);
   g.position.set(x,0,z); g.rotation.y=(x*2.1+z)*.31; addDeco(g); return g;
 }
+function makeStageBeacon(x,z,color=0x86efac){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(boxGeometry(.7,.035,.7),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.22}));
+  base.position.y=.03; g.add(base);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.34,.025,6,20),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9}));
+  ring.rotation.x=Math.PI/2; ring.position.y=.07; g.add(ring);
+  const marker=new THREE.Mesh(octahedronGeometry(.11),glowMat(color,color,.18,.7,.08));
+  marker.position.y=.38; g.add(marker);
+  g.position.set(x,0,z); g.userData.stageMarker=true; addDeco(g); return g;
+}
 function clearDecorations(){
   while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
 }
@@ -346,6 +356,17 @@ function populateWorld(zone='hub'){
     [[-9,-11,1.1,{leaf:0x22c55e}],[11,-15,1.25,{leaf:0x16a34a,fruit:0xf97316}],[15,11,1,{leaf:0x15803d}],[-13,13,1.15],[19,2,1.05],[-20,-3,1.2,{fruit:0xef4444}],[3,-18,1.3]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
     for(const [x,z] of [[-5,-5],[2,-8],[8,-3],[-8,4],[5,6],[-2,-14],[10,3],[-12,-2]]) makeGrassTuft(x,z,1+((x+z)&1)*.2);
     makeFlower(-1,-6,0xfacc15); makeFlower(4,-11,0xfb7185); makeFlower(-7,2,0xa78bfa);
+  }else if(zone==='grass-meadow'){
+    // Scene-first blockout: landmarks and traversal markers are ready before monsters are added.
+    [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.35],[-8,-17,1.15]].forEach(v=>makeRock(...v));
+    [[-14,5,1.05,{leaf:0x22c55e}],[14,5,1.1,{leaf:0x16a34a}],[15,-14,1.25,{fruit:0xf97316}],[-15,-14,1.15],[4,15,1.1],[-5,-15,1.2]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt||{}));
+    for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeGrassTuft(x,z,.9+((x+z)&1)*.15);
+    [[-8,12,0xfacc15],[0,12,0xfb7185],[8,12,0xa78bfa],[-8,-10,0xfde047],[8,-10,0x67e8f9]].forEach(v=>makeFlower(...v));
+    [[-11,2],[0,2],[11,2],[-11,-8],[0,-8],[11,-8]].forEach(([x,z])=>makeStageBeacon(x,z,0x86efac));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xb99a62,transparent:true,opacity:.3}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
   }else if(zone==='cave'){
     [[-10,6,1.4,0x57534e],[9,-7,1.6,0x44403c],[14,4,1.2,0x78716c],[-15,-5,1.5,0x57534e],[3,-15,1.8,0x3f3f46],[-4,16,1.3,0x52525b]].forEach(v=>makeRock(...v));
     [[-8,-4,1.1],[6,-9,1.3],[-12,9,1.4],[11,8,1.2],[0,-12,1.6],[15,-2,1],[-6,12,1.25]].forEach(v=>makeStalagmite(...v));
@@ -2157,7 +2178,8 @@ characterUI=createCharacterUIController({
 });
 let hubCompanion=null;
 const ZONES={
-  hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[]},
+  hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
+  'grass-meadow':{label:'Grass Meadow • Scene Preview',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],sceneStatus:'blockout'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2173,7 +2195,7 @@ function setZoneLighting(zone){
     hemi.intensity=0.6;
     sun.intensity=0.8;
     sun.color.setHex(0xb0c4de);
-  }else if(zone==='grassland'){
+  }else if(zone==='grassland'||zone==='grass-meadow'){
     hemi.intensity=1.55;
     sun.intensity=2.15;
     sun.color.setHex(0xffffff);
@@ -2301,7 +2323,8 @@ function switchZone(zone,silent=false){
   const cfg=ZONES[zone];
   setZoneGround(zone);
   populateWorld(zone);
-  player.position.set(0,0,5);
+  const start=cfg.playerStart||[0,0,5];
+  player.position.set(...start);
   playerData.hp=Math.max(1,playerData.hp);
   setHubVisibility(zone==='hub');
   spawnZone(zone);
@@ -2309,7 +2332,7 @@ function switchZone(zone,silent=false){
   syncRanchVisuals();
   syncHubCompanion();
   renderZoneUI();
-  if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:`${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
+  if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
 }
 
@@ -4255,7 +4278,7 @@ function ensureWildPopulation(dt){
 }
 
 // ---------- Frame ----------
-function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,-32,32);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,32);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
+function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);

@@ -21,7 +21,7 @@
 .action.capture.aiming{outline:3px solid #93c5fd;box-shadow:0 0 0 7px #3b82f633,0 5px 20px #0005;transform:scale(1.05)}
 
 /* V6.1 visibility / companion UX */
-.active-pill{border-color:#fbbf2455}.active-pill b{color:#fde68a}.zone-travel button[data-zone="grassland"],.zone-travel button[data-zone="cave"]{border-color:#60a5fa44}.zone-travel button[data-zone="grassland"].active,.zone-travel button[data-zone="cave"].active{background:#1d4ed8;border-color:#93c5fd}.hub-companion-note{color:#fde68a}
+.active-pill{border-color:#fbbf2455}.active-pill b{color:#fde68a}.zone-travel button[data-zone="grass-meadow"],.zone-travel button[data-zone="grassland"],.zone-travel button[data-zone="cave"]{border-color:#60a5fa44}.zone-travel button[data-zone="grass-meadow"].active,.zone-travel button[data-zone="grassland"].active,.zone-travel button[data-zone="cave"].active{background:#1d4ed8;border-color:#93c5fd}.hub-companion-note{color:#fde68a}
 @media(max-width:700px){.active-pill{display:flex}.topbar{right:64px}.zone-travel button{font-size:9px;padding:6px 8px}}
 
 
