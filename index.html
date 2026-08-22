@@ -166,6 +166,16 @@
       </div>
     </section>
 
+    <section id="breedingPanel" class="breeding-caretaker-panel hidden" role="dialog" aria-label="ศูนย์เพาะพันธุ์">
+      <div class="breeding-caretaker-card">
+        <header class="breeding-caretaker-head"><div><span class="breeding-kicker">BREEDING CENTER</span><h2>ผู้ดูแลเพาะพันธุ์</h2><p>จับคู่มอนสเตอร์ที่เข้ากันได้และดู Gene ที่อาจส่งต่อ</p></div><button id="breedingClose" aria-label="ปิดศูนย์เพาะพันธุ์">✕</button></header>
+        <div class="breeding-caretaker-dialog">เลือก Parent A และ Parent B จาก Storage แล้วตรวจ Compatibility ก่อนเริ่มสร้างไข่</div>
+        <div class="breeding-preview-grid"><div><span>Parent A</span><strong>มอนสเตอร์ตัวที่หนึ่ง</strong></div><div class="breeding-heart">♥</div><div><span>Parent B</span><strong>มอนสเตอร์ตัวที่สอง</strong></div></div>
+        <div class="breeding-safety-list"><div>✓ ตรวจเพศและ Breeding Group</div><div>✓ ตรวจ Bond, อายุ และญาติใกล้ชิด</div><div>✓ บันทึก Parent ID และ Gene ก่อนสร้างไข่</div></div>
+        <button id="breedingOpenManager" class="breeding-open-btn">เปิดศูนย์ผสมพันธุ์</button>
+      </div>
+    </section>
+
     <section id="ranchServices" class="ranch-services hidden" aria-label="บริการผู้ดูแลฟาร์ม">
       <div class="ranch-services-card"><header><h2>ผู้ดูแลฟาร์ม</h2><button type="button" data-ranch-close aria-label="กลับ">✕</button></header><p>จัดการคลังและบริการฟาร์ม</p><button type="button" data-ranch-service="storage">คลังมอนสเตอร์</button><button type="button" data-ranch-service="breeding">ผสมพันธุ์</button><button type="button" data-ranch-service="heal">รักษาฟรี</button></div>
     </section>
