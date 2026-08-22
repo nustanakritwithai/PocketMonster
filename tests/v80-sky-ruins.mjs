@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { STAGE_BY_ID, createStageProgress, recordStageClear, stageUnlockReason } from '../stage-catalog.mjs';
+import { routesFrom } from '../warp-routes.mjs';
+import { activeJs as js } from './active-assets.mjs';
+
+const stage=STAGE_BY_ID['sky-ruins'];
+assert.ok(stage,'Sky Ruins catalog definition exists');
+assert.equal(stage.unlockRule.stageId,'rocky-canyon','Sky Ruins follows Rocky Canyon');
+assert.deepEqual(stage.primaryTypes,['Flying'],'Sky Ruins is Flying-led');
+assert.equal(stage.capturePolicy,'normal-wild-only','Sky Ruins keeps Boss capture disabled policy');
+assert.equal(routesFrom('rocky-canyon').some(route=>route.to==='sky-ruins'),true,'Rocky Canyon has Sky Ruins warp');
+assert.equal(routesFrom('sky-ruins').some(route=>route.to==='rocky-canyon'),true,'Sky Ruins has return warp');
+const progress=createStageProgress();
+Object.assign(progress,recordStageClear(progress,'storm-field'),recordStageClear(progress,'frozen-pass'),recordStageClear(progress,'rocky-canyon'));
+assert.equal(stageUnlockReason(progress,'sky-ruins').ok,true,'Rocky clear unlocks Sky Ruins');
+const zoneBlock=js.match(/['"]sky-ruins['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]rocky-canyon['"]\s*:)/)?.[0]||'';
+assert.match(zoneBlock,/stageId:'sky-ruins'/,'Sky Ruins runtime zone is catalog-linked');
+assert.match(zoneBlock,/spawn:\[/,'Sky Ruins has Normal encounter spawn data');
+assert.match(zoneBlock,/eliteSpawn:\[/,'Sky Ruins has Elite encounter data');
+assert.match(zoneBlock,/bossSpawn:\[/,'Sky Ruins has Boss encounter data');
+assert.match(zoneBlock,/progressionBossSpeciesId:/,'Sky Ruins has deterministic Boss progression');
+assert.match(zoneBlock,/sceneStatus:'stage-ready'/,'Sky Ruins is presentation-only');
+assert.match(js,/zone==='sky-ruins'\?'ruins'/,'Sky Ruins uses its own ground presentation');
+assert.doesNotMatch(zoneBlock,/playerData\.hp|status|damage|teleport|fly|jump/,'Sky Ruins has no flight/terrain damage logic');
+console.log('V8 Sky Ruins: PASS');

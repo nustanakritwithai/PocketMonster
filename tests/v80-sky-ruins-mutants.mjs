@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { STAGE_BY_ID } from '../stage-catalog.mjs';
+
+const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
+const block=()=>js.match(/['"]sky-ruins['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]rocky-canyon['"]\s*:)/)?.[0]||'';
+const expectGuard=(label,pattern,replace)=>{
+  const mutated=block().replace(pattern,replace);
+  assert.notEqual(mutated,block(),`${label}: mutation applied`);
+  assert.doesNotMatch(mutated,pattern,label);
+};
+
+assert.match(block(),/stageId:'sky-ruins'/,'Sky Ruins stays catalog-linked');
+assert.match(block(),/spawn:\[/,'Normal encounters stay present');
+assert.match(block(),/eliteSpawn:\[/,'Elite encounters stay present');
+assert.match(block(),/bossSpawn:\[/,'Boss encounter stays present');
+assert.match(block(),/progressionBossSpeciesId:/,'Boss progression stays deterministic');
+assert.equal(STAGE_BY_ID['sky-ruins'].capturePolicy,'normal-wild-only','Boss capture policy stays disabled');
+assert.doesNotMatch(block(),/playerData\.hp|status|damage|teleport|fly|jump/,'scene remains presentation-only');
+
+expectGuard('mutation 1: missing Normal spawn is rejected',/spawn:\[/,'normalSpawnRemoved:[]');
+expectGuard('mutation 2: missing Elite spawn is rejected',/eliteSpawn:\[/,'eliteSpawnRemoved:[]');
+expectGuard('mutation 3: missing Boss spawn is rejected',/bossSpawn:\[/,'bossSpawnRemoved:[]');
+expectGuard('mutation 4: missing progression Boss is rejected',/progressionBossSpeciesId:/,'progressionBossRemoved:');
+const unsafe=`${block()}\nplayerData.hp-=1`;
+assert.throws(()=>assert.doesNotMatch(unsafe,/playerData\.hp|status|damage|teleport|fly|jump/),'mutation 5: combat/flight logic is rejected');
+console.log('V8 Sky Ruins mutation guards: PASS (5/5 killed)');
