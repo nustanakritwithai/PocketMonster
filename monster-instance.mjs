@@ -6,6 +6,7 @@
 
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
+import { skillCatalogEntry } from './skill-catalog.mjs';
 import {
   levelFromTotalExp,
   trainingCapacity,
@@ -13,9 +14,14 @@ import {
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 8;
+export const INSTANCE_SAVE_VERSION = 9;
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);
 export const CORE_GENES = Object.freeze(['hp', 'atk', 'def', 'spd']);
+export const TRANSIENT_COOLDOWN_FIELDS = Object.freeze([
+  'cooldownRemaining',
+  'cooldownRemainingMs',
+  'skillCds',
+]);
 
 // Body/Mind passive drift per hour while the game is closed (R11). No death.
 export const LIFE_RATES = Object.freeze({
@@ -49,6 +55,41 @@ function clamp100(value, fallback = 0) {
   return clamp(num(value, fallback), 0, 100);
 }
 
+function withoutTransientCooldownFields(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const copy = { ...raw };
+  for (const field of TRANSIENT_COOLDOWN_FIELDS) delete copy[field];
+  return copy;
+}
+
+export function normalizeOwnedSkillRecord(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const record = withoutTransientCooldownFields(raw);
+  const definition = skillCatalogEntry(record.skillId);
+  if (definition) {
+    const sourceUses = record.currentUses;
+    record.currentUses = sourceUses == null
+      ? definition.maxUses
+      : Number.isFinite(sourceUses)
+        ? clamp(Math.floor(sourceUses), 0, definition.maxUses)
+        : 0;
+  } else if ('currentUses' in record) {
+    record.currentUses = Number.isFinite(record.currentUses)
+      ? Math.max(0, Math.floor(record.currentUses))
+      : 0;
+  }
+  return record;
+}
+
+export function sanitizeMonsterInstanceForPersistence(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const instance = withoutTransientCooldownFields(raw);
+  instance.skills = Array.isArray(raw.skills)
+    ? raw.skills.map(normalizeOwnedSkillRecord)
+    : [];
+  return instance;
+}
+
 function normalizeGenes(raw = {}) {
   const genes = {};
   for (const stat of CORE_GENES) {
@@ -79,6 +120,7 @@ export function normalizeTraining(raw = {}, config = BALANCE_CONFIG) {
 // Build a fully-formed instance from partial data, filling every R18 field.
 export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
+  const persistentSource = withoutTransientCooldownFields(source);
   const level = clamp(Math.floor(num(source.level, 1)), BALANCE_CONFIG.level.min, BALANCE_CONFIG.level.cap);
 
   // Legacy shape used `exp`; the trait lived inside `genes.trait`.
@@ -102,7 +144,7 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
   };
 
   return {
-    ...source,
+    ...persistentSource,
     instanceId: typeof source.instanceId === 'string' ? source.instanceId : `m${now}-${Math.floor(Math.random() * 1e6)}`,
     speciesId: source.speciesId ?? null,
     formId: source.formId ?? null,
@@ -119,10 +161,9 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
     traitIds,
     body,
     mind,
-    // Skill runtime fields (uses/cooldowns) belong to this monster instance.
-    // Clone records so normalizing the same raw object cannot share mutations.
+    // Uses persist per monster; encounter cooldowns are stripped by schema.
     skills: Array.isArray(source.skills)
-      ? source.skills.map(skill => skill && typeof skill === 'object' ? { ...skill } : skill)
+      ? source.skills.map(normalizeOwnedSkillRecord)
       : [],
     equipment: {
       gear: source.equipment?.gear ?? null,
@@ -196,11 +237,12 @@ export function catalogIdentityDiagnostics(state = {}) {
 // preserving all other state (party/storage/inventory/etc.). No data loss (R21 Save).
 export function migrateState(state = {}, { now = Date.now() } = {}) {
   const source = state && typeof state === 'object' ? state : {};
+  const persistentSource = withoutTransientCooldownFields(source);
   const collection = Array.isArray(source.collection)
     ? source.collection.map(monster => normalizeInstance(monster, { now }))
     : [];
   return {
-    ...source,
+    ...persistentSource,
     collection,
     saveVersion: INSTANCE_SAVE_VERSION,
   };

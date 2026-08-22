@@ -12,6 +12,7 @@ import {
   captureChance,
 } from '../balance-formulas.mjs';
 import {
+  INSTANCE_SAVE_VERSION,
   normalizeInstance,
   migrateState,
   addGrowthExp,
@@ -155,7 +156,7 @@ assert.ok(gate.withinTolerance, 'balance exit gate: same-level builds share a CR
 const state = { collection: [mon, partner, child], party: ['hero', null, null], storage: ['partner'], inventory: { captureBalls: 5 }, saveVersion: 7 };
 const migrated = migrateState(state);
 const reMigrated = migrateState(migrated);
-assert.equal(migrated.saveVersion, 8, 'state migrates to save version 8');
+assert.equal(migrated.saveVersion, INSTANCE_SAVE_VERSION, 'state migrates to the current save version');
 assert.equal(migrated.collection.length, 3, 'no monster lost in migration');
 assert.equal(new Set(migrated.collection.map(m => m.instanceId)).size, 3, 'no duplicate instances after migration');
 assert.deepEqual(reMigrated.collection.map(m => m.instanceId), migrated.collection.map(m => m.instanceId), 'migration is idempotent');

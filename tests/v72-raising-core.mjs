@@ -32,7 +32,7 @@ const legacy = {
   parentBId: 'mB',
 };
 const inst = normalizeInstance(legacy, { now: 1000 });
-assert.equal(inst.saveVersion, INSTANCE_SAVE_VERSION, 'instance is stamped with the V8 save version');
+assert.equal(inst.saveVersion, INSTANCE_SAVE_VERSION, 'instance is stamped with the current save version');
 assert.equal(inst.growthExp, 300, 'legacy exp migrates into growthExp');
 assert.deepEqual(inst.genes, { hp: 'B', atk: 'A', def: 'C', spd: 'B' }, 'genes normalize (case-insensitive, trait stripped out)');
 assert.deepEqual(inst.traitIds, ['Brave'], 'legacy genes.trait migrates into traitIds');
@@ -46,7 +46,7 @@ assert.equal(inst.trainingBonus.atk, 4, 'unknown legacy fields are preserved, no
 
 // Migrating a whole save keeps other state intact.
 const migrated = migrateState({ collection: [legacy], party: ['m1', null, null], inventory: { captureBalls: 12 }, saveVersion: 7 }, { now: 1000 });
-assert.equal(migrated.saveVersion, INSTANCE_SAVE_VERSION, 'state save version bumped to 8');
+assert.equal(migrated.saveVersion, INSTANCE_SAVE_VERSION, 'state save version is migrated to current');
 assert.equal(migrated.collection.length, 1, 'collection preserved');
 assert.deepEqual(migrated.party, ['m1', null, null], 'party preserved');
 assert.equal(migrated.inventory.captureBalls, 12, 'inventory preserved');
