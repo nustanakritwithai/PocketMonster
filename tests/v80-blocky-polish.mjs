@@ -62,7 +62,7 @@ assert.ok(coarse < fine - 2, 'stronger 64px lines stay darker than the fine grid
 assert.equal(pixelDiffRatio(hubGround, paintGroundGrid(0x62c96b, 'grass')), 0, 'stronger grid paint stays deterministic');
 
 assert.match(js, /setZoneLighting\(zone\)/, 'P5 lighting still runs');
-assert.match(extractFn('setZoneGround'), /scene\.fog\.near=zone==='cave'\?15:30/, 'P5 cave fog still shortens');
+assert.match(extractFn('setZoneGround'), /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:30/, 'P5 cave and Frozen Pass fog remain readable');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a sphere');
 
 console.log('V8.0 blocky polish: PASS');
