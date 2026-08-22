@@ -164,6 +164,24 @@ export function instanceSpeciesIdentity(instance) {
   });
 }
 
+export function catalogIdentityDiagnostics(state = {}) {
+  const collection = Array.isArray(state?.collection) ? state.collection : [];
+  const diagnostics = [];
+  for (let index = 0; index < collection.length; index += 1) {
+    const instance = collection[index];
+    const identity = instanceSpeciesIdentity(instance);
+    if (identity.ok) continue;
+    diagnostics.push(Object.freeze({
+      code: 'migration_invalid_reference',
+      path: `collection[${index}].speciesId`,
+      instanceId: typeof instance?.instanceId === 'string' ? instance.instanceId : null,
+      runtimeSpeciesId: identity.runtimeSpeciesId,
+      reason: identity.reason,
+    }));
+  }
+  return Object.freeze(diagnostics);
+}
+
 // Migrate a whole save state's monster collection to the V8 instance schema,
 // preserving all other state (party/storage/inventory/etc.). No data loss (R21 Save).
 export function migrateState(state = {}, { now = Date.now() } = {}) {
