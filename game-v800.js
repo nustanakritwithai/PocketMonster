@@ -4047,7 +4047,34 @@ function bindCharacterAccessControl(node,handler){
   node.addEventListener('pointerdown',run,{passive:false});
   node.addEventListener('click',run);
 }
+function bindMobileNpcSheet(panel,close){
+  const handle=panel?.querySelector('[data-npc-sheet-handle]');
+  if(!handle)return;
+  let startY=0,dragging=false;
+  handle.addEventListener('pointerdown',event=>{
+    startY=event.clientY; dragging=true; handle.setPointerCapture?.(event.pointerId);
+    panel.querySelector(':scope > *')?.style.setProperty('transition','none');
+  });
+  handle.addEventListener('pointermove',event=>{
+    if(!dragging)return;
+    const delta=Math.max(0,event.clientY-startY);
+    panel.querySelector(':scope > *')?.style.setProperty('transform',`translateY(${delta}px)`);
+  });
+  const end=event=>{
+    if(!dragging)return;
+    dragging=false;
+    const card=panel.querySelector(':scope > *');
+    const delta=Math.max(0,event.clientY-startY);
+    if(delta>72){card?.style.removeProperty('transform');close();return;}
+    if(card){card.style.removeProperty('transform');card.style.removeProperty('transition');}
+  };
+  handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end);
+}
 el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else if(isNearTrainer())openTrainer();else if(isNearEvolution())openEvolutionGuide();else if(isNearBreeding())openBreedingCaretaker();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('trainerClose').onclick=()=>{playSFX('sfx_ui_click');closeTrainer();};el('evolutionClose').onclick=()=>{playSFX('sfx_ui_click');closeEvolutionGuide();};el('breedingClose').onclick=()=>{playSFX('sfx_ui_click');closeBreedingCaretaker();};el('breedingOpenManager').onclick=()=>{playSFX('sfx_ui_click');closeBreedingCaretaker();openManager({source:'npc'});setManagerTab('breeding');};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('trainerPanel').addEventListener('pointerdown',e=>{if(e.target===el('trainerPanel'))closeTrainer();});el('evolutionPanel').addEventListener('pointerdown',e=>{if(e.target===el('evolutionPanel'))closeEvolutionGuide();});el('breedingPanel').addEventListener('pointerdown',e=>{if(e.target===el('breedingPanel'))closeBreedingCaretaker();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+bindMobileNpcSheet(el('merchantShop'),closeMerchant);
+bindMobileNpcSheet(el('trainerPanel'),closeTrainer);
+bindMobileNpcSheet(el('evolutionPanel'),closeEvolutionGuide);
+bindMobileNpcSheet(el('breedingPanel'),closeBreedingCaretaker);
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
