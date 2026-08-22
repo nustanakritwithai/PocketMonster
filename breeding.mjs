@@ -6,10 +6,23 @@
 import { createRng } from './rng.mjs';
 import { clamp } from './balance-formulas.mjs';
 import { normalizeInstance, CORE_GENES } from './monster-instance.mjs';
+import { resolveWorkbookEvolutionStage } from './evolution.mjs';
 
 export const GENE_RANKS = Object.freeze(['D', 'C', 'B', 'A', 'S']);
-export const BREEDING_ADULT_STAGES = Object.freeze(['Adult', 'Mature']);
+export const BREEDING_REQUIRED_STAGE = 2;
+export const BREEDING_MIN_LEVEL = 20;
 export const BREEDING_MIN_BOND = 50;
+export const STANDARD_BREEDING_ROLES = Object.freeze({ eggHolder: 'Female', partner: 'Male' });
+export const BREEDING_GROUPS = Object.freeze([
+  'Field',
+  'Water1',
+  'Mineral',
+  'Flying',
+  'Bug',
+  'Dragon',
+  'Humanlike',
+  'Amorphous',
+]);
 export const POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
 export const POTENTIAL_LIMITS = Object.freeze({ min: 0, max: 31 });
 
@@ -42,7 +55,11 @@ export function isCloseRelative(a, b) {
 }
 
 export function canBreed(a, b) {
-  if (!a || !b) return { ok: false, reason: 'invalid_state' };
+  if (!a || !b
+    || typeof a.instanceId !== 'string' || a.instanceId.trim().length === 0
+    || typeof b.instanceId !== 'string' || b.instanceId.trim().length === 0) {
+    return { ok: false, reason: 'invalid_state' };
+  }
   if (a.instanceId === b.instanceId) return { ok: false, reason: 'breeding_same_instance' };
   if (isCloseRelative(a, b)) return { ok: false, reason: 'breeding_relative_gate' };
   return { ok: true, reason: null };
@@ -65,57 +82,100 @@ function breedingBond(instance) {
 
 function cooldownUntil(instance) {
   const value = instance?.breedingCooldownUntil;
-  return Number.isFinite(value) ? value : 0;
+  if (value == null) return 0;
+  return Number.isFinite(value) ? value : null;
 }
 
-export function genderCompatible(a, b) {
-  if (!a || !b) return false;
-  if (a.gender === 'Genderless' || b.gender === 'Genderless') return true;
-  return (a.gender === 'Male' && b.gender === 'Female')
-    || (a.gender === 'Female' && b.gender === 'Male');
+function normalizedBreedingEligibility(profile) {
+  const value = profile?.breedingEligibility ?? profile?.breedingEligible;
+  if (value === true || value === 'Yes') return 'Yes';
+  if (value === 'SpecialRecipeOnly') return 'SpecialRecipeOnly';
+  return 'No';
 }
 
-export function evaluateBreedingCompatibility(a, b, {
+export function genderCompatible(eggHolder, partner) {
+  return eggHolder?.gender === STANDARD_BREEDING_ROLES.eggHolder
+    && partner?.gender === STANDARD_BREEDING_ROLES.partner;
+}
+
+// Pure BRD_v1.0 standard-pair gate. Arguments are deliberately role-named and
+// positional: A32 must resolve the owned Female Egg Holder before calling it.
+// The legacy breed(parentA, parentB) generator remains symmetric and does not
+// opt into this adapter; A32 owns the egg transaction/live integration.
+export function evaluateStandardBreedingCompatibility(eggHolder, partner, {
   speciesById,
   now = Date.now(),
-  adultStages = BREEDING_ADULT_STAGES,
-  minBond = BREEDING_MIN_BOND,
 } = {}) {
-  const base = canBreed(a, b);
+  if (!Number.isFinite(now)) return compatibilityResult(false, 'invalid_state');
+  const base = canBreed(eggHolder, partner);
   if (!base.ok) return compatibilityResult(false, base.reason);
-  if (!adultStages.includes(a.lifeStage) || !adultStages.includes(b.lifeStage)) {
-    return compatibilityResult(false, 'breeding_stage_gate', {
-      stages: Object.freeze([a.lifeStage ?? null, b.lifeStage ?? null]),
-    });
-  }
-  const profileA = speciesProfile(speciesById, a.speciesId);
-  const profileB = speciesProfile(speciesById, b.speciesId);
+  const profileA = speciesProfile(speciesById, eggHolder.speciesId);
+  const profileB = speciesProfile(speciesById, partner.speciesId);
   if (!profileA || !profileB) {
     return compatibilityResult(false, 'unknown_id', {
-      speciesIds: Object.freeze([a.speciesId ?? null, b.speciesId ?? null]),
+      speciesIds: Object.freeze([eggHolder.speciesId ?? null, partner.speciesId ?? null]),
     });
   }
-  if (!profileA.breedingGroup || profileA.breedingGroup !== profileB.breedingGroup) {
-    return compatibilityResult(false, 'breeding_group_gate', {
-      groups: Object.freeze([profileA.breedingGroup ?? null, profileB.breedingGroup ?? null]),
+
+  const eligibilities = Object.freeze([
+    normalizedBreedingEligibility(profileA),
+    normalizedBreedingEligibility(profileB),
+  ]);
+  if (eggHolder.gender === 'Genderless' || partner.gender === 'Genderless'
+    || eligibilities.includes('SpecialRecipeOnly')) {
+    return compatibilityResult(false, 'breeding_recipe_only', { eligibilities });
+  }
+
+  const stageResolutions = Object.freeze([
+    resolveWorkbookEvolutionStage(eggHolder),
+    resolveWorkbookEvolutionStage(partner),
+  ]);
+  if (stageResolutions.some(result => !result.ok || !result.stage2)) {
+    return compatibilityResult(false, 'breeding_stage_gate', {
+      stages: Object.freeze(stageResolutions.map(result => result.stage2 ? BREEDING_REQUIRED_STAGE : null)),
+      stageEvidence: Object.freeze(stageResolutions.map(result => result.stageEvidence)),
+      requiredStage: BREEDING_REQUIRED_STAGE,
     });
   }
-  if (!genderCompatible(a, b)) {
+  const levels = Object.freeze([eggHolder.level, partner.level]);
+  if (levels.some(value => !Number.isInteger(value) || value < BREEDING_MIN_LEVEL)) {
+    return compatibilityResult(false, 'breeding_level_gate', {
+      levels,
+      minLevel: BREEDING_MIN_LEVEL,
+    });
+  }
+  const bonds = Object.freeze([breedingBond(eggHolder), breedingBond(partner)]);
+  if (bonds.some(value => value < BREEDING_MIN_BOND)) {
+    return compatibilityResult(false, 'breeding_bond_gate', { bonds, minBond: BREEDING_MIN_BOND });
+  }
+  if (!genderCompatible(eggHolder, partner)) {
     return compatibilityResult(false, 'breeding_gender_gate', {
-      genders: Object.freeze([a.gender ?? null, b.gender ?? null]),
+      genders: Object.freeze([eggHolder.gender ?? null, partner.gender ?? null]),
+      requiredGenders: STANDARD_BREEDING_ROLES,
     });
   }
-  const bonds = Object.freeze([breedingBond(a), breedingBond(b)]);
-  if (bonds.some(value => value < minBond)) {
-    return compatibilityResult(false, 'breeding_bond_gate', { bonds, minBond });
+  const groups = Object.freeze([profileA.breedingGroup ?? null, profileB.breedingGroup ?? null]);
+  if (groups.some(group => !BREEDING_GROUPS.includes(group)) || groups[0] !== groups[1]) {
+    return compatibilityResult(false, 'breeding_group_gate', {
+      groups,
+    });
   }
-  const cooldowns = Object.freeze([cooldownUntil(a), cooldownUntil(b)]);
+  if (eligibilities.some(value => value !== 'Yes')) {
+    return compatibilityResult(false, 'breeding_eligibility_gate', { eligibilities });
+  }
+  const cooldowns = Object.freeze([cooldownUntil(eggHolder), cooldownUntil(partner)]);
+  if (cooldowns.includes(null)) {
+    return compatibilityResult(false, 'invalid_state', { cooldowns });
+  }
   if (cooldowns.some(value => value > now)) {
     return compatibilityResult(false, 'breeding_cooldown', { cooldowns, now });
   }
   return compatibilityResult(true, null, {
-    breedingGroup: profileA.breedingGroup,
-    minBond,
+    breedingGroup: groups[0],
+    stageEvidence: Object.freeze(stageResolutions.map(result => result.stageEvidence)),
+    requiredStage: BREEDING_REQUIRED_STAGE,
+    minLevel: BREEDING_MIN_LEVEL,
+    minBond: BREEDING_MIN_BOND,
   });
 }
 
@@ -201,10 +261,8 @@ export function resolvePotentialInheritance(eggHolder, partner, { seed = 0 } = {
 }
 
 // Produce a child instance from two parents. Deterministic under `seed`.
-export function breed(parentA, parentB, { species = {}, seed = 0, now = Date.now(), personalityPool = [], compatibility = null } = {}) {
-  const check = compatibility
-    ? evaluateBreedingCompatibility(parentA, parentB, { ...compatibility, now })
-    : canBreed(parentA, parentB);
+export function breed(parentA, parentB, { species = {}, seed = 0, now = Date.now(), personalityPool = [] } = {}) {
+  const check = canBreed(parentA, parentB);
   if (!check.ok) return { ok: false, reason: check.reason };
 
   const rng = createRng(seed);
