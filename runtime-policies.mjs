@@ -5,6 +5,23 @@ export const ENCOUNTER_POLICY = Object.freeze({
   maxEngaged: 2,
 });
 
+// Legacy owned-monster Basic Attack distances/timing, now centralized for the
+// deterministic A35 resolver. These values are runtime compatibility policy;
+// Monster_Profile Role/PreferredRange/AIStyle does not define numeric weights.
+export const OWNED_BASIC_AI_POLICY = Object.freeze({
+  acquireRangeM: 9,
+  retainRangeM: 12,
+  basicAttackRangeM: 1.35,
+  basicAttackCooldownSec: 0.9,
+  basicAttackPower: 15,
+  actionTypes: Object.freeze(['idle', 'move', 'basic_attack']),
+  targetTieBreak: 'distance_then_stable_id',
+  commandSource: 'basicAI',
+  manualSkillSlots: 'never',
+  usesConsumed: 0,
+  skillPriority: 'deferred_AI_Skill_Priority_TODO',
+});
+
 function capturePolicyResult(ok, reason) {
   return Object.freeze({ ok, reason, shouldRoll: ok });
 }
