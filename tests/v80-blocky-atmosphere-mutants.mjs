@@ -29,8 +29,8 @@ const flower = extractFn('makeFlower');
 
 assert.doesNotMatch(lighting, /scene\.children\.find/, 'mutant 3: do not look up hemi by scanning the scene');
 assert.match(js, /const hemi=new THREE\.HemisphereLight/, 'mutant 4: hemisphere stays a named light');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:30/, 'mutant 5: stage fog near distances stay intentional');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:76/, 'mutant 6: stage fog far distances stay intentional');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:zone==='poison-marsh'\?18:30/, 'mutant 5: stage fog near distances stay intentional');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:zone==='poison-marsh'\?58:76/, 'mutant 6: stage fog far distances stay intentional');
 assert.match(ground, /zone==='hub'\?0x65c9f5/, 'mutant 7: hub fog must not reuse the sky hex');
 assert.match(lighting, /sun\.color\.setHex\(0xb0c4de\)/, 'mutant 8: cave sun color must cool down');
 assert.match(lighting, /sun\.color\.setHex\(0xfff4e0\)/, 'mutant 9: hub sun color must warm up');
@@ -47,7 +47,8 @@ assert.match(flower, /glowMat\(color,color,\.08/, 'mutant 15: flower bloom now u
 assert.match(painterSrc, /zoneType === 'cave'/, 'mutant 16: cave grid still uses the cave speckle path');
 assert.match(painterSrc, /zoneType === 'rocky'/, 'mutant 17: Rocky Canyon grid still uses the rock speckle path');
 assert.match(painterSrc, /zoneType === 'ruins'/, 'mutant 18: Sky Ruins grid still uses the slate speckle path');
+assert.match(painterSrc, /zoneType === 'marsh'/, 'mutant 19: Poison Marsh grid still uses the lime speckle path');
 assert.match(extractFn('switchZone'), /setZoneGround\(zone\)/, 'mutant 17: zone changes still call setZoneGround');
-assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 19: monster shine stays a sphere');
+assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 20: monster shine stays a sphere');
 
 console.log('V8.0 blocky atmosphere mutants: PASS');

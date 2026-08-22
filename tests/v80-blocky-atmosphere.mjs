@@ -41,8 +41,8 @@ assert.doesNotMatch(lighting, /scene\.children\.find/, 'lighting uses the named 
 
 assert.match(ground, /setZoneLighting\(zone\)/, 'ground swap also applies zone lighting');
 assert.match(ground, /scene\.fog\.color\.setHex\(zone==='cave'\?0x1e293b:\(zone==='hub'\?0x65c9f5:z\.bg\)\)/, 'hub fog is table 0x65c9f5, cave 0x1e293b, meadow uses sky');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:30/, 'stage fog uses readable near distances');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:76/, 'stage fog uses readable far distances');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:zone==='poison-marsh'\?18:30/, 'stage fog uses readable near distances');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:zone==='poison-marsh'\?58:76/, 'stage fog uses readable far distances');
 assert.match(ground, /makeGroundTexture\(z\.ground,type\)/, 'zone still swaps the tiled ground map');
 assert.match(ground, /makeSkyTexture\(z\.bg\)/, 'zone still swaps the sky gradient');
 
@@ -52,6 +52,7 @@ assert.match(painterSrc, /scatter\(img, 36, 3, 3, \[0, 0, 0\]/, 'cave grid uses 
 assert.match(painterSrc, /scatter\(img, 34, 2, 3, \[125, 211, 252\]/, 'Frozen Pass grid uses blue ice speckles');
 assert.match(painterSrc, /scatter\(img, 34, 3, 2, \[120, 53, 15\]/, 'Rocky Canyon grid uses brown rock speckles');
 assert.match(painterSrc, /scatter\(img, 34, 2, 2, \[51, 65, 85\]/, 'Sky Ruins grid uses slate ruin speckles');
+assert.match(painterSrc, /scatter\(img, 34, 2, 3, \[132, 204, 22\]/, 'Poison Marsh grid uses lime marsh speckles');
 assert.match(painterSrc, /scatter\(img, 30, 2, 4, \[0, 100, 0\]/, 'grass grid keeps green marks');
 
 const cave = paintGroundGrid(0x57606f, 'cave');
@@ -66,5 +67,8 @@ assert.ok(pixelDiffRatio(rocky, rockyAsGrass) > 0.002, 'Rocky Canyon rock speckl
 const ruins = paintGroundGrid(0x64748b, 'ruins');
 const ruinsAsGrass = paintGroundGrid(0x64748b, 'grass');
 assert.ok(pixelDiffRatio(ruins, ruinsAsGrass) > 0.002, 'Sky Ruins slate speckles differ from grass marks');
+const marsh = paintGroundGrid(0x365314, 'marsh');
+const marshAsGrass = paintGroundGrid(0x365314, 'grass');
+assert.ok(pixelDiffRatio(marsh, marshAsGrass) > 0.002, 'Poison Marsh speckles differ from grass marks');
 
 console.log('V8.0 blocky atmosphere: PASS');
