@@ -24,6 +24,7 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, SKILL_SLOTS } from './skill-progression.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
+import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
@@ -2501,7 +2502,8 @@ function createWild(sp,x,z,level=1,opts={}){
   marker.position.set(0,boss?2.45:(rare?2.2:2.05),0);marker.name='wildMarker';mesh.add(marker);
   scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),maxHp=Math.round(statValue(sp.base.hp,level,genes.hp,.14,0)*(boss?2.0:(elite?1.3:1)));
   const capturePolicy=encounterProfile.capturePolicy;
-  const w={id:'w'+nextId++,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst};
+  const wildId='w'+nextId++;
+  const w={id:wildId,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');
   if(boss)markBossProgress(w,'found');
@@ -2509,7 +2511,7 @@ function createWild(sp,x,z,level=1,opts={}){
 }
 function clearWilds(){
   abortCaptureSequence();
-  for(const w of wilds){removeAndDispose(scene,w.mesh);removeWildLabel(w);}
+  for(const w of wilds){w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});removeAndDispose(scene,w.mesh);removeWildLabel(w);}
   wilds.length=0;
   distanceTickScheduler.clearAll();
   labelTickScheduler.clearAll();
@@ -2522,7 +2524,7 @@ function retireWild(w){
 }
 function livingWilds(){return wilds.filter(w=>!w.dead);}
 function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;const starterDone=state.starterJourney?.grassMeadow?.captured;const progressionKey=cfg.progressionBossSpeciesId?`${zone}:${cfg.progressionBossSpeciesId}`:null;const bossReady=Boolean(progressionKey&&state.eliteProgress?.defeated?.[progressionKey]&&!state.bossProgress?.defeated?.[progressionKey]);if(bossReady&&cfg.bossSpawn?.length){for(const [id,x,z,l,opts] of cfg.bossSpawn)createWild(spById[id],x,z,l,opts);return;}for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}const eliteGate=zone!=='grass-meadow'||starterDone;if(cfg.eliteSpawn?.length&&eliteGate&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance){for(const [id,x,z,l,opts] of cfg.eliteSpawn)createWild(spById[id],x,z,l,opts);}}
-function resetWild(w){if(w.dead)return;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
+function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
   const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead||w.capturing)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
@@ -2730,6 +2732,7 @@ function completeStageClear(stageId){
 }
 function defeatWild(w){
   if(w.dead)return;
+  w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
   w.dead=true;
   if(state.currentZone==='grass-meadow')markStarterJourney('battled');
   if(w.elite)markEliteProgress(w,'defeated');
@@ -3179,6 +3182,8 @@ function selectWildAggressors(){
 }
 function updateWild(w,dt,canEngage=false){
   if(!w||w.dead||!w.mesh||w.capturing)return;
+  const statusAdvance=advanceEncounterEffects(w.statusState,{toSec:w.statusState.currentTimeSec+dt,targetHp:w.hp,targetMaxHp:w.maxHp});
+  if(statusAdvance.ok){w.statusState=statusAdvance.state;if(statusAdvance.damage>0){damageWild(w,Math.max(1,Math.round(statusAdvance.damage)),{type:wildTypes(w)[0],eff:1,statusDamage:true});if(w.dead)return;}}
   w.attackCd=tickCooldown(w.attackCd,dt);
   w.wanderT=(Number.isFinite(w.wanderT)?w.wanderT:0)-dt;
   w.dir=ensureDirection(w.dir||w.wanderDir);
