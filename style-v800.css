@@ -559,4 +559,14 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .character-quick-identity{margin-top:4px}.character-quick-portrait{width:34px;height:34px;flex-basis:34px}
   .character-quick-meta,.character-quick-type,.character-quick-cr,.character-quick-place,.character-quick-stats{font-size:9px}
 }
+/* Character UI Full Manager: force the reference three-column layout on every landscape browser.
+   This intentionally does not depend on pointer:coarse because Android browsers can report fine input. */
+@media (orientation:landscape){
+  .manager.character-manager-mode .character-manager-layout.manager-tab-pane.active{
+    display:grid!important;
+    grid-template-columns:minmax(112px,.85fr) minmax(156px,1.2fr) minmax(140px,1fr);
+    gap:7px;
+    min-height:0;
+  }
+}
 /* Character UI compact portrait control guard */
