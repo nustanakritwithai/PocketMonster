@@ -118,6 +118,45 @@ export function workbookEvolutionPathById(pathId) {
   return WORKBOOK_EVOLUTION_BY_ID.get(pathId) ?? null;
 }
 
+// Resolve Stage-2 identity from stable form/evolution facts. This accepts the
+// Workbook target form for future captured Stage-2 records and the currently
+// locked live Lv2 evolution history; display names never count as identity.
+export function resolveWorkbookEvolutionStage(instance) {
+  if (!instance || typeof instance !== 'object') {
+    return Object.freeze({ ok: false, reason: 'invalid_state', stage2: false, stageEvidence: null, path: null });
+  }
+  const path = workbookEvolutionPathForSpecies(instance.speciesId);
+  if (!path) {
+    return Object.freeze({ ok: false, reason: 'unknown_id', stage2: false, stageEvidence: null, path: null });
+  }
+  const history = Array.isArray(instance.evolutionHistory) ? instance.evolutionHistory : [];
+  if (instance.formId === path.toWorkbookMonsterId) {
+    return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'workbook_stage2_form', path });
+  }
+  if (history.some(entry => entry?.evolutionId === path.id && entry?.to === path.toWorkbookMonsterId)) {
+    return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'workbook_evolution_history', path });
+  }
+  const liveEvolution = history.findLast(entry => entry
+    && typeof entry.evolutionId === 'string'
+    && entry.evolutionId.length > 0
+    && typeof entry.from === 'string'
+    && typeof entry.to === 'string'
+    && entry.from !== entry.to
+    && entry.to === instance.formId
+    && instance.formId !== instance.speciesId);
+  if (liveEvolution) {
+    return Object.freeze({
+      ok: true,
+      reason: null,
+      stage2: true,
+      stageEvidence: 'live_evolution_history',
+      path,
+      liveEvolution: Object.freeze({ ...liveEvolution }),
+    });
+  }
+  return Object.freeze({ ok: true, reason: 'evolution_required', stage2: false, stageEvidence: null, path });
+}
+
 export function previewWorkbookEvolution(instance) {
   if (!instance || typeof instance !== 'object') return Object.freeze({ ok: false, reason: 'invalid_state' });
   const path = workbookEvolutionPathForSpecies(instance.speciesId);
