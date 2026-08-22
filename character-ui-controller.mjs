@@ -96,6 +96,44 @@ export function getFocusedCharacterPresentation({
   };
 }
 
+export function getFocusedEvolutionCatalogPresentation({
+  getInst,
+  focusedMonsterId,
+  resolveEvolutionPreview,
+} = {}) {
+  const instance = typeof getInst === 'function' && typeof focusedMonsterId === 'string'
+    ? getInst(focusedMonsterId)
+    : null;
+  if (!instance) return Object.freeze({ ok: false, reason: 'unknown_id', isEmpty: true, readOnly: true });
+  if (typeof resolveEvolutionPreview !== 'function') {
+    return Object.freeze({ ok: false, reason: 'resolver_required', isEmpty: true, readOnly: true });
+  }
+  const preview = resolveEvolutionPreview(instance);
+  if (!preview.ok) return Object.freeze({ ...preview, isEmpty: true, readOnly: true });
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    isEmpty: false,
+    readOnly: true,
+    monsterId: instance.instanceId,
+    pathId: preview.path.id,
+    fromWorkbookMonsterId: preview.path.fromWorkbookMonsterId,
+    toWorkbookMonsterId: preview.path.toWorkbookMonsterId,
+    toNameTH: preview.path.toNameTH,
+    sourceBST: preview.path.sourceBST,
+    targetBST: preview.path.targetBST,
+    bstGain: preview.path.bstGain,
+    requiredLevelReference: preview.path.requiredLevelReference,
+    requiredBondReference: preview.path.requiredBondReference,
+    unlockSkill: preview.unlockSkill,
+    sourceEligible: preview.sourceEligible,
+    alreadyCommitted: preview.alreadyCommitted,
+    canCommit: false,
+    activation: preview.activation,
+    runtimeEvolutionDecision: preview.runtimeEvolutionDecision,
+  });
+}
+
 export function attachCharacterUi(state, ui = createCharacterUiState()) {
   if (!state || typeof state !== 'object') throw new TypeError('game state is required');
   Object.defineProperty(state, 'ui', {
