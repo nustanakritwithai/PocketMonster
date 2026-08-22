@@ -27,6 +27,7 @@ function assertRuntimeLearnsetHooks(source){
   const migration=sourceSection(source,'function migrateLoadedState(', '\nlet remoteSaveReady=');
   const monsterSkills=sourceSection(source,'function getMonsterSkills(', '\nfunction randomGenes(');
   const useSkill=sourceSection(source,'function useSkill(', '\nfunction updateOwned(');
+  const mastery=sourceSection(source,'function awardAcceptedSkillMastery(', '\nfunction applyAcceptedSkillCommand(');
   const learnCandidate=sourceSection(source,'function learnCandidateSkill(', '\nfunction mutateOwnedSkill(');
   assert.match(makeInstance,/synchronizeStage1Learnset\(inst\);/,'new/captured/created monsters synchronize LevelUp skills');
   assert.match(defeatWild,/applyBattleGrowth\(inst,result\);[\s\S]*?synchronizeStage1Learnset\(inst\);/,'active battle growth synchronizes skills');
@@ -37,7 +38,9 @@ function assertRuntimeLearnsetHooks(source){
   assert.match(migration,/state\.collection\.forEach\(synchronizeStage1Learnset\);/,'loaded saves synchronize eligible skills once');
   assert.match(monsterSkills,/if\(cand\?\.replaces&&rec\.slot===cand\.slot\)/,'unequipped legacy candidates cannot alter the live field moves');
   assert.doesNotMatch(useSkill,/learnSkill\(a\.inst/,'live casting never lazy-learns or creates a duplicate manual slot');
-  assert.match(useSkill,/addSkillExp\(a\.inst,skillRec\.skillId,sExp\)/,'live mastery follows the equipped learned record');
+  assert.doesNotMatch(mastery,/learnSkill\(a\.inst/,'accepted mastery never lazy-learns a missing record');
+  assert.match(mastery,/const skillRec=getSkill\(a\.inst,move\.skillId\)/,'live mastery reads the canonical equipped SkillID');
+  assert.match(mastery,/addSkillExp\(a\.inst,move\.skillId,sExp\)/,'live mastery follows the canonical equipped learned record');
   assert.match(learnCandidate,/learnSkill\(inst,\{skillId:def\.id,slot:null\}\)/,'legacy candidates learn unequipped instead of colliding with workbook defaults');
 }
 

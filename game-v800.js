@@ -23,7 +23,9 @@ import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrain
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
-import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, SKILL_SLOTS } from './skill-progression.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS } from './skill-progression.mjs';
+import { skillCatalogEntry } from './skill-catalog.mjs';
+import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -193,7 +195,7 @@ function ensureCombatHudSemantics(){
     reason.textContent='อยู่ Ranch • ออกไป Wild Zone ก่อน';
     document.querySelector('.controls-right')?.insertAdjacentElement('afterend',reason);
   }
-  for(const id of ['skill1Btn','skill2Btn','skill3Btn','captureBtn','summonBtn','recallBtn']){
+  for(const id of ['skill1Btn','skill2Btn','skill3Btn','skill4Btn','captureBtn','summonBtn','recallBtn']){
     const button=el(id);
     if(!button)continue;
     button.type='button';
@@ -653,6 +655,32 @@ function getMonsterSkills(inst){
     }
   }
   return moves;
+}
+// Manual combat commands use the workbook-owned four-slot loadout. The legacy
+// species moves above remain a presentation/Basic-AI compatibility surface and
+// must never decide a manual command's SkillID, Uses, target, or cooldown.
+function canonicalCombatSkills(inst){
+  if(!inst)return MANUAL_SKILL_SLOTS.map(()=>null);
+  return manualSkillLoadout(inst).map(entry=>{
+    const definition=entry.skillId?skillCatalogEntry(entry.skillId):null;
+    if(!definition||!entry.skill)return null;
+    return Object.freeze({
+      skillId:definition.id,
+      name:definition.nameTH||definition.nameEN,
+      nameEN:definition.nameEN,
+      type:definition.runtimeType,
+      power:definition.power,
+      targetType:definition.targetType,
+      effect:definition.effect,
+      directDamage:definition.directDamage,
+      effectAvailable:definition.directDamage&&definition.targetType!=='Self'&&definition.targetType!=='GroundPoint',
+      unavailableReason:'Targeting พร้อมแล้ว • เอฟเฟกต์นี้รอระบบสกิลขั้นถัดไป',
+      currentUses:entry.skill.currentUses,
+      maxUses:definition.maxUses,
+      cooldown:definition.cooldownSec,
+      activation:definition.activation,
+    });
+  });
 }
 function randomGenes(sp){ return {hp:rand(POTENTIALS),atk:rand(POTENTIALS),def:rand(POTENTIALS),spd:rand(POTENTIALS),trait:rand(sp.traitPool),skillGene:sp.skills[0].name,typeAffinity:sp.types[0]}; }
 function lifeStageFor(inst){ if(inst.origin==='bred'&&inst.level<=1)return 'Baby'; if(inst.level<=2)return 'Juvenile'; if(inst.level<6)return 'Adult'; return 'Mature'; }
@@ -1766,8 +1794,8 @@ function renderTargetTypesIfChanged(node,types){
 const skillIconCache=new Map();
 function skillIconKind(skill){
   if(!skill||typeof skill==='string')return skill?'enemy':'empty';
-  if(skill.targetType==='area')return 'area';
-  if(skill.targetType==='self'){
+  if(skill.targetType==='area'||skill.targetType==='EnemyArea'||skill.targetType==='GroundPoint')return 'area';
+  if(skill.targetType==='self'||skill.targetType==='Self'){
     if(skill.effect==='heal')return 'heal';
     if(skill.effect==='shield')return 'shield';
     return 'buff';
@@ -2841,7 +2869,7 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1){
   const stab=monsterTypes(attackerInst).includes(move.type)?1.5:1;
   const defTypes=defender?.instanceId?monsterTypes(defender):wildTypes(defender);
   const eff=typeEffectiveness(move.type,defTypes);
-  const skillRec=getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0]);
+  const skillRec=getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0]);
   const mastery=skillRec?masteryRawPower(skillRec.masteryRank):0;
   const derived=derivedStats(instanceCombatBuildSafe(attackerInst));
   return liveMoveDamage({
@@ -3030,7 +3058,7 @@ function spawnOwned(inst,pos){
   mesh.userData.instanceId=inst.instanceId;
   mesh.position.copy(pos);mesh.position.y=0;scene.add(mesh);setupMonsterMotion(mesh,sp,inst);
   spawnElementalFX(monsterTypes(inst)[0],pos.clone().add(new THREE.Vector3(0,.45,0)),'summon',1.05);
-  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:[0,0,0],attackBuff:1,buffTimer:0,shieldReduction:0,shieldTimer:0};
+  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),attackBuff:1,buffTimer:0,shieldReduction:0,shieldTimer:0};
   inst.bond=clamp(inst.bond+.4);
   msg(`${displayName(inst)} ลงสนาม • AI จะเลือกศัตรูใกล้ที่สุดและโจมตีพื้นฐานเอง`);
   renderParty();renderSkillButtons();renderHUD();
@@ -3194,36 +3222,153 @@ function spawnBuffAtkSkillEffect(pos, type, duration) {
   scene.add(auraMesh);
   effects.push({mesh: auraMesh, life: duration, maxLife: duration, kind: 'buff-aura'});
 }
-function useSkill(index){
-  if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return;}const a=activeSummon,move=getMonsterSkills(a.inst)[index];if(!move)return;if((a.skillCds[index]||0)>0){msg(`${move.name} คูลดาวน์ ${a.skillCds[index].toFixed(1)}s`);return;}
-  let res=null;
-  const sfxId=`sfx_skill_${move.type.toLowerCase()}`;
-  if(sfxId)playSFX(sfxId);
-  if(move.targetType==='enemy'){
-    const t=nearestWild(move.range||5.5,a.mesh.position);if(!t){msg(`${move.name}: ไม่มีศัตรูในระยะ`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));spawnSkillSprite(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});damageWild(t,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);a.skillCds[index]=move.cooldown;const [lab]=effectLabel(res.eff);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${lab}${res.stab>1?' • STAB':''}`);logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
-  }else if(move.targetType==='area'){
-    const targets=wilds.filter(w=>!w.dead&&distXZ(a.mesh.position,w.mesh.position)<=move.range);if(!targets.length){msg(`${move.name}: ไม่มีศัตรูในพื้นที่`);return;}playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:Math.min(2.8,move.range*.7),duration:1.45,intensity:1.15});spawnAreaWave(move.type,a.mesh.position.clone(),move.range);triggerCameraShake(.11,.17);let total=0;for(const t of targets){spawnElementalFX(move.type,t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);res=monsterDamage(a.inst,move,t,a.attackBuff);spawnGroundDecal(move.type,t.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});damageWild(t,res.damage,{type:move.type,eff:res.eff});total+=res.damage;}a.skillCds[index]=move.cooldown;msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
-  }else if(move.targetType==='self'){
-    triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnSkillSprite(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0.8,0.6);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
-    if(move.effect==='heal'){const gain=Math.round(a.inst.maxHp*move.value);a.inst.hp=clamp(a.inst.hp+gain,0,a.inst.maxHp);spawnDamageNumber(gain,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});spawnHealSkillEffect(a.mesh.position.clone(),move.type);msg(`${displayName(a.inst)} ใช้ ${move.name} • ฟื้น HP ${gain}`);logBattleEvent('spirit',move.value*10);}
-    if(move.effect==='shield'){a.shieldReduction=move.value;a.shieldTimer=move.duration;spawnShieldSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • ลด Damage ${Math.round(move.value*100)}% ${move.duration}s`);logBattleEvent('defense',move.duration*3);}
-    if(move.effect==='buffAtk'){a.attackBuff=move.value;a.buffTimer=move.duration;spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,move.duration);msg(`${displayName(a.inst)} ใช้ ${move.name} • เพิ่มพลังโจมตี ${move.duration}s`);logBattleEvent('power',move.duration*3);}a.skillCds[index]=move.cooldown;
+let skillCommandSequence=0;
+const skillGroundRaycaster=new THREE.Raycaster();
+const skillGroundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+function reticleGroundPoint(){
+  const point=new THREE.Vector3();
+  skillGroundRaycaster.setFromCamera({x:0,y:0},camera);
+  return skillGroundRaycaster.ray.intersectPlane(skillGroundPlane,point)
+    ?Object.freeze({x:point.x,z:point.z})
+    :null;
+}
+function createSkillDispatchIntent(index,overrides={}){
+  const move=activeSummon?canonicalCombatSkills(activeSummon.inst)[index]:null;
+  const suppliedId=Object.prototype.hasOwnProperty.call(overrides,'commandId');
+  const commandId=suppliedId?overrides.commandId:`${activeSummon?.inst?.instanceId||'no-active'}:${++skillCommandSequence}`;
+  const suppliedGround=Object.prototype.hasOwnProperty.call(overrides,'groundPoint');
+  const groundPoint=suppliedGround?overrides.groundPoint:(move?.targetType==='GroundPoint'?reticleGroundPoint():null);
+  return Object.freeze({commandId,groundPoint});
+}
+function dispatchSkill(index,overrides={}){return useSkill(index,createSkillDispatchIntent(index,overrides));}
+function skillActorSnapshot(a){
+  return Object.freeze({
+    id:a.inst.instanceId,
+    alive:!a.inst.fainted&&a.inst.hp>0,
+    position:Object.freeze({x:a.mesh.position.x,z:a.mesh.position.z}),
+  });
+}
+function skillEnemySnapshots(){
+  const snapshots=[];
+  for(const wild of wilds){
+    if(typeof wild?.id!=='string'||!wild.mesh?.position)continue;
+    snapshots.push(Object.freeze({
+      id:wild.id,
+      alive:!wild.dead,
+      targetable:!wild.capturing,
+      position:Object.freeze({x:wild.mesh.position.x,z:wild.mesh.position.z}),
+    }));
+  }
+  return Object.freeze(snapshots);
+}
+function materializeSkillTargets(a,command){
+  if(command.targetKind==='Self'){
+    if(command.targetIds.length!==1||command.targetIds[0]!==a.inst.instanceId)return [];
+    return [Object.freeze({id:a.inst.instanceId,alive:!a.inst.fainted&&a.inst.hp>0,targetable:true,world:a})];
+  }
+  const byId=new Map();
+  for(const wild of wilds){
+    if(typeof wild?.id==='string')byId.set(wild.id,wild);
+  }
+  const targets=[];
+  for(const targetId of command.targetIds){
+    const wild=byId.get(targetId);
+    if(!wild||wild.dead||wild.capturing||!wild.mesh?.position)return [];
+    targets.push(Object.freeze({id:targetId,alive:true,targetable:true,world:wild}));
+  }
+  return targets;
+}
+function canApplyLiveSkill(command){
+  const definition=skillCatalogEntry(command.skillId);
+  return Boolean(definition?.directDamage
+    && (command.targetKind==='NearestEnemy'||command.targetKind==='EnemyArea'));
+}
+function awardAcceptedSkillMastery(a,move,res){
+  const skillRec=getSkill(a.inst,move.skillId);
+  const hitQuality=res&&Number.isFinite(res.eff)?res.eff:1;
+  const spam=(a._skillSpam=a._skillSpam||{}),spamCount=spam[move.skillId]||0;
+  spam[move.skillId]=spamCount+1;
+  const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
+  if(sExp>0&&skillRec){
+    const sResult=addSkillExp(a.inst,move.skillId,sExp);
+    if(sResult?.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}
+  }
+}
+function applyAcceptedSkillCommand(a,index,move,command,materialized){
+  // Uses has already committed. Cooldown is the first live mutation here; all
+  // presentation, damage, bond, mastery, and logs follow the acceptance guard.
+  a.skillCds[index]=command.startCooldownSec;
+  const targets=materialized.map(target=>target.world);
+  playSFX(`sfx_skill_${move.type.toLowerCase()}`);
+  let res=null,total=0;
+  if(command.targetKind==='NearestEnemy'){
+    const target=targets[0];
+    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);
+    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);
+    spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));
+    spawnSkillSprite(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);
+    spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);
+    res=monsterDamage(a.inst,move,target,a.attackBuff);
+    spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});
+    damageWild(target,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);
+    const [label]=effectLabel(res.eff);
+    msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${label}${res.stab>1?' • STAB':''}`);
+    logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
+  }else{
+    const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
+    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
+    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);
+    spawnGroundDecal(move.type,anchor,{radius:Math.min(2.8,command.radiusM),duration:1.45,intensity:1.15});
+    spawnAreaWave(move.type,anchor,command.radiusM);triggerCameraShake(.11,.17);
+    for(const target of targets){
+      spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);
+      res=monsterDamage(a.inst,move,target,a.attackBuff);
+      spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});
+      damageWild(target,res.damage,{type:move.type,eff:res.eff});total+=res.damage;
+    }
+    msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
   }
   a.inst.bond=clamp(a.inst.bond+.3);
-  // V7.5: Award Skill EXP for skill usage (mastery progression)
-  if(move&&a.inst){
-    if(!Array.isArray(a.inst.skills))a.inst.skills=[];
-    const skillRec=a.inst.skills.find(skill=>skill?.slot==='s'+(index+1))||getSkill(a.inst,move.name);
-    const hitQuality=res&&res.eff?res.eff:1;const spamCount=(a._skillSpam=a._skillSpam||{})[move.name]||0;
-    a._skillSpam[move.name]=(a._skillSpam[move.name]||0)+1;
-    const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
-    if(sExp>0&&skillRec){const sResult=addSkillExp(a.inst,skillRec.skillId,sExp);
-      if(sResult&&sResult.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}}
-  }
+  awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
+  return Object.freeze({effectMode:'legacy_damage_compatibility',hitCount:targets.length,totalDamage:command.targetKind==='EnemyArea'?total:res?.damage||0});
+}
+function skillFailureMessage(move,result){
+  const reasons={
+    cooldown_active:`${move?.name||'สกิล'} ยังติดคูลดาวน์`,
+    no_uses:`${move?.name||'สกิล'} Uses หมด • กลับ Ranch เพื่อฟื้นฟู`,
+    no_valid_target:`${move?.name||'สกิล'}: ไม่มีศัตรูในระยะ`,
+    ground_point_required:`${move?.name||'สกิล'}: เล็งพื้นไม่สำเร็จ`,
+    ground_point_out_of_range:`${move?.name||'สกิล'}: จุดเล็งอยู่นอกระยะ`,
+    not_equipped:'ยังไม่มีสกิลช่องนี้',
+    not_ready:'Targeting พร้อมแล้ว • เอฟเฟกต์สกิลนี้รอระบบขั้นถัดไป',
+    duplicate_cast:'คำสั่งซ้ำถูกปฏิเสธ',
+    target_count_mismatch:'เป้าหมายเปลี่ยนก่อนใช้สกิล • ยกเลิกคำสั่ง',
+    apply_failed:'คำสั่งถูกยืนยันและใช้ Uses แล้ว • เอฟเฟกต์ขัดข้องและจะไม่ลองซ้ำ',
+  };
+  return reasons[result.reason]||`${move?.name||'สกิล'} ใช้ไม่ได้ (${result.reason})`;
+}
+function useSkill(index,intent={}){
+  if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
+  const a=activeSummon,slot=MANUAL_SKILL_SLOTS[index],move=canonicalCombatSkills(a.inst)[index];
+  if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});msg(skillFailureMessage(move,result));return result;}
+  const result=executeEquippedSkillCommand(a.inst,{
+    slot,
+    commandId:intent.commandId,
+    actor:skillActorSnapshot(a),
+    enemies:skillEnemySnapshots(),
+    groundPoint:intent.groundPoint??null,
+    cooldownRemainingSec:a.skillCds[index]||0,
+  },{
+    materializeTargets:command=>materializeSkillTargets(a,command),
+    canApply:command=>canApplyLiveSkill(command),
+    applyAccepted:(command,targets)=>applyAcceptedSkillCommand(a,index,move,command,targets),
+  });
+  if(!result.ok){msg(skillFailureMessage(move,result));renderSkillButtons();}
+  return result;
 }
 function updateOwned(dt){
-  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=Math.max(0,a.attackCd-dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));for(let i=0;i<3;i++){const cd=a.skillCds[i];const btn=el(`skill${i+1}Btn`);if(!btn)continue;if(cd>0){if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');let cdEl=btn.querySelector('.cd-overlay');if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}cdEl.textContent=cd.toFixed(1)+'s';}else{if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();}}if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
+  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=Math.max(0,a.attackCd-dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){const cd=a.skillCds[i];const btn=el(`skill${i+1}Btn`);if(!btn)continue;if(cd>0){if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');let cdEl=btn.querySelector('.cd-overlay');if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}cdEl.textContent=cd.toFixed(1)+'s';}else{if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();}}if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
   let t=a.target;if(!t||t.dead||distXZ(a.mesh.position,t.mesh.position)>12)t=nearestWild(9,a.mesh.position);a.target=t;let moving=false;if(t){const d=distXZ(a.mesh.position,t.mesh.position);if(d>1.35){moving=true;const dir=t.mesh.position.clone().sub(a.mesh.position);dir.y=0;dir.normalize();a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);}else if(a.attackCd<=0){a.attackCd=.9;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],t.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:15};const res=monsterDamage(a.inst,basic,t,a.attackBuff);damageWild(t,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}}
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
@@ -4108,7 +4253,7 @@ function combatMonsterPresentation(inst){
 }
 function combatHudPresentation(){
   const selected=selectedInstance(),skillOwner=activeSummon?.inst||selected;
-  const skillDefs=skillOwner?getMonsterSkills(skillOwner):[];
+  const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[];
   return createCombatHudViewModel({
     zoneIsWild:state.currentZone!=='hub',
     activeMonster:combatMonsterPresentation(activeSummon?.inst),
@@ -4117,7 +4262,14 @@ function combatHudPresentation(){
     captureBalls:state.inventory.captureBalls||0,
     captureAiming:activeSummon?false:captureAimActive,
     summonCooldownSeconds:Math.max(0,(summonCooldownUntil-Date.now())/1000),
-    skills:Array.from({length:3},(_,index)=>skillDefs[index]?{name:skillDefs[index].name,cooldownSeconds:activeSummon?.skillCds?.[index]||0}:null),
+    skills:MANUAL_SKILL_SLOTS.map((_,index)=>skillDefs[index]?{
+      name:skillDefs[index].name,
+      cooldownSeconds:activeSummon?.skillCds?.[index]||0,
+      currentUses:skillDefs[index].currentUses,
+      maxUses:skillDefs[index].maxUses,
+      effectAvailable:skillDefs[index].effectAvailable,
+      unavailableReason:skillDefs[index].unavailableReason,
+    }:null),
   });
 }
 function applyActionPresentation(button,presentation,label){
@@ -4131,8 +4283,8 @@ function applyActionPresentation(button,presentation,label){
 }
 function renderCombatPresentation(){
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
-  const skillDefs=skillOwner?getMonsterSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
-  [0,1,2].forEach(index=>{
+  const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
+  MANUAL_SKILL_SLOTS.forEach((_,index)=>{
     const button=el(`skill${index+1}Btn`),skill=skillDefs[index],view=presentation.skills[index];
     const iconUrl=getSkillIcon(skill);
     applyButtonIcon(button,iconUrl,'70%');
@@ -4739,9 +4891,10 @@ captureBtn.addEventListener('pointercancel',event=>{
 });
 bindActionPress(el('summonBtn'),summonThrow);
 bindActionPress(el('recallBtn'),()=>recall(true));
-bindActionPress(el('skill1Btn'),()=>useSkill(0));
-bindActionPress(el('skill2Btn'),()=>useSkill(1));
-bindActionPress(el('skill3Btn'),()=>useSkill(2));
+bindActionPress(el('skill1Btn'),()=>dispatchSkill(0));
+bindActionPress(el('skill2Btn'),()=>dispatchSkill(1));
+bindActionPress(el('skill3Btn'),()=>dispatchSkill(2));
+bindActionPress(el('skill4Btn'),()=>dispatchSkill(3));
 el('saveBtn').onclick=()=>saveGame(true);
 el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'🔇 เสียงปิด':'🔊 เสียงเปิด';localStorage.setItem('mlr-audio-muted',String(m));};
 {const savedVol=localStorage.getItem('mlr-audio-volume');if(savedVol){setVolume(parseFloat(savedVol));el('volumeSlider').value=Math.round(parseFloat(savedVol)*100);}const savedMute=localStorage.getItem('mlr-audio-muted');if(savedMute==='true'){toggleMute();el('muteBtn').textContent='🔇 เสียงปิด';}}

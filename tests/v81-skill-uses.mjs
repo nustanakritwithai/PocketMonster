@@ -105,7 +105,7 @@ const system = makeInstance('uses-system');
 learnSkill(system, { skillId: 'SK_NORMAL_01', slot: 'basicAI' });
 assert.equal(consumeSkillUse(system, {
   skillId: 'SK_NORMAL_01', castId: 'cast-basic', castAccepted: true,
-}).reason, 'manual_slot_required', 'basicAI remains outside the three manual use commands');
+}).reason, 'manual_slot_required', 'basicAI remains outside the four manual use commands');
 
 assert.equal(consumeSkillUse(first, {
   skillId: 'SK_UNKNOWN_01', castId: 'cast-unknown', castAccepted: true,

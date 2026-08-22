@@ -54,6 +54,7 @@ function runtimeContract(source){
   const migration=sourceSection(source,'function migrateLoadedState(', '\nlet remoteSaveReady=');
   const monsterSkills=sourceSection(source,'function getMonsterSkills(', '\nfunction randomGenes(');
   const useSkill=sourceSection(source,'function useSkill(', '\nfunction updateOwned(');
+  const mastery=sourceSection(source,'function awardAcceptedSkillMastery(', '\nfunction applyAcceptedSkillCommand(');
   const learnCandidate=sourceSection(source,'function learnCandidateSkill(', '\nfunction mutateOwnedSkill(');
   assert.match(makeInstance,/synchronizeStage1Learnset\(inst\);/);
   assert.match(defeatWild,/applyBattleGrowth\(inst,result\);[\s\S]*?synchronizeStage1Learnset\(inst\);/);
@@ -64,7 +65,9 @@ function runtimeContract(source){
   assert.match(migration,/state\.collection\.forEach\(synchronizeStage1Learnset\);/);
   assert.match(monsterSkills,/if\(cand\?\.replaces&&rec\.slot===cand\.slot\)/);
   assert.doesNotMatch(useSkill,/learnSkill\(a\.inst/);
-  assert.match(useSkill,/addSkillExp\(a\.inst,skillRec\.skillId,sExp\)/);
+  assert.doesNotMatch(mastery,/learnSkill\(a\.inst/);
+  assert.match(mastery,/const skillRec=getSkill\(a\.inst,move\.skillId\)/);
+  assert.match(mastery,/addSkillExp\(a\.inst,move\.skillId,sExp\)/);
   assert.match(learnCandidate,/learnSkill\(inst,\{skillId:def\.id,slot:null\}\)/);
 }
 
@@ -98,7 +101,7 @@ const runtimeMutants=[
   ['skip raising-event sync','if(result.ok){synchronizeStage1Learnset(inst);','if(result.ok){'],
   ['skip hatch sync','\n  synchronizeStage1Learnset(child);\n  refreshStats(child,true);','\n  refreshStats(child,true);'],
   ['skip loaded-save sync','\n  state.collection.forEach(synchronizeStage1Learnset);',''],
-  ['restore lazy casting learn','const skillRec=a.inst.skills.find(skill=>skill?.slot===\'s\'+(index+1))||getSkill(a.inst,move.name);','let skillRec=getSkill(a.inst,move.name);if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.name,slot:\'s\'+(index+1)});'],
+  ['restore lazy casting learn','const skillRec=getSkill(a.inst,move.skillId);','let skillRec=getSkill(a.inst,move.skillId);if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.skillId,slot:\'s\'+(index+1)});'],
   ['restore candidate auto-equip','learnSkill(inst,{skillId:def.id,slot:null});','learnSkill(inst,{skillId:def.id,slot:def.slot||\'s1\'});'],
   ['apply unequipped candidate','if(cand?.replaces&&rec.slot===cand.slot){','if(cand?.replaces){'],
 ];
