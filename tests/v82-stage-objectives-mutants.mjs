@@ -5,13 +5,13 @@ const objectiveSource=fs.readFileSync(new URL('../stage-objectives.mjs',import.m
 const gameSource=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const htmlSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 
-async function loadResolver(source,label){
+async function loadObjectiveModule(source,label){
   const url=`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}#${encodeURIComponent(label)}`;
-  return (await import(url)).resolveStageObjective;
+  return import(url);
 }
 
 async function assertObjectiveContract(source,label='baseline'){
-  const resolve=await loadResolver(source,label);
+  const {resolveStageObjective:resolve,requiresStageClearReconciliation:requiresReconciliation,runStageClearReconciliation:runReconciliation}=await loadObjectiveModule(source,label);
   const zone={stageId:'grass-meadow',progressionBossSpeciesId:'mossbun'};
   const input={zoneId:'grass-meadow',zone,stageProgress:{cleared:[]},starterJourney:{grassMeadow:{captured:false}},eliteProgress:{defeated:{}},bossProgress:{defeated:{}}};
   assert.equal(resolve(input).phase,'capture-starter');
@@ -19,10 +19,21 @@ async function assertObjectiveContract(source,label='baseline'){
   assert.equal(resolve(input).phase,'defeat-elite');
   input.eliteProgress.defeated['grass-meadow:mossbun']={count:1};
   assert.equal(resolve(input).phase,'defeat-boss');
+  const legacyBossOnly=structuredClone(input);
+  legacyBossOnly.eliteProgress.defeated={};
   input.bossProgress.defeated['grass-meadow:mossbun']={count:1};
-  assert.equal(resolve(input).phase,'stage-clear-pending');
+  legacyBossOnly.bossProgress.defeated['grass-meadow:mossbun']={count:1};
+  const pending=resolve(input);
+  assert.equal(pending.phase,'stage-clear-pending');
+  assert.equal(resolve(legacyBossOnly).phase,'stage-clear-pending');
+  assert.equal(requiresReconciliation(pending),true);
+  const reconciled=[];
+  assert.equal(runReconciliation({objective:pending,stageId:'grass-meadow',completeStageClear:stage=>reconciled.push(stage)}),true);
+  assert.deepEqual(reconciled,['grass-meadow']);
   input.stageProgress.cleared=['grass-meadow'];
-  assert.equal(resolve(input).phase,'stage-cleared');
+  const cleared=resolve(input);
+  assert.equal(cleared.phase,'stage-cleared');
+  assert.equal(requiresReconciliation(cleared),false);
 }
 
 function assertRuntimeContract(game,html){
@@ -35,8 +46,16 @@ function assertRuntimeContract(game,html){
   assert.match(game,/const replacesProgressionElite=[\s\S]*?if\(!replacesProgressionElite\)respawnWild\(w,wildRespawnDelay\(w\)\)/);
   assert.match(game,/defeatWild[\s\S]*?retireWild\(w\);\s*ensureProgressionEncounter\(w\.zone\)/);
   assert.match(game,/availability\.requires===state\.currentZone[\s\S]*?stageObjectiveText\(currentStageObjective\(\)\)/);
-  const completeStageClear=game.match(/function completeStageClear\(stageId\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(completeStageClear,/state\.stageProgress=next;[\s\S]*?renderWarpPrompt\(\);/);
+  const completeStageClear=game.match(/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(completeStageClear,/state\.stageProgress=next;\s*saveGame\(false\);[\s\S]*?renderWarpPrompt\(\);/);
+  assert.match(game,/function reconcilePendingStageClear\(zone,objective\)[\s\S]*?completeStageClear:stageId=>completeStageClear\(stageId,\{recovered:true\}\)[\s\S]*?currentStageObjective\(zone\)/);
+  assert.match(game,/function spawnZone\(zone\)[\s\S]*?objective=reconcilePendingStageClear\(zone,objective\)/);
+  assert.match(game,/if\(w\.boss\)markBossProgress\(w,'defeated',false\)/);
+  assert.match(game,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)[\s\S]*?const elapsed=!recovered&&stageRunStartedAt\?/);
+  assert.match(game,/async function syncCloudSave\(\)[\s\S]*?migrateLoadedState\(remote\.state\)[\s\S]*?reloadWorldFromLoadedState\(\)/);
+  assert.match(game,/function saveGame\(show=true\)[\s\S]*?else if\(remoteSaveSyncing\)remoteSavePending=true;/);
+  assert.match(game,/async function flushRemoteSaveUntilSettled\(\)[\s\S]*?do\{[\s\S]*?remoteSavePending=false;[\s\S]*?await saveRemoteSave\(currentSaveEnvelope\(\)\);[\s\S]*?\}while\(remoteSavePending\);[\s\S]*?remoteSaveReady=true;[\s\S]*?remoteSaveSyncing=false;/);
+  assert.match(game,/async function syncCloudSave\(\)[\s\S]*?remoteSaveSyncing=true;[\s\S]*?reloadWorldFromLoadedState\(\)[\s\S]*?await flushRemoteSaveUntilSettled\(\)/);
 }
 
 await assertObjectiveContract(objectiveSource);
@@ -45,8 +64,11 @@ assertRuntimeContract(gameSource,htmlSource);
 const resolverMutants=[
   ['remove starter objective',objectiveSource.replace("if(stageId==='grass-meadow'&&!starterJourney?.grassMeadow?.captured)","if(false)")],
   ['skip required Elite',objectiveSource.replace("if(!hasProgressRecord(eliteProgress?.defeated,key))","if(false)")],
-  ['skip required Boss',objectiveSource.replace("if(!hasProgressRecord(bossProgress?.defeated,key))","if(false)")],
+  ['ignore recorded Boss defeat',objectiveSource.replace("if(hasProgressRecord(bossProgress?.defeated,key))","if(false)")],
+  ['skip required Boss',objectiveSource.replace("return {phase:'defeat-boss',encounter:'boss',speciesId,complete:false};","return {phase:'stage-clear-pending',encounter:null,speciesId:null,complete:false};")],
   ['ignore recorded stage clear',objectiveSource.replace("if(Array.isArray(stageProgress?.cleared)&&stageProgress.cleared.includes(stageId))","if(false)")],
+  ['disable interrupted-save reconciliation',objectiveSource.replace("objective?.phase==='stage-clear-pending'","false")],
+  ['skip canonical completion callback',objectiveSource.replace('  completeStageClear(stageId);','  void stageId;')],
 ];
 for(const [name,mutant] of resolverMutants){
   assert.notEqual(mutant,objectiveSource,`${name} mutation must apply`);
@@ -64,6 +86,13 @@ const runtimeMutants=[
   ['require reload after Elite',gameSource.replace('ensureProgressionEncounter(w.zone);','void w.zone;'),htmlSource],
   ['restore generic warp lock text',gameSource.replace("if(availability.requires===state.currentZone)return stageObjectiveText(currentStageObjective());",''),htmlSource],
   ['leave an open warp prompt locked after Boss clear',gameSource.replace('  renderWarpPrompt();\n  renderStageReward({definition,first,rewards,elapsed});','  renderStageReward({definition,first,rewards,elapsed});'),htmlSource],
+  ['leave interrupted Boss clear unreconciled',gameSource.replace('  objective=reconcilePendingStageClear(zone,objective);','  void objective;'),htmlSource],
+  ['persist half-completed Boss defeat',gameSource.replace("markBossProgress(w,'defeated',false)","markBossProgress(w,'defeated')"),htmlSource],
+  ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  saveGame(false);','  state.stageProgress=next;'),htmlSource],
+  ['record fake recovery best time',gameSource.replace('const elapsed=!recovered&&stageRunStartedAt?', 'const elapsed=stageRunStartedAt?'),htmlSource],
+  ['leave cloud save pending clear unreconciled',gameSource.replace('      reloadWorldFromLoadedState();','      void remote.state;'),htmlSource],
+  ['drop local saves during initial Cloud sync',gameSource.replace('  else if(remoteSaveSyncing)remoteSavePending=true;',''),htmlSource],
+  ['leave reconciled Cloud document stale',gameSource.replace('    await flushRemoteSaveUntilSettled();','    void currentSaveEnvelope();'),htmlSource],
 ];
 for(const [name,game,html] of runtimeMutants){
   assert.throws(()=>assertRuntimeContract(game,html),undefined,`${name} must be killed`);

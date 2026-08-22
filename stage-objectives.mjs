@@ -13,11 +13,21 @@ export function resolveStageObjective({zoneId,zone,stageProgress,starterJourney,
     return {phase:'capture-starter',encounter:null,speciesId:null,complete:false};
   }
   const key=`${stageId}:${speciesId}`;
+  if(hasProgressRecord(bossProgress?.defeated,key)){
+    return {phase:'stage-clear-pending',encounter:null,speciesId:null,complete:false};
+  }
   if(!hasProgressRecord(eliteProgress?.defeated,key)){
     return {phase:'defeat-elite',encounter:'elite',speciesId,complete:false};
   }
-  if(!hasProgressRecord(bossProgress?.defeated,key)){
-    return {phase:'defeat-boss',encounter:'boss',speciesId,complete:false};
-  }
-  return {phase:'stage-clear-pending',encounter:null,speciesId:null,complete:false};
+  return {phase:'defeat-boss',encounter:'boss',speciesId,complete:false};
+}
+
+export function requiresStageClearReconciliation(objective){
+  return objective?.phase==='stage-clear-pending';
+}
+
+export function runStageClearReconciliation({objective,stageId,completeStageClear}={}){
+  if(!requiresStageClearReconciliation(objective)||!stageId||typeof completeStageClear!=='function')return false;
+  completeStageClear(stageId);
+  return true;
 }

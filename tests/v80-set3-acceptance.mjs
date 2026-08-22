@@ -31,7 +31,7 @@ assert.equal(stageUnlockReason(fresh,'dragon-crater').ok,true,'full Set 3 unlock
 assert.equal(stageUnlockReason({...fresh,cleared:fresh.cleared.filter(id=>id!=='steel-factory')},'dragon-crater').ok,false,'partial Set 3 keeps Dragon Crater locked');
 const malformed=normalizeStageProgress({cleared:['dream-shrine','steel-factory'],setCleared:{'set-3':true},firstClearRewards:{}});
 assert.equal(stageUnlockReason(malformed,'dragon-crater').ok,false,'malformed persisted set flag cannot unlock Dragon Crater');
-assert.match(js,/function completeStageClear\(stageId\)\{[\s\S]*?const first=!next\.firstClearRewards\[stageId\]/,'first-clear reward remains idempotent');
+assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?const first=!next\.firstClearRewards\[stageId\]/,'first-clear reward remains idempotent');
 for(const id of set3){
   const block=js.match(new RegExp(`['"]${id}['"]\\s*:\\s*\\{[\\s\\S]*?(?=\\n  ['"](?:steel-factory|sky-ruins|rocky-canyon)['"]\\s*:)`))?.[0]||'';
   assert.match(block,/spawn:\[/,`${id} has Normal encounters`);

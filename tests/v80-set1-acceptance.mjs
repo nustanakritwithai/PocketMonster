@@ -38,7 +38,7 @@ for(const id of set1Ids){
   assert.match(zoneBlock,/progressionBossSpeciesId:/,`${id} has deterministic Boss progression`);
 }
 assert.match(js,/STAGE_CATALOG/,'Stage Select consumes the shared catalog');
-assert.match(js,/function completeStageClear\(stageId\)/,'Stage clear/reward path exists');
+assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)/,'Stage clear/reward path exists');
 assert.match(css,/stage-select-card/,'Stage Select remains mobile-first');
 assert.match(css,/stage-reward-card/,'Stage reward remains mobile-first');
 console.log('V8 Set 1 Acceptance: PASS (Grass, Ember, Misty, Storm)');
