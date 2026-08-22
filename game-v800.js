@@ -2,7 +2,7 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, stageUnlockReason } from './stage-catalog.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, recordStageClear, stageUnlockReason } from './stage-catalog.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -2206,7 +2206,7 @@ function ensureStarter(){
 }
 
 // ---------- World zones / wild encounters ----------
-let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;
+let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
 characterUI=createCharacterUIController({
   getState:()=>state,
   getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
@@ -2365,6 +2365,7 @@ function switchZone(zone,silent=false){
   clearWilds();
   clearTransientEffects();
   closeStageSelect();
+  closeStageReward();
   el('monsterManager').classList.add('hidden');
   characterUI.closeAll();
   state.currentZone=zone;
@@ -2373,6 +2374,7 @@ function switchZone(zone,silent=false){
     journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
     journey.grassMeadow.entered=true;
     state.starterJourney=journey;
+    stageRunStartedAt=Date.now();
   }
   playBGM(zone);
   startAmbient(zone);
@@ -2478,6 +2480,22 @@ function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+a
 let battleEventLog=[];
 function logBattleEvent(category,amount,meaningful=true){if(TRAINING_LINES.includes(category)&&amount>0)battleEventLog.push({category,amount,meaningful});}
 function getEnemyTier(w){if(w.boss)return'boss';if(w.elite)return'elite';if(w.trial)return'trial';if(w.strong)return'strong';return'normal';}
+function completeStageClear(stageId){
+  const definition=STAGE_BY_ID[stageId];
+  if(!definition)return '';
+  const elapsed=stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
+  const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
+  const first=!next.firstClearRewards[stageId];
+  const rewards={captureBalls:5,healthy:2,mineralBite:1};
+  if(first){
+    for(const [key,value] of Object.entries(rewards))state.inventory[key]=(state.inventory[key]||0)+value;
+    next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
+  }
+  state.stageProgress=next;
+  renderStageSelect();
+  renderStageReward({definition,first,rewards,elapsed});
+  return first?' • รางวัลครั้งแรก +Capture Ball 5 +อาหารฟื้นฟู 2 +แร่บำรุง 1':' • เคลียร์ด่านแล้ว';
+}
 function defeatWild(w){
   if(w.dead)return;
   w.dead=true;
@@ -2511,6 +2529,7 @@ function defeatWild(w){
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
+  const clearSummary=w.boss&&w.zone==='grass-meadow'?completeStageClear('grass-meadow'):'';
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':w.rare?'RARE ':'';
   let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${playerExp} Player EXP`;
   if(activeSummon){
@@ -2519,7 +2538,7 @@ function defeatWild(w){
     if(trainSummary)battleMsg+=trainSummary;
     if(partyShareLine)battleMsg+=partyShareLine;
   }
-  msg(battleMsg);
+  msg(battleMsg+clearSummary);
   renderAll();
   saveGame(false);
   const meadowEliteCleared=w.elite&&w.zone==='grass-meadow'&&!state.bossProgress?.defeated?.['grass-meadow:mossbun'];
@@ -4177,6 +4196,17 @@ function openStageSelect(){
   el('stageSelect')?.classList.remove('hidden');
 }
 function closeStageSelect(){el('stageSelect')?.classList.add('hidden');}
+function renderStageReward({definition,first,rewards,elapsed}){
+  const title=el('stageRewardTitle'),summary=el('stageRewardSummary'),list=el('stageRewardList');
+  if(!title||!summary||!list)return;
+  title.textContent=`${definition.displayName} เคลียร์แล้ว!`;
+  summary.textContent=`Boss ถูกปราบ • เวลา ${elapsed?`${elapsed} วินาที`:'—'} • ${first?'ได้รับรางวัลครั้งแรก':'รางวัลครั้งแรกได้รับไปแล้ว'}`;
+  list.replaceChildren();
+  const labels={captureBalls:'🔴 Capture Ball',healthy:'💚 อาหารฟื้นฟู',mineralBite:'🪨 แร่บำรุง'};
+  for(const [key,value] of Object.entries(rewards)){const item=document.createElement('div');item.className='stage-reward-item';item.textContent=`${labels[key]||key} +${value}`;list.append(item);}
+  el('stageReward')?.classList.remove('hidden');
+}
+function closeStageReward(){el('stageReward')?.classList.add('hidden');}
 function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ออกล่า → ทุ่ง • Wild 6';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
@@ -4379,6 +4409,8 @@ el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV
 el('zoneToggleBtn').onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.toggle('hidden');};
 el('stageSelectBtn').onclick=()=>{playSFX('sfx_ui_click');openStageSelect();};
 el('stageSelectClose').onclick=()=>{playSFX('sfx_ui_click');closeStageSelect();};
+el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
+el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 document.querySelectorAll('#zoneDropdown [data-zone]').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');el('zoneDropdown').classList.add('hidden');switchZone(b.dataset.zone);});
 addEventListener('pointerdown',e=>{const dd=el('zoneDropdown');if(!dd.classList.contains('hidden')&&!el('zoneTravel').contains(e.target))dd.classList.add('hidden');});
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');switchZone(state.currentZone==='hub'?'grassland':'hub');};
