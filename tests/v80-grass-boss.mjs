@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+
+assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+const grassStage=js.match(/["']grass-meadow["']\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
+assert.match(grassStage,/bossSpawn:/,'Grass Meadow Boss spawn pool exists');
+assert.match(grassStage,/grassMeadowBoss\.level/,'Boss level is balance-configured');
+assert.match(grassStage,/bossEncounterTableId:'grass-meadow-boss-v1'/,'Boss encounter table is explicit');
+assert.match(js,/function markBossProgress\(/,'Boss progress handler exists');
+assert.match(js,/bossProgress:\{found:\{\},defeated:\{\}\}/,'Boss progress state is persisted');
+assert.match(js,/state\.eliteProgress\?\.defeated\?\.\['grass-meadow:mossbun'\]/,'Boss requires the Grass Meadow Elite to be defeated');
+assert.match(js,/!state\.bossProgress\?\.defeated\?\.\['grass-meadow:mossbun'\]/,'Boss does not repeat after clear');
+assert.match(js,/const bossReady=zone==='grass-meadow'/,'Boss is selected by a zone-ready gate');
+assert.match(js,/if\(bossReady&&cfg\.bossSpawn\?\.length\)/,'Boss replaces the next empty-zone refill');
+assert.match(js,/const meadowEliteCleared=w\.elite&&w\.zone==='grass-meadow'/,'Elite is not respawned while the first Boss is pending');
+assert.match(js,/if\(w\.boss\)markBossProgress\(w,'defeated'\)/,'Boss defeat is recorded');
+assert.match(js,/capturePolicy=boss\?'disabled'/,'Boss capture remains disabled');
+assert.match(css,/world-monster-label\.boss/,'Boss label styling remains available');
+console.log('V8.3 Grass Meadow Boss Spawn: PASS');
