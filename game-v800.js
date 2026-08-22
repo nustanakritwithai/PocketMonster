@@ -343,6 +343,16 @@ function makeRuinPillar(x,z,s=1,tone=0x64748b){
   cap.position.y=2.55*s; cap.rotation.y=.12; g.add(cap);
   g.position.set(x,0,z); g.rotation.y=(x+z)*.03; addDeco(g); return g;
 }
+function makeMarshReed(x,z,s=1){
+  const g=new THREE.Group();
+  for(const [dx,h,tilt] of [[-.12,.9,.12],[.04,1.2,-.08],[.18,.72,.2]]){
+    const stem=new THREE.Mesh(boxGeometry(.06*s,h*s,.06*s),mat(0x365314,.82,.03));
+    stem.position.set(dx*s,h*.5*s,0); stem.rotation.z=tilt; g.add(stem);
+  }
+  const flower=new THREE.Mesh(boxGeometry(.16*s,.16*s,.16*s),glowMat(0xa855f7,0xa855f7,.1,.52,.04));
+  flower.position.set(.04*s,1.22*s,0); g.add(flower);
+  g.position.set(x,0,z); g.rotation.y=(x-z)*.2; addDeco(g); return g;
+}
 function makeFencePost(x,z){
   const post=new THREE.Mesh(boxGeometry(.1,.7,.1),mat(0x8b5e34,.86,.02));
   post.position.set(x,.35,z); addDeco(post); return post;
@@ -419,6 +429,14 @@ function populateWorld(zone='hub'){
       tile.position.set(0,.025,z); addDeco(tile);
     }
     for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xc4b5fd);
+  }else if(zone==='poison-marsh'){
+    [[-18,10,1.2],[18,10,1.1],[-18,-10,1.3],[18,-10,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x365314));
+    [[-15,5,1.1],[15,5,1.2],[15,-14,1.3],[-15,-14,1.05],[-7,12,1],[7,-12,1.1]].forEach(([x,z,s])=>makeMarshReed(x,z,s));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0x84cc16,transparent:true,opacity:.24}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xd9f99d);
   }else if(zone==='frozen-pass'){
     [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.25],[-8,-17,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x94a3b8));
     [[-15,5,1.2],[15,5,1.1],[15,-14,1.35],[-15,-14,1.2],[5,15,1.15],[-5,-15,1.2],[-4,-5,1],[8,-8,1.1]].forEach(([x,z,s])=>makeIceCrystal(x,z,s));
@@ -2294,6 +2312,9 @@ const ZONES={
   'storm-field':{label:'Storm Field • Electric + Flying + Steel',stageId:'storm-field',biomeId:'storm-field',bg:0x1e40af,ground:0x1e3a8a,spawn:[
     ['voltkit',-11,2,12,{}],['voltkit',11,2,12,{}],['galebird',-11,-8,12,{}],['galebird',11,-8,12,{}],['ironbug',-7,-14,13,{}],['ironbug',7,-14,13,{}]
   ],eliteSpawn:[['voltkit',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,18,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:{min:12,max:18},sceneStatus:'stage-ready'},
+  'poison-marsh':{label:'Poison Marsh • Poison + Grass + Bug',stageId:'poison-marsh',biomeId:'poison-marsh',bg:0x6b7f4a,ground:0x365314,spawn:[
+    ['toxitoad',-11,2,31,{}],['toxitoad',11,2,31,{}],['mossbun',-11,-8,31,{}],['mossbun',11,-8,31,{}],['buglet',-7,-14,32,{}],['toxitoad',7,-14,32,{}]
+  ],eliteSpawn:[['toxitoad',0,-16,35,{elite:true}]],eliteChance:.16,bossSpawn:[['toxitoad',0,-18,38,{boss:true}]],progressionBossSpeciesId:'toxitoad',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Poison'],secondaryTypes:['Grass','Bug'],encounterTableId:'encounter-poison-marsh-v1',eliteEncounterTableId:'elite-poison-marsh-v1',bossEncounterTableId:'boss-poison-marsh-v1',balanceProfileId:'stage-poison-marsh-v1',recommendedLevel:{min:30,max:38},sceneStatus:'stage-ready'},
   'sky-ruins':{label:'Sky Ruins • Flying + Electric + Psychic',stageId:'sky-ruins',biomeId:'sky-ruins',bg:0x8da4c7,ground:0x64748b,spawn:[
     ['galebird',-11,2,24,{}],['galebird',11,2,24,{}],['voltkit',-11,-8,24,{}],['voltkit',11,-8,24,{}],['mindcoon',-7,-14,25,{}],['galebird',7,-14,25,{}]
   ],eliteSpawn:[['galebird',0,-16,27,{elite:true}]],eliteChance:.16,bossSpawn:[['galebird',0,-18,30,{boss:true}]],progressionBossSpeciesId:'galebird',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Flying'],secondaryTypes:['Electric','Psychic'],encounterTableId:'encounter-sky-ruins-v1',eliteEncounterTableId:'elite-sky-ruins-v1',bossEncounterTableId:'boss-sky-ruins-v1',balanceProfileId:'stage-sky-ruins-v1',recommendedLevel:{min:24,max:30},sceneStatus:'stage-ready'},
@@ -2346,6 +2367,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.25;
     sun.intensity=1.65;
     sun.color.setHex(0xc7d2fe);
+  }else if(zone==='poison-marsh'){
+    hemi.intensity=1.05;
+    sun.intensity=1.35;
+    sun.color.setHex(0xb7d48a);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2355,14 +2380,14 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='rocky-canyon'?'rocky':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='poison-marsh'?'marsh':zone==='rocky-canyon'?'rocky':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
   scene.background=makeSkyTexture(z.bg);
   scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
-  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:zone==='rocky-canyon'?24:zone==='sky-ruins'?22:30;
-  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:zone==='sky-ruins'?80:76;
+  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:zone==='rocky-canyon'?24:zone==='sky-ruins'?22:zone==='poison-marsh'?18:30;
+  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:zone==='sky-ruins'?80:zone==='poison-marsh'?58:76;
   setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){

@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { STAGE_BY_ID, createStageProgress, recordStageClear, stageUnlockReason } from '../stage-catalog.mjs';
+import { routesFrom } from '../warp-routes.mjs';
+import { activeJs as js } from './active-assets.mjs';
+
+const stage=STAGE_BY_ID['poison-marsh'];
+assert.ok(stage,'Poison Marsh catalog definition exists');
+assert.equal(stage.unlockRule.stageId,'sky-ruins','Poison Marsh follows Sky Ruins');
+assert.deepEqual(stage.primaryTypes,['Poison'],'Poison Marsh is Poison-led');
+assert.equal(stage.capturePolicy,'normal-wild-only','Poison Marsh keeps Boss capture disabled policy');
+assert.equal(routesFrom('sky-ruins').some(route=>route.to==='poison-marsh'),true,'Sky Ruins has Poison Marsh warp');
+assert.equal(routesFrom('poison-marsh').some(route=>route.to==='sky-ruins'),true,'Poison Marsh has return warp');
+const progress=createStageProgress();
+for(const id of ['storm-field','frozen-pass','rocky-canyon','sky-ruins'])Object.assign(progress,recordStageClear(progress,id));
+assert.equal(stageUnlockReason(progress,'poison-marsh').ok,true,'Sky Ruins clear unlocks Poison Marsh');
+const zoneBlock=js.match(/['"]poison-marsh['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+assert.match(zoneBlock,/stageId:'poison-marsh'/,'Poison Marsh runtime zone is catalog-linked');
+assert.match(zoneBlock,/spawn:\[/,'Poison Marsh has Normal encounter spawn data');
+assert.match(zoneBlock,/eliteSpawn:\[/,'Poison Marsh has Elite encounter data');
+assert.match(zoneBlock,/bossSpawn:\[/,'Poison Marsh has Boss encounter data');
+assert.match(zoneBlock,/progressionBossSpeciesId:/,'Poison Marsh has deterministic Boss progression');
+assert.match(zoneBlock,/sceneStatus:'stage-ready'/,'Poison Marsh is presentation-only');
+assert.match(js,/zone==='poison-marsh'\?'marsh'/,'Poison Marsh uses its own ground presentation');
+assert.doesNotMatch(zoneBlock,/playerData\.hp|status|damage|teleport|fly|jump/,'Poison Marsh has no terrain/combat side effects');
+console.log('V8 Poison Marsh: PASS');
