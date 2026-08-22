@@ -106,3 +106,66 @@ export function validateMonsterCatalog(records) {
 export function monsterCatalogEntry(runtimeSpeciesId) {
   return MONSTER_BY_RUNTIME_ID.get(runtimeSpeciesId) ?? null;
 }
+
+function adapterDiagnostic(code, runtimeSpeciesId, detail = {}) {
+  return Object.freeze({ code, runtimeSpeciesId, ...detail });
+}
+
+export function createSpeciesCatalogAdapter(runtimeSpeciesRecords = []) {
+  const records = Array.isArray(runtimeSpeciesRecords) ? runtimeSpeciesRecords : [];
+  const diagnostics = [];
+  const byId = Object.create(null);
+
+  for (const species of records) {
+    const runtimeSpeciesId = species?.id;
+    if (typeof runtimeSpeciesId !== 'string' || runtimeSpeciesId.length === 0) {
+      diagnostics.push(adapterDiagnostic('invalid_runtime_species', runtimeSpeciesId ?? null));
+      continue;
+    }
+    if (byId[runtimeSpeciesId]) {
+      diagnostics.push(adapterDiagnostic('duplicate_runtime_species', runtimeSpeciesId));
+      continue;
+    }
+    byId[runtimeSpeciesId] = species;
+    const mapping = monsterCatalogEntry(runtimeSpeciesId);
+    if (!mapping) {
+      diagnostics.push(adapterDiagnostic('unknown_runtime_species', runtimeSpeciesId));
+      continue;
+    }
+    const primaryType = species?.types?.[0] ?? null;
+    if (primaryType !== mapping.runtimeType) {
+      diagnostics.push(adapterDiagnostic('runtime_type_mismatch', runtimeSpeciesId, {
+        expected: mapping.runtimeType,
+        value: primaryType,
+      }));
+    }
+  }
+
+  const presentIds = new Set(Object.keys(byId));
+  for (const mapping of MONSTER_CATALOG) {
+    if (!presentIds.has(mapping.runtimeSpeciesId)) {
+      diagnostics.push(adapterDiagnostic('missing_runtime_species', mapping.runtimeSpeciesId));
+    }
+  }
+
+  Object.freeze(byId);
+  const frozenDiagnostics = Object.freeze(diagnostics);
+  return Object.freeze({
+    byId,
+    diagnostics: frozenDiagnostics,
+    resolve(runtimeSpeciesId) {
+      const species = byId[runtimeSpeciesId] ?? null;
+      const mapping = monsterCatalogEntry(runtimeSpeciesId);
+      if (!species || !mapping) {
+        return Object.freeze({
+          ok: false,
+          reason: 'unknown_species_id',
+          runtimeSpeciesId,
+          species: null,
+          mapping: null,
+        });
+      }
+      return Object.freeze({ ok: true, reason: null, runtimeSpeciesId, species, mapping });
+    },
+  });
+}

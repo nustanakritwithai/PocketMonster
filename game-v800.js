@@ -42,6 +42,7 @@ import {
   equipmentById,
   foodById,
 } from './content-catalog.mjs';
+import { createSpeciesCatalogAdapter } from './monster-catalog.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
@@ -601,7 +602,9 @@ const species=[
   ],evo:{id:'fairimp_lv2',name:'Fairimp',form:'fairimp',color:0xf9a8d4,scale:1.03,statMods:{hp:1.08,atk:1.08,def:1.08,spd:1.14},requires:{level:2}}})
 ];
 applySpeciesProgression(species);
-const spById=Object.fromEntries(species.map(s=>[s.id,s]));
+const speciesCatalogAdapter=createSpeciesCatalogAdapter(species);
+if(speciesCatalogAdapter.diagnostics.length)console.warn('Species catalog diagnostics',speciesCatalogAdapter.diagnostics);
+const spById=speciesCatalogAdapter.byId;
 const personalities=['Brave','Calm','Playful','Lazy','Aggressive','Curious'];
 const POTENTIALS=['D','C','B','A','S'];
 // V7.2 Balance Foundation gene scale: narrow 8% spread (D=0.96 → S=1.04)
