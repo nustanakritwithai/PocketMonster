@@ -41,8 +41,8 @@ assert.doesNotMatch(lighting, /scene\.children\.find/, 'lighting uses the named 
 
 assert.match(ground, /setZoneLighting\(zone\)/, 'ground swap also applies zone lighting');
 assert.match(ground, /scene\.fog\.color\.setHex\(zone==='cave'\?0x1e293b:\(zone==='hub'\?0x65c9f5:z\.bg\)\)/, 'hub fog is table 0x65c9f5, cave 0x1e293b, meadow uses sky');
-assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:zone==='poison-marsh'\?18:zone==='dream-shrine'\?20:30/, 'stage fog uses readable near distances');
-assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:zone==='poison-marsh'\?58:zone==='dream-shrine'\?64:76/, 'stage fog uses readable far distances');
+assert.match(ground, /scene\.fog\.near=zone==='cave'\?15:zone==='frozen-pass'\?18:zone==='rocky-canyon'\?24:zone==='sky-ruins'\?22:zone==='poison-marsh'\?18:zone==='dream-shrine'\?20:zone==='haunted-woods'\?14:30/, 'stage fog uses readable near distances');
+assert.match(ground, /scene\.fog\.far=zone==='cave'\?50:zone==='frozen-pass'\?62:zone==='rocky-canyon'\?68:zone==='sky-ruins'\?80:zone==='poison-marsh'\?58:zone==='dream-shrine'\?64:zone==='haunted-woods'\?48:76/, 'stage fog uses readable far distances');
 assert.match(ground, /makeGroundTexture\(z\.ground,type\)/, 'zone still swaps the tiled ground map');
 assert.match(ground, /makeSkyTexture\(z\.bg\)/, 'zone still swaps the sky gradient');
 
@@ -54,6 +54,7 @@ assert.match(painterSrc, /scatter\(img, 34, 3, 2, \[120, 53, 15\]/, 'Rocky Canyo
 assert.match(painterSrc, /scatter\(img, 34, 2, 2, \[51, 65, 85\]/, 'Sky Ruins grid uses slate ruin speckles');
 assert.match(painterSrc, /scatter\(img, 34, 2, 3, \[132, 204, 22\]/, 'Poison Marsh grid uses lime marsh speckles');
 assert.match(painterSrc, /scatter\(img, 34, 2, 2, \[216, 180, 254\]/, 'Dream Shrine grid uses violet shrine speckles');
+assert.match(painterSrc, /scatter\(img, 34, 3, 2, \[71, 85, 105\]/, 'Haunted Woods grid uses slate woods speckles');
 assert.match(painterSrc, /scatter\(img, 30, 2, 4, \[0, 100, 0\]/, 'grass grid keeps green marks');
 
 const cave = paintGroundGrid(0x57606f, 'cave');
@@ -74,5 +75,8 @@ assert.ok(pixelDiffRatio(marsh, marshAsGrass) > 0.002, 'Poison Marsh speckles di
 const shrine = paintGroundGrid(0x6d28d9, 'shrine');
 const shrineAsGrass = paintGroundGrid(0x6d28d9, 'grass');
 assert.ok(pixelDiffRatio(shrine, shrineAsGrass) > 0.002, 'Dream Shrine speckles differ from grass marks');
+const woods = paintGroundGrid(0x334155, 'woods');
+const woodsAsGrass = paintGroundGrid(0x334155, 'grass');
+assert.ok(pixelDiffRatio(woods, woodsAsGrass) > 0.002, 'Haunted Woods speckles differ from grass marks');
 
 console.log('V8.0 blocky atmosphere: PASS');
