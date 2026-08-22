@@ -23,6 +23,13 @@ export const STATUS_APPLICATION_POLICY = Object.freeze({
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
 });
 
+export const HARD_CC_DR_RULES = Object.freeze({
+  windowSec: 6,
+  durationMultipliers: Object.freeze([1, 0.65, 0.4]),
+  minimumDurationSec: 0.25,
+  historyScope: 'shared_target_all_hard_cc',
+});
+
 const RAW_STATUS_TYPE_RULES = [
   ['FIRE', 'ST_BURN', 'Immune', 100],
   ['POISON', 'ST_POISON', 'Immune', 100],
@@ -83,6 +90,59 @@ function readStatusRoll(rng) {
     return statusResult(false, 'invalid_rng_value', { rngDraws: 1 });
   }
   return statusResult(true, null, { roll, rngDraws: 1 });
+}
+
+export function resolveHardCcDuration({
+  statusId,
+  baseDurationSec,
+  nowSec,
+  history = [],
+} = {}) {
+  const status = statusCatalogEntry(statusId);
+  if (!status) return statusResult(false, 'unknown_status', { statusId: statusId ?? null });
+  if (!status.hardCC || status.category !== 'HardCC') {
+    return statusResult(false, 'not_hard_cc', { statusId });
+  }
+  if (!Number.isFinite(nowSec) || nowSec < 0) {
+    return statusResult(false, 'invalid_time', { statusId, nowSec: nowSec ?? null });
+  }
+  if (!Array.isArray(history) || history.some(entry => (
+    !entry || typeof entry !== 'object'
+      || typeof entry.statusId !== 'string'
+      || !Number.isFinite(entry.atSec)
+      || entry.atSec < 0
+      || entry.atSec > nowSec
+  ))) {
+    return statusResult(false, 'invalid_history', { statusId });
+  }
+
+  const duration = baseDurationSec == null ? status.baseDurationSec : baseDurationSec;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return statusResult(false, 'invalid_duration', { statusId, baseDurationSec: duration ?? null });
+  }
+
+  const rules = HARD_CC_DR_RULES;
+  const activeHistory = history.filter(entry => nowSec - entry.atSec < rules.windowSec);
+  const drTier = Math.min(3, activeHistory.length + 1);
+  const durationMultiplier = rules.durationMultipliers[drTier - 1];
+  const durationSec = Math.max(rules.minimumDurationSec, duration * durationMultiplier);
+  const current = Object.freeze({ statusId, atSec: nowSec });
+  const nextHistory = Object.freeze([
+    ...activeHistory.map(entry => Object.freeze({ statusId: entry.statusId, atSec: entry.atSec })),
+    current,
+  ]);
+
+  return statusResult(true, null, {
+    statusId,
+    baseDurationSec: duration,
+    durationSec,
+    durationMultiplier,
+    drTier,
+    applicationsInWindow: activeHistory.length,
+    windowSec: rules.windowSec,
+    minimumDurationSec: rules.minimumDurationSec,
+    nextHistory,
+  });
 }
 
 export function resolveStatusApplication({
