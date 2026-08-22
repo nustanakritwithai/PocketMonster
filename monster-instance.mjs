@@ -119,7 +119,11 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
     traitIds,
     body,
     mind,
-    skills: Array.isArray(source.skills) ? source.skills.slice() : [],
+    // Skill runtime fields (uses/cooldowns) belong to this monster instance.
+    // Clone records so normalizing the same raw object cannot share mutations.
+    skills: Array.isArray(source.skills)
+      ? source.skills.map(skill => skill && typeof skill === 'object' ? { ...skill } : skill)
+      : [],
     equipment: {
       gear: source.equipment?.gear ?? null,
       charm: source.equipment?.charm ?? null,
