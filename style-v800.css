@@ -561,6 +561,39 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 }
 /* Ranch Storage Phase 1 */
 .ranch-services,.ranch-storage-page{position:fixed;inset:0;z-index:190;pointer-events:auto;background:#020617cc;padding:14px;overflow:auto}.ranch-services-card{width:min(480px,94vw);margin:8vh auto;background:#0f172a;border:1px solid #ffffff22;border-radius:18px;padding:18px}.ranch-services-card header,.ranch-storage-head{display:flex;align-items:center;gap:10px}.ranch-services-card h2,.ranch-storage-head h2{margin:0;flex:1}.ranch-services-card button,.ranch-storage-head button{pointer-events:auto;touch-action:manipulation;min-height:var(--touch-min)}.ranch-services-card>button{display:block;width:100%;margin-top:9px}.ranch-storage-page{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1fr) minmax(180px,1fr);grid-template-rows:auto 1fr;gap:10px}.ranch-storage-head{grid-column:1/-1}.ranch-storage-roster,.ranch-storage-preview,.ranch-storage-details{min-width:0;overflow:auto;border:1px solid #ffffff20;border-radius:14px;background:#0f172a;padding:10px}@media(max-width:700px){.ranch-storage-page{grid-template-columns:1fr;grid-template-rows:auto auto auto auto}.ranch-storage-head{grid-column:auto;flex-wrap:wrap}.ranch-storage-roster,.ranch-storage-preview,.ranch-storage-details{min-height:120px}}
+
+/* Keeper / Ranch Storage mobile bottom sheet */
+.ranch-services-card button{border:1px solid #ffffff18;border-radius:12px;background:#172554;color:#fff;font-weight:900;font-size:13px;text-align:left;padding:10px 12px;transition:transform .16s ease,background .16s ease}
+.ranch-services-card button:active{transform:scale(.98);background:#1d4ed8}
+.ranch-storage-head .npc-sheet-handle{display:none}
+.ranch-storage-roster .manager-item{width:100%;text-align:left;cursor:pointer;touch-action:manipulation}
+.ranch-storage-roster .manager-item:active{transform:scale(.985);border-color:#93c5fd88}
+.ranch-storage-preview .focused-name{font-size:18px;font-weight:1000;color:#fff;margin-bottom:5px}
+.storage-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+.storage-actions button{min-height:var(--touch-min);border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:900;touch-action:manipulation}
+.storage-actions button:active{transform:scale(.98);filter:brightness(1.2)}
+@media(max-width:700px){
+  .ranch-services,.ranch-storage-page{align-items:end;padding:0 max(8px,var(--safe-right)) max(8px,var(--safe-bottom));overflow:hidden}
+  .ranch-services{display:grid}.ranch-storage-page{display:flex;flex-direction:column;justify-content:flex-end;gap:7px}
+  .ranch-services-card{width:100%;max-height:min(70dvh,560px);margin:0;padding:12px;border-radius:20px 20px 14px 14px;overflow:auto}
+  .ranch-services-card .npc-sheet-handle{display:block}
+  .ranch-services-card header{gap:8px}.ranch-services-card h2{font-size:18px}.ranch-services-card p{font-size:10px;margin:7px 0}
+  .ranch-services-card>button{min-height:48px;margin-top:7px}
+  .ranch-storage-page{width:100%;height:min(88dvh,720px);max-height:calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);padding:10px;border-radius:20px 20px 14px 14px;background:linear-gradient(180deg,#0f172af5,#020617f7);border:1px solid #ffffff22;overflow:auto;overscroll-behavior:contain}
+  .ranch-storage-head{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;width:100%;padding-top:10px;flex-shrink:0}
+  .ranch-storage-head .npc-sheet-handle{display:block;position:absolute;top:0;left:50%;transform:translateX(-50%)}
+  .ranch-storage-head button{font-size:10px;padding:6px 8px}.ranch-storage-head h2{font-size:17px}.ranch-storage-head span{font-size:9px;white-space:nowrap;color:#cbd5e1}
+  .ranch-storage-roster{display:flex;gap:6px;min-height:76px;max-height:92px;padding:7px;overflow-x:auto;overflow-y:hidden;flex-shrink:0;scroll-snap-type:x proximity}
+  .ranch-storage-roster .manager-empty{min-width:max-content;align-self:center}.ranch-storage-roster .manager-item{flex:0 0 auto;width:max-content;min-width:116px;margin:0;padding:8px;scroll-snap-align:start}
+  .ranch-storage-roster .manager-empty:not(:first-child){display:none}
+  .ranch-storage-preview{min-height:102px;max-height:125px;padding:10px;flex-shrink:0}
+  .ranch-storage-details{min-height:108px;padding:10px;flex:1;overflow:auto}
+  .storage-actions{position:sticky;bottom:0;grid-template-columns:repeat(2,minmax(0,1fr));padding-top:8px;background:linear-gradient(180deg,transparent,#0f172a 22%)}
+  .storage-actions button{min-height:46px}
+}
+@media(max-width:380px){
+  .ranch-storage-page{padding:8px}.ranch-storage-head h2{font-size:15px}.ranch-storage-head span{font-size:8px}.ranch-storage-roster .manager-item{min-width:104px;font-size:10px}.ranch-storage-preview .focused-name{font-size:16px}
+}
 /* Character UI Full Manager: force the reference three-column layout on every landscape browser.
    This intentionally does not depend on pointer:coarse because Android browsers can report fine input. */
 @media (orientation:landscape){
