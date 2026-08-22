@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  CONTENT_STATES,
   CONTENT_ID_PATTERNS,
   LEARNSET_METHODS,
   assertContentBundle,
@@ -25,6 +26,17 @@ assert.equal(CONTENT_ID_PATTERNS.skills.test('SK_NORMAL_01'), true, 'skill IDs m
 assert.equal(CONTENT_ID_PATTERNS.passives.test('PASS_NORMAL_01'), true, 'passive IDs match the reviewed workbook');
 assert.equal(CONTENT_ID_PATTERNS.statuses.test('ST_ATK_UP'), true, 'status IDs match the reviewed workbook');
 assert.equal(LEARNSET_METHODS.includes('RareManual'), true, 'deferred workbook methods remain schema-valid');
+assert.equal(LEARNSET_METHODS.includes('SecondaryLevel'), true, 'secondary-type level rows remain schema-valid');
+assert.equal(LEARNSET_METHODS.includes('BreedingCandidate'), true, 'breeding candidate rows remain schema-valid');
+assert.equal(CONTENT_STATES.includes('DataReady'), true, 'data-ready rows remain distinct from active rows');
+
+const dataReady = validFixture();
+dataReady.learnsets[0] = {
+  ...dataReady.learnsets[0],
+  method: 'BreedingCandidate',
+  state: 'DataReady',
+};
+assert.equal(validateContentBundle(dataReady).ok, true, 'reviewed non-active learnset enums validate without activating content');
 
 const duplicate = validFixture();
 duplicate.monsters.push({ id: 'MON_001', passiveId: 'PASS_NORMAL_01', name: 'Duplicate' });

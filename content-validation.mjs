@@ -5,8 +5,15 @@ export const CONTENT_ID_PATTERNS = Object.freeze({
   statuses: /^ST_[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
 });
 
-export const LEARNSET_METHODS = Object.freeze(['LevelUp', 'Evolution', 'Tutor', 'Breeding', 'RareManual']);
-export const CONTENT_STATES = Object.freeze(['Active', 'Deferred']);
+export const LEARNSET_METHODS = Object.freeze([
+  'LevelUp',
+  'Evolution',
+  'SecondaryLevel',
+  'Tutor',
+  'BreedingCandidate',
+  'RareManual',
+]);
+export const CONTENT_STATES = Object.freeze(['Active', 'DataReady', 'Deferred']);
 
 const REQUIRED_CATALOGS = Object.freeze(['monsters', 'skills', 'passives', 'statuses', 'learnsets', 'skillStatusLinks']);
 const MASTER_CATALOGS = Object.freeze(['monsters', 'skills', 'passives', 'statuses']);
