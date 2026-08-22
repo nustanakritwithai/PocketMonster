@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { firebaseConfig } from './firebase-config.mjs';
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -10,6 +10,12 @@ const gate = () => document.getElementById('accountGate');
 const show = id => { document.getElementById('loginPage')?.classList.toggle('hidden', id !== 'login'); document.getElementById('registerPage')?.classList.toggle('hidden', id !== 'register'); };
 
 function bindAuthUi() {
+  document.getElementById('googleLoginBtn')?.addEventListener('click', async () => {
+    const button = document.getElementById('googleLoginBtn'); button.disabled = true;
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); location.reload(); }
+    catch { text('loginStatus', 'เข้าสู่ระบบ Google ไม่สำเร็จ'); }
+    finally { button.disabled = false; }
+  });
   document.getElementById('showRegisterBtn')?.addEventListener('click', () => { show('register'); text('registerStatus', ''); });
   document.getElementById('backToLoginBtn')?.addEventListener('click', () => { show('login'); text('loginStatus', ''); });
   document.getElementById('loginForm')?.addEventListener('submit', async event => {
