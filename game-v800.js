@@ -4,6 +4,7 @@ import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createS
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
+import { resolveStageObjective } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
@@ -2060,13 +2061,38 @@ function markStarterJourney(step){
   journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
   if(step in journey.grassMeadow&&!journey.grassMeadow[step]){journey.grassMeadow[step]=true;state.starterJourney=journey;renderStarterJourney();saveGame(false);}
 }
+function currentStageObjective(zoneId=state.currentZone){
+  return resolveStageObjective({
+    zoneId,
+    zone:ZONES[zoneId],
+    stageProgress:state.stageProgress,
+    starterJourney:state.starterJourney,
+    eliteProgress:state.eliteProgress,
+    bossProgress:state.bossProgress,
+  });
+}
+function stageObjectiveText(objective,zoneId=state.currentZone){
+  const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
+  const monsterName=objective.speciesId?(spById[objective.speciesId]?.displayName||spById[objective.speciesId]?.name||objective.speciesId):'';
+  if(objective.phase==='capture-starter')return '1/3 จับมอนสเตอร์ 1 ตัว • Recall คู่หูก่อนใช้ Capture Ball';
+  if(objective.phase==='defeat-elite'){
+    const step=zoneId==='grass-meadow'?'2/3':'1/2';
+    return `${step} ปราบ ELITE ${monsterName} ที่ปรากฏในด่าน`;
+  }
+  if(objective.phase==='defeat-boss'){
+    const step=zoneId==='grass-meadow'?'3/3':'2/2';
+    return `${step} ปราบ BOSS ${monsterName} เพื่อเปิดจุดวาปด่านถัดไป`;
+  }
+  if(objective.phase==='stage-clear-pending')return `กำลังบันทึกผลการเคลียร์ ${stageName}`;
+  if(objective.phase==='stage-cleared')return `✓ เคลียร์ ${stageName} แล้ว • จุดวาปด่านถัดไปเปิดแล้ว`;
+  return 'สำรวจพื้นที่และเตรียมทีมสำหรับด่านถัดไป';
+}
 function renderStarterJourney(){
-  const panel=el('starterJourney'),stepEl=el('starterJourneyStep');
+  const panel=el('stageObjective'),stepEl=el('stageObjectiveStep');
   if(!panel||!stepEl)return;
-  const progress=state.starterJourney?.grassMeadow;
-  if(state.currentZone!=='grass-meadow'||!progress||progress.captured){panel.classList.add('hidden');return;}
-  const step=!progress.entered?'สำรวจ Grass Meadow และเดินตามทาง':!progress.battled?'ปาเรียกมอน แล้วชนะ Normal Monster':!progress.recalled?'กด Recall ก่อนเริ่มจับมอนสเตอร์':'เล็งเป้าแล้วกด Capture เพื่อเพิ่มมอนเข้าทีม';
-  panel.classList.remove('hidden');setTextIfChanged(stepEl,step);
+  if(!STAGE_BY_ID[state.currentZone]){panel.classList.add('hidden');return;}
+  const objective=currentStageObjective();
+  panel.classList.remove('hidden');setTextIfChanged(stepEl,stageObjectiveText(objective));
 }
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
@@ -2523,7 +2549,28 @@ function retireWild(w){
   if(index>=0)wilds.splice(index,1);
 }
 function livingWilds(){return wilds.filter(w=>!w.dead);}
-function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;const starterDone=state.starterJourney?.grassMeadow?.captured;const progressionKey=cfg.progressionBossSpeciesId?`${zone}:${cfg.progressionBossSpeciesId}`:null;const bossReady=Boolean(progressionKey&&state.eliteProgress?.defeated?.[progressionKey]&&!state.bossProgress?.defeated?.[progressionKey]);if(bossReady&&cfg.bossSpawn?.length){for(const [id,x,z,l,opts] of cfg.bossSpawn)createWild(spById[id],x,z,l,opts);return;}for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}const eliteGate=zone!=='grass-meadow'||starterDone;if(cfg.eliteSpawn?.length&&eliteGate&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance){for(const [id,x,z,l,opts] of cfg.eliteSpawn)createWild(spById[id],x,z,l,opts);}}
+function spawnRecords(records=[]){for(const [id,x,z,l,opts] of records)createWild(spById[id],x,z,l,opts);}
+function ensureProgressionEncounter(zone=state.currentZone){
+  if(zone!==state.currentZone)return null;
+  const cfg=ZONES[zone],objective=currentStageObjective(zone);
+  renderStarterJourney();
+  if(!cfg||!objective.encounter)return null;
+  if(livingWilds().some(w=>w[objective.encounter]))return objective.encounter;
+  const records=objective.encounter==='boss'?cfg.bossSpawn:cfg.eliteSpawn;
+  if(!records?.length)return null;
+  spawnRecords(records);
+  renderStarterJourney();
+  return objective.encounter;
+}
+function spawnZone(zone){
+  const cfg=ZONES[zone];if(!cfg)return;
+  const objective=currentStageObjective(zone);
+  if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}
+  spawnRecords(cfg.spawn);
+  if(objective.encounter!=='elite'&&cfg.rareSpawn?.length&&Math.random()<cfg.rareChance)spawnRecords(cfg.rareSpawn);
+  if(objective.encounter==='elite')ensureProgressionEncounter(zone);
+  else if(objective.complete&&cfg.eliteSpawn?.length&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance)spawnRecords(cfg.eliteSpawn);
+}
 function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
@@ -2727,6 +2774,7 @@ function completeStageClear(stageId){
   }
   state.stageProgress=next;
   renderStageSelect();
+  renderWarpPrompt();
   renderStageReward({definition,first,rewards,elapsed});
   return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}`:' • เคลียร์ด่านแล้ว';
 }
@@ -2779,6 +2827,7 @@ function defeatWild(w){
   const stageEliteCleared=w.elite&&ZONES[w.zone]?.progressionBossSpeciesId&&!state.bossProgress?.defeated?.[`${w.zone}:${ZONES[w.zone].progressionBossSpeciesId}`];
   if(!stageEliteCleared)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
+  ensureProgressionEncounter(w.zone);
 }
 function monsterDamage(attackerInst,move,defender,atkBuff=1){
   const stab=monsterTypes(attackerInst).includes(move.type)?1.5:1;
@@ -2912,8 +2961,12 @@ function finishCaptureSuccess(cs){
   msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':w.rare?' • RARE':''} • +${playerExp} Player EXP (${Math.round(cs.chance*100)}%)`);
   renderAll();
   saveGame(false);
-  respawnWild(w,wildRespawnDelay(w));
+  const progressionSpeciesId=ZONES[w.zone]?.progressionBossSpeciesId;
+  const progressionKey=progressionSpeciesId?`${w.zone}:${progressionSpeciesId}`:null;
+  const replacesProgressionElite=Boolean(w.elite&&w.speciesId===progressionSpeciesId&&progressionKey&&!state.eliteProgress?.defeated?.[progressionKey]);
+  if(!replacesProgressionElite)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
+  ensureProgressionEncounter(state.currentZone);
 }
 function finishCaptureFail(cs){
   playSFX('sfx_capture_fail');
@@ -4448,6 +4501,7 @@ function closeStageReward(){el('stageReward')?.classList.add('hidden');}
 function warpLockText(availability){
   if(availability.ok)return '';
   if(availability.reason==='requires-stage-clear'&&availability.requires){
+    if(availability.requires===state.currentZone)return stageObjectiveText(currentStageObjective());
     return `ต้องเคลียร์ ${STAGE_BY_ID[availability.requires]?.displayName||availability.requires} ก่อน`;
   }
   return 'เส้นทางนี้ยังล็อกอยู่';
