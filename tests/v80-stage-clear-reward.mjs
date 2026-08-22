@@ -10,7 +10,7 @@ assert.match(js,/function completeStageClear\(stageId\)/,'Stage clear resolver e
 assert.match(js,/recordStageClear\(state\.stageProgress,stageId/,'Clear state uses catalog resolver');
 assert.match(js,/const first=!next\.firstClearRewards\[stageId\]/,'First-clear reward is idempotent');
 assert.match(js,/next\.firstClearRewards\[stageId\]=\{grantedAt:Date\.now\(\),rewards\}/,'First-clear grant is persisted');
-assert.match(js,/w\.boss&&w\.zone==='grass-meadow'\?completeStageClear\('grass-meadow'\)/,'Grass Meadow Boss completes the stage');
+assert.match(js,/w\.boss&&STAGE_BY_ID\[w\.zone\]\?completeStageClear\(w\.zone\)/,'Active stage Boss completes its stage');
 assert.match(js,/function renderStageReward\(/,'Reward sheet renderer exists');
 assert.match(js,/el\('stageRewardDone'\)\.onclick/,'Reward sheet close action is wired');
 console.log('V8 Grass Meadow Stage Clear + Reward: PASS');

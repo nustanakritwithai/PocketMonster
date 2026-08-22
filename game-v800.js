@@ -2224,7 +2224,10 @@ const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
   'grass-meadow':{label:'Grass Meadow • Normal + Rare + Elite + Boss',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
     ['mossbun',-11,2,1,{}],['mossbun',11,2,1,{}],['buglet',-11,-8,1,{}],['buglet',11,-8,1,{}],['normalooze',-6,-14,1,{}],['normalooze',6,-14,1,{}],['mossbun',-16,14,2,{}],['buglet',16,14,2,{}]
-  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,eliteSpawn:[['mossbun',0,-18,3,{elite:true}]],eliteChance:.18,bossSpawn:[['mossbun',0,-18,BALANCE.grassMeadowBoss.level,{boss:true}]],bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',eliteEncounterTableId:'grass-meadow-elite-v1',bossEncounterTableId:'grass-meadow-boss-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:5},sceneStatus:'normal-encounters'},
+  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,eliteSpawn:[['mossbun',0,-18,3,{elite:true}]],eliteChance:.18,bossSpawn:[['mossbun',0,-18,BALANCE.grassMeadowBoss.level,{boss:true}]],progressionBossSpeciesId:'mossbun',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',eliteEncounterTableId:'grass-meadow-elite-v1',bossEncounterTableId:'grass-meadow-boss-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:5},sceneStatus:'normal-encounters'},
+  'ember-valley':{label:'Ember Valley • Fire + Rock + Ground',stageId:'ember-valley',biomeId:'volcanic-valley',bg:0xc2410c,ground:0x7c2d12,spawn:[
+    ['flameling',-11,2,4,{}],['flameling',11,2,4,{}],['rockhorn',-11,-8,4,{}],['rockhorn',11,-8,4,{}],['sandmole',-7,-14,5,{}],['sandmole',7,-14,5,{}]
+  ],eliteSpawn:[['flameling',0,-16,6,{elite:true,evolutionPath:'flame_wolf'}]],eliteChance:.16,bossSpawn:[['flameling',0,-18,8,{boss:true,evolutionPath:'magma_bear'}]],progressionBossSpeciesId:'flameling',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Fire'],secondaryTypes:['Rock','Ground'],encounterTableId:'encounter-ember-valley-v1',eliteEncounterTableId:'elite-ember-valley-v1',bossEncounterTableId:'boss-ember-valley-v1',balanceProfileId:'stage-ember-valley-v1',recommendedLevel:{min:4,max:8},sceneStatus:'stage-ready'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -2244,6 +2247,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.55;
     sun.intensity=2.15;
     sun.color.setHex(0xffffff);
+  }else if(zone==='ember-valley'){
+    hemi.intensity=1.1;
+    sun.intensity=1.7;
+    sun.color.setHex(0xffc078);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2253,7 +2260,7 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
@@ -2293,7 +2300,7 @@ function retireWild(w){
   if(index>=0)wilds.splice(index,1);
 }
 function livingWilds(){return wilds.filter(w=>!w.dead);}
-function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;const starterDone=state.starterJourney?.grassMeadow?.captured;const bossReady=zone==='grass-meadow'&&starterDone&&state.eliteProgress?.defeated?.['grass-meadow:mossbun']&&!state.bossProgress?.defeated?.['grass-meadow:mossbun'];if(bossReady&&cfg.bossSpawn?.length){for(const [id,x,z,l,opts] of cfg.bossSpawn)createWild(spById[id],x,z,l,opts);return;}for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}if(cfg.eliteSpawn?.length&&starterDone&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance){for(const [id,x,z,l,opts] of cfg.eliteSpawn)createWild(spById[id],x,z,l,opts);}}
+function spawnZone(zone){const cfg=ZONES[zone];if(!cfg)return;const starterDone=state.starterJourney?.grassMeadow?.captured;const progressionKey=cfg.progressionBossSpeciesId?`${zone}:${cfg.progressionBossSpeciesId}`:null;const bossReady=Boolean(progressionKey&&state.eliteProgress?.defeated?.[progressionKey]&&!state.bossProgress?.defeated?.[progressionKey]);if(bossReady&&cfg.bossSpawn?.length){for(const [id,x,z,l,opts] of cfg.bossSpawn)createWild(spById[id],x,z,l,opts);return;}for(const [id,x,z,l,opts] of cfg.spawn)createWild(spById[id],x,z,l,opts);if(cfg.rareSpawn?.length&&Math.random()<cfg.rareChance){for(const [id,x,z,l,opts] of cfg.rareSpawn)createWild(spById[id],x,z,l,opts);}const eliteGate=zone!=='grass-meadow'||starterDone;if(cfg.eliteSpawn?.length&&eliteGate&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance){for(const [id,x,z,l,opts] of cfg.eliteSpawn)createWild(spById[id],x,z,l,opts);}}
 function resetWild(w){if(w.dead)return;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
@@ -2352,6 +2359,7 @@ function updateHubCompanion(dt){
 
 function switchZone(zone,silent=false){
   if(!ZONES[zone])return;
+  if(STAGE_BY_ID[zone]&&!stageUnlockReason(state.stageProgress,zone).ok){msg(`${STAGE_BY_ID[zone].displayName} ยังล็อกอยู่ • เคลียร์ด่านก่อนหน้า`);return;}
   if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return;}
   const safetyBalls=zone!=='hub'&&ensureCaptureBallSafety();
   zoneGeneration++;
@@ -2374,8 +2382,8 @@ function switchZone(zone,silent=false){
     journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
     journey.grassMeadow.entered=true;
     state.starterJourney=journey;
-    stageRunStartedAt=Date.now();
   }
+  if(STAGE_BY_ID[zone])stageRunStartedAt=Date.now();
   playBGM(zone);
   startAmbient(zone);
   const cfg=ZONES[zone];
@@ -2486,7 +2494,7 @@ function completeStageClear(stageId){
   const elapsed=stageRunStartedAt?Math.max(1,Math.round((Date.now()-stageRunStartedAt)/1000)):null;
   const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
   const first=!next.firstClearRewards[stageId];
-  const rewards={captureBalls:5,healthy:2,mineralBite:1};
+  const rewards=stageId==='ember-valley'?{captureBalls:5,protein:2,emberFruit:1}:{captureBalls:5,healthy:2,mineralBite:1};
   if(first){
     for(const [key,value] of Object.entries(rewards))state.inventory[key]=(state.inventory[key]||0)+value;
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
@@ -2494,7 +2502,7 @@ function completeStageClear(stageId){
   state.stageProgress=next;
   renderStageSelect();
   renderStageReward({definition,first,rewards,elapsed});
-  return first?' • รางวัลครั้งแรก +Capture Ball 5 +อาหารฟื้นฟู 2 +แร่บำรุง 1':' • เคลียร์ด่านแล้ว';
+  return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}`:' • เคลียร์ด่านแล้ว';
 }
 function defeatWild(w){
   if(w.dead)return;
@@ -2529,7 +2537,7 @@ function defeatWild(w){
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
-  const clearSummary=w.boss&&w.zone==='grass-meadow'?completeStageClear('grass-meadow'):'';
+  const clearSummary=w.boss&&STAGE_BY_ID[w.zone]?completeStageClear(w.zone):'';
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':w.rare?'RARE ':'';
   let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${playerExp} Player EXP`;
   if(activeSummon){
@@ -2541,8 +2549,8 @@ function defeatWild(w){
   msg(battleMsg+clearSummary);
   renderAll();
   saveGame(false);
-  const meadowEliteCleared=w.elite&&w.zone==='grass-meadow'&&!state.bossProgress?.defeated?.['grass-meadow:mossbun'];
-  if(!meadowEliteCleared)respawnWild(w,wildRespawnDelay(w));
+  const stageEliteCleared=w.elite&&ZONES[w.zone]?.progressionBossSpeciesId&&!state.bossProgress?.defeated?.[`${w.zone}:${ZONES[w.zone].progressionBossSpeciesId}`];
+  if(!stageEliteCleared)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
 }
 function monsterDamage(attackerInst,move,defender,atkBuff=1){
@@ -4202,7 +4210,7 @@ function renderStageReward({definition,first,rewards,elapsed}){
   title.textContent=`${definition.displayName} เคลียร์แล้ว!`;
   summary.textContent=`Boss ถูกปราบ • เวลา ${elapsed?`${elapsed} วินาที`:'—'} • ${first?'ได้รับรางวัลครั้งแรก':'รางวัลครั้งแรกได้รับไปแล้ว'}`;
   list.replaceChildren();
-  const labels={captureBalls:'🔴 Capture Ball',healthy:'💚 อาหารฟื้นฟู',mineralBite:'🪨 แร่บำรุง'};
+  const labels={captureBalls:'🔴 Capture Ball',healthy:'💚 อาหารฟื้นฟู',mineralBite:'🪨 แร่บำรุง',protein:'🥩 โปรตีน',emberFruit:'🔥 ผลไฟ'};
   for(const [key,value] of Object.entries(rewards)){const item=document.createElement('div');item.className='stage-reward-item';item.textContent=`${labels[key]||key} +${value}`;list.append(item);}
   el('stageReward')?.classList.remove('hidden');
 }

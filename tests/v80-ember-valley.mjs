@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+
+assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+const ember=js.match(/["']ember-valley["']\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
+assert.match(ember,/primaryTypes:\['Fire'\]/,'Ember Valley primary type is Fire');
+assert.match(ember,/secondaryTypes:\['Rock','Ground'\]/,'Ember Valley counters are explicit');
+assert.match(ember,/encounterTableId:'encounter-ember-valley-v1'/,'Normal encounter profile is explicit');
+assert.match(ember,/eliteEncounterTableId:'elite-ember-valley-v1'/,'Elite encounter profile is explicit');
+assert.match(ember,/bossEncounterTableId:'boss-ember-valley-v1'/,'Boss encounter profile is explicit');
+assert.match(ember,/flameling[\s\S]*rockhorn[\s\S]*sandmole/,'Ember Valley uses Fire/Rock/Ground species');
+assert.match(ember,/eliteSpawn:/,'Ember Valley Elite pool exists');
+assert.match(ember,/bossSpawn:/,'Ember Valley Boss pool exists');
+assert.match(ember,/progressionBossSpeciesId:'flameling'/,'Boss progression species is explicit');
+assert.match(js,/if\(STAGE_BY_ID\[zone\]&&!stageUnlockReason\(state\.stageProgress,zone\)\.ok\)/,'Stage route enforces unlock state');
+assert.match(js,/const progressionKey=cfg\.progressionBossSpeciesId/,'Boss progression is data-driven per stage');
+assert.match(js,/w\.boss&&STAGE_BY_ID\[w\.zone\]\?completeStageClear\(w\.zone\)/,'Any active stage Boss completes its stage');
+assert.match(css,/stage-reward/,'Stage reward presentation remains available');
+console.log('V8 Ember Valley: PASS');
