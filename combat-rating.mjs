@@ -13,6 +13,7 @@ import {
   effectiveHp,
   geneModifier,
 } from './balance-formulas.mjs';
+import { resolvePassiveStaticModifier } from './passive-resolver.mjs';
 
 export const CORE_STATS = Object.freeze(['hp', 'atk', 'def', 'spd']);
 
@@ -63,10 +64,18 @@ export function statBreakdown(build, stat, config = BALANCE_CONFIG) {
   const geneRank = build.genes?.[stat] ?? 'B';
   const evolutionProfile = num(build.evolutionProfile?.[stat], 1) || 1;
   const conditionModifier = 1 + conditionCombatModifier(build.condition ?? 'normal', config);
-  const final = coreStatFinal(
+  const prePassiveFinal = coreStatFinal(
     { raw, geneRank, evolutionProfile, condition: build.condition ?? 'normal' },
     config,
   );
+  const passiveModifiers = resolvePassiveStaticModifier({
+    passiveId: build.passiveId,
+    ownerSpeciesId: build.passiveOwnerSpeciesId,
+    ownerFainted: build.passiveOwnerFainted,
+  })
+    .filter(modifier => modifier.kind === 'stat_multiplier' && modifier.stat === stat.toUpperCase());
+  const passiveMultiplier = passiveModifiers.reduce((value, modifier) => value * modifier.multiplier, 1);
+  const final = Math.round(prePassiveFinal * passiveMultiplier);
 
   return {
     stat,
@@ -80,6 +89,9 @@ export function statBreakdown(build, stat, config = BALANCE_CONFIG) {
     geneMultiplier: geneModifier(geneRank, config),
     evolutionProfile,
     conditionModifier,
+    prePassiveFinal,
+    passiveMultiplier,
+    passiveSources: passiveModifiers.map(modifier => modifier.sourcePassiveId),
     final,
   };
 }

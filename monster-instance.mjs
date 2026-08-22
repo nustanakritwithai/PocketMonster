@@ -6,6 +6,7 @@
 
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
+import { defaultPassiveIdForSpecies, isPassiveEligibleForSpecies } from './passive-catalog.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { createRng } from './rng.mjs';
 import {
@@ -15,7 +16,7 @@ import {
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 10;
+export const INSTANCE_SAVE_VERSION = 11;
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);
 export const CORE_GENES = Object.freeze(['hp', 'atk', 'def', 'spd']);
 export const INSTANCE_POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
@@ -25,6 +26,17 @@ export const TRANSIENT_COOLDOWN_FIELDS = Object.freeze([
   'cooldownRemaining',
   'cooldownRemainingMs',
   'skillCds',
+]);
+export const TRANSIENT_PASSIVE_FIELDS = Object.freeze([
+  'passive',
+  'passiveEventState',
+  'passiveEventStates',
+  'passiveEventLedger',
+  'passiveEventLedgers',
+  'passiveRuntimeState',
+  'passiveRuntimeStates',
+  'processedEventIds',
+  'eventFingerprintById',
 ]);
 
 // Body/Mind passive drift per hour while the game is closed (R11). No death.
@@ -103,7 +115,16 @@ function withoutTransientCooldownFields(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
   const copy = { ...raw };
   for (const field of TRANSIENT_COOLDOWN_FIELDS) delete copy[field];
+  for (const field of TRANSIENT_PASSIVE_FIELDS) delete copy[field];
   return copy;
+}
+
+function normalizedPassiveId(source) {
+  const defaultPassiveId = defaultPassiveIdForSpecies(source?.speciesId);
+  if (!defaultPassiveId) return null;
+  return isPassiveEligibleForSpecies(source.speciesId, source.passiveId)
+    ? source.passiveId
+    : defaultPassiveId;
 }
 
 export function normalizeOwnedSkillRecord(raw) {
@@ -132,6 +153,7 @@ export function sanitizeMonsterInstanceForPersistence(raw) {
     ? raw.skills.map(normalizeOwnedSkillRecord)
     : [];
   instance.potential = potentialForPersistence(raw.potential, raw.instanceId);
+  instance.passiveId = normalizedPassiveId(raw);
   return instance;
 }
 
@@ -208,6 +230,7 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
     },
     personalityId: source.personalityId ?? source.personality ?? 'balanced',
     traitIds,
+    passiveId: normalizedPassiveId(source),
     body,
     mind,
     // Uses persist per monster; encounter cooldowns are stripped by schema.

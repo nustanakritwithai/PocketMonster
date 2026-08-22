@@ -57,8 +57,8 @@ const initialState = {
 
 assert.equal(BREEDING_VERSION, 'BRD_v1.0');
 assert.equal(PARENT_BREEDING_COOLDOWN_MS, 30 * 60 * 1000);
-assert.equal(INSTANCE_SAVE_VERSION, 10);
-assert.equal(SAVE_SCHEMA_VERSION, 10);
+assert.equal(INSTANCE_SAVE_VERSION, 11);
+assert.equal(SAVE_SCHEMA_VERSION, 11);
 assert.equal(WORKBOOK_BREEDING_PROFILES.length, 18);
 assert.equal(Object.isFrozen(WORKBOOK_BREEDING_PROFILES), true);
 assert.ok(WORKBOOK_BREEDING_PROFILES.every(Object.isFrozen));
@@ -401,7 +401,7 @@ const legacySave = {
   }],
 };
 const migrated = normalizeSavedState(legacySave, { now: NOW, onDiagnostic: issue => migrationDiagnostics.push(issue) });
-assert.equal(migrated.saveVersion, 10);
+assert.equal(migrated.saveVersion, 11);
 assert.deepEqual(migrated.eggs[0], legacySave.eggs[0], 'legacy embedded-child egg is quarantined without lossy guessing');
 assert.ok(migrationDiagnostics.some(issue => issue.code === 'legacy_egg_quarantined'));
 assert.deepEqual(normalizeSavedState(migrated, { now: NOW + 999 }), migrated, 'v10 migration is twice-is-same');

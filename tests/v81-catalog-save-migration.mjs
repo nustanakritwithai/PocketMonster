@@ -35,6 +35,7 @@ assert.deepEqual(
   [
     ['monster-instance-v9-skill-runtime', 9],
     ['breeding-egg-v10', 10],
+    ['passive-instance-v11', 11],
   ],
   'the supported instance migration is explicit and versioned',
 );

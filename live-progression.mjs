@@ -62,6 +62,9 @@ export function instanceCombatBuild(inst, sp, path, equipmentFlat = null) {
     equipmentFlat: equipmentFlat ?? { hp: 0, atk: 0, def: 0, spd: 0 },
     evolutionProfile: profile,
     condition: inst._condition ?? deriveCondition(inst),
+    passiveId: inst.passiveId ?? null,
+    passiveOwnerSpeciesId: inst.speciesId ?? null,
+    passiveOwnerFainted: inst.fainted === true || (Number.isFinite(inst.hp) && inst.hp <= 0),
   };
 }
 
@@ -82,6 +85,16 @@ export function applyComputedStats(inst, stats, { heal = false } = {}) {
   inst.hp = heal ? inst.maxHp : Math.max(0, Math.min(inst.maxHp, Math.round(inst.maxHp * ratio)));
   inst.fainted = inst.hp <= 0;
   return inst;
+}
+
+export function refreshCoreStats(inst, sp, path, equipmentFlat = null, { heal = false } = {}) {
+  if (heal) {
+    inst.fainted = false;
+    if (Number.isFinite(inst.hp) && inst.hp <= 0) inst.hp = 1;
+  }
+  const computed = computeCoreStats(inst, sp, path, equipmentFlat);
+  applyComputedStats(inst, computed.stats, { heal });
+  return computed;
 }
 
 export function growthExpForLevel(level) {

@@ -16,6 +16,7 @@ import {
   liveCaptureChance,
   liveMoveDamage,
   ranchTrainingGain,
+  refreshCoreStats,
 } from '../live-progression.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
@@ -68,6 +69,14 @@ assert.ok(trainedStats.breakdown.atk.training > 0, 'ATK breakdown exposes the tr
 const applied = applyComputedStats({ hp: 10, maxHp: 10 }, trainedStats.stats, { heal: true });
 assert.equal(applied.maxHp, trainedStats.stats.hp, 'applyComputedStats writes the rated HP');
 assert.equal(applied.hp, trainedStats.stats.hp, 'heal fills to the new max');
+const revived = mk({ speciesId: 'rockhorn', passiveId: 'PASS_ROCK_01', hp: 0, maxHp: 100, fainted: true, _condition: 'normal' });
+const revivedStats = refreshCoreStats(revived, {
+  id: 'rockhorn',
+  base: { hp: 100, atk: 100, def: 100, spd: 100 },
+  growthPerLevel: { hp: 0, atk: 0, def: 0, spd: 0 },
+}, null, null, { heal: true });
+assert.equal(revivedStats.stats.def, 110, 'heal/revive recomputes alive passive stats atomically');
+assert.equal(revived.fainted, false);
 
 // Ranch training respects aptitude + remaining capacity.
 const ranch = mk({ level: 1, training: { power: 0, defense: 0, speed: 0, technique: 0, spirit: 0 } });
@@ -111,7 +120,7 @@ for (const needle of [
   'beginCaptureAttempt(',
   'liveMoveDamage(',
   'computeCoreStats(',
-  'applyComputedStats(',
+  'refreshCoreStats(',
   'ranchTrainingGain(',
   'let res=null',
   'renderRaisingEventBanner',
