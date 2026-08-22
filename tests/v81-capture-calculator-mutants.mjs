@@ -38,7 +38,7 @@ function configContract(module) {
   assert.equal(config.levelRules[2].minDifference, 3);
   assert.deepEqual(config.variantRules.Elite, { captureEnabled: true, multiplier: 0.55 });
   assert.deepEqual(config.variantRules.Boss, { captureEnabled: false, multiplier: 0 });
-  assert.equal(config.activation, 'calculator_only');
+  assert.equal(config.activation, 'live_client_transaction');
   assert.equal(config.rollAuthority, 'future_server_boundary');
 }
 
@@ -167,7 +167,7 @@ const mutants = [
   ['config', 'wrong extreme level multiplier', "ruleId: 'LV_EXTREME', minDifference: 10, multiplier: 0.55", "ruleId: 'LV_EXTREME', minDifference: 10, multiplier: 0.5"],
   ['config', 'wrong Elite variant multiplier', "Elite: Object.freeze({ captureEnabled: true, multiplier: 0.55 })", "Elite: Object.freeze({ captureEnabled: true, multiplier: 0.5 })"],
   ['config', 'enable Boss capture', "Boss: Object.freeze({ captureEnabled: false, multiplier: 0.0 })", "Boss: Object.freeze({ captureEnabled: true, multiplier: 1.0 })"],
-  ['config', 'activate calculator early', "statusStackRule: 'StrongestOnly',\n  activation: 'calculator_only'", "statusStackRule: 'StrongestOnly',\n  activation: 'live'"],
+  ['config', 'downgrade live transaction activation', "statusStackRule: 'StrongestOnly',\n  activation: 'live_client_transaction'", "statusStackRule: 'StrongestOnly',\n  activation: 'calculator_only'"],
   ['config', 'claim server authority', "rollAuthority: 'future_server_boundary'", "rollAuthority: 'server'"],
   ['formulas', 'invert HP slope direction', 'config.hpFactor.slope * (1 - ratio)', 'config.hpFactor.slope * ratio'],
   ['formulas', 'skip HP factor clamp', 'return clamp(raw, config.hpFactor.min, config.hpFactor.max);', 'return raw;'],
