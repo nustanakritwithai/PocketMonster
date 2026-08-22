@@ -26,6 +26,9 @@ export const PLAYER_PALETTE = Object.freeze({
 export const KEEPER_PALETTE = Object.freeze({
   skin: 0xf0c8a0, hair: 0xfacc15, shirt: 0x15803d, pants: 0x3f3f46, bag: 0x7c3aed, boot: 0x111827, hat: 0xfacc15, apron: 0xf8fafc, staff: 0x475569, orb: 0xf59e0b,
 });
+export const MERCHANT_PALETTE = Object.freeze({
+  skin: 0xd9a47f, hair: 0x78350f, shirt: 0x92400e, pants: 0x44403c, bag: 0xb45309, boot: 0x292524, hat: 0xf59e0b, apron: 0xfef3c7,
+});
 
 function trackRest(map, node) {
   map.set(node, {
@@ -84,7 +87,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
   return function bigheadFactory({ request, def }) {
     const role = request.role;
-    const palette = role === 'keeper' ? KEEPER_PALETTE : PLAYER_PALETTE;
+    const palette = role === 'keeper' ? KEEPER_PALETTE : role === 'merchant' ? MERCHANT_PALETTE : PLAYER_PALETTE;
     const head = def.metrics?.head || [0.64, 0.72, 0.56];
     const headY = def.metrics?.headY ?? 1.44;
     const [headW, headH, headD] = head;
@@ -115,7 +118,7 @@ export function createBigheadProvider({ THREE, box, cylinder, material, loadFace
 
     const hairRoot = new THREE.Group(); headPivot.add(hairRoot);
     const hatRoot = new THREE.Group(); headPivot.add(hatRoot);
-    if (role === 'keeper') {
+    if (role === 'keeper' || role === 'merchant') {
       const brim = new THREE.Mesh(cylinder ? cylinder(0.42, 0.44, 0.03, 12) : box(0.84, 0.03, 0.84), material(palette.hat, 0.62, 0.08));
       brim.position.y = headH / 2;
       hatRoot.add(brim);

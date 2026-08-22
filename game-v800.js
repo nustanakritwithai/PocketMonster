@@ -1174,10 +1174,12 @@ assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterPro
 // ---------- Player / NPC ----------
 const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
-await Promise.all([playerVisual.ready,keeperVisual.ready].filter(Boolean));
+const merchantVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'merchant',appearanceId:'appearance.human.merchant-brown.v1',quality:qualityProfile.tier});
+await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready].filter(Boolean));
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
 const playerData={hp:100,maxHp:100,speed:5.7,invuln:0};
 const npc=keeperVisual.root; npc.position.set(4,0,3); scene.add(npc);
+const merchantNpc=merchantVisual.root; merchantNpc.position.set(9,0,3); scene.add(merchantNpc);
 const presentationScratch={throwOrigin:new THREE.Vector3(),hitText:new THREE.Vector3()};
 function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentationScratch.throwOrigin); }
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
@@ -2180,7 +2182,7 @@ function removeSceneRole(role,instanceId=null){
     removeAndDispose(scene, obj);
   }
 }
-function setHubVisibility(on){npc.visible=on;ranchPad.disk.visible=ranchPad.ring.visible=on;breedingPad.disk.visible=breedingPad.ring.visible=on;incubator.visible=on;}
+function setHubVisibility(on){npc.visible=on;merchantNpc.visible=on;ranchPad.disk.visible=ranchPad.ring.visible=on;breedingPad.disk.visible=breedingPad.ring.visible=on;incubator.visible=on;}
 function clearHubCompanion(){
   if(hubCompanion) removeAndDispose(scene, hubCompanion.mesh);
   hubCompanion=null;
@@ -3168,7 +3170,37 @@ function renderEvolution(targetPanel=null){
 
 // ---------- NPC manager ----------
 function isNearNpc(){return state.currentZone==='hub'&&distXZ(player.position,npc.position)<3.4;}
-function updateNpcUI(){const b=el('npcBtn');if(isNearNpc()&&state.currentZone==='hub'&&el('monsterManager').classList.contains('hidden')){const p=worldToScreen(npc.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent='คุย';b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;}else b.classList.add('hidden');}else b.classList.add('hidden');}
+function isNearMerchant(){return state.currentZone==='hub'&&distXZ(player.position,merchantNpc.position)<3.4;}
+function updateNpcUI(){
+  const b=el('npcBtn');
+  if(!el('monsterManager').classList.contains('hidden')||!el('merchantShop').classList.contains('hidden')){b.classList.add('hidden');return;}
+  const target=isNearMerchant()?merchantNpc:isNearNpc()?npc:null;
+  if(target){const p=worldToScreen(target.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent=target===merchantNpc?'ร้านค้า':'คุย';b.classList.toggle('merchant-btn',target===merchantNpc);b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;return;}}
+  b.classList.add('hidden');
+}
+const MERCHANT_STOCK=Object.freeze([
+  {id:'hpPotion',name:'ยาฟื้นพลัง',price:50,icon:'🧪',note:'ฟื้น HP ของมอนสเตอร์'},
+  {id:'captureBalls',name:'ลูกแก้วจับมอน',price:200,icon:'🔴',note:'ใช้จับมอนสเตอร์'},
+  {id:'trainingChow',name:'อาหารบำรุง',price:150,icon:'🍖',note:'ใช้ดูแลและฝึกมอนสเตอร์'},
+]);
+function openMerchant(){
+  if(!isNearMerchant()){msg('เข้าใกล้พ่อค้าก่อน');return;}
+  el('merchantShop').classList.remove('hidden');
+  renderMerchantShop();
+  playSFX('sfx_ui_open');
+}
+function closeMerchant(){el('merchantShop').classList.add('hidden');playSFX('sfx_ui_close');}
+function renderMerchantShop(){
+  const box=el('merchantProducts');if(!box)return;
+  box.innerHTML=MERCHANT_STOCK.map(item=>`<div class="merchant-item"><div class="merchant-icon">${item.icon}</div><div class="merchant-info"><b>${item.name}</b><small>${item.note}</small><span>${item.price} เหรียญ</span></div><button data-buy-item="${item.id}">ซื้อ</button></div>`).join('');
+  box.querySelectorAll('[data-buy-item]').forEach(button=>button.onclick=()=>{
+    const item=MERCHANT_STOCK.find(entry=>entry.id===button.dataset.buyItem);if(!item)return;
+    // Phase 1: catalog and interaction are live; trusted currency purchase will move to VPS.
+    state.inventory[item.id]=(state.inventory[item.id]||0)+1;
+    msg(`${item.name} เข้ากระเป๋าแล้ว • ราคาทดสอบ ${item.price} เหรียญ`);
+    renderMerchantShop();renderHUD();saveGame(false);
+  });
+}
 function assertCharacterMutable(id){
   const gate=characterUI.requestMutate(id);
   if(!gate.ok){msg(gate.reasonText);return false;}
@@ -3977,7 +4009,7 @@ function bindCharacterAccessControl(node,handler){
   node.addEventListener('pointerdown',run,{passive:false});
   node.addEventListener('click',run);
 }
-el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
@@ -4088,7 +4120,7 @@ function ensureWildPopulation(dt){
 }
 
 // ---------- Frame ----------
-function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,-32,32);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,32);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});}
+function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,-32,32);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,32);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
