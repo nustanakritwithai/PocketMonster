@@ -2,7 +2,7 @@ import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCoold
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, normalizeStageProgress, recordStageClear, stageRewards, stageUnlockReason } from './stage-catalog.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, warpAvailability } from './warp-routes.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import {
@@ -2479,7 +2479,10 @@ function setZoneGround(zone){
   setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){
-  const boss=!!opts.boss,elite=!!opts.elite||!!sp.elite,rare=!!opts.rare,evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
+  const boss=!!opts.boss,elite=!!opts.elite||!!sp?.elite,rare=!!opts.rare;
+  const encounterProfile=resolveEncounterProfile({stageId:STAGE_BY_ID[state.currentZone]?state.currentZone:null,runtimeSpeciesId:sp?.id,variant:encounterVariantFromFlags({boss,elite,rare}),level});
+  if(!encounterProfile.ok){console.warn('Encounter profile rejected',encounterProfile.issues);return null;}
+  const evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
   mesh.position.set(x,0,z);
   mesh.scale.multiplyScalar(boss?1.12:(rare?1.1:1.06));
   const markerColor=boss?0xfb7185:(elite?0xfde047:(rare?0xf0abfc:0x86efac));
@@ -2487,7 +2490,7 @@ function createWild(sp,x,z,level=1,opts={}){
   const marker=new THREE.Mesh(octahedronGeometry(markerSize),new THREE.MeshStandardMaterial({color:markerColor,emissive:markerColor,emissiveIntensity:rare?.9:.65,roughness:.35}));
   marker.position.set(0,boss?2.45:(rare?2.2:2.05),0);marker.name='wildMarker';mesh.add(marker);
   scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),maxHp=Math.round(statValue(sp.base.hp,level,genes.hp,.14,0)*(boss?2.0:(elite?1.3:1)));
-  const capturePolicy=boss?'disabled':(elite?'elite':'normal');
+  const capturePolicy=encounterProfile.capturePolicy;
   const w={id:'w'+nextId++,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');

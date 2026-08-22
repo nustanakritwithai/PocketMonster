@@ -1,3 +1,6 @@
+import { monsterCatalogEntry } from './monster-catalog.mjs';
+import { typeProfile } from './type-catalog.mjs';
+
 export const STAGE_TYPES=Object.freeze([
   'Grass','Bug','Fire','Water','Electric','Ice','Rock','Ground','Flying','Poison',
   'Psychic','Ghost','Dark','Steel','Dragon','Fairy','Fighting','Normal',
@@ -30,6 +33,68 @@ export const STAGE_CATALOG=Object.freeze([
 ]);
 
 export const STAGE_BY_ID=Object.freeze(Object.fromEntries(STAGE_CATALOG.map(definition=>[definition.id,definition])));
+
+export const ENCOUNTER_VARIANTS=Object.freeze(['normal','rare','elite','boss']);
+export const CAPTURE_POLICIES=Object.freeze(['normal','elite','disabled']);
+
+const VARIANT_CAPTURE_POLICY=Object.freeze({
+  normal:'normal',
+  rare:'normal',
+  elite:'elite',
+  boss:'disabled',
+});
+
+function encounterIssue(code,field,detail={}){
+  return Object.freeze({code,field,...detail});
+}
+
+export function encounterVariantFromFlags({boss=false,elite=false,rare=false}={}){
+  if(boss)return 'boss';
+  if(elite)return 'elite';
+  if(rare)return 'rare';
+  return 'normal';
+}
+
+export function resolveEncounterProfile({stageId=null,runtimeSpeciesId,variant='normal',level=null,capturePolicy=null}={}){
+  const issues=[];
+  const stage=stageId===null?null:STAGE_BY_ID[stageId]||null;
+  if(stageId!==null&&!stage)issues.push(encounterIssue('unknown_stage','stageId',{value:stageId}));
+  const mapping=monsterCatalogEntry(runtimeSpeciesId);
+  if(!mapping)issues.push(encounterIssue('unknown_species','runtimeSpeciesId',{value:runtimeSpeciesId??null}));
+  const profile=mapping?typeProfile(mapping.runtimeType):null;
+  if(mapping&&!profile)issues.push(encounterIssue('unknown_runtime_type','runtimeSpeciesId',{value:runtimeSpeciesId,type:mapping.runtimeType}));
+  if(!ENCOUNTER_VARIANTS.includes(variant))issues.push(encounterIssue('invalid_variant','variant',{value:variant}));
+  if(level!==null&&(!Number.isInteger(level)||level<1))issues.push(encounterIssue('invalid_level','level',{value:level}));
+
+  const expectedCapturePolicy=VARIANT_CAPTURE_POLICY[variant]??'disabled';
+  if(capturePolicy!==null&&!CAPTURE_POLICIES.includes(capturePolicy)){
+    issues.push(encounterIssue('invalid_capture_policy','capturePolicy',{value:capturePolicy}));
+  }else if(capturePolicy!==null&&capturePolicy!==expectedCapturePolicy){
+    issues.push(encounterIssue('capture_policy_mismatch','capturePolicy',{value:capturePolicy,expected:expectedCapturePolicy}));
+  }
+  if(stage&&stage.capturePolicy!=='normal-wild-only'){
+    issues.push(encounterIssue('invalid_stage_capture_policy','stageId',{value:stage.capturePolicy}));
+  }
+  if(stage&&mapping){
+    const advertisedTypes=[...(stage.primaryTypes||[]),...(stage.secondaryTypes||[])];
+    if(!advertisedTypes.includes(mapping.runtimeType)){
+      issues.push(encounterIssue('species_type_outside_stage','runtimeSpeciesId',{stageId,type:mapping.runtimeType}));
+    }
+  }
+
+  const frozenIssues=Object.freeze(issues);
+  return Object.freeze({
+    ok:issues.length===0,
+    issues:frozenIssues,
+    stageId,
+    runtimeSpeciesId:runtimeSpeciesId??null,
+    workbookMonsterId:mapping?.workbookBaseMonsterId??null,
+    runtimeType:mapping?.runtimeType??null,
+    variant,
+    level,
+    capturePolicy:expectedCapturePolicy,
+  });
+}
 
 export const STAGE_SET_MEMBERS=Object.freeze({
   'set-1':Object.freeze(['grass-meadow','ember-valley','misty-lake','storm-field']),
