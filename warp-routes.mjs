@@ -22,6 +22,8 @@ export const WARP_ROUTES=Object.freeze([
   {id:'haunted-to-dream',from:'haunted-woods',to:'dream-shrine',label:'Dream Shrine',position:[-20,0],spawn:[19,0,0],kind:'return'},
   {id:'haunted-to-shadow',from:'haunted-woods',to:'shadow-city',label:'Shadow City',position:[20,0],spawn:[-19,0,0],kind:'forward'},
   {id:'shadow-to-haunted',from:'shadow-city',to:'haunted-woods',label:'Haunted Woods',position:[-20,0],spawn:[19,0,0],kind:'return'},
+  {id:'shadow-to-steel',from:'shadow-city',to:'steel-factory',label:'Steel Factory',position:[20,0],spawn:[-19,0,0],kind:'forward'},
+  {id:'steel-to-shadow',from:'steel-factory',to:'shadow-city',label:'Shadow City',position:[-20,0],spawn:[19,0,0],kind:'return'},
   {id:'storm-to-hub',from:'storm-field',to:'hub',label:'Ranch Hub',position:[0,-19],spawn:[0,0,-7],kind:'return'},
 ]);
 

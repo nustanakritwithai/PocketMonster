@@ -17,7 +17,7 @@ for(const id of ['frozen-pass','rocky-canyon','sky-ruins','poison-marsh','dream-
 assert.equal(stageUnlockReason(progress,'shadow-city').ok,true,'Haunted Woods clear unlocks Shadow City');
 const route=routesFrom('haunted-woods').find(candidate=>candidate.to==='shadow-city');
 assert.equal(warpAvailability(progress,route,stageUnlockReason).ok,true,'Shadow City route is available after Haunted Woods');
-const zoneBlock=js.match(/['"]shadow-city['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const zoneBlock=js.match(/['"]shadow-city['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]steel-factory['"]\s*:)/)?.[0]||'';
 assert.match(zoneBlock,/stageId:'shadow-city'/,'Shadow City runtime zone is catalog-linked');
 assert.match(zoneBlock,/spawn:\[/,'Shadow City has Normal encounter spawn data');
 assert.match(zoneBlock,/eliteSpawn:\[/,'Shadow City has Elite encounter data');

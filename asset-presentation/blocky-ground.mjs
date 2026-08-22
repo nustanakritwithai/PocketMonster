@@ -79,7 +79,7 @@ export function paintGroundGrid(zoneColor, zoneType = 'grass') {
   const img = makeImage(GROUND_TILE, GROUND_TILE, hexToRgb(zoneColor));
   strokeGrid(img, GROUND_GRID, 1, 0.14);
   strokeGrid(img, GROUND_COARSE, 2, 0.24);
-  const seed = ((Number(zoneColor) >>> 0) ^ (zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : 0x9a55)) >>> 0;
+  const seed = ((Number(zoneColor) >>> 0) ^ (zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : zoneType === 'factory' ? 0x5fac7001 : 0x9a55)) >>> 0;
   scatter(img, 40, 2, 2, [255, 255, 255], 0.05, seed);
   if (zoneType === 'cave') {
     scatter(img, 36, 3, 3, [0, 0, 0], 0.18, seed ^ 0x11111111);
@@ -97,6 +97,8 @@ export function paintGroundGrid(zoneColor, zoneType = 'grass') {
     scatter(img, 34, 3, 2, [71, 85, 105], 0.16, seed ^ 0x88888888);
   } else if (zoneType === 'city') {
     scatter(img, 34, 2, 2, [34, 211, 238], 0.14, seed ^ 0x99999999);
+  } else if (zoneType === 'factory') {
+    scatter(img, 34, 2, 2, [148, 163, 184], 0.15, seed ^ 0xaaaaaaaa);
   } else {
     scatter(img, 30, 2, 4, [0, 100, 0], 0.08, seed ^ 0x22222222);
   }
