@@ -4116,26 +4116,25 @@ function bindCharacterAccessControl(node,handler){
   node.addEventListener('pointerdown',run,{passive:false});
   node.addEventListener('click',run);
 }
-function bindMobileNpcSheet(panel,close){
+function bindMobileNpcSheet(panel,close,dragTarget=panel?.querySelector(':scope > *')){
   const handle=panel?.querySelector('[data-npc-sheet-handle]');
-  if(!handle)return;
+  if(!handle||!dragTarget)return;
   let startY=0,dragging=false;
   handle.addEventListener('pointerdown',event=>{
     startY=event.clientY; dragging=true; handle.setPointerCapture?.(event.pointerId);
-    panel.querySelector(':scope > *')?.style.setProperty('transition','none');
+    dragTarget.style.setProperty('transition','none');
   });
   handle.addEventListener('pointermove',event=>{
     if(!dragging)return;
     const delta=Math.max(0,event.clientY-startY);
-    panel.querySelector(':scope > *')?.style.setProperty('transform',`translateY(${delta}px)`);
+    dragTarget.style.setProperty('transform',`translateY(${delta}px)`);
   });
   const end=event=>{
     if(!dragging)return;
     dragging=false;
-    const card=panel.querySelector(':scope > *');
     const delta=Math.max(0,event.clientY-startY);
-    if(delta>72){card?.style.removeProperty('transform');close();return;}
-    if(card){card.style.removeProperty('transform');card.style.removeProperty('transition');}
+    if(delta>72){dragTarget.style.removeProperty('transform');close();return;}
+    dragTarget.style.removeProperty('transform');dragTarget.style.removeProperty('transition');
   };
   handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end);
 }
@@ -4145,14 +4144,7 @@ bindMobileNpcSheet(el('trainerPanel'),closeTrainer);
 bindMobileNpcSheet(el('evolutionPanel'),closeEvolutionGuide);
 bindMobileNpcSheet(el('breedingPanel'),closeBreedingCaretaker);
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
-const ranchStorageSheet=el('ranchStoragePage'),ranchStorageHandle=ranchStorageSheet?.querySelector('[data-npc-sheet-handle]');
-if(ranchStorageSheet&&ranchStorageHandle){
-  let ranchStorageStartY=0,ranchStorageDragging=false;
-  ranchStorageHandle.addEventListener('pointerdown',event=>{ranchStorageStartY=event.clientY;ranchStorageDragging=true;ranchStorageHandle.setPointerCapture?.(event.pointerId);ranchStorageSheet.style.transition='none';});
-  ranchStorageHandle.addEventListener('pointermove',event=>{if(ranchStorageDragging)ranchStorageSheet.style.transform=`translateY(${Math.max(0,event.clientY-ranchStorageStartY)}px)`;});
-  const finishRanchStorageDrag=event=>{if(!ranchStorageDragging)return;ranchStorageDragging=false;const delta=Math.max(0,event.clientY-ranchStorageStartY);ranchStorageSheet.style.removeProperty('transform');ranchStorageSheet.style.removeProperty('transition');if(delta>72)closeRanchSurface();};
-  ranchStorageHandle.addEventListener('pointerup',finishRanchStorageDrag);ranchStorageHandle.addEventListener('pointercancel',finishRanchStorageDrag);
-}
+bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
