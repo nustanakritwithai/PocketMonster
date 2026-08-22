@@ -455,6 +455,14 @@ function populateWorld(zone='hub'){
       tile.position.set(0,.025,z); addDeco(tile);
     }
     for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xf0abfc);
+  }else if(zone==='haunted-woods'){
+    [[-18,10,1.2],[18,10,1.15],[-18,-10,1.25],[18,-10,1.1]].forEach(([x,z,s])=>makeTree(x,z,s,{leaf:0x312e81,fruit:0xa78bfa}));
+    [[-15,5,1.1],[15,5,1.2],[15,-14,1.15],[-15,-14,1.1],[-7,12,1],[7,-12,1.05]].forEach(([x,z,s])=>makeStalagmite(x,z,s));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0x475569,transparent:true,opacity:.3}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xc4b5fd);
   }else if(zone==='frozen-pass'){
     [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.25],[-8,-17,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x94a3b8));
     [[-15,5,1.2],[15,5,1.1],[15,-14,1.35],[-15,-14,1.2],[5,15,1.15],[-5,-15,1.2],[-4,-5,1],[8,-8,1.1]].forEach(([x,z,s])=>makeIceCrystal(x,z,s));
@@ -2336,6 +2344,9 @@ const ZONES={
   'dream-shrine':{label:'Dream Shrine • Psychic + Fairy + Normal',stageId:'dream-shrine',biomeId:'dream-shrine',bg:0x312e81,ground:0x6d28d9,spawn:[
     ['mindcoon',-11,2,20,{}],['mindcoon',11,2,20,{}],['fairimp',-11,-8,20,{}],['fairimp',11,-8,20,{}],['normalooze',-7,-14,21,{}],['mindcoon',7,-14,21,{}]
   ],eliteSpawn:[['mindcoon',0,-16,23,{elite:true}]],eliteChance:.16,bossSpawn:[['mindcoon',0,-18,24,{boss:true}]],progressionBossSpeciesId:'mindcoon',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Psychic'],secondaryTypes:['Fairy','Normal'],encounterTableId:'encounter-dream-shrine-v1',eliteEncounterTableId:'elite-dream-shrine-v1',bossEncounterTableId:'boss-dream-shrine-v1',balanceProfileId:'stage-dream-shrine-v1',recommendedLevel:{min:20,max:24},sceneStatus:'stage-ready'},
+  'haunted-woods':{label:'Haunted Woods • Ghost + Dark + Poison',stageId:'haunted-woods',biomeId:'haunted-woods',bg:0x1e293b,ground:0x334155,spawn:[
+    ['ghostpurr',-11,2,22,{}],['ghostpurr',11,2,22,{}],['toxitoad',-11,-8,22,{}],['toxitoad',11,-8,22,{}],['voidhorn',-7,-14,23,{}],['ghostpurr',7,-14,23,{}]
+  ],eliteSpawn:[['ghostpurr',0,-16,25,{elite:true}]],eliteChance:.16,bossSpawn:[['ghostpurr',0,-18,26,{boss:true}]],progressionBossSpeciesId:'ghostpurr',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ghost'],secondaryTypes:['Dark','Poison'],encounterTableId:'encounter-haunted-woods-v1',eliteEncounterTableId:'elite-haunted-woods-v1',bossEncounterTableId:'boss-haunted-woods-v1',balanceProfileId:'stage-haunted-woods-v1',recommendedLevel:{min:22,max:26},sceneStatus:'stage-ready'},
   'sky-ruins':{label:'Sky Ruins • Flying + Electric + Psychic',stageId:'sky-ruins',biomeId:'sky-ruins',bg:0x8da4c7,ground:0x64748b,spawn:[
     ['galebird',-11,2,24,{}],['galebird',11,2,24,{}],['voltkit',-11,-8,24,{}],['voltkit',11,-8,24,{}],['mindcoon',-7,-14,25,{}],['galebird',7,-14,25,{}]
   ],eliteSpawn:[['galebird',0,-16,27,{elite:true}]],eliteChance:.16,bossSpawn:[['galebird',0,-18,30,{boss:true}]],progressionBossSpeciesId:'galebird',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Flying'],secondaryTypes:['Electric','Psychic'],encounterTableId:'encounter-sky-ruins-v1',eliteEncounterTableId:'elite-sky-ruins-v1',bossEncounterTableId:'boss-sky-ruins-v1',balanceProfileId:'stage-sky-ruins-v1',recommendedLevel:{min:24,max:30},sceneStatus:'stage-ready'},
@@ -2396,6 +2407,10 @@ function setZoneLighting(zone){
     hemi.intensity=1.35;
     sun.intensity=1.4;
     sun.color.setHex(0xd8b4fe);
+  }else if(zone==='haunted-woods'){
+    hemi.intensity=0.7;
+    sun.intensity=0.9;
+    sun.color.setHex(0x94a3b8);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -2405,14 +2420,14 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='poison-marsh'?'marsh':zone==='dream-shrine'?'shrine':zone==='rocky-canyon'?'rocky':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='poison-marsh'?'marsh':zone==='dream-shrine'?'shrine':zone==='haunted-woods'?'woods':zone==='rocky-canyon'?'rocky':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;
   scene.background=makeSkyTexture(z.bg);
   scene.fog.color.setHex(zone==='cave'?0x1e293b:(zone==='hub'?0x65c9f5:z.bg));
-  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:zone==='rocky-canyon'?24:zone==='sky-ruins'?22:zone==='poison-marsh'?18:zone==='dream-shrine'?20:30;
-  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:zone==='sky-ruins'?80:zone==='poison-marsh'?58:zone==='dream-shrine'?64:76;
+  scene.fog.near=zone==='cave'?15:zone==='frozen-pass'?18:zone==='rocky-canyon'?24:zone==='sky-ruins'?22:zone==='poison-marsh'?18:zone==='dream-shrine'?20:zone==='haunted-woods'?14:30;
+  scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:zone==='sky-ruins'?80:zone==='poison-marsh'?58:zone==='dream-shrine'?64:zone==='haunted-woods'?48:76;
   setZoneLighting(zone);
 }
 function createWild(sp,x,z,level=1,opts={}){

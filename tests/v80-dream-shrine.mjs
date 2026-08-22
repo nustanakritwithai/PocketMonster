@@ -17,7 +17,7 @@ for(const id of ['frozen-pass','rocky-canyon','sky-ruins','poison-marsh'])Object
 assert.equal(stageUnlockReason(progress,'dream-shrine').ok,true,'Set 2 clear unlocks Dream Shrine');
 const route=routesFrom('poison-marsh').find(candidate=>candidate.to==='dream-shrine');
 assert.equal(warpAvailability(progress,route,stageUnlockReason).ok,true,'Dream Shrine route is available after Set 2');
-const zoneBlock=js.match(/['"]dream-shrine['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const zoneBlock=js.match(/['"]dream-shrine['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]haunted-woods['"]\s*:)/)?.[0]||'';
 assert.match(zoneBlock,/stageId:'dream-shrine'/,'Dream Shrine runtime zone is catalog-linked');
 assert.match(zoneBlock,/spawn:\[/,'Dream Shrine has Normal encounter spawn data');
 assert.match(zoneBlock,/eliteSpawn:\[/,'Dream Shrine has Elite encounter data');
