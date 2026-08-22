@@ -10,6 +10,7 @@ import { evaluateEligibility, MASTERY_RANK_ORDER } from './requirements.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { learnsetEntriesForMonster } from './learnset-catalog.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
+import { resolveWorkbookEvolutionStage } from './evolution.mjs';
 
 export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3']);
 export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
@@ -259,6 +260,77 @@ export function resolveStage1Learnset(instance) {
 
 export function listStage1SkillCandidates(instance) {
   return resolveStage1Learnset(instance).candidates;
+}
+
+const STAGE2_NATIVE_METHODS = new Set(['LevelUp', 'Evolution']);
+
+export function resolveStage2Learnset(instance) {
+  if (!instance || typeof instance !== 'object') {
+    return Object.freeze({
+      ok: false,
+      reason: 'invalid_state',
+      entries: Object.freeze([]),
+      candidates: Object.freeze([]),
+      stage2: false,
+      stageEvidence: null,
+    });
+  }
+  const mapping = monsterCatalogEntry(instance.speciesId);
+  if (!mapping) {
+    return Object.freeze({
+      ok: false,
+      reason: 'unknown_id',
+      entries: Object.freeze([]),
+      candidates: Object.freeze([]),
+      stage2: false,
+      stageEvidence: null,
+    });
+  }
+  const stage = resolveWorkbookEvolutionStage(instance);
+  const level = Number.isFinite(instance.level) ? Math.max(1, Math.floor(instance.level)) : 1;
+  const entries = learnsetEntriesForMonster(mapping.workbookStage2MonsterId, { includeBlocked: true })
+    .map(entry => {
+      const learned = Boolean(getSkill(instance, entry.skillId));
+      const supportedMethod = STAGE2_NATIVE_METHODS.has(entry.method);
+      let eligible = false;
+      let reason = null;
+      if (entry.state !== 'Active') reason = 'deferred';
+      else if (!supportedMethod) reason = 'unavailable_by_system';
+      else if (!stage.stage2) reason = 'evolution_required';
+      else if (entry.method === 'LevelUp' && level < entry.learnLevel) reason = 'level_required';
+      else if (learned) reason = 'already_learned';
+      else eligible = true;
+      return Object.freeze({
+        entry,
+        skillId: entry.skillId,
+        method: entry.method,
+        referenceLearnLevel: entry.learnLevel,
+        eligible,
+        learned,
+        obtainable: eligible,
+        reason,
+      });
+    });
+  const candidates = Object.freeze(entries.filter(entry => entry.eligible).map(entry => entry.skillId));
+  return Object.freeze({
+    ok: true,
+    reason: stage.reason,
+    runtimeSpeciesId: instance.speciesId,
+    workbookMonsterId: mapping.workbookStage2MonsterId,
+    level,
+    stage2: stage.stage2,
+    stageEvidence: stage.stageEvidence,
+    evolutionPath: stage.path,
+    runtimeEvolutionDecision: stage.path.runtimeEvolutionDecision,
+    supportedMethods: Object.freeze([...STAGE2_NATIVE_METHODS]),
+    entries: Object.freeze(entries),
+    candidates,
+    autoGrant: false,
+  });
+}
+
+export function listStage2SkillCandidates(instance) {
+  return resolveStage2Learnset(instance).candidates;
 }
 
 // Add Skill EXP from a use event and recompute mastery rank.
