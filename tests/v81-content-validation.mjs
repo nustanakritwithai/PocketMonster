@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import {
+  CONTENT_ID_PATTERNS,
+  LEARNSET_METHODS,
+  assertContentBundle,
+  validateContentBundle,
+} from '../content-validation.mjs';
+
+function validFixture() {
+  return {
+    monsters: [{ id: 'MON001', passiveId: 'PASS001', name: 'Sproutling' }],
+    skills: [{ id: 'SK001', name: 'Leaf Tap', target: 'Enemy' }],
+    passives: [{ id: 'PASS001', name: 'Fresh Start' }],
+    statuses: [{ id: 'ST001', name: 'Poison' }],
+    learnsets: [{ monsterId: 'MON001', skillId: 'SK001', method: 'LevelUp', level: 1, state: 'Active' }],
+    skillStatusLinks: [{ skillId: 'SK001', statusId: 'ST001' }],
+  };
+}
+
+const valid = validFixture();
+assert.equal(validateContentBundle(valid).ok, true, 'a complete stable-ID fixture passes');
+assert.equal(assertContentBundle(valid), valid, 'assertion returns the validated bundle without cloning runtime state');
+assert.equal(CONTENT_ID_PATTERNS.monsters.test('MON001'), true, 'monster IDs use the canonical prefix');
+assert.equal(CONTENT_ID_PATTERNS.skills.test('SK108'), true, 'skill IDs use the canonical prefix');
+assert.equal(LEARNSET_METHODS.includes('RareManual'), true, 'deferred workbook methods remain schema-valid');
+
+const duplicate = validFixture();
+duplicate.monsters.push({ id: 'MON001', passiveId: 'PASS001', name: 'Duplicate' });
+assert.ok(
+  validateContentBundle(duplicate).issues.some(issue => issue.code === 'duplicate_id' && issue.catalog === 'monsters'),
+  'duplicate stable IDs are rejected',
+);
+
+const badId = validFixture();
+badId.skills[0].id = 'skill-one';
+assert.ok(
+  validateContentBundle(badId).issues.some(issue => issue.code === 'invalid_id' && issue.catalog === 'skills'),
+  'invalid stable-ID shapes are rejected',
+);
+
+const danglingPassive = validFixture();
+danglingPassive.monsters[0].passiveId = 'PASS999';
+assert.ok(
+  validateContentBundle(danglingPassive).issues.some(issue => issue.code === 'dangling_reference' && issue.field === 'passiveId'),
+  'monster-to-passive dangling references are rejected',
+);
+
+const danglingLearnset = validFixture();
+danglingLearnset.learnsets[0].skillId = 'SK999';
+assert.ok(
+  validateContentBundle(danglingLearnset).issues.some(issue => issue.code === 'dangling_reference' && issue.catalog === 'learnsets'),
+  'learnset-to-skill dangling references are rejected',
+);
+
+const danglingStatus = validFixture();
+danglingStatus.skillStatusLinks[0].statusId = 'ST999';
+assert.ok(
+  validateContentBundle(danglingStatus).issues.some(issue => issue.code === 'dangling_reference' && issue.catalog === 'skillStatusLinks'),
+  'skill-to-status dangling references are rejected',
+);
+
+const invalidMethod = validFixture();
+invalidMethod.learnsets[0].method = 'DebugGrant';
+assert.ok(
+  validateContentBundle(invalidMethod).issues.some(issue => issue.code === 'invalid_enum' && issue.field === 'method'),
+  'unknown learnset grant methods are rejected',
+);
+
+const invalidState = validFixture();
+invalidState.learnsets[0].state = 'AutoEquip';
+assert.ok(
+  validateContentBundle(invalidState).issues.some(issue => issue.code === 'invalid_enum' && issue.field === 'state'),
+  'unknown rollout states are rejected',
+);
+
+for (const [field, value] of [
+  ['currentHp', 10],
+  ['currentUses', 2],
+  ['cooldownRemaining', 1],
+  ['ownerState', 'party'],
+  ['instanceId', 'instance-1'],
+  ['equippedSkills', ['SK001']],
+]) {
+  const leaked = validFixture();
+  leaked.monsters[0].profile = { [field]: value };
+  assert.ok(
+    validateContentBundle(leaked).issues.some(issue => issue.code === 'runtime_field_in_static_catalog' && issue.field.endsWith(field)),
+    `${field} cannot leak into immutable master data`,
+  );
+}
+
+const malformed = validateContentBundle({ monsters: null });
+assert.equal(malformed.ok, false, 'missing catalog arrays are rejected');
+assert.equal(Object.isFrozen(malformed.issues), true, 'validation output is immutable');
+
+assert.throws(
+  () => assertContentBundle(danglingStatus),
+  error => error instanceof TypeError && error.code === 'content_bundle_invalid',
+  'invalid bundles cannot cross the catalog boundary',
+);
+
+console.log('V8.1 content validation: PASS');
