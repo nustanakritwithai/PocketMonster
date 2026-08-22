@@ -15,6 +15,8 @@ export const MANUAL_SKILL_SLOTS = Object.freeze(['s1', 's2', 's3']);
 export const SYSTEM_SKILL_SLOTS = Object.freeze(['basicAI', 'passive', 'evolutionTrait']);
 export const SKILL_SLOTS = Object.freeze([...SYSTEM_SKILL_SLOTS.slice(0, 1), ...MANUAL_SKILL_SLOTS, ...SYSTEM_SKILL_SLOTS.slice(1)]);
 
+const CONSUMED_SKILL_CASTS = new WeakMap();
+
 function num(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
@@ -51,7 +53,7 @@ export function masteryRawPower(rank) {
 }
 
 export function getSkill(instance, skillId) {
-  return (instance.skills ?? []).find(s => s.skillId === skillId) ?? null;
+  return (instance?.skills ?? []).find(s => s?.skillId === skillId) ?? null;
 }
 
 // Learn a skill into a slot (candidate → owned). No-op if already known.
@@ -59,9 +61,109 @@ export function learnSkill(instance, { skillId, slot = 's1' }) {
   if (!Array.isArray(instance.skills)) instance.skills = [];
   if (slot !== null && !SKILL_SLOTS.includes(slot)) return null;
   if (getSkill(instance, skillId)) return getSkill(instance, skillId);
-  const record = { skillId, slot, masteryExp: 0, masteryRank: 'novice', mutationId: null };
+  const definition = skillCatalogEntry(skillId);
+  const record = {
+    skillId,
+    slot,
+    masteryExp: 0,
+    masteryRank: 'novice',
+    mutationId: null,
+    ...(definition ? { currentUses: definition.maxUses } : {}),
+  };
   instance.skills.push(record);
   return record;
+}
+
+function skillUseResult(ok, reason, detail = {}) {
+  return Object.freeze({ ok, reason, consumed: 0, ...detail });
+}
+
+function currentSkillUses(skill, maxUses) {
+  if (skill?.currentUses == null) return maxUses;
+  if (!Number.isFinite(skill.currentUses)) return 0;
+  return Math.max(0, Math.min(maxUses, Math.floor(skill.currentUses)));
+}
+
+function consumedCastIds(instance, skillId, create = false) {
+  let bySkill = CONSUMED_SKILL_CASTS.get(instance);
+  if (!bySkill && create) {
+    bySkill = new Map();
+    CONSUMED_SKILL_CASTS.set(instance, bySkill);
+  }
+  let castIds = bySkill?.get(skillId);
+  if (!castIds && create) {
+    castIds = new Set();
+    bySkill.set(skillId, castIds);
+  }
+  return castIds ?? null;
+}
+
+function rememberConsumedCast(instance, skillId, castId) {
+  const castIds = consumedCastIds(instance, skillId, true);
+  castIds.add(castId);
+}
+
+// Read-only command validation. A use is metered only after targeting/combat has
+// accepted a manual cast; rejected commands never initialize or consume state.
+export function evaluateSkillUse(instance, {
+  skillId,
+  castId,
+  castAccepted = false,
+} = {}) {
+  if (!instance || typeof instance !== 'object' || !Array.isArray(instance.skills)) {
+    return skillUseResult(false, 'invalid_state');
+  }
+  if (typeof castId !== 'string' || castId.trim() === '') {
+    return skillUseResult(false, 'invalid_cast_id', { skillId: skillId ?? null });
+  }
+  const normalizedCastId = castId.trim();
+  const definition = skillCatalogEntry(skillId);
+  if (!definition) return skillUseResult(false, 'unknown_id', { skillId: skillId ?? null, castId: normalizedCastId });
+  const skill = getSkill(instance, skillId);
+  if (!skill) return skillUseResult(false, 'not_learned', { skillId, castId: normalizedCastId, maxUses: definition.maxUses });
+  if (!MANUAL_SKILL_SLOTS.includes(skill.slot)) {
+    return skillUseResult(false, 'manual_slot_required', { skillId, castId: normalizedCastId, slot: skill.slot ?? null, maxUses: definition.maxUses });
+  }
+  if (consumedCastIds(instance, skillId)?.has(normalizedCastId)) {
+    return skillUseResult(false, 'duplicate_cast', {
+      skillId,
+      castId: normalizedCastId,
+      currentUses: currentSkillUses(skill, definition.maxUses),
+      maxUses: definition.maxUses,
+    });
+  }
+  const currentUses = currentSkillUses(skill, definition.maxUses);
+  if (castAccepted !== true) {
+    return skillUseResult(false, 'cast_rejected', { skillId, castId: normalizedCastId, currentUses, maxUses: definition.maxUses });
+  }
+  if (currentUses <= 0) {
+    return skillUseResult(false, 'no_uses', { skillId, castId: normalizedCastId, currentUses: 0, maxUses: definition.maxUses });
+  }
+  return skillUseResult(true, null, {
+    skillId,
+    castId: normalizedCastId,
+    currentUses,
+    nextUses: currentUses - 1,
+    maxUses: definition.maxUses,
+  });
+}
+
+// Commit one accepted cast. castId makes duplicate callbacks idempotent during
+// the current runtime; A18 owns persistence/migration of the metered fields.
+export function consumeSkillUse(instance, command = {}) {
+  const result = evaluateSkillUse(instance, command);
+  if (!result.ok) return result;
+  const skill = getSkill(instance, result.skillId);
+  skill.currentUses = result.nextUses;
+  rememberConsumedCast(instance, result.skillId, result.castId);
+  return skillUseResult(true, null, {
+    skillId: result.skillId,
+    castId: result.castId,
+    consumed: 1,
+    previousUses: result.currentUses,
+    currentUses: result.nextUses,
+    maxUses: result.maxUses,
+  });
 }
 
 function equipResult(ok, reason, detail = {}) {
