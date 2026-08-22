@@ -5,10 +5,14 @@ import {
   migrateState,
   sanitizeMonsterInstanceForPersistence,
 } from './monster-instance.mjs';
+import {
+  eggCollectionDiagnostics,
+  normalizeEggsForPersistence,
+} from './breeding.mjs';
 
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
-export const SAVE_SCHEMA_VERSION = 9;
+export const SAVE_SCHEMA_VERSION = 10;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
@@ -23,7 +27,12 @@ if (INSTANCE_SAVE_VERSION !== SAVE_SCHEMA_VERSION) {
 export const SAVE_MIGRATION_REGISTRY = Object.freeze([
   Object.freeze({
     id: 'monster-instance-v9-skill-runtime',
-    targetVersion: INSTANCE_SAVE_VERSION,
+    targetVersion: 9,
+    migrate: migrateState,
+  }),
+  Object.freeze({
+    id: 'breeding-egg-v10',
+    targetVersion: 10,
     migrate: migrateState,
   }),
 ]);
@@ -35,6 +44,7 @@ export function sanitizeStateForPersistence(input) {
   state.collection = Array.isArray(source.collection)
     ? source.collection.map(sanitizeMonsterInstanceForPersistence)
     : [];
+  state.eggs = normalizeEggsForPersistence(source.eggs);
   state.saveVersion = SAVE_SCHEMA_VERSION;
   return state;
 }
@@ -47,8 +57,11 @@ export function applySaveMigrations(input, { now = Date.now() } = {}) {
   return state;
 }
 
-function reportCatalogDiagnostics(state, onDiagnostic) {
-  const diagnostics = catalogIdentityDiagnostics(state);
+function reportSaveDiagnostics(state, onDiagnostic) {
+  const diagnostics = Object.freeze([
+    ...catalogIdentityDiagnostics(state),
+    ...eggCollectionDiagnostics(state.eggs),
+  ]);
   if (typeof onDiagnostic === 'function') {
     for (const diagnostic of diagnostics) onDiagnostic(diagnostic);
   }
@@ -126,10 +139,11 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now(), onD
         ? source.inventory.stash.filter(id => typeof id === 'string')
         : ['ranch_band', 'guard_charm', 'swift_lens', 'flame_claw', 'guard_band', 'focus_lens'],
     },
+    eggs: normalizeEggsForPersistence(source.eggs),
     saveVersion: SAVE_SCHEMA_VERSION,
   };
   const migrated = applySaveMigrations(canonical, { now });
-  reportCatalogDiagnostics(migrated, onDiagnostic);
+  reportSaveDiagnostics(migrated, onDiagnostic);
   return migrated;
 }
 
@@ -150,7 +164,7 @@ export function readStoredSave(storage) {
 export function writeStoredSave(storage, envelope, { onDiagnostic } = {}) {
   if (!envelope?.state || typeof envelope.state !== 'object') throw new TypeError('save envelope state is required');
   const persistentState = sanitizeStateForPersistence(envelope.state);
-  reportCatalogDiagnostics(persistentState, onDiagnostic);
+  reportSaveDiagnostics(persistentState, onDiagnostic);
   const previousRaw = storage.getItem(SAVE_KEY);
   if (parseEnvelope(previousRaw)) storage.setItem(SAVE_BACKUP_KEY, previousRaw);
   const next = {

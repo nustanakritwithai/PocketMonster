@@ -50,6 +50,8 @@ function runtimeContract(source){
   const defeatWild=sourceSection(source,'function defeatWild(', '\nfunction monsterDamage(');
   const levelUp=sourceSection(source,'function levelUpInstance(', '\n// V7.2: simulateLife adapter');
   const raisingEvent=sourceSection(source,'function resolveRaisingEvent(', '\nfunction renderRaisingEventBanner(');
+  const prepareHatched=sourceSection(source,'function prepareHatchedChildForLive(', '\nfunction hatchLegacyEgg(');
+  const hatchLegacy=sourceSection(source,'function hatchLegacyEgg(', '\nfunction hatchEgg(');
   const hatchEgg=sourceSection(source,'function hatchEgg(', '\n// ---------- Evolution ----------');
   const migration=sourceSection(source,'function migrateLoadedState(', '\nlet remoteSaveReady=');
   const monsterSkills=sourceSection(source,'function getMonsterSkills(', '\nfunction randomGenes(');
@@ -61,7 +63,9 @@ function runtimeContract(source){
   assert.match(defeatWild,/addGrowthExp\(pm,share\);synchronizeStage1Learnset\(pm\);/);
   assert.match(levelUp,/addGrowthExp\(inst,need\);\s*synchronizeStage1Learnset\(inst\);/);
   assert.match(raisingEvent,/if\(result\.ok\)\{synchronizeStage1Learnset\(inst\);/);
-  assert.match(hatchEgg,/synchronizeStage1Learnset\(child\);\s*refreshStats\(child,true\);/);
+  assert.match(prepareHatched,/synchronizeStage1Learnset\(child\);\s*refreshStats\(child,true\);/);
+  assert.match(hatchLegacy,/prepareHatchedChildForLive\(ensureInstanceShape\(/);
+  assert.match(hatchEgg,/prepareHatchedChildForLive\(result\.child\)/);
   assert.match(migration,/state\.collection\.forEach\(synchronizeStage1Learnset\);/);
   assert.match(monsterSkills,/if\(cand\?\.replaces&&rec\.slot===cand\.slot\)/);
   assert.doesNotMatch(useSkill,/learnSkill\(a\.inst/);
@@ -100,6 +104,8 @@ const runtimeMutants=[
   ['skip manual-level sync','addGrowthExp(inst,need);\n  synchronizeStage1Learnset(inst);','addGrowthExp(inst,need);'],
   ['skip raising-event sync','if(result.ok){synchronizeStage1Learnset(inst);','if(result.ok){'],
   ['skip hatch sync','\n  synchronizeStage1Learnset(child);\n  refreshStats(child,true);','\n  refreshStats(child,true);'],
+  ['skip canonical hatch hydrator','const child=prepareHatchedChildForLive(result.child);','const child=result.child;'],
+  ['skip legacy hatch hydrator','const child=prepareHatchedChildForLive(ensureInstanceShape({...egg.child,origin:\'bred\',parentAId,parentBId}));','const child=ensureInstanceShape({...egg.child,origin:\'bred\',parentAId,parentBId});'],
   ['skip loaded-save sync','\n  state.collection.forEach(synchronizeStage1Learnset);',''],
   ['restore lazy casting learn','const skillRec=getSkill(a.inst,move.skillId);','let skillRec=getSkill(a.inst,move.skillId);if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.skillId,slot:\'s\'+(index+1)});'],
   ['restore candidate auto-equip','learnSkill(inst,{skillId:def.id,slot:null});','learnSkill(inst,{skillId:def.id,slot:def.slot||\'s1\'});'],

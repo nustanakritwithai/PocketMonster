@@ -7,11 +7,15 @@ import { createRng } from './rng.mjs';
 import { clamp } from './balance-formulas.mjs';
 import { normalizeInstance, CORE_GENES } from './monster-instance.mjs';
 import { resolveWorkbookEvolutionStage } from './evolution.mjs';
+import { MONSTER_CATALOG } from './monster-catalog.mjs';
+import { resolveSecondaryTypeAssignment } from './secondary-type-resolver.mjs';
 
 export const GENE_RANKS = Object.freeze(['D', 'C', 'B', 'A', 'S']);
 export const BREEDING_REQUIRED_STAGE = 2;
 export const BREEDING_MIN_LEVEL = 20;
 export const BREEDING_MIN_BOND = 50;
+export const BREEDING_VERSION = 'BRD_v1.0';
+export const PARENT_BREEDING_COOLDOWN_MS = 30 * 60 * 1000;
 export const STANDARD_BREEDING_ROLES = Object.freeze({ eggHolder: 'Female', partner: 'Male' });
 export const BREEDING_GROUPS = Object.freeze([
   'Field',
@@ -25,6 +29,59 @@ export const BREEDING_GROUPS = Object.freeze([
 ]);
 export const POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
 export const POTENTIAL_LIMITS = Object.freeze({ min: 0, max: 31 });
+
+const BREEDING_PROFILE_RULES = Object.freeze({
+  normalooze: Object.freeze(['Field', '50M/50F', 'Yes']),
+  flameling: Object.freeze(['Field', '50M/50F', 'Yes']),
+  aquapuff: Object.freeze(['Water1', '50M/50F', 'Yes']),
+  voltkit: Object.freeze(['Field', '50M/50F', 'Yes']),
+  mossbun: Object.freeze(['Field', '50M/50F', 'Yes']),
+  frostowl: Object.freeze(['Field', '50M/50F', 'Yes']),
+  punchcub: Object.freeze(['Humanlike', '50M/50F', 'Yes']),
+  toxitoad: Object.freeze(['Field', '50M/50F', 'Yes']),
+  sandmole: Object.freeze(['Field', '50M/50F', 'Yes']),
+  galebird: Object.freeze(['Flying', '50M/50F', 'Yes']),
+  mindcoon: Object.freeze(['Field', '50M/50F', 'Yes']),
+  buglet: Object.freeze(['Bug', '50M/50F', 'Yes']),
+  rockhorn: Object.freeze(['Mineral', '50M/50F', 'Yes']),
+  ghostpurr: Object.freeze(['Amorphous', 'Genderless', 'SpecialRecipeOnly']),
+  emberdrake: Object.freeze(['Dragon', '75M/25F', 'Yes']),
+  voidhorn: Object.freeze(['Field', '50M/50F', 'Yes']),
+  ironbug: Object.freeze(['Mineral', 'Genderless', 'SpecialRecipeOnly']),
+  fairimp: Object.freeze(['Field', '25M/75F', 'Yes']),
+});
+
+export const WORKBOOK_BREEDING_PROFILES = Object.freeze(MONSTER_CATALOG.map(mapping => {
+  const rule = BREEDING_PROFILE_RULES[mapping.runtimeSpeciesId];
+  if (!rule) throw new TypeError(`Missing breeding profile for ${mapping.runtimeSpeciesId}`);
+  const [breedingGroup, genderRule, breedingEligibility] = rule;
+  return Object.freeze({
+    runtimeSpeciesId: mapping.runtimeSpeciesId,
+    childMonsterId: mapping.workbookBaseMonsterId,
+    adultMonsterId: mapping.workbookStage2MonsterId,
+    breedingGroup,
+    genderRule,
+    breedingEligibility,
+    hatchTimeMin: 15,
+    baseBond: 10,
+    requiredStage: BREEDING_REQUIRED_STAGE,
+    requiredLevel: BREEDING_MIN_LEVEL,
+    breedingVersion: BREEDING_VERSION,
+  });
+}));
+
+const BREEDING_PROFILE_BY_SPECIES = new Map(WORKBOOK_BREEDING_PROFILES.map(profile => [
+  profile.runtimeSpeciesId,
+  profile,
+]));
+const BREEDING_PROFILE_BY_CHILD_MONSTER = new Map(WORKBOOK_BREEDING_PROFILES.map(profile => [
+  profile.childMonsterId,
+  profile,
+]));
+
+export function workbookBreedingProfile(runtimeSpeciesId) {
+  return BREEDING_PROFILE_BY_SPECIES.get(runtimeSpeciesId) ?? null;
+}
 
 // R13 inheritance baselines (tunable rules, not content).
 export const INHERITANCE = Object.freeze({
@@ -70,6 +127,7 @@ function compatibilityResult(ok, reason, detail = {}) {
 }
 
 function speciesProfile(speciesById, speciesId) {
+  if (speciesById == null) return workbookBreedingProfile(speciesId);
   if (typeof speciesById === 'function') return speciesById(speciesId) ?? null;
   if (speciesById instanceof Map) return speciesById.get(speciesId) ?? null;
   return speciesById && typeof speciesById === 'object' ? speciesById[speciesId] ?? null : null;
@@ -258,6 +316,385 @@ export function resolvePotentialInheritance(eggHolder, partner, { seed = 0 } = {
     holderInheritedCount: holderStats.length,
     partnerInheritedCount: 1,
   });
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function transactionResult(ok, reason, state, detail = {}) {
+  return Object.freeze({ ok, reason, state, ...detail });
+}
+
+function nonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function ownedMonster(state, instanceId) {
+  const matches = Array.isArray(state?.collection)
+    ? state.collection.filter(monster => monster?.instanceId === instanceId)
+    : [];
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function existingEggs(state, eggId) {
+  return (Array.isArray(state?.eggs) ? state.eggs : []).filter(egg => egg?.eggId === eggId);
+}
+
+export function resolveGenderFromSeed(genderRule, seed) {
+  if (!Number.isSafeInteger(seed)) return null;
+  if (genderRule === 'Genderless') return 'Genderless';
+  const match = /^(25|50|75)M\/(75|50|25)F$/.exec(genderRule ?? '');
+  if (!match || Number(match[1]) + Number(match[2]) !== 100) return null;
+  const roll = ((seed % 100) + 100) % 100;
+  return roll < Number(match[1]) ? 'Male' : 'Female';
+}
+
+function resolveSecondaryAffinity(eggHolder) {
+  const candidateType = eggHolder?.secondaryType ?? null;
+  if (candidateType == null) return null;
+  const resolution = resolveSecondaryTypeAssignment({
+    runtimeSpeciesId: eggHolder.speciesId,
+    stage: 2,
+    candidateType,
+  });
+  return resolution.ok ? resolution.secondaryType : null;
+}
+
+function samePotential(left, right) {
+  return POTENTIAL_STATS.every(stat => left?.[stat] === right?.[stat]);
+}
+
+function sameOrderedValues(left, right) {
+  return Array.isArray(left) && Array.isArray(right)
+    && left.length === right.length
+    && left.every((value, index) => value === right[index]);
+}
+
+function eggCreationSnapshotMatches(egg, eggHolder, partner, {
+  eggId,
+  now,
+}) {
+  if (!eggHolder || !partner) return false;
+  const holderStage = resolveWorkbookEvolutionStage(eggHolder);
+  const holderProfile = workbookBreedingProfile(eggHolder.speciesId);
+  if (!holderStage.ok || !holderStage.stage2 || !holderProfile
+    || holderStage.path?.fromWorkbookMonsterId !== holderProfile.childMonsterId) return false;
+  const inheritance = resolvePotentialInheritance(eggHolder, partner, { seed: eggId });
+  if (!inheritance.ok) return false;
+  return egg.breedingVersion === BREEDING_VERSION
+    && egg.childMonsterId === holderProfile.childMonsterId
+    && egg.hatchAt === now + holderProfile.hatchTimeMin * 60 * 1000
+    && sameOrderedValues(egg.potentialInheritedStats, inheritance.inheritedStats)
+    && samePotential(egg.potentialValues, inheritance.potential)
+    && (egg.secondaryAffinity ?? null) === resolveSecondaryAffinity(eggHolder)
+    && egg.inheritedSkillMemoryId == null
+    && egg.recipeId == null;
+}
+
+function eggIssue(code, field, detail = {}) {
+  return Object.freeze({ code, field, ...detail });
+}
+
+export function validateWorkbookEgg(egg) {
+  const issues = [];
+  if (!egg || typeof egg !== 'object' || Array.isArray(egg)) {
+    return Object.freeze({ ok: false, issues: Object.freeze([eggIssue('egg_schema_invalid', 'root')]) });
+  }
+  if (!UUID_PATTERN.test(egg.eggId ?? '')) issues.push(eggIssue('egg_schema_invalid', 'eggId'));
+  if (egg.breedingVersion !== BREEDING_VERSION) issues.push(eggIssue('unsupported_breeding_version', 'breedingVersion'));
+  const childProfile = BREEDING_PROFILE_BY_CHILD_MONSTER.get(egg.childMonsterId) ?? null;
+  if (!childProfile || childProfile.breedingEligibility !== 'Yes') {
+    issues.push(eggIssue('child_species_unresolved', 'childMonsterId'));
+  }
+  if (!nonEmptyString(egg.eggHolderOwnedMonsterId)) issues.push(eggIssue('egg_schema_invalid', 'eggHolderOwnedMonsterId'));
+  if (!nonEmptyString(egg.partnerOwnedMonsterId)) issues.push(eggIssue('egg_schema_invalid', 'partnerOwnedMonsterId'));
+  if (egg.eggHolderOwnedMonsterId === egg.partnerOwnedMonsterId) issues.push(eggIssue('egg_schema_invalid', 'parentIds'));
+  if (!Number.isSafeInteger(egg.createdAt)) issues.push(eggIssue('egg_schema_invalid', 'createdAt'));
+  if (!Number.isSafeInteger(egg.hatchAt) || egg.hatchAt <= egg.createdAt) issues.push(eggIssue('egg_schema_invalid', 'hatchAt'));
+  const hatchProfile = childProfile;
+  if (hatchProfile && Number.isSafeInteger(egg.createdAt)
+    && egg.hatchAt !== egg.createdAt + hatchProfile.hatchTimeMin * 60 * 1000) {
+    issues.push(eggIssue('invalid_hatch_time', 'hatchAt'));
+  }
+  if (!Number.isSafeInteger(egg.genderSeed)) issues.push(eggIssue('egg_schema_invalid', 'genderSeed'));
+  if (!Array.isArray(egg.potentialInheritedStats)
+    || egg.potentialInheritedStats.length !== 3
+    || new Set(egg.potentialInheritedStats).size !== 3
+    || egg.potentialInheritedStats.some(stat => !POTENTIAL_STATS.includes(stat))) {
+    issues.push(eggIssue('egg_schema_invalid', 'potentialInheritedStats'));
+  }
+  if (!validPotentialRecord(egg.potentialValues)) issues.push(eggIssue('egg_schema_invalid', 'potentialValues'));
+  if (egg.secondaryAffinity != null) {
+    const profile = BREEDING_PROFILE_BY_CHILD_MONSTER.get(egg.childMonsterId) ?? null;
+    const affinity = profile && nonEmptyString(egg.secondaryAffinity)
+      ? resolveSecondaryTypeAssignment({
+        runtimeSpeciesId: profile.runtimeSpeciesId,
+        stage: 2,
+        candidateType: egg.secondaryAffinity,
+      })
+      : null;
+    if (!nonEmptyString(egg.secondaryAffinity) || (profile && !affinity?.ok)) {
+      issues.push(eggIssue('egg_schema_invalid', 'secondaryAffinity'));
+    }
+  }
+  if (egg.inheritedSkillMemoryId != null && !nonEmptyString(egg.inheritedSkillMemoryId)) issues.push(eggIssue('egg_schema_invalid', 'inheritedSkillMemoryId'));
+  if (egg.recipeId != null) issues.push(eggIssue('egg_schema_invalid', 'recipeId'));
+  if (egg.hatchedOwnedMonsterId != null) {
+    if (!UUID_PATTERN.test(egg.hatchedOwnedMonsterId ?? '')) {
+      issues.push(eggIssue('egg_schema_invalid', 'hatchedOwnedMonsterId'));
+    } else if (egg.hatchedOwnedMonsterId !== hatchedOwnedMonsterIdForEgg(egg.eggId)) {
+      issues.push(eggIssue('hatch_state_conflict', 'hatchedOwnedMonsterId'));
+    }
+  }
+  if ('isReadyToHatch' in egg) issues.push(eggIssue('derived_field_persisted', 'isReadyToHatch'));
+  return Object.freeze({ ok: issues.length === 0, issues: Object.freeze(issues) });
+}
+
+const OPTIONAL_EGG_DEFAULT_FIELDS = Object.freeze([
+  'secondaryAffinity',
+  'inheritedSkillMemoryId',
+  'recipeId',
+  'hatchedOwnedMonsterId',
+]);
+
+function materializeWorkbookEggDefaults(record) {
+  const egg = { ...record };
+  if (record.breedingVersion === BREEDING_VERSION) {
+    for (const field of OPTIONAL_EGG_DEFAULT_FIELDS) egg[field] = record[field] ?? null;
+  }
+  return egg;
+}
+
+export function normalizeEggsForPersistence(records) {
+  return (Array.isArray(records) ? records : [])
+    .map(record => {
+      if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+      const egg = materializeWorkbookEggDefaults(record);
+      delete egg.isReadyToHatch;
+      if (Array.isArray(record.potentialInheritedStats)) egg.potentialInheritedStats = [...record.potentialInheritedStats];
+      if (record.potentialValues && typeof record.potentialValues === 'object'
+        && !Array.isArray(record.potentialValues)) {
+        egg.potentialValues = { ...record.potentialValues };
+      }
+      return egg;
+    });
+}
+
+export function eggCollectionDiagnostics(records) {
+  const issues = [];
+  const seen = new Set();
+  for (const [index, egg] of (Array.isArray(records) ? records : []).entries()) {
+    if (!egg || typeof egg !== 'object' || Array.isArray(egg)) {
+      issues.push(Object.freeze({ code: 'egg_schema_invalid', index, field: 'root' }));
+      continue;
+    }
+    if (egg.breedingVersion == null) {
+      issues.push(Object.freeze({ code: 'legacy_egg_quarantined', index, eggId: egg.eggId ?? null }));
+    } else {
+      const validation = validateWorkbookEgg(egg);
+      for (const issue of validation.issues) issues.push(Object.freeze({ ...issue, index, eggId: egg.eggId ?? null }));
+    }
+    if (seen.has(egg.eggId)) issues.push(Object.freeze({ code: 'duplicate_egg_id', index, eggId: egg.eggId ?? null }));
+    seen.add(egg.eggId);
+  }
+  return Object.freeze(issues);
+}
+
+export function isEggReadyToHatch(egg, now = Date.now()) {
+  return Number.isFinite(now) && Number.isSafeInteger(egg?.hatchAt) && now >= egg.hatchAt;
+}
+
+function eggValidationFailureReason(validation) {
+  if (validation.issues.some(issue => issue.code === 'hatch_state_conflict')) return 'hatch_state_conflict';
+  if (validation.issues.some(issue => issue.code === 'child_species_unresolved')) return 'child_species_unresolved';
+  if (validation.issues.some(issue => issue.code === 'invalid_hatch_time')) return 'invalid_hatch_time';
+  return 'egg_schema_invalid';
+}
+
+// The egg UUID is the command identity. Derive a separate stable UUID-shaped
+// owned-monster ID so backup/multi-tab replay cannot create a different child.
+export function hatchedOwnedMonsterIdForEgg(eggId) {
+  if (!UUID_PATTERN.test(eggId ?? '')) return null;
+  const rng = createRng(`A32-hatched-owned-monster:${eggId.toLowerCase()}`);
+  const chars = Array.from({ length: 32 }, () => rng.int(0, 15).toString(16));
+  chars[12] = '5';
+  chars[16] = (8 + rng.int(0, 3)).toString(16);
+  const hex = chars.join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function createStandardBreedingEggTransaction(state, {
+  eggId,
+  eggHolderOwnedMonsterId,
+  partnerOwnedMonsterId,
+  genderSeed,
+  now = Date.now(),
+} = {}) {
+  if (!state || typeof state !== 'object' || !Array.isArray(state.collection) || !Array.isArray(state.eggs)
+    || !Number.isSafeInteger(now) || !UUID_PATTERN.test(eggId ?? '')
+    || !nonEmptyString(eggHolderOwnedMonsterId) || !nonEmptyString(partnerOwnedMonsterId)
+    || !Number.isSafeInteger(genderSeed)) {
+    return transactionResult(false, 'invalid_state', state);
+  }
+
+  const duplicates = existingEggs(state, eggId);
+  if (duplicates.length > 0) {
+    const existing = duplicates.length === 1 ? duplicates[0] : null;
+    const replayHolders = state.collection.filter(monster => monster?.instanceId === eggHolderOwnedMonsterId);
+    const replayPartners = state.collection.filter(monster => monster?.instanceId === partnerOwnedMonsterId);
+    const replayHolder = replayHolders.length === 1 ? replayHolders[0] : null;
+    const replayPartner = replayPartners.length === 1 ? replayPartners[0] : null;
+    const parentsUnavailable = replayHolders.length === 0 && replayPartners.length === 0;
+    const identityMatches = existing
+      && existing.eggId === eggId
+      && existing.eggHolderOwnedMonsterId === eggHolderOwnedMonsterId
+      && existing.partnerOwnedMonsterId === partnerOwnedMonsterId
+      && existing.genderSeed === genderSeed
+      && existing.createdAt === now;
+    if (existing && validateWorkbookEgg(existing).ok
+      && identityMatches
+      && (parentsUnavailable || eggCreationSnapshotMatches(existing, replayHolder, replayPartner, {
+          eggId,
+          now,
+        }))) {
+      return transactionResult(true, null, state, { egg: existing, replay: true });
+    }
+    return transactionResult(false, 'egg_id_conflict', state);
+  }
+
+  const eggHolder = ownedMonster(state, eggHolderOwnedMonsterId);
+  const partner = ownedMonster(state, partnerOwnedMonsterId);
+  if (!eggHolder || !partner) return transactionResult(false, 'unknown_id', state);
+
+  const compatibility = evaluateStandardBreedingCompatibility(eggHolder, partner, { now });
+  if (!compatibility.ok) return transactionResult(false, compatibility.reason, state, { compatibility });
+
+  const holderStage = resolveWorkbookEvolutionStage(eggHolder);
+  const holderProfile = workbookBreedingProfile(eggHolder.speciesId);
+  if (!holderStage.ok || !holderStage.stage2 || !holderProfile
+    || holderStage.path?.fromWorkbookMonsterId !== holderProfile.childMonsterId) {
+    return transactionResult(false, 'child_species_unresolved', state);
+  }
+
+  const inheritance = resolvePotentialInheritance(eggHolder, partner, { seed: eggId });
+  if (!inheritance.ok) return transactionResult(false, inheritance.reason, state);
+
+  const hatchAt = now + holderProfile.hatchTimeMin * 60 * 1000;
+  if (!Number.isSafeInteger(hatchAt) || hatchAt <= now) {
+    return transactionResult(false, 'invalid_hatch_time', state);
+  }
+
+  const egg = Object.freeze({
+    eggId,
+    breedingVersion: BREEDING_VERSION,
+    childMonsterId: holderProfile.childMonsterId,
+    eggHolderOwnedMonsterId,
+    partnerOwnedMonsterId,
+    createdAt: now,
+    hatchAt,
+    genderSeed,
+    potentialInheritedStats: inheritance.inheritedStats,
+    potentialValues: inheritance.potential,
+    secondaryAffinity: resolveSecondaryAffinity(eggHolder),
+    inheritedSkillMemoryId: null,
+    recipeId: null,
+    hatchedOwnedMonsterId: null,
+  });
+  const validation = validateWorkbookEgg(egg);
+  if (!validation.ok) {
+    return transactionResult(false, eggValidationFailureReason(validation), state, { validation });
+  }
+
+  const cooldownUntil = now + PARENT_BREEDING_COOLDOWN_MS;
+  const collection = state.collection.map(monster => (
+    monster.instanceId === eggHolderOwnedMonsterId || monster.instanceId === partnerOwnedMonsterId
+      ? { ...monster, breedingCooldownUntil: cooldownUntil, breedingVersion: BREEDING_VERSION }
+      : monster
+  ));
+  const nextState = {
+    ...state,
+    collection,
+    eggs: [...(Array.isArray(state.eggs) ? state.eggs : []), egg],
+  };
+  return transactionResult(true, null, nextState, {
+    egg,
+    replay: false,
+    parentCooldownUntil: cooldownUntil,
+    inheritance,
+  });
+}
+
+export function hatchBreedingEggTransaction(state, { eggId, now = Date.now() } = {}) {
+  if (!state || typeof state !== 'object' || !Array.isArray(state.collection)
+    || !Array.isArray(state.storage) || !Array.isArray(state.eggs)
+    || !Number.isSafeInteger(now) || !UUID_PATTERN.test(eggId ?? '')) {
+    return transactionResult(false, 'invalid_state', state);
+  }
+  const matches = existingEggs(state, eggId);
+  if (matches.length === 0) return transactionResult(false, 'egg_not_found', state);
+  if (matches.length !== 1) return transactionResult(false, 'egg_id_conflict', state);
+  const egg = matches[0];
+  if (egg.breedingVersion !== BREEDING_VERSION) {
+    return transactionResult(false, 'unsupported_breeding_version', state);
+  }
+  const validation = validateWorkbookEgg(egg);
+  if (!validation.ok) {
+    return transactionResult(false, eggValidationFailureReason(validation), state, { validation });
+  }
+
+  if (egg.hatchedOwnedMonsterId != null) {
+    const hatchedMatches = state.collection.filter(monster => monster?.instanceId === egg.hatchedOwnedMonsterId);
+    const profile = BREEDING_PROFILE_BY_CHILD_MONSTER.get(egg.childMonsterId) ?? null;
+    const expectedGender = profile ? resolveGenderFromSeed(profile.genderRule, egg.genderSeed) : null;
+    const child = hatchedMatches.length === 1 ? hatchedMatches[0] : null;
+    const childMatches = child && profile
+      && child.speciesId === profile.runtimeSpeciesId
+      && child.gender === expectedGender
+      && child.parents?.a === egg.eggHolderOwnedMonsterId
+      && child.parents?.b === egg.partnerOwnedMonsterId
+      && samePotential(child.potential, egg.potentialValues);
+    return childMatches
+      ? transactionResult(false, 'egg_already_hatched', state, { child: hatchedMatches[0] })
+      : transactionResult(false, 'hatch_state_conflict', state);
+  }
+  if (!isEggReadyToHatch(egg, now)) return transactionResult(false, 'egg_not_ready', state, { hatchAt: egg.hatchAt });
+
+  const instanceId = hatchedOwnedMonsterIdForEgg(egg.eggId);
+  if (!instanceId) return transactionResult(false, 'egg_schema_invalid', state);
+  if (state.collection.some(monster => monster?.instanceId === instanceId)) {
+    return transactionResult(false, 'hatch_owned_id_conflict', state);
+  }
+  const profile = BREEDING_PROFILE_BY_CHILD_MONSTER.get(egg.childMonsterId) ?? null;
+  if (!profile) return transactionResult(false, 'child_species_unresolved', state);
+  const gender = resolveGenderFromSeed(profile.genderRule, egg.genderSeed);
+  if (!gender) return transactionResult(false, 'egg_schema_invalid', state);
+
+  const child = normalizeInstance({
+    instanceId,
+    speciesId: profile.runtimeSpeciesId,
+    formId: profile.runtimeSpeciesId,
+    level: 1,
+    growthExp: 0,
+    potential: egg.potentialValues,
+    gender,
+    secondaryType: null,
+    parents: { a: egg.eggHolderOwnedMonsterId, b: egg.partnerOwnedMonsterId },
+    origin: 'bred',
+    mind: { bond: profile.baseBond },
+    inheritedSkillMemoryId: egg.inheritedSkillMemoryId ?? null,
+    breedingVersion: egg.breedingVersion,
+  }, { now });
+  const markedEgg = Object.freeze({
+    ...materializeWorkbookEggDefaults(egg),
+    hatchedOwnedMonsterId: instanceId,
+  });
+  const storage = Array.isArray(state.storage) ? state.storage : [];
+  const nextState = {
+    ...state,
+    collection: [...state.collection, child],
+    storage: storage.includes(instanceId) ? storage : [...storage, instanceId],
+    eggs: state.eggs.map(record => record === egg ? markedEgg : record),
+  };
+  return transactionResult(true, null, nextState, { child, egg: markedEgg, replay: false });
 }
 
 // Produce a child instance from two parents. Deterministic under `seed`.

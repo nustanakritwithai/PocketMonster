@@ -1,7 +1,7 @@
 import { ENCOUNTER_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
-import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, writeStoredSave } from './save-schema.mjs';
+import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation } from './stage-objectives.mjs';
@@ -19,7 +19,7 @@ import {
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { combatRating, compareBuilds } from './combat-rating.mjs';
-import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, resolveOfflineTrainingWindow, simulateLife, deriveCondition, appendHistory, TRAINING_LINES, CORE_GENES } from './monster-instance.mjs';
+import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrainingExp, trainingUsed as instTrainingUsed, trainingRemaining as instTrainingRemaining, resolveOfflineTrainingWindow, simulateLife, deriveCondition, appendHistory, TRAINING_LINES } from './monster-instance.mjs';
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
@@ -31,9 +31,9 @@ import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffect
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
-import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget } from './evolution.mjs';
+import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
-import { canBreed as canBreedFn, breed as breedFn, createEgg as createEggFn, GENE_RANKS as BREED_GENE_RANKS } from './breeding.mjs';
+import { BREEDING_VERSION, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
 import { applyComputedStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveCaptureChance, liveMoveDamage, ranchTrainingGain, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
@@ -581,7 +581,7 @@ const species=[
   mkSpecies({id:'mindcoon',name:'Mind Slime',color:0xec4d7f,types:['Psychic'],base:{hp:78,atk:14,def:10,spd:13},capture:.56,group:'Field',traits:['Wise','Focused','Calm Mind'],skills:[
     move('Mind Bolt','Psychic',28),move('Psy Wave','Psychic',20,'area',{range:3.4,cooldown:6}),move('Inner Focus','Psychic',0,'self',{effect:'heal',value:.24,cooldown:8})
   ],evo:{id:'mindcoon_lv2',name:'Mindcoon',form:'mindcoon',color:0xf472b6,scale:1.03,statMods:{hp:1.08,atk:1.12,def:1.08,spd:1.12},requires:{level:2}}}),
-  mkSpecies({id:'buglet',name:'Bug Slime',color:0x9cab25,types:['Bug'],base:{hp:78,atk:12,def:11,spd:13},capture:.60,group:'Bug',genderMode:'genderless',traits:['Swarm Spirit','Hard Worker','Sturdy'],skills:[
+  mkSpecies({id:'buglet',name:'Bug Slime',color:0x9cab25,types:['Bug'],base:{hp:78,atk:12,def:11,spd:13},capture:.60,group:'Bug',traits:['Swarm Spirit','Hard Worker','Sturdy'],skills:[
     move('Pin Bite','Bug',26),move('Swarm Spin','Bug',18,'area',{range:3,cooldown:6}),move('Carapace Boost','Bug',0,'self',{effect:'shield',value:.40,duration:5,cooldown:8})
   ],evo:{id:'buglet_lv2',name:'Beetling',form:'buglet',color:0xb6c833,scale:1.03,statMods:{hp:1.10,atk:1.10,def:1.12,spd:1.08},requires:{level:2}}}),
   mkSpecies({id:'rockhorn',name:'Rock Slime',color:0xa48e38,types:['Rock'],base:{hp:100,atk:13,def:16,spd:7},capture:.58,group:'Monster',traits:['Tough Skin','Sturdy','Patient'],skills:[
@@ -593,7 +593,7 @@ const species=[
   mkSpecies({id:'emberdrake',name:'Drake Slime',color:0x6a45d3,types:['Dragon'],base:{hp:104,atk:18,def:13,spd:12},capture:.50,group:'Dragon',traits:['Ancient Blood','Fierce','Proud'],skills:[
     move('Dragon Flame','Dragon',34),move('Scale Burst','Dragon',22,'area',{range:3.3,cooldown:6.2}),move('Ancient Rage','Dragon',0,'self',{effect:'buffAtk',value:1.30,duration:5,cooldown:9})
   ],evo:{id:'emberdrake_lv2',name:'Emberdrake',form:'emberdrake',color:0xe45236,scale:1.06,statMods:{hp:1.14,atk:1.20,def:1.10,spd:1.08},requires:{level:2}}}),
-  mkSpecies({id:'voidhorn',name:'Shadow Slime',color:0x584b43,types:['Dark'],base:{hp:96,atk:16,def:12,spd:12},capture:.54,group:'Monster',genderMode:'genderless',traits:['Night Hunter','Fierce','Sharp Eye'],skills:[
+  mkSpecies({id:'voidhorn',name:'Shadow Slime',color:0x584b43,types:['Dark'],base:{hp:96,atk:16,def:12,spd:12},capture:.54,group:'Monster',traits:['Night Hunter','Fierce','Sharp Eye'],skills:[
     move('Night Crash','Dark',31),move('Shadow Burst','Dark',21,'area',{range:3.2,cooldown:6}),move('Void Guard','Dark',0,'self',{effect:'shield',value:.50,duration:6,cooldown:9})
   ],evo:{id:'voidhorn_lv2',name:'Voidhorn',form:'voidhorn',color:0x9b5de5,scale:1.06,statMods:{hp:1.14,atk:1.18,def:1.10,spd:1.06},requires:{level:2}}}),
   mkSpecies({id:'ironbug',name:'Metal Slime',color:0x8e8eaa,types:['Steel'],base:{hp:102,atk:12,def:18,spd:7},capture:.57,group:'Machine',genderMode:'genderless',traits:['Iron Shell','Hard Worker','Sturdy'],skills:[
@@ -621,10 +621,16 @@ const MASTERY_NEXT_TH={novice:'คุ้นเคย',familiar:'ชำนาญ'
 const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spirit:'hp'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
-const BREEDING_RECIPES=[]; // future explicit Hybrid recipes only
 const BALANCE={eliteCaptureModifier:.34,bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4,grassMeadowBoss:{level:5,respawnMs:30000},grassMeadowNormal:{battleExpBase:8,battleExpPerLevel:4,captureExp:8,respawnMs:12000,captureBonus:.05},grassMeadowRare:{chance:.24,level:2,respawnMs:18000}};
 
-function rollGender(sp){ return sp.genderMode==='genderless'?'Genderless':(Math.random()<.5?'Male':'Female'); }
+function rollGender(sp){
+  const profile=workbookBreedingProfile(sp?.id);
+  if(profile){
+    const resolved=resolveGenderFromSeed(profile.genderRule,Math.floor(Math.random()*100));
+    if(resolved)return resolved;
+  }
+  return sp?.genderMode==='genderless'?'Genderless':(Math.random()<.5?'Male':'Female');
+}
 function getEvolutionPath(inst){ const sp=spById[inst?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===inst.formId||p.id===inst.evolutionPath)||null; }
 function availableEvolutionPaths(inst){ const sp=spById[inst?.speciesId]; if(!sp)return []; const from=inst.formId||sp.id; return (sp.evolutionPaths||[]).filter(p=>(p.fromFormId||sp.id)===from&&p.id!==inst.formId); }
 function displayName(inst){ return getEvolutionPath(inst)?.name||spById[inst.speciesId]?.name||'Monster'; }
@@ -3648,63 +3654,97 @@ function updateRanchVisuals(dt){let i=0;for(const obj of ranchVisuals.values()){
 function toggleRanchActive(id){if(!assertRanchOperation())return;if(!state.storage.includes(id))return;if(state.ranchActive.includes(id)){state.ranchActive=state.ranchActive.filter(x=>x!==id);msg('เก็บมอนออกจากลาน Ranch แล้ว');}else{if(state.ranchActive.length>=RANCH_ACTIVE_MAX){msg(`Ranch Active เต็ม ${RANCH_ACTIVE_MAX} ตัว`);return;}state.ranchActive.push(id);msg(`ปล่อย ${displayName(getInst(id))} ออกมาเดินใน Ranch`);}syncRanchVisuals();renderManager();renderRanchStoragePage();renderHUD();saveGame(false);}
 
 // ---------- Breeding / genetics ----------
-function adultForBreeding(inst){return ['Adult','Mature'].includes(inst.lifeStage);}
-function isCloseRelative(a,b){if(!a||!b)return false;if(a.instanceId===b.instanceId)return true;if(a.parentAId===b.instanceId||a.parentBId===b.instanceId||b.parentAId===a.instanceId||b.parentBId===a.instanceId)return true;const ap=[a.parentAId,a.parentBId].filter(Boolean),bp=[b.parentAId,b.parentBId].filter(Boolean);return ap.some(x=>bp.includes(x));}
-function genderCompatible(a,b){if(!a||!b)return false;if(a.gender==='Genderless'||b.gender==='Genderless')return true;return (a.gender==='Male'&&b.gender==='Female')||(a.gender==='Female'&&b.gender==='Male');}
-function breedingCompatibility(a,b){
-  if(!a||!b)return{ok:false,text:'เลือก Parent A และ Parent B'};if(a.instanceId===b.instanceId)return{ok:false,text:'ต้องเป็นมอนคนละตัว'};if(!state.storage.includes(a.instanceId)||!state.storage.includes(b.instanceId))return{ok:false,text:'พ่อแม่ต้องอยู่ใน Storage/Ranch'};if(!adultForBreeding(a)||!adultForBreeding(b))return{ok:false,text:'ต้องโตถึง Adult ก่อน'};
-  const sa=spById[a.speciesId],sb=spById[b.speciesId];if(sa.breedingGroup!==sb.breedingGroup)return{ok:false,text:`Breeding Group ไม่ตรง (${sa.breedingGroup}/${sb.breedingGroup})`};if(!genderCompatible(a,b))return{ok:false,text:`Gender ไม่เข้ากัน (${a.gender}/${b.gender})`};if(a.bond<50||b.bond<50)return{ok:false,text:'Bond ของทั้งสองตัวต้อง ≥ 50'};if(isCloseRelative(a,b))return{ok:false,text:'ไม่อนุญาตญาติใกล้ชิด'};return{ok:true,text:`เข้ากันได้ • ${sa.breedingGroup} • Bond ≥ 50`};
+const BREEDING_REASON_TH=Object.freeze({
+  breeding_same_instance:'ต้องเป็นมอนคนละตัว',
+  breeding_relative_gate:'ไม่อนุญาตญาติใกล้ชิด',
+  breeding_recipe_only:'มอน Genderless/Special Recipe ผสมได้ผ่านสูตรเฉพาะเท่านั้น',
+  breeding_stage_gate:'ทั้งสองตัวต้องเป็น Stage 2',
+  breeding_level_gate:'ทั้งสองตัวต้องมี Level 20 ขึ้นไป',
+  breeding_bond_gate:'Bond ของทั้งสองตัวต้อง ≥ 50',
+  breeding_gender_gate:'Standard Breeding ต้องเป็น Female Egg Holder × Male Partner',
+  breeding_group_gate:'Breeding Group ตาม Workbook ต้องตรงกัน',
+  breeding_eligibility_gate:'สายพันธุ์นี้ไม่เปิด Standard Breeding',
+  breeding_cooldown:'พ่อแม่อย่างน้อยหนึ่งตัวยังติดคูลดาวน์ 30 นาที',
+  unknown_id:'ไม่พบ Species ID ใน Workbook catalog',
+  invalid_state:'ข้อมูลผสมพันธุ์ไม่ถูกต้อง',
+});
+const EGG_TRANSACTION_REASON_TH=Object.freeze({
+  egg_id_conflict:'รหัสไข่ซ้ำกับธุรกรรมอื่น',
+  egg_schema_invalid:'ข้อมูลไข่ไม่ครบตาม BRD_v1.0',
+  child_species_unresolved:'หา Stage 1 Species ของลูกไม่พบ',
+  invalid_hatch_time:'เวลาฟักไข่ไม่ถูกต้อง',
+  unsupported_breeding_version:'ไข่นี้เป็นคนละเวอร์ชันและถูกกักไว้แบบ Legacy',
+  egg_not_found:'ไม่พบไข่',
+  egg_not_ready:'ไข่ยังไม่พร้อมฟัก',
+  egg_already_hatched:'ไข่นี้ฟักแล้ว',
+  hatch_owned_id_conflict:'รหัสมอนที่ฟักชนกับมอนที่มีอยู่',
+  hatch_state_conflict:'สถานะไข่กับมอนที่ฟักแล้วไม่สอดคล้องกัน',
+  unknown_id:'ไม่พบพ่อแม่ใน Collection',
+  invalid_state:'ข้อมูลธุรกรรมไข่ไม่ถูกต้อง',
+});
+function standardBreedingRoles(a,b){
+  if(a?.gender==='Female'&&b?.gender==='Male')return{eggHolder:a,partner:b};
+  if(b?.gender==='Female'&&a?.gender==='Male')return{eggHolder:b,partner:a};
+  if(a?.gender==='Female')return{eggHolder:a,partner:b};
+  if(b?.gender==='Female')return{eggHolder:b,partner:a};
+  return{eggHolder:a,partner:b};
 }
-function eggHolder(a,b){if(a.gender==='Female')return a;if(b.gender==='Female')return b;if(a.gender==='Genderless')return a;if(b.gender==='Genderless')return b;return null;}
-function resolveBreedingSpecies(a,b,holder){for(const r of BREEDING_RECIPES){const ids=[a.speciesId,b.speciesId].sort().join('+');if(ids===r.parents.slice().sort().join('+'))return spById[r.childSpeciesId];}return spById[holder.speciesId];}
-function chooseInheritedPotential(a,b,key){const vals=[a.genes[key],b.genes[key]];if(Math.random()<.18)return rand(POTENTIALS);return rand(vals);}
-function makeChild(a,b,holder){
-  const sp=resolveBreedingSpecies(a,b,holder);
+function breedingReasonText(result){
+  if(result.ok)return`เข้ากันได้ • ${result.breedingGroup} • Stage 2 / Lv.20 / Bond 50`;
+  return BREEDING_REASON_TH[result.reason]||`Breeding: ${result.reason||'ไม่พร้อม'}`;
+}
+function breedingCompatibility(a,b){
+  if(!a||!b)return{ok:false,text:'เลือก Parent A และ Parent B',eggHolder:null,partner:null};
+  if(!state.storage.includes(a.instanceId)||!state.storage.includes(b.instanceId))return{ok:false,text:'พ่อแม่ต้องอยู่ใน Storage/Ranch',eggHolder:null,partner:null};
   syncToBodyMind(a);syncToBodyMind(b);
-  const bred=breedFn(a,b,{species:{id:sp.id,aptitudeBase:sp.aptitudeBase||{power:3,defense:3,speed:3,technique:3,spirit:3},allowedSecondary:sp.allowedSecondary||[]},seed:`${a.instanceId}+${b.instanceId}+${Date.now()}`,now:Date.now(),personalityPool:personalities});
-  if(!bred.ok)return null;
-  const mother=a.gender==='Female'?a:(b.gender==='Female'?b:holder);
-  const father=mother===a?b:a;
-  const child=makeInstance(sp,1,{
-    origin:'bred',
-    genes:{...bred.child.genes,trait:Math.random()<.5?a.genes.trait:b.genes.trait,skillGene:Math.random()<.5?a.genes.skillGene:b.genes.skillGene,typeAffinity:Math.random()<.5?a.genes.typeAffinity:b.genes.typeAffinity},
-    aptitude:bred.child.aptitude,
-    personality:bred.child.personalityId||rand(personalities),
-    bond:12,hunger:90,energy:90,mood:88,fitness:42,
-    generation:bred.child.generation,
-    parentAId:a.instanceId,parentBId:b.instanceId,
-    motherId:mother?.instanceId||null,fatherId:father?.instanceId||null,
-    secondaryType:bred.child.secondaryType??sp.types[1]??null
-  });
-  child.lifeStage='Baby';
-  child.skillPotential=bred.child.skillPotential||[];
-  return child;
+  const roles=standardBreedingRoles(a,b);
+  const result=evaluateStandardBreedingCompatibility(roles.eggHolder,roles.partner,{now:Date.now()});
+  return{...result,...roles,text:breedingReasonText(result)};
 }
 function createEgg(){if(!assertRanchOperation())return;const a=getInst(state.breeding.parentA),b=getInst(state.breeding.parentB),compat=breedingCompatibility(a,b);if(!compat.ok){msg(compat.text);renderBreeding();return;}
-  a.parents=a.parents||{a:a.parentAId||null,b:a.parentBId||null};
-  b.parents=b.parents||{a:b.parentAId||null,b:b.parentBId||null};
-  const breedCheck=canBreedFn(a,b);
-  if(!breedCheck.ok){msg(`Breeding: ${breedCheck.reason}`);renderBreeding();return;}const holder=eggHolder(a,b);if(!holder){msg('ไม่พบผู้ถือไข่ที่เข้ากันได้');return;}
-  const child=makeChild(a,b,holder);if(!child){msg('สร้างลูกไม่สำเร็จ');return;}
-  a.energy=clamp(a.energy-15);b.energy=clamp(b.energy-15);
-  const hatchMs=30000+Math.floor(Math.random()*30001);
-  const wrapped=createEggFn({ok:true,child},{hatchMs,now:Date.now()});
-  const egg={eggId:'e'+Date.now()+'-'+Math.floor(Math.random()*9999),parentAId:a.instanceId,parentBId:b.instanceId,eggHolderId:holder.instanceId,createdAt:Date.now(),readyAt:wrapped.egg.hatchAt,child:wrapped.egg.child};
-  state.eggs.push(egg);
+  const now=Date.now(),eggId=crypto.randomUUID(),genderSeedWords=new Uint32Array(1);
+  crypto.getRandomValues(genderSeedWords);
+  const result=createStandardBreedingEggTransaction(state,{eggId,eggHolderOwnedMonsterId:compat.eggHolder.instanceId,partnerOwnedMonsterId:compat.partner.instanceId,genderSeed:genderSeedWords[0],now});
+  if(!result.ok){msg(EGG_TRANSACTION_REASON_TH[result.reason]||`สร้างไข่ไม่สำเร็จ: ${result.reason}`);renderBreeding();return;}
+  state.collection=result.state.collection;state.eggs=result.state.eggs;
   let posA=fxWorldPos(a.instanceId),posB=fxWorldPos(b.instanceId);
   if(posA.distanceTo(posB)<.05){posA=incubator.position.clone().add(new THREE.Vector3(-.8,0,0));posB=incubator.position.clone().add(new THREE.Vector3(.8,0,0));}
   spawnBreedingEffect(posA,posB);
-  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(holder)} • ฟัก ${Math.round(hatchMs/1000)} วินาที`);renderManager();saveGame(false);}
-function hatchEgg(eggId){if(!assertRanchOperation())return;const egg=state.eggs.find(e=>e.eggId===eggId);if(!egg)return;if(Date.now()<egg.readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}const a=getInst(egg.parentAId),b=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);if(!a||!b||!holder){msg('ข้อมูลพ่อแม่/ผู้ถือไข่ไม่ครบ');return;}
-  const child=egg.child?ensureInstanceShape({...egg.child,origin:'bred',parentAId:a.instanceId,parentBId:b.instanceId}):makeChild(a,b,holder);
-  if(!child){msg('ฟักไข่ไม่สำเร็จ');return;}
+  msg(`สร้างไข่สำเร็จ • ผู้ถือไข่ ${displayName(compat.eggHolder)} • ฟัก 15 นาที`);renderManager();saveGame(false);}
+function prepareHatchedChildForLive(child){
+  child.origin='bred';child.lifeStage='Baby';child.createdAt=child.createdAt||Date.now();child.fainted=false;
+  child.personality=child.personality||child.personalityId||'balanced';
+  child.trainingFocus=child.trainingFocus||'power';child.trainingExp=child.trainingExp||0;child.trainingBonus=child.trainingBonus||{hp:0,atk:0,def:0,spd:0};
+  child.parentAId=child.parentAId||child.parents?.a||null;child.parentBId=child.parentBId||child.parents?.b||null;child.exp=child.growthExp||0;
+  syncFromBodyMind(child);
   synchronizeStage1Learnset(child);
   refreshStats(child,true);
-  state.collection.push(child);state.storage.push(child.instanceId);state.eggs=state.eggs.filter(e=>e.eggId!==eggId);
-  appendHistory(child,{type:'birth',origin:'bred',parentA:a.instanceId,parentB:b.instanceId});
+  return child;
+}
+function hatchLegacyEgg(egg,now=Date.now()){
+  const readyAt=egg?.readyAt??egg?.hatchAt;
+  if(!Number.isFinite(readyAt)){msg('ไข่ Legacy นี้ไม่มีเวลาฟักที่เชื่อถือได้');return;}
+  if(now<readyAt){msg('ไข่ยังไม่พร้อมฟัก');return;}
+  if(!egg.child||typeof egg.child!=='object'){msg('ไข่ Legacy ไม่มี snapshot ลูก จึงไม่สร้างข้อมูลทดแทน');return;}
+  if(typeof egg.child.instanceId!=='string'||!egg.child.instanceId.trim()||!spById[egg.child.speciesId]){msg('snapshot ลูกในไข่ Legacy ไม่ครบ จึงไม่เดารหัสหรือ Species ทดแทน');return;}
+  const parentAId=egg.parentAId||egg.eggHolderId||null,parentBId=egg.parentBId||null;
+  const child=prepareHatchedChildForLive(ensureInstanceShape({...egg.child,origin:'bred',parentAId,parentBId}));
+  if(!child?.instanceId||state.collection.some(monster=>monster.instanceId===child.instanceId)){msg('รหัสมอนจากไข่ Legacy ซ้ำหรือไม่ถูกต้อง');return;}
+  state.collection.push(child);if(!state.storage.includes(child.instanceId))state.storage.push(child.instanceId);state.eggs=state.eggs.filter(record=>record!==egg);
+  appendHistory(child,{type:'birth',origin:'bred',parentA:parentAId,parentB:parentBId,legacyEgg:true});
   spawnHatchEffect(incubator.position.clone());
   playSFX('sfx_hatch');
-  msg(`ฟักไข่! ได้ ${displayName(child)} Gen ${child.generation} • Species ตามผู้ถือไข่ ${displayName(holder)}`);renderAll();renderManager();saveGame(false);}
+  msg(`ฟักไข่ Legacy! ได้ ${displayName(child)}`);renderAll();renderManager();saveGame(false);
+}
+function hatchEgg(eggId){if(!assertRanchOperation())return;const egg=state.eggs.find(record=>record?.eggId===eggId);if(!egg){msg('ไม่พบไข่');return;}const now=Date.now();if(egg.breedingVersion==null){hatchLegacyEgg(egg,now);return;}if(egg.breedingVersion!==BREEDING_VERSION){msg(EGG_TRANSACTION_REASON_TH.unsupported_breeding_version);return;}
+  const result=hatchBreedingEggTransaction(state,{eggId,now});
+  if(!result.ok){msg(EGG_TRANSACTION_REASON_TH[result.reason]||`ฟักไข่ไม่สำเร็จ: ${result.reason}`);renderBreeding();return;}
+  state.collection=result.state.collection;state.storage=result.state.storage;state.eggs=result.state.eggs;
+  const child=prepareHatchedChildForLive(result.child);
+  appendHistory(child,{type:'birth',origin:'bred',parentA:result.egg.eggHolderOwnedMonsterId,parentB:result.egg.partnerOwnedMonsterId,eggId:result.egg.eggId});
+  spawnHatchEffect(incubator.position.clone());
+  playSFX('sfx_hatch');
+  msg(`ฟักไข่! ได้ ${displayName(child)} • Stage 1 • Bond 10`);renderAll();renderManager();saveGame(false);}
 
 // ---------- Evolution ----------
 function evoRequirementStatus(inst,path){
@@ -4077,11 +4117,11 @@ function showCrDebug(id){
   const inst=getInst(id);
   if(inst&&rated)msg(`${displayName(inst)} • CR ${rated.cr} • DPS ${Math.round(rated.dps)} • EHP ${Math.round(rated.ehp)}`);
 }
-function breedingAdultIds(){return state.storage.filter(id=>{const i=getInst(id);return i&&adultForBreeding(i);});}
+function breedingAdultIds(){return state.storage.filter(id=>{const inst=getInst(id);return inst&&resolveWorkbookEvolutionStage(inst).stage2;});}
 let pickerTarget='parentA';
-function parentButtonHTML(inst){if(!inst)return '<span class="parent-empty">＋ เลือกมอน</span>';const sp=spById[inst.speciesId];return `<span class="parent-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span><b>${displayName(inst)}</b><small>${GENDER_TH[inst.gender]||inst.gender} • Bond ${fmt(inst.bond)} • ${sp.breedingGroup}</small></span>`;}
+function parentButtonHTML(inst){if(!inst)return '<span class="parent-empty">＋ เลือกมอน</span>';const sp=spById[inst.speciesId],profile=workbookBreedingProfile(inst.speciesId);return `<span class="parent-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span><b>${displayName(inst)}</b><small>${GENDER_TH[inst.gender]||inst.gender} • Bond ${fmt(inst.mind?.bond??inst.bond)} • ${profile?.breedingGroup||'Unknown'}</small></span>`;}
 function closeMonsterPicker(){el('monsterPicker').classList.add('hidden');}
-function openMonsterPicker(target){if(!assertRanchOperation())return;pickerTarget=target;const list=el('monsterPickerList'),ids=breedingAdultIds();el('pickerTitle').textContent=target==='parentA'?'เลือก Parent A':'เลือก Parent B';list.innerHTML='';if(!ids.length){list.innerHTML='<div class="manager-empty">ยังไม่มีมอน Adult/Mature ใน Storage</div>';}for(const id of ids){const inst=getInst(id),sp=spById[inst.speciesId],selected=state.breeding[target]===id,d=document.createElement('button');d.className='picker-mon-card'+(selected?' selected':'');d.innerHTML=`<span class="picker-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span class="picker-info"><b>${displayName(inst)}</b><small>Lv.${inst.level} • ${inst.lifeStage} • ${GENDER_TH[inst.gender]||inst.gender}</small><small>Bond ${fmt(inst.bond)} • Group ${sp.breedingGroup}</small></span>${inst.bond>=50?'<span class="picker-ok">พร้อม</span>':'<span class="picker-warn">Bond ต่ำ</span>'}`;d.onclick=()=>{state.breeding[target]=id;closeMonsterPicker();renderBreeding();};list.appendChild(d);}el('monsterPicker').classList.remove('hidden');}
+function openMonsterPicker(target){if(!assertRanchOperation())return;pickerTarget=target;const list=el('monsterPickerList'),ids=breedingAdultIds();el('pickerTitle').textContent=target==='parentA'?'เลือก Parent A':'เลือก Parent B';list.innerHTML='';if(!ids.length){list.innerHTML='<div class="manager-empty">ยังไม่มีมอน Stage 2 ใน Storage</div>';}for(const id of ids){const inst=getInst(id),sp=spById[inst.speciesId],profile=workbookBreedingProfile(inst.speciesId),bond=inst.mind?.bond??inst.bond??0,cooldown=inst.breedingCooldownUntil??0,eligible=profile?.breedingEligibility==='Yes'&&inst.level>=20&&bond>=50&&cooldown<=Date.now(),selected=state.breeding[target]===id,d=document.createElement('button');d.className='picker-mon-card'+(selected?' selected':'');d.innerHTML=`<span class="picker-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><span class="picker-info"><b>${displayName(inst)}</b><small>Lv.${inst.level} • Stage 2 • ${GENDER_TH[inst.gender]||inst.gender}</small><small>Bond ${fmt(bond)} • Group ${profile?.breedingGroup||'Unknown'}</small></span>${eligible?'<span class="picker-ok">พร้อม</span>':'<span class="picker-warn">ยังไม่พร้อม</span>'}`;d.onclick=()=>{state.breeding[target]=id;closeMonsterPicker();renderBreeding();};list.appendChild(d);}el('monsterPicker').classList.remove('hidden');}
 function renderBreeding(){
   const ids=breedingAdultIds();
   if(state.breeding.parentA&&!ids.includes(state.breeding.parentA))state.breeding.parentA=null;
@@ -4093,28 +4133,31 @@ function renderBreeding(){
   c.className='compatibility '+(a&&b?(compat.ok?'ok':'bad'):'');
   el('breedBtn').disabled=!compat.ok;
   if(a&&b){
-    const holder=eggHolder(a,b);
-    const genePreview=CORE_GENES.map(g=>{
-      const ga=a.genes?.[g]||'B',gb=b.genes?.[g]||'B';
-      return `<div class="gene-inherit-cell"><span class="gene-label">${g.toUpperCase()}</span><span class="gene-pred">${ga}/${gb}</span><span class="gene-pct">45%/45%/10%</span></div>`;
+    const holder=compat.eggHolder,partner=compat.partner,childProfile=workbookBreedingProfile(holder?.speciesId);
+    const potentialPreview=[['hp','HP'],['atk','ATK'],['def','DEF'],['spAtk','SP.ATK'],['spDef','SP.DEF'],['spd','SPD']].map(([key,label])=>{
+      const holderValue=holder?.potential?.[key]??'?',partnerValue=partner?.potential?.[key]??'?';
+      return `<div class="gene-inherit-cell"><span class="gene-label">${label}</span><span class="gene-pred">${holderValue}/${partnerValue}</span><span class="gene-pct">0–31</span></div>`;
     }).join('');
-    const relative=isCloseRelative(a,b);
-    const relativeHTML=relative?'<div class="close-relative-warn">⚠ ญาติสนิท — ไม่สามารถผสมพันธุ์ได้</div>':'<div class="close-relative-ok">✓ ไม่ใช่ญาติสนิท — ผสมพันธุ์ได้</div>';
-    const childGen=Math.max(a.generation||1,b.generation||1)+1;
     const births=(state.collection||[]).filter(m=>m.origin==='bred'||(m.lifeHistory||[]).some(h=>h.type==='birth'));
-    const birthHTML=births.length?`<div class="birth-history">${births.slice(-6).map(m=>`<div class="birth-history-item">ฟัก ${displayName(m)} • Gen ${m.generation}</div>`).join('')}</div>`:'';
-    el('inheritPreview').innerHTML=`ผู้ถือไข่: <b>${holder?displayName(holder):'ไม่พบ'}</b> • Species ตามผู้ถือไข่<br><div class="gen-counter">ลูกรุ่น Gen ${childGen}</div>${relativeHTML}<div class="gene-inherit-preview">${genePreview}</div><div style="font-size:8px;color:#64748b;margin-top:4px">45% จาก A • 45% จาก B • 10% mutation (70%เหมือน / 15%ดีขึ้น / 15%แย่ลง)</div>${birthHTML}`;
-  }else el('inheritPreview').textContent='เลือกพ่อแม่เพื่อดูแนวโน้ม Gene ที่ส่งต่อ';
+    const birthHTML=births.length?`<div class="birth-history">${births.slice(-6).map(m=>`<div class="birth-history-item">ฟัก ${displayName(m)} • Stage 1</div>`).join('')}</div>`:'';
+    el('inheritPreview').innerHTML=`Egg Holder: <b>${holder?displayName(holder):'ไม่พบ'}</b> • ลูกเป็น ${childProfile?.childMonsterId||'Stage 1 ของ Holder'}<br><div class="gene-inherit-preview">${potentialPreview}</div><div style="font-size:8px;color:#64748b;margin-top:4px">Potential: สุ่มรับ 2 ค่าจาก Holder + 1 ค่าจาก Partner แบบ exact และสุ่มอีก 3 ค่าในช่วง 0–31 ตอนสร้างไข่เพียงครั้งเดียว</div>${birthHTML}`;
+  }else el('inheritPreview').textContent='เลือกพ่อแม่เพื่อดู Potential ที่จะส่งต่อ';
   const list=el('eggList');
   list.innerHTML='';
   if(!state.eggs.length)list.innerHTML='<div class="manager-empty">ยังไม่มีไข่ใน Incubator</div>';
   const now=Date.now();
   for(const egg of state.eggs){
-    const pa=getInst(egg.parentAId),pb=getInst(egg.parentBId),holder=getInst(egg.eggHolderId);
-    const remain=remainingCountdownSeconds(egg.readyAt,now),d=document.createElement('div');
+    if(!egg||typeof egg!=='object')continue;
+    const holderId=egg.eggHolderOwnedMonsterId||egg.eggHolderId||egg.parentAId,partnerId=egg.partnerOwnedMonsterId||egg.parentBId;
+    const holder=getInst(holderId),partner=getInst(partnerId),readyAt=egg.hatchAt??egg.readyAt,hasDeadline=Number.isFinite(readyAt),hatched=!!egg.hatchedOwnedMonsterId;
+    const remain=hasDeadline?remainingCountdownSeconds(readyAt,now):Infinity,d=document.createElement('div');
     d.className='egg-card';
-    d.dataset.eggReadyAt=String(egg.readyAt);
-    d.innerHTML=`<div class="egg-top"><span class="egg-icon">🥚</span><b data-egg-countdown>${remain>0?remain+'s':'พร้อมฟัก!'}</b></div><div class="egg-meta">${pa?displayName(pa):'?'} × ${pb?displayName(pb):'?'}<br>ผู้ถือไข่: ${holder?displayName(holder):'?'}</div><button data-egg-hatch ${remain>0?'disabled':''}>${remain>0?'กำลังฟัก':'ฟักไข่'}</button>`;
+    if(hasDeadline)d.dataset.eggReadyAt=String(readyAt);
+    d.dataset.eggHatched=hatched?'true':'false';
+    const countdown=hatched?'ฟักแล้ว':(!hasDeadline?'ข้อมูลเวลาไม่ถูกต้อง':(remain>0?remain+'s':'พร้อมฟัก!'));
+    const action=hatched?'ฟักแล้ว':(!hasDeadline?'ฟักไม่ได้':(remain>0?'กำลังฟัก':'ฟักไข่'));
+    const disabled=hatched||!hasDeadline||remain>0;
+    d.innerHTML=`<div class="egg-top"><span class="egg-icon">🥚</span><b data-egg-countdown>${countdown}</b></div><div class="egg-meta">${holder?displayName(holder):holderId||'?'} × ${partner?displayName(partner):partnerId||'?'}<br>ผู้ถือไข่: ${holder?displayName(holder):holderId||'?'}</div><button data-egg-hatch ${disabled?'disabled':''}>${action}</button>`;
     d.querySelector('[data-egg-hatch]').onclick=()=>hatchEgg(egg.eggId);
     list.appendChild(d);
   }
@@ -4123,12 +4166,13 @@ function updateEggCountdowns(now=Date.now()){
   const list=el('eggList');
   if(!list)return;
   for(const card of list.querySelectorAll('[data-egg-ready-at]')){
+    const hatched=card.dataset.eggHatched==='true';
     const remain=remainingCountdownSeconds(Number(card.dataset.eggReadyAt),now);
-    const status=remain>0?remain+'s':'พร้อมฟัก!',action=remain>0?'กำลังฟัก':'ฟักไข่';
+    const status=hatched?'ฟักแล้ว':(remain>0?remain+'s':'พร้อมฟัก!'),action=hatched?'ฟักแล้ว':(remain>0?'กำลังฟัก':'ฟักไข่');
     const label=card.querySelector('[data-egg-countdown]'),button=card.querySelector('[data-egg-hatch]');
     if(label&&label.textContent!==status)label.textContent=status;
     if(button){
-      if(button.disabled!==(remain>0))button.disabled=remain>0;
+      if(button.disabled!==(hatched||remain>0))button.disabled=hatched||remain>0;
       if(button.textContent!==action)button.textContent=action;
     }
   }
@@ -4715,7 +4759,7 @@ function migrateLoadedState(s){
   state.exp=Number.isFinite(clean.exp)?clean.exp:0;
   state.lifeLastAt=clean.lifeLastAt;
   state.inventory=clean.inventory;
-  state.eggs=(clean.eggs||[]).map(e=>({...e,eggHolderId:e.eggHolderId||e.parentAId,readyAt:e.readyAt||Date.now()+30000}));
+  state.eggs=clean.eggs||[];
   state.breeding=clean.breeding||{parentA:null,parentB:null};
   state.evolutionCandidate=null;
   state.starterJourney=clean.starterJourney||starterJourneyDefaults();
@@ -4730,7 +4774,7 @@ function migrateLoadedState(s){
 }
 let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false;
 function currentSaveEnvelope(){
-  return {state:persistableState(state),playerHp:playerData.hp};
+  return {state:sanitizeStateForPersistence(persistableState(state)),playerHp:playerData.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION};
 }
 function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
