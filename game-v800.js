@@ -1878,10 +1878,25 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},saveVersion:SAVE_SCHEMA_VERSION};
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
+function starterJourneyDefaults(){return{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}};}
+function markStarterJourney(step){
+  if(state.currentZone!=='grass-meadow')return;
+  const journey=state.starterJourney||starterJourneyDefaults();
+  journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
+  if(step in journey.grassMeadow&&!journey.grassMeadow[step]){journey.grassMeadow[step]=true;state.starterJourney=journey;renderStarterJourney();saveGame(false);}
+}
+function renderStarterJourney(){
+  const panel=el('starterJourney'),stepEl=el('starterJourneyStep');
+  if(!panel||!stepEl)return;
+  const progress=state.starterJourney?.grassMeadow;
+  if(state.currentZone!=='grass-meadow'||!progress||progress.captured){panel.classList.add('hidden');return;}
+  const step=!progress.entered?'สำรวจ Grass Meadow และเดินตามทาง':!progress.battled?'ปาเรียกมอน แล้วชนะ Normal Monster':!progress.recalled?'กด Recall ก่อนเริ่มจับมอนสเตอร์':'เล็งเป้าแล้วกด Capture เพื่อเพิ่มมอนเข้าทีม';
+  panel.classList.remove('hidden');setTextIfChanged(stepEl,step);
+}
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
 function distXZ(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
@@ -2320,6 +2335,12 @@ function switchZone(zone,silent=false){
   el('monsterManager').classList.add('hidden');
   characterUI.closeAll();
   state.currentZone=zone;
+  if(zone==='grass-meadow'){
+    const journey=state.starterJourney||starterJourneyDefaults();
+    journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
+    journey.grassMeadow.entered=true;
+    state.starterJourney=journey;
+  }
   playBGM(zone);
   startAmbient(zone);
   const cfg=ZONES[zone];
@@ -2334,6 +2355,7 @@ function switchZone(zone,silent=false){
   syncRanchVisuals();
   syncHubCompanion();
   renderZoneUI();
+  renderStarterJourney();
   if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
 }
@@ -2418,6 +2440,7 @@ function getEnemyTier(w){if(w.boss)return'boss';if(w.elite)return'elite';if(w.tr
 function defeatWild(w){
   if(w.dead)return;
   w.dead=true;
+  if(state.currentZone==='grass-meadow')markStarterJourney('battled');
   removeAndDispose(scene,w.mesh);
   removeWildLabel(w);
   state.exp+=12*w.level;
@@ -2573,6 +2596,7 @@ function finishCaptureSuccess(cs){
   triggerCameraShake(.1,.2);
   if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
   const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:24,evolutionPath:w.evolutionPath,secondaryType:wildPath(w)?.secondaryType??cs.sp.types[1]??null});
+  if(state.currentZone==='grass-meadow')markStarterJourney('captured');
   state.collection.push(inst);
   const empty=state.party.findIndex(x=>x===null);
   if(empty>=0)state.party[empty]=inst.instanceId;
@@ -2657,6 +2681,7 @@ function recall(show=true,setCooldown=true){
   removeAndDispose(scene, activeSummon.mesh);
   activeSummon=null;
   removeSceneRole('activeSummon');
+  if(state.currentZone==='grass-meadow')markStarterJourney('recalled');
   syncHubCompanion();
   if(setCooldown)summonCooldownUntil=Date.now()+1000;
   if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
@@ -3777,6 +3802,7 @@ function renderHUD(){
   setTextIfChanged(wildCount,state.currentZone==='hub'?'0':livingWilds().length);
   renderCombatPresentation();
   renderCharacterAccess();
+  renderStarterJourney();
 }
 function switchPartySlot(index){
   if(index<0||index>=state.party.length)return;
@@ -4088,6 +4114,7 @@ function migrateLoadedState(s){
   state.eggs=(clean.eggs||[]).map(e=>({...e,eggHolderId:e.eggHolderId||e.parentAId,readyAt:e.readyAt||Date.now()+30000}));
   state.breeding=clean.breeding||{parentA:null,parentB:null};
   state.evolutionCandidate=null;
+  state.starterJourney=clean.starterJourney||starterJourneyDefaults();
   state.currentZone=ZONES[clean.currentZone]?clean.currentZone:'hub';
   state.saveVersion=SAVE_SCHEMA_VERSION;
   attachCharacterUi(state);
