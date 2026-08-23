@@ -8,7 +8,7 @@ import { BALANCE_CONFIG } from './balance-config.mjs';
 import { clamp } from './balance-formulas.mjs';
 import { combatRating, CORE_STATS } from './combat-rating.mjs';
 import { evaluateEligibility } from './requirements.mjs';
-import { masteryRankFromExp } from './skill-progression.mjs';
+import { learnSkill, masteryRankFromExp } from './skill-progression.mjs';
 import { appendHistory, canonicalFormIdForInstance } from './monster-instance.mjs';
 import { MONSTER_CATALOG, monsterCatalogEntry } from './monster-catalog.mjs';
 import { monsterStatCatalogEntry } from './monster-stat-catalog.mjs';
@@ -64,7 +64,7 @@ export const WORKBOOK_EVOLUTION_PATHS = Object.freeze(MONSTER_CATALOG.map(mappin
     activation: 'runtime_live',
     runtimeEvolutionDecision: 'M6_CANONICAL_STAGE2_LIVE',
     secondaryTypeActivation: 'deferred_to_A29',
-    unlockSkillActivation: 'deferred_to_A16',
+    unlockSkillActivation: 'learned_unequipped_on_evolution_commit',
     sourceWorkbookVersion: mapping.sourceWorkbookVersion,
   });
 }));
@@ -366,6 +366,19 @@ export function commitEvolution(instance, evoDef, { now = Date.now(), ownedItemC
     }
   }
 
+  // The workbook evolution skill becomes learned on the same instance, but it
+  // never overwrites the player's four-slot loadout. The player chooses a slot
+  // later through the canonical loadout transaction.
+  let unlockedSkill = null;
+  if (workbookPreview) {
+    const skillId = workbookPath.unlockSkillId;
+    const alreadyLearned = (instance.skills ?? []).some(skill => skill?.skillId === skillId);
+    const learned = learnSkill(instance, { skillId, slot: null });
+    unlockedSkill = learned
+      ? { skillId, newlyLearned: !alreadyLearned, slot: learned.slot ?? null }
+      : null;
+  }
+
   // Keep compatible equipment, otherwise unequip (reversible, R10).
   const unequipped = [];
   if (instance.equipment) {
@@ -407,5 +420,6 @@ export function commitEvolution(instance, evoDef, { now = Date.now(), ownedItemC
     canonicalStats: workbookPreview?.targetStats ?? null,
     carried,
     unequipped,
+    unlockedSkill,
   };
 }

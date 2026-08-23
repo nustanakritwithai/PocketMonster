@@ -12,6 +12,7 @@ import { evoDefFromPath, refreshCanonicalOwnedStats } from '../live-progression.
 import { MONSTER_CATALOG } from '../monster-catalog.mjs';
 import { normalizeInstance, sanitizeMonsterInstanceForPersistence } from '../monster-instance.mjs';
 import { calculateMonsterStats } from '../monster-stat-formula.mjs';
+import { skillCatalogEntry } from '../skill-catalog.mjs';
 
 const POTENTIAL = Object.freeze({ hp: 17, atk: 16, def: 15, spAtk: 14, spDef: 13, spd: 12 });
 const TRAINING = Object.freeze({ hp: 20, atk: 40, def: 60, spAtk: 80, spDef: 100, spd: 120 });
@@ -20,6 +21,7 @@ assert.equal(validateWorkbookEvolutionCatalog(WORKBOOK_EVOLUTION_PATHS).ok, true
 assert.equal(WORKBOOK_EVOLUTION_PATHS.length, 18);
 assert.ok(WORKBOOK_EVOLUTION_PATHS.every(path => path.activation === 'runtime_live'));
 assert.ok(WORKBOOK_EVOLUTION_PATHS.every(path => path.runtimeEvolutionDecision === 'M6_CANONICAL_STAGE2_LIVE'));
+assert.ok(WORKBOOK_EVOLUTION_PATHS.every(path => path.unlockSkillActivation === 'learned_unequipped_on_evolution_commit'));
 assert.ok(WORKBOOK_EVOLUTION_PATHS.every(path => path.requiredLevelReference === 15 && path.requiredBondReference === 50));
 
 function liveDefinition(mapping) {
@@ -83,6 +85,11 @@ for (const mapping of MONSTER_CATALOG) {
   assert.equal(committed.canonicalToFormId, mapping.workbookStage2MonsterId);
   assert.deepEqual(committed.canonicalStats, preview.targetStats);
   assert.equal(instance.canonicalFormId, mapping.workbookStage2MonsterId);
+  assert.deepEqual(committed.unlockedSkill, { skillId: path.unlockSkillId, newlyLearned: true, slot: null });
+  const unlockedRecord = instance.skills.find(skill => skill.skillId === path.unlockSkillId);
+  assert.ok(unlockedRecord, `${mapping.runtimeSpeciesId} learns its workbook evolution skill`);
+  assert.equal(unlockedRecord.slot, null, 'evolution never overwrites the selected manual loadout');
+  assert.equal(unlockedRecord.currentUses, skillCatalogEntry(path.unlockSkillId).maxUses);
   assert.deepEqual({
     instanceId: instance.instanceId,
     parents: instance.parents,
@@ -134,6 +141,8 @@ assert.match(game, /previewWorkbookEvolution/);
 assert.match(requirementStatus, /requiredLevelReference/);
 assert.match(requirementStatus, /requiredBondReference/);
 assert.match(evolveMonster, /refreshStats\(inst,false\)/, 'live commit preserves current HP ratio');
+assert.match(evolveMonster, /committed\.unlockedSkill\?\.newlyLearned/);
+assert.match(evolveMonster, /ยังไม่ติดตั้ง/);
 assert.doesNotMatch(evolveMonster, /refreshStats\(inst,true\)/);
 assert.match(evolutionPreview, /workbook\.sourceStats\[stat\]/);
 assert.match(evolutionPreview, /workbook\.targetStats\[stat\]/);
