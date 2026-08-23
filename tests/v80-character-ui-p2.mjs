@@ -99,7 +99,7 @@ assert.equal(peek.controller.peekPartySlot(1).switched, false);
 assert.equal(peek.state.selectedSlot, 0);
 assert.equal(peek.controller.snapshot().characterPanel, 'quick');
 
-assert.match(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap still peeks');
-assert.match(extractFn('renderParty'), /switchPartySlot\(index\)/, 'party Switch still calls switchPartySlot');
+assert.doesNotMatch(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap does not open character peek');
+assert.match(extractFn('renderParty'), /switchPartySlot\(index\)/, 'party tap still switches through the existing gate');
 
 console.log('V8.2 Character UI Phase 2 global access: PASS');
