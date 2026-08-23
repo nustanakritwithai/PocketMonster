@@ -4,7 +4,8 @@ import { activeCss as css, activeHtml as html, activeJs as js } from './active-a
 
 assert.match(html, /id="breedingPanel"[^>]*breeding-salon/, 'NPC overlay uses the Breeding Salon skin');
 assert.match(html, /id="breedingClose"/, 'salon close control remains');
-assert.match(html, /id="breedingOpenManager"/, 'lab entry control remains');
+assert.match(html, /id="breedingOpenManager"/, 'salon start-breeding control remains');
+assert.match(html, />เริ่มผสมพันธุ์</, 'salon CTA is the start-breeding command');
 assert.match(html, /class="breeding-caretaker-card"/, 'caretaker card mount remains');
 assert.match(html, /class="breeding-preview-grid"/, 'parent pairing grid remains');
 assert.match(html, /class="breeding-heart"/, 'pairing heart remains for desktop');
@@ -40,7 +41,9 @@ assert.match(js, /el\('breedingSalonParentA'\)\?\.addEventListener\('click'/, 's
 assert.match(js, /el\('breedingSalonParentB'\)\?\.addEventListener\('click'/, 'salon Parent B opens the picker');
 assert.match(js, /openRanchBreeding\(\)/, 'farm-keeper breeding route remains');
 assert.match(js, /tab==='breeding'&&!\(isNearNpc\(\)\|\|isNearBreeding\(\)\)/, 'manager breeding tab accepts the breeding NPC');
-assert.match(js, /closeBreedingCaretaker\(\);openManager\(\{source:'npc'\}\);setManagerTab\('breeding'\)/, 'salon CTA still opens the manager lab');
+assert.match(js, /el\('breedingOpenManager'\)\.onclick=\(\)=>\{playSFX\('sfx_ui_click'\);createEgg\(\);\}/, 'salon CTA starts the canonical breed command');
+assert.match(js, /el\('breedingOpenManager'\);if\(start\)start\.disabled=!compat\.ok/, 'salon CTA stays disabled until the pair passes compatibility');
+assert.doesNotMatch(js, /el\('breedingOpenManager'\)\.onclick=.{0,160}openManager/, 'salon CTA no longer dumps into the manager lab');
 assert.doesNotMatch(js, /id="parentABtn"|id="breedBtn"|id="eggList"/, 'salon does not steal manager lab IDs');
 
 console.log('V8.2 Breeding Salon NPC UI: PASS');

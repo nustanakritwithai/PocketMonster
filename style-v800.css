@@ -921,6 +921,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   background:linear-gradient(180deg,#f472b6,#be185d);
   border:1px solid #fde68a55;box-shadow:0 8px 24px #9f123966
 }
+.breeding-salon .breeding-open-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 @media(max-width:700px){
   .breeding-salon .breeding-preview-grid>div:not(.breeding-heart){min-height:88px;padding:8px}
   .breeding-salon-stats span{font-size:9px;padding:3px 7px}
