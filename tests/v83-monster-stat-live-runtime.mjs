@@ -16,7 +16,7 @@ import {
 const POTENTIAL = Object.freeze({ hp: 15, atk: 15, def: 15, spAtk: 15, spDef: 15, spd: 15 });
 const TRAINING = Object.freeze({ hp: 0, atk: 0, def: 0, spAtk: 0, spDef: 0, spd: 0 });
 
-assert.equal(CANONICAL_LIVE_STAT_VERSION, 'canonical-live-stats/v1');
+assert.equal(CANONICAL_LIVE_STAT_VERSION, 'canonical-live-stats/v2');
 assert.equal(Object.isFrozen(WILD_STAT_VARIANT_MULTIPLIERS), true);
 for (const multipliers of Object.values(WILD_STAT_VARIANT_MULTIPLIERS)) assert.equal(Object.isFrozen(multipliers), true);
 
@@ -29,24 +29,24 @@ const ownedBefore = structuredClone(owned);
 const computed = computeCanonicalOwnedStats(owned);
 assert.equal(computed.ok, true);
 assert.equal(computed.activation, 'runtime_live');
-assert.equal(computed.version, 'canonical-live-stats/v1');
+assert.equal(computed.version, 'canonical-live-stats/v2');
 assert.equal(computed.formId, 'MON_002');
-assert.deepEqual(computed.stats, { hp: 41, atk: 18, def: 17, spAtk: 23, spDef: 18, spd: 21 });
+assert.deepEqual(computed.stats, { hp: 246, atk: 18, def: 17, spAtk: 23, spDef: 18, spd: 21 });
 assert.deepEqual(owned, ownedBefore, 'owned computation is pure');
 
 owned.maxHp = 100;
 owned.hp = 25;
 const refreshed = refreshCanonicalOwnedStats(owned);
 assert.equal(refreshed.ok, true);
-assert.equal(owned.maxHp, 41);
-assert.equal(owned.hp, 10, 'non-heal refresh preserves HP ratio');
+assert.equal(owned.maxHp, 246);
+assert.equal(owned.hp, 62, 'non-heal refresh preserves HP ratio');
 assert.equal(owned.spAtk, 23);
 assert.equal(owned.spDef, 18);
 refreshCanonicalOwnedStats(owned, null, { heal: true });
 assert.equal(owned.hp, owned.maxHp, 'heal refresh restores canonical MaxHP');
 
 const equipped = computeCanonicalOwnedStats(owned, { hp: 3, atk: 2, def: 1, spAtk: 4, spDef: 5, spd: 6 });
-assert.deepEqual(equipped.stats, { hp: 44, atk: 20, def: 18, spAtk: 27, spDef: 23, spd: 27 });
+assert.deepEqual(equipped.stats, { hp: 264, atk: 20, def: 18, spAtk: 27, spDef: 23, spd: 27 });
 const rejected = normalizeInstance({ instanceId: 'unknown-live', speciesId: 'unknown', level: 1 }, { now: 1000 });
 const rejectedBefore = structuredClone(rejected);
 assert.equal(refreshCanonicalOwnedStats(rejected).ok, false);
@@ -64,7 +64,8 @@ for (const mapping of MONSTER_CATALOG) {
       assert.equal(wild.ok, true);
       const expectedFormId = stage === 1 ? mapping.workbookBaseMonsterId : mapping.workbookStage2MonsterId;
       assert.equal(wild.formId, expectedFormId);
-      assert.deepEqual(wild.stats, calculateMonsterStats({ formId: expectedFormId, level, potential: POTENTIAL, training: TRAINING }).stats);
+      const formulaStats = calculateMonsterStats({ formId: expectedFormId, level, potential: POTENTIAL, training: TRAINING }).stats;
+      assert.deepEqual(wild.stats, { ...formulaStats, hp: formulaStats.hp * 6 });
       assert.deepEqual(Object.keys(wild.stats), MONSTER_STAT_KEYS);
       resolvedWildForms += 1;
     }
