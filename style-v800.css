@@ -726,7 +726,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .npc-btn{min-height:32px;padding:4px 8px;font-size:11px;border-radius:999px}
   .npc-btn:after{content:none}
   .merchant-shop,.trainer-panel,.evolution-guide-panel,.breeding-caretaker-panel,.ranch-services{
-    align-items:end;justify-items:center;place-items:unset;overflow:hidden;
+    place-items:end center;overflow:hidden;
     padding:0 max(6px,var(--safe-right)) max(6px,var(--safe-bottom)) max(6px,var(--safe-left));
   }
   .ranch-services{display:grid}
