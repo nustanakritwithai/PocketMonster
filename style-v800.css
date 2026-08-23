@@ -646,18 +646,19 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   }
   .account-card{
     width:min(640px,96vw);max-width:96vw;max-height:calc(100dvh - 8px);overflow:auto;
-    padding:8px 10px;border-radius:14px;
-    display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;align-items:end
+    padding:6px 10px;border-radius:14px;
+    display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;align-items:end
   }
   .account-logo{display:none}
   .account-card h1{grid-column:1/-1;margin:0;font-size:15px;text-align:left}
   .account-card p{display:none}
   .account-card .auth-back{grid-column:1/-1;margin:0;text-align:left}
-  .account-card form{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;align-items:end}
+  .account-card form{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;align-items:end}
   .account-card label{margin:0;font-size:10px}
   .account-card input{margin-top:2px;padding:6px 8px;min-height:32px}
   .account-card form .auth-primary{grid-column:1/-1;margin-top:2px;padding:6px 8px;min-height:32px;font-size:12px}
-  .auth-google,.auth-guest{margin-top:0;padding:6px 8px;min-height:32px;font-size:12px}
+  .auth-google{grid-column:1/-1;margin-top:0;padding:6px 8px;min-height:32px;font-size:12px}
+  #guestLoginBtn,.auth-guest{grid-column:1/-1;display:block;margin-top:0;padding:6px 8px;min-height:32px;font-size:12px}
   .account-status{grid-column:1/-1;min-height:0;margin:0;font-size:11px}
   .auth-switch{grid-column:1/-1;margin:0;font-size:11px;text-align:left}
 }
