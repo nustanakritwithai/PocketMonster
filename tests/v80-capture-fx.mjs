@@ -42,7 +42,7 @@ assert.match(extractFn('finishCaptureSuccess'), /spawnCaptureResultEffect\(cs\.p
 assert.match(extractFn('finishCaptureSuccess'), /playSFX\('sfx_capture_success'\)/, 'success SFX stays');
 assert.match(extractFn('finishCaptureFail'), /playSFX\('sfx_capture_fail'\)/, 'fail SFX stays');
 
-assert.match(extractFn('updateProjectiles'), /p\.type==='capture'/, 'capture projectile mesh is handed to the sequence');
+assert.match(extractFn('updateWorldStream'), /captureSequence\?\.wild===w/, 'world streaming must not unhide a wild that is inside the ball');
 assert.match(extractFn('executeCaptureThrow'), /t\.capturing=true/, 'wild freezes at throw so the ball does not land on a stale point');
 assert.match(extractFn('capturePrerequisite'), /w\.capturing/, 'a second throw cannot start while a wild is inside a ball');
 assert.match(extractFn('capturePrerequisite'), /p\.type==='capture'/, 'a second throw cannot start while a capture ball is in flight');

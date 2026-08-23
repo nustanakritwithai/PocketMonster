@@ -39,6 +39,7 @@ assert.match(js, /window\.MLRPG_WORLD_STREAM=/, 'live diagnostics expose attache
 assert.match(js, /worldStream\.resetHitch=resetStreamHitch/, 'live hitch samples can be reset between test phases');
 assert.match(functionSource(js, 'spawnZone'), /spawnRecords\(cfg\.spawn\)/, 'wild spawn stays immediate on zone load');
 assert.doesNotMatch(functionSource(js, 'updateWorldStream'), /disposeObject3D|removeAndDispose/, 'detach must keep shared geometries for reuse');
+assert.match(functionSource(js, 'updateWorldStream'), /captureSequence\?\.wild===w/, 'streaming must leave a bagged wild hidden for the ball animation');
 
 function fakeMesh(x, z, extra = {}) {
   return {
@@ -87,6 +88,7 @@ function createHarness() {
     'removeAndDispose',
     `'use strict';
      let decoStreaming=false;
+     let captureSequence=null;
      ${functionSource(js, 'isKeepAliveDeco')}
      ${functionSource(js, 'decoDistanceSq')}
      ${functionSource(js, 'addDeco')}
@@ -99,6 +101,7 @@ function createHarness() {
        clearDecorations,
        updateWorldStream,
        setStreaming(value){ decoStreaming=value; },
+       setCaptureSequence(value){ captureSequence=value; },
      };`,
   )(
     WORLD_STREAM,
@@ -171,6 +174,16 @@ harness.updateWorldStream();
 assert.equal(farWild.mesh.visible, false, 'far wild meshes skip the GPU until the player walks closer');
 assert.equal(nearWild.mesh.visible, true, 'nearby wilds stay visible');
 assert.equal(fightingWild.mesh.visible, true, 'engaged wilds stay visible even when far');
+
+const bagged = { mesh: fakeMesh(4, 0), engaged: false, capturing: true };
+bagged.mesh.visible = false;
+const inFlight = { mesh: fakeMesh(6, 0), engaged: false, capturing: true };
+inFlight.mesh.visible = true;
+harness.wilds.push(bagged, inFlight);
+harness.setCaptureSequence({ wild: bagged });
+harness.updateWorldStream();
+assert.equal(bagged.mesh.visible, false, 'a wild inside the capture ball stays hidden so the ball animation is visible');
+assert.equal(inFlight.mesh.visible, true, 'a wild stays visible while the capture ball is still in flight');
 
 harness.clearDecorations();
 assert.equal(harness.decorations.children.length, 0);

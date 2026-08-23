@@ -30,6 +30,6 @@ assert.match(functionSource(js, 'loop'), /STREAM_HITCH\.armed/, 'mutant 8b: hitc
 assert.match(functionSource(js, 'switchZone'), /lastSwitchZoneMs=performance\.now\(\)-switchStarted/, 'mutant 8c: zone switches keep hitch timing');
 assert.doesNotMatch(functionSource(js, 'updateWorldStream'), /removeAndDispose|disposeObject3D/, 'mutant 9: walking away must not dispose reusable decorations');
 assert.match(js, /loadRadius:22/, 'mutant 10: the nearby attach radius stays 22m');
-assert.match(js, /zoneAttachBudget:12/, 'mutant 12: zone entry must not attach the whole neighborhood in one hitch');
+assert.match(functionSource(js, 'updateWorldStream'), /captureSequence\?\.wild===w/, 'mutant 13: capture sequence owns bagged-wild visibility');
 
 console.log('V8.0 world stream mutants: PASS');

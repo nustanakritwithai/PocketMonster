@@ -359,7 +359,12 @@ function updateWorldStream(){
   for(let i=0;i<wilds.length;i++){
     const w=wilds[i];
     if(!w.mesh)continue;
-    if(w.engaged||w.capturing){w.mesh.visible=true;continue;}
+    if(w.capturing){
+      if(captureSequence?.wild===w)continue;
+      w.mesh.visible=true;
+      continue;
+    }
+    if(w.engaged){w.mesh.visible=true;continue;}
     const dx=w.mesh.position.x-ox,dz=w.mesh.position.z-oz;
     const d2=dx*dx+dz*dz;
     if(d2>hideR2)w.mesh.visible=false;
@@ -3141,7 +3146,7 @@ function createWildLabel(w){
 function removeWildLabel(w){ if(w?.labelEl){w.labelEl.remove();w.labelEl=null;} }
 function updateWorldLabels(dt){
   for(const w of wilds){
-    if(w.dead||!w.labelEl){if(w.labelEl)w.labelEl.classList.add('hidden');continue;}
+    if(w.dead||!w.labelEl||(w.capturing&&captureSequence?.wild===w)){if(w.labelEl)w.labelEl.classList.add('hidden');continue;}
     const d=distXZ(player.position,w.mesh.position);
     if(!labelTickScheduler.advance(`label:${w.id}`,d,dt,w.engaged))continue;
     const screen=worldToScreen(w.mesh.position.clone().add(new THREE.Vector3(0,w.boss?2.55:2.15,0)));
