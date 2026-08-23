@@ -1,4 +1,5 @@
 import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, fillEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
+import { acceptBossChallenge, bossCombatAuthorized, bossPromptAvailable, bossTargetable, createBossChallengeSession, declineBossChallenge, rearmBossChallenge, retreatBossChallenge } from './boss-challenge.mjs';
 import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
@@ -2278,7 +2279,7 @@ function stageObjectiveText(objective,zoneId=state.currentZone){
   }
   if(objective.phase==='defeat-boss'){
     const step=zoneId==='grass-meadow'?'3/3':'2/2';
-    return `${step} ปราบ BOSS ${monsterName} เพื่อเปิดจุดวาปด่านถัดไป`;
+    return `${step} ปราบ BOSS ${monsterName} • เลือกเข้าสู้เมื่อพร้อม`;
   }
   if(objective.phase==='stage-clear-pending')return `กำลังบันทึกผลการเคลียร์ ${stageName}`;
   if(objective.phase==='stage-cleared')return `✓ เคลียร์ ${stageName} แล้ว • จุดวาปด่านถัดไปเปิดแล้ว`;
@@ -2766,6 +2767,7 @@ function ensureStarter(){
 
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
+let bossChallengeSession=createBossChallengeSession(),nearbyBossChallengeId=null;
 let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null,dismissedWarpId=null;
 characterUI=createCharacterUIController({
   getState:()=>state,
@@ -2922,7 +2924,7 @@ function createWild(sp,x,z,level=1,opts={}){
   scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),{hp:maxHp,atk,def,spAtk,spDef,spd}=canonicalStats.stats;
   const capturePolicy=encounterProfile.capturePolicy;
   const wildId='w'+nextId++;
-  const w={id:wildId,speciesId:sp.id,canonicalFormId:canonicalStats.formId,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk,def,spAtk,spDef,spd,potential,genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
+  const w={id:wildId,speciesId:sp.id,canonicalFormId:canonicalStats.formId,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk,def,spAtk,spDef,spd,potential,genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,combatEnabled:!boss,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');
   if(boss)markBossProgress(w,'found');
@@ -2964,16 +2966,89 @@ function spawnZone(zone){
   const cfg=ZONES[zone];if(!cfg)return;
   let objective=currentStageObjective(zone);
   objective=reconcilePendingStageClear(zone,objective);
-  if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}
   spawnRecords(cfg.spawn);
+  if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}
   if(objective.encounter!=='elite'&&cfg.rareSpawn?.length&&Math.random()<cfg.rareChance)spawnRecords(cfg.rareSpawn);
   if(objective.encounter==='elite')ensureProgressionEncounter(zone);
   else if(objective.complete&&cfg.eliteSpawn?.length&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance)spawnRecords(cfg.eliteSpawn);
 }
-function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.captureReferenceLevel=null;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;w.mesh.position.copy(w.home);}
-function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead)continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
+function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.captureReferenceLevel=null;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;if(w.boss)w.combatEnabled=false;w.mesh.position.copy(w.home);}
+function canCombatTargetWild(w){return bossTargetable(w,bossChallengeSession);}
+function bossChallengeWild(id=bossChallengeSession.activeBossId){return id?wilds.find(w=>w?.id===id&&w.boss&&!w.dead)||null:null;}
+function closeBossChallengeUi({clearSession=false}={}){
+  nearbyBossChallengeId=null;
+  el('bossChallenge')?.classList.add('hidden');
+  el('bossRetreatBtn')?.classList.add('hidden');
+  if(clearSession)bossChallengeSession=createBossChallengeSession();
+}
+function updateBossChallengePrompt(){
+  const active=bossChallengeWild();
+  if(bossChallengeSession.activeBossId){
+    if(!active){closeBossChallengeUi({clearSession:true});return;}
+    nearbyBossChallengeId=null;
+    el('bossChallenge')?.classList.add('hidden');
+    el('bossRetreatBtn')?.classList.remove('hidden');
+    return;
+  }
+  el('bossRetreatBtn')?.classList.add('hidden');
+  const boss=wilds.find(w=>w?.boss&&!w.dead&&w.mesh?.position)||null;
+  if(!boss){nearbyBossChallengeId=null;el('bossChallenge')?.classList.add('hidden');return;}
+  const distanceM=distXZ(player.position,boss.mesh.position);
+  bossChallengeSession=rearmBossChallenge(bossChallengeSession,boss.id,distanceM);
+  if(!bossPromptAvailable({session:bossChallengeSession,bossId:boss.id,alive:!boss.dead,distanceM})){
+    nearbyBossChallengeId=null;el('bossChallenge')?.classList.add('hidden');return;
+  }
+  nearbyBossChallengeId=boss.id;
+  setTextIfChanged(el('bossChallengeTitle'),`ท้าสู้ BOSS ${wildDisplayName(boss)}?`);
+  setTextIfChanged(el('bossChallengeDetail'),`Lv.${boss.level} • จะยังไม่โจมตีจนกว่าจะกดเข้าสู้`);
+  el('bossChallenge')?.classList.remove('hidden');
+}
+function startBossChallenge(){
+  const boss=bossChallengeWild(nearbyBossChallengeId);
+  if(!boss||!bossPromptAvailable({session:bossChallengeSession,bossId:boss.id,alive:!boss.dead,distanceM:distXZ(player.position,boss.mesh.position)}))return false;
+  bossChallengeSession=acceptBossChallenge(bossChallengeSession,boss.id);
+  nearbyBossChallengeId=null;
+  ensureCaptureReferenceLevel(boss);
+  boss.combatEnabled=true;boss.engaged=true;boss.state='chase';
+  if(activeSummon){activeSummon.target=null;activeSummon.aiDecision=null;}
+  el('bossChallenge')?.classList.add('hidden');
+  el('bossRetreatBtn')?.classList.remove('hidden');
+  playBGM('boss');
+  msg(`เริ่มการต่อสู้ BOSS ${wildDisplayName(boss)} • กด “ออกจากไฟต์” ได้ทุกเมื่อ`);
+  return true;
+}
+function declineNearbyBossChallenge(){
+  const boss=bossChallengeWild(nearbyBossChallengeId);
+  if(!boss)return false;
+  bossChallengeSession=declineBossChallenge(bossChallengeSession,boss.id);
+  nearbyBossChallengeId=null;
+  el('bossChallenge')?.classList.add('hidden');
+  msg(`ยังไม่เข้าสู้ BOSS ${wildDisplayName(boss)} • เดินออกแล้วกลับมาใหม่เมื่อพร้อม`);
+  return true;
+}
+function exitBossChallenge(reason='player'){
+  const boss=bossChallengeWild();
+  if(!boss)return false;
+  bossChallengeSession=retreatBossChallenge(bossChallengeSession,boss.id);
+  resetWild(boss);
+  clearBossChallengeCombatEffects();battleEventLog.length=0;
+  if(activeSummon){
+    activeSummon.target=null;activeSummon.aiDecision=null;
+    resetActiveBossChallengeStatus();
+  }
+  el('bossRetreatBtn')?.classList.add('hidden');
+  playBGM(state.currentZone);
+  msg(reason==='leash'?'ออกห่างจากสนามบอส • ยุติการต่อสู้โดยไม่มีโทษ':`ออกจากไฟต์ BOSS ${wildDisplayName(boss)} • ไม่มีโทษและยังกลับมาท้าใหม่ได้`);
+  return true;
+}
+function finishBossChallenge(w){
+  if(!w?.boss||!bossCombatAuthorized(bossChallengeSession,w.id))return;
+  closeBossChallengeUi({clearSession:true});
+  playBGM(state.currentZone);
+}
+function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead||!canCombatTargetWild(w))continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
-  const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead||w.capturing)continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
+  const f=forward(),start=player.position,best={w:null,score:Infinity};for(const w of wilds){if(w.dead||w.capturing||!canCombatTargetWild(w))continue;const v=w.mesh.position.clone().sub(start);v.y=0;const along=v.dot(f);if(along<1||along>maxRange)continue;const closest=start.clone().add(f.clone().multiplyScalar(along)),lat=distXZ(closest,w.mesh.position);if(lat<=radius&&lat+along*.015<best.score){best.w=w;best.score=lat+along*.015;}}return best.w;
 }
 function respawnWild(w,delay=6000){
   const generation=zoneGeneration,zone=w.zone,id=w.speciesId,level=w.level,boss=w.boss,elite=w.elite,rare=w.rare,x=w.home.x,z=w.home.z,evolutionPath=w.evolutionPath;
@@ -3042,6 +3117,7 @@ function switchZone(zone,silent=false){
   summonCooldownUntil=0;
   clearWilds();
   clearTransientEffects();
+  closeBossChallengeUi({clearSession:true});
   clearSkillFields();
   clearSkillSwarms();
   closeWarpPrompt();
@@ -3086,6 +3162,7 @@ function switchZone(zone,silent=false){
   lastSwitchZoneMs=performance.now()-switchStarted;
   return true;
 }
+function clearBossChallengeCombatEffects(){clearSkillFields();clearSkillSwarms();}
 
 // ---------- Camera / input ----------
 let cameraYaw=0,cameraPitch=.48;
@@ -3179,7 +3256,7 @@ function captureWorkbookVariant(w){return encounterVariantFromFlags({boss:!!w?.b
 function validCapturePolicyForWild(w){const variant=captureWorkbookVariant(w),expected=variant==='elite'?'elite':variant==='boss'?'disabled':'normal';return w?.capturePolicy===expected;}
 function captureActiveStatusIds(w){const status=w?.statusState;if(!status||status.ended||!Array.isArray(status.statuses)||!Number.isFinite(status.currentTimeSec))return null;return status.statuses.filter(entry=>entry&&typeof entry.statusId==='string'&&Number.isFinite(entry.expiresAtSec)&&entry.expiresAtSec>status.currentTimeSec).map(entry=>entry.statusId);}
 function captureCalculatorInput(w,{referenceLevel=w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit=true}={}){const identity=captureIdentityForWild(w),activeStatusIds=captureActiveStatusIds(w);if(!identity||!activeStatusIds||!validCapturePolicyForWild(w))return null;return{targetId:w.id,monsterId:captureWorkbookMonsterId(w),currentHp:w.hp,maxHp:w.maxHp,activeStatusIds,ballClass:'Basic',ballTargetType:null,targetSecondaryType:identity.targetSecondaryType,targetLevel:w.level,referenceLevel,variant:captureWorkbookVariant(w),ownedMonsterActive:!!(activeSummon||pendingSummon),ballQuantity:state.inventory.captureBalls,projectileHit,targetAlive:!w.dead&&w.hp>0};}
-function damageWild(w,dmg,meta={}){if(w.dead)return;ensureCaptureReferenceLevel(w);w.engaged=true;w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}}
+function damageWild(w,dmg,meta={}){if(w.dead)return;ensureCaptureReferenceLevel(w);w.engaged=true;if(!canCombatTargetWild(w)){w.engaged=false;return false;}w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}return true;}
 function monsterExpNeed(level){return 24+level*18;}
 function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+amount;let ups=0;while(inst.exp>=monsterExpNeed(inst.level)){inst.exp-=monsterExpNeed(inst.level);levelUpInstance(inst);ups++;}inst.bond=clamp(inst.bond+Math.min(2,amount*.04));return ups;}
 // V7.3: Battle event tracking for growth/training (per-encounter, cleared on defeat)
@@ -3206,6 +3283,7 @@ function completeStageClear(stageId,{recovered=false}={}){
 }
 function defeatWild(w){
   if(w.dead)return;
+  finishBossChallenge(w);
   w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
   w.dead=true;
   if(state.currentZone==='grass-meadow')markStarterJourney('battled');
@@ -3487,6 +3565,11 @@ function recall(show=true,setCooldown=true){
   if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
   renderParty();renderSkillButtons();renderHUD();
 }
+function resetActiveBossChallengeStatus(){
+  if(!activeSummon)return;
+  activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});
+  activeSummon.statusState=createEncounterStatusState({encounterId:activeSummon.inst.instanceId,nowSec:0});
+}
 function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}clearSkillSwarms();const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
 function spawnSkillTrail(type, fromPos, toPos) {
   const cfg = typeFx(type);
@@ -3663,7 +3746,7 @@ function skillEnemySnapshots(){
     snapshots.push(Object.freeze({
       id:wild.id,
       alive:!wild.dead,
-      targetable:!wild.capturing,
+      targetable:!wild.capturing&&canCombatTargetWild(wild),
       position:Object.freeze({x:wild.mesh.position.x,z:wild.mesh.position.z}),
     }));
   }
@@ -3682,6 +3765,7 @@ function materializeSkillTargets(a,command){
   for(const targetId of command.targetIds){
     const wild=byId.get(targetId);
     if(!wild||wild.dead||wild.capturing||!wild.mesh?.position)return [];
+    if(!canCombatTargetWild(wild))return [];
     targets.push(Object.freeze({id:targetId,alive:true,targetable:true,world:wild}));
   }
   return targets;
@@ -3783,7 +3867,7 @@ function updateSkillFields(dt){
       while(field.nextTickSec<=Math.min(field.ageSec,field.durationSec)+Number.EPSILON){
         for(let wildIndex=wilds.length-1;wildIndex>=0;wildIndex--){
           const w=wilds[wildIndex];
-          if(w.dead||w.capturing||distXZ(field.center,w.mesh.position)>field.radiusM)continue;
+          if(w.dead||w.capturing||!canCombatTargetWild(w)||distXZ(field.center,w.mesh.position)>field.radiusM)continue;
           const defense=Number.isFinite(w.def)?w.def:10,specialDefense=Number.isFinite(w.spDef)?w.spDef:(Number.isFinite(w.spdef)?w.spdef:defense);
           const target={id:w.id,level:w.level,types:[...wildTypes(w)],stats:{DEF:defense,SPDEF:specialDefense},hp:w.hp,maxHp:w.maxHp,statusState:w.statusState};
           const resolved=resolveWorkbookDirectDamage({skillId:field.skillId,attacker:field.attacker,defender:target,attackerNowSec:field.attackerNowSec,defenderNowSec:w.statusState.currentTimeSec},{rng:Math.random});
@@ -3819,7 +3903,7 @@ function updateSkillSwarms(dt){
       let target=null,nearestDistance=Infinity;
       for(let wildIndex=0;wildIndex<wilds.length;wildIndex++){
         const candidate=wilds[wildIndex];
-        if(candidate.dead||candidate.capturing||!candidate.mesh?.position)continue;
+        if(candidate.dead||candidate.capturing||!canCombatTargetWild(candidate)||!candidate.mesh?.position)continue;
         const distance=distXZ(swarm.center,candidate.mesh.position);
         if(distance>swarm.radiusM||distance>nearestDistance)continue;
         if(distance===nearestDistance&&target&&candidate.id.localeCompare(target.id)>=0)continue;
@@ -4050,6 +4134,7 @@ function fillOwnedBasicAiRequest(scratch,a,liveWilds){
     target.id=wild?.id;
     target.alive=wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0;
     target.targetable=wild?.capturing===undefined||wild.capturing===false;
+    if(wild?.combatEnabled===false)target.targetable=false;
     target.position.x=wild?.mesh?.position?.x;
     target.position.z=wild?.mesh?.position?.z;
     request.enemies[index]=target;
@@ -4090,7 +4175,7 @@ function materializeOwnedBasicAiTarget(a,decision){
   if(matchCount!==1)return null;
   const actorPosition=a?.mesh?.position,targetPosition=target?.mesh?.position;
   if(target.dead!==false||!Number.isFinite(target.hp)||target.hp<=0
-    ||!(target.capturing===undefined||target.capturing===false)
+    ||!(target.capturing===undefined||target.capturing===false)||target.combatEnabled===false
     ||!Number.isFinite(actorPosition?.x)||!Number.isFinite(actorPosition?.z)
     ||!Number.isFinite(targetPosition?.x)||!Number.isFinite(targetPosition?.z))return null;
   const distanceM=distXZ(actorPosition,targetPosition);
@@ -4131,7 +4216,7 @@ function selectWildAggressors(){
     candidate.id=w?.id;
     candidate.dead=w?.dead;
     candidate.engaged=w?.engaged;
-    candidate.targetValid=!!w?.mesh?.position;
+    candidate.targetValid=!!w?.mesh?.position&&canCombatTargetWild(w);
     candidate.distanceToTarget=w?.mesh?.position?distXZ(w.mesh.position,target.position):Infinity;
     candidate.distanceFromHome=w?.mesh?.position&&w?.home?distXZ(w.mesh.position,w.home):Infinity;
     wildAggressorCandidates[index]=candidate;
@@ -4164,7 +4249,10 @@ function updateWild(w,dt,canEngage=false){
   const distanceFromHome=w.home?distXZ(w.mesh.position,w.home):Infinity;
   const resetRequest=wildUpdateScratch.resetRequest;
   resetRequest.engaged=w.engaged;resetRequest.targetValid=targetValid;resetRequest.distanceToTarget=distanceToTarget;resetRequest.distanceFromHome=distanceFromHome;
-  if(shouldResetEncounter(resetRequest)) resetWild(w);
+  if(shouldResetEncounter(resetRequest)){
+    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id)){exitBossChallenge('leash');return;}
+    resetWild(w);
+  }
 
   if(!canEngage||!targetValid){
     if(w.engaged)resetWild(w);
@@ -5856,6 +5944,9 @@ el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();}
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('warpPromptAction').onclick=()=>startWarp();
 el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');dismissedWarpId=nearbyWarp?.id||null;closeWarpPrompt();};
+el('bossChallengeAccept').onclick=()=>{playSFX('sfx_ui_click');startBossChallenge();};
+el('bossChallengeDecline').onclick=()=>{playSFX('sfx_ui_click');declineNearbyBossChallenge();};
+el('bossRetreatBtn').onclick=()=>{playSFX('sfx_ui_click');exitBossChallenge();};
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
@@ -5926,6 +6017,7 @@ function loop(now){
     updatePlayer(dt);
     updateWorldStream();
     updateWarpPrompt(dt);
+    updateBossChallengePrompt();
     updateCamera(dt);
     updateWorldLabels(dt);
     updateFloatingTexts(dt);
