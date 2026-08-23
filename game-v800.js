@@ -5025,17 +5025,6 @@ function switchPartySlot(index){
     dismissCharacterAccessHistory();
   }
   state.selectedSlot=index;
-  const inst=selectedInstance();
-  if(state.currentZone!=='hub'&&inst&&!inst.fainted&&inst.hp>0){
-    if(activeSummon&&activeSummon.inst.instanceId!==inst.instanceId){
-      recall(false,false);
-      summonCooldownUntil=0;
-      summonThrow();
-    }else if(!activeSummon&&!pendingSummon){
-      summonCooldownUntil=0;
-      summonThrow();
-    }
-  }
   syncHubCompanion();renderParty();renderSkillButtons();renderHUD();renderCharacterAccess();
 }
 function renderParty(){

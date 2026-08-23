@@ -159,7 +159,7 @@ assert.match(extractFn('openManager'), /isNearNpc/, 'full manager stays NPC-gate
 assert.match(extractFn('openManager'), /requestOpenFull/, 'full manager opens through the controller');
 assert.match(extractFn('closeManager'), /closeAll\(\)/, 'closing the manager clears the overlay stack');
 assert.match(extractFn('switchPartySlot'), /requestSwitchParty/, 'combat switch is gated');
-assert.match(extractFn('switchPartySlot'), /summonThrow\(\)/, 'allowed switch still uses the original summon path');
+assert.doesNotMatch(extractFn('switchPartySlot'), /summonThrow\(|recall\(/, 'selecting a party slot must not throw or recall');
 assert.doesNotMatch(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap must not open character peek');
 assert.match(extractFn('renderParty'), /sw\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Switch chip supports keyboard click without duplicating pointer input');
 assert.match(extractFn('renderParty'), /button\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Party slot supports keyboard click without duplicating pointer input');
