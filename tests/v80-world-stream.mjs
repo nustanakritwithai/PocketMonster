@@ -22,7 +22,7 @@ function functionSource(source, name) {
 assert.match(js, /const WORLD_STREAM=Object\.freeze\(\{/, 'world stream radii must be named');
 assert.match(js, /loadRadius:22/, 'nearby props attach inside 22m');
 assert.match(js, /unloadRadius:32/, 'far props detach past 32m hysteresis');
-assert.match(js, /attachPerFrame:5/, 'walking attaches a bounded number of props per frame');
+assert.match(js, /zoneAttachBudget:12/, 'zone entry attaches a small nearby budget instead of the whole neighborhood at once');
 assert.match(functionSource(js, 'populateWorld'), /decoStreaming=true/, 'zone rebuild queues far decorations');
 assert.match(functionSource(js, 'populateWorld'), /decoStreaming=false/, 'zone rebuild must stop queuing after props are built');
 assert.match(functionSource(js, 'addDeco'), /decoStreaming&&!isKeepAliveDeco\(mesh\)/, 'only streamable props wait in the attach queue');
@@ -32,7 +32,11 @@ assert.match(functionSource(js, 'isKeepAliveDeco'), /stageMarker/, 'stage marker
 assert.match(functionSource(js, 'clearDecorations'), /disposeObject3D\(decoAttachQueue/, 'zone clear must dispose queued props, not leak GPU objects');
 assert.match(functionSource(js, 'switchZone'), /player\.position\.set\(\.\.\.start\);\s*flushNearbyDecos\(player\.position,WORLD_STREAM\.zoneAttachBudget\)/, 'zone entry attaches the neighborhood after the player lands');
 assert.match(functionSource(js, 'loop'), /updateWorldStream\(\)/, 'the live loop streams the neighborhood each frame');
+assert.match(functionSource(js, 'loop'), /STREAM_HITCH\.armed/, 'the live loop records hitch samples');
+assert.match(functionSource(js, 'switchZone'), /lastSwitchZoneMs=performance\.now\(\)-switchStarted/, 'zone switches record main-thread hitch time');
+assert.match(functionSource(js, 'flushNearbyDecos'), /bestD=loadR2/, 'zone flush attaches the nearest queued props first');
 assert.match(js, /window\.MLRPG_WORLD_STREAM=/, 'live diagnostics expose attached vs queued decoration counts');
+assert.match(js, /worldStream\.resetHitch=resetStreamHitch/, 'live hitch samples can be reset between test phases');
 assert.match(functionSource(js, 'spawnZone'), /spawnRecords\(cfg\.spawn\)/, 'wild spawn stays immediate on zone load');
 assert.doesNotMatch(functionSource(js, 'updateWorldStream'), /disposeObject3D|removeAndDispose/, 'detach must keep shared geometries for reuse');
 
@@ -148,6 +152,16 @@ const clustered = Array.from({ length: 6 }, (_, index) => fakeMesh(index, 0));
 for (const mesh of clustered) budget.addDeco(mesh);
 assert.equal(budget.flushNearbyDecos(budget.player.position, 5), 5, 'per-frame attach stays budgeted');
 assert.equal(budget.decoAttachQueue.length, 1, 'overflow props wait for a later frame');
+
+const nearestFirst = createHarness();
+nearestFirst.setStreaming(true);
+const closer = fakeMesh(2, 0);
+const fartherInRange = fakeMesh(18, 0);
+nearestFirst.addDeco(fartherInRange);
+nearestFirst.addDeco(closer);
+assert.equal(nearestFirst.flushNearbyDecos(nearestFirst.player.position, 1), 1);
+assert.equal(nearestFirst.decorations.children[0], closer, 'the closest queued prop attaches first');
+assert.equal(nearestFirst.decoAttachQueue.includes(fartherInRange), true, 'farther in-range props wait for leftover budget');
 
 const farWild = { mesh: fakeMesh(50, 0), engaged: false, capturing: false };
 const nearWild = { mesh: fakeMesh(4, 0), engaged: false, capturing: false };

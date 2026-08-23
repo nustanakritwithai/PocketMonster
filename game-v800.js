@@ -279,12 +279,34 @@ const WORLD_STREAM=Object.freeze({
   loadRadius:22,
   unloadRadius:32,
   attachPerFrame:5,
-  zoneAttachBudget:48,
+  zoneAttachBudget:12,
   wildHideRadius:36,
   wildShowRadius:26,
 });
 const decoAttachQueue=[];
 let decoStreaming=false;
+const STREAM_HITCH={armed:false,samples:0,sumMs:0,lastMs:0,maxMs:0,over33:0,over50:0};
+let lastSwitchZoneMs=0;
+let lastSwitchParts={ground:0,populate:0,flush:0,spawn:0,save:0};
+function resetStreamHitch(){
+  STREAM_HITCH.samples=0;STREAM_HITCH.sumMs=0;STREAM_HITCH.lastMs=0;STREAM_HITCH.maxMs=0;STREAM_HITCH.over33=0;STREAM_HITCH.over50=0;STREAM_HITCH.armed=true;
+}
+function streamHitchSnapshot(){
+  const avg=STREAM_HITCH.samples?STREAM_HITCH.sumMs/STREAM_HITCH.samples:0;
+  return {
+    samples:STREAM_HITCH.samples,
+    fps:STREAM_HITCH.samples?Number((1000/avg).toFixed(1)):0,
+    avgMs:Number(avg.toFixed(2)),
+    maxMs:Number(STREAM_HITCH.maxMs.toFixed(2)),
+    over33:STREAM_HITCH.over33,
+    over50:STREAM_HITCH.over50,
+    switchMs:Number(lastSwitchZoneMs.toFixed(2)),
+    switchParts:lastSwitchParts,
+    drawCalls:renderer.info.render.calls,
+    triangles:renderer.info.render.triangles,
+    tier:qualityProfile.tier,
+  };
+}
 function isKeepAliveDeco(mesh){
   return !!(mesh?.userData?.warpRouteId||mesh?.userData?.stageMarker);
 }
@@ -308,13 +330,15 @@ function flushNearbyDecos(origin,budget=WORLD_STREAM.zoneAttachBudget){
   const ox=origin.x,oz=origin.z;
   const loadR2=WORLD_STREAM.loadRadius*WORLD_STREAM.loadRadius;
   let attached=0;
-  for(let i=decoAttachQueue.length-1;i>=0&&attached<budget;i--){
-    const mesh=decoAttachQueue[i];
-    if(decoDistanceSq(mesh,ox,oz)<=loadR2){
-      decoAttachQueue.splice(i,1);
-      decorations.add(mesh);
-      attached++;
+  while(attached<budget){
+    let best=-1,bestD=loadR2;
+    for(let i=0;i<decoAttachQueue.length;i++){
+      const distance=decoDistanceSq(decoAttachQueue[i],ox,oz);
+      if(distance<=bestD){bestD=distance;best=i;}
     }
+    if(best<0)break;
+    decorations.add(decoAttachQueue.splice(best,1)[0]);
+    attached++;
   }
   return attached;
 }
@@ -1469,7 +1493,7 @@ function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentat
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
 if(typeof window!=='undefined'){
   window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
-  window.MLRPG_WORLD_STREAM=()=>({
+  const worldStream=()=>({
     attached:decorations.children.length,
     queued:decoAttachQueue.length,
     keepAlive:decorations.children.filter(child=>child.userData.warpRouteId||child.userData.stageMarker).length,
@@ -1477,7 +1501,11 @@ if(typeof window!=='undefined'){
     unloadRadius:WORLD_STREAM.unloadRadius,
     x:+player.position.x.toFixed(2),
     z:+player.position.z.toFixed(2),
+    hitch:streamHitchSnapshot(),
   });
+  worldStream.resetHitch=resetStreamHitch;
+  worldStream.moveTo=(x,z)=>{player.position.x=x;player.position.z=z;};
+  window.MLRPG_WORLD_STREAM=worldStream;
 }
 const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
 const VFX_PRIORITY_RANK=Object.freeze({P0:0,P1:1,P2:2,P3:3,P4:4});
@@ -2992,6 +3020,7 @@ function switchZone(zone,silent=false){
   if(STAGE_BY_ID[zone]&&!stageUnlockReason(state.stageProgress,zone).ok){msg(`${STAGE_BY_ID[zone].displayName} ยังล็อกอยู่ • เคลียร์ด่านก่อนหน้า`);return false;}
   if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return false;}
   const safetyBalls=zone!=='hub'&&ensureCaptureBallSafety();
+  const switchStarted=performance.now();
   zoneGeneration++;
   abortCaptureSequence();
   if(activeSummon)recall(false,false);
@@ -3021,22 +3050,29 @@ function switchZone(zone,silent=false){
   playBGM(zone);
   startAmbient(zone);
   const cfg=ZONES[zone];
+  let mark=performance.now();
   setZoneGround(zone);
+  const groundMs=performance.now()-mark;mark=performance.now();
   populateWorld(zone);
+  const populateMs=performance.now()-mark;mark=performance.now();
   const start=warpSpawnOverride||cfg.playerStart||[0,0,5];
   warpSpawnOverride=null;
   player.position.set(...start);
   flushNearbyDecos(player.position,WORLD_STREAM.zoneAttachBudget);
+  const flushMs=performance.now()-mark;mark=performance.now();
   playerData.hp=Math.max(1,playerData.hp);
   setHubVisibility(zone==='hub');
   spawnZone(zone);
   if(zone!=='hub'&&livingWilds().length===0)spawnZone(zone);
+  const spawnMs=performance.now()-mark;mark=performance.now();
   syncRanchVisuals();
   syncHubCompanion();
   renderZoneUI();
   renderStarterJourney();
   if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
+  lastSwitchParts={ground:Number(groundMs.toFixed(2)),populate:Number(populateMs.toFixed(2)),flush:Number(flushMs.toFixed(2)),spawn:Number(spawnMs.toFixed(2)),save:Number((performance.now()-mark).toFixed(2))};
+  lastSwitchZoneMs=performance.now()-switchStarted;
   return true;
 }
 
@@ -5866,8 +5902,15 @@ let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 const wildFrameSnapshot=[];
 function loop(now){
   try{
-    const dt=Math.min(.033,(now-last)/1000);
+    const frameMs=now-last;
+    const dt=Math.min(.033,frameMs/1000);
     last=now;
+    if(STREAM_HITCH.armed){
+      STREAM_HITCH.samples++;STREAM_HITCH.sumMs+=frameMs;STREAM_HITCH.lastMs=frameMs;
+      if(frameMs>STREAM_HITCH.maxMs)STREAM_HITCH.maxMs=frameMs;
+      if(frameMs>33.4)STREAM_HITCH.over33++;
+      if(frameMs>50)STREAM_HITCH.over50++;
+    }
     updatePlayer(dt);
     updateWorldStream();
     updateWarpPrompt(dt);

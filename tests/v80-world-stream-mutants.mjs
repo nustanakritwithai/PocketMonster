@@ -26,8 +26,10 @@ assert.match(functionSource(js, 'spawnZone'), /spawnRecords\(cfg\.spawn\)/, 'mut
 assert.match(functionSource(js, 'clearDecorations'), /removeAndDispose\(decorations,decorations\.children\[0\]\)/, 'mutant 6: attached props still go through removeAndDispose');
 assert.match(functionSource(js, 'clearDecorations'), /disposeObject3D\(decoAttachQueue/, 'mutant 7: queued props are disposed on zone clear');
 assert.match(functionSource(js, 'loop'), /updateWorldStream\(\)/, 'mutant 8: the live loop must keep streaming the neighborhood');
+assert.match(functionSource(js, 'loop'), /STREAM_HITCH\.armed/, 'mutant 8b: hitch sampling stays in the live loop');
+assert.match(functionSource(js, 'switchZone'), /lastSwitchZoneMs=performance\.now\(\)-switchStarted/, 'mutant 8c: zone switches keep hitch timing');
 assert.doesNotMatch(functionSource(js, 'updateWorldStream'), /removeAndDispose|disposeObject3D/, 'mutant 9: walking away must not dispose reusable decorations');
 assert.match(js, /loadRadius:22/, 'mutant 10: the nearby attach radius stays 22m');
-assert.match(js, /unloadRadius:32/, 'mutant 11: unload hysteresis stays wider than load');
+assert.match(js, /zoneAttachBudget:12/, 'mutant 12: zone entry must not attach the whole neighborhood in one hitch');
 
 console.log('V8.0 world stream mutants: PASS');
