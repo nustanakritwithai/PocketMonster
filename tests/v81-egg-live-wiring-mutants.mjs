@@ -16,6 +16,13 @@ function functionSource(source, name) {
   assert.fail(`${name} must have a complete body`);
 }
 
+function mutateFunction(source, name, before, after) {
+  const originalFunction = functionSource(source, name);
+  assert.ok(originalFunction.includes(before), `${name} mutation target must exist`);
+  const mutatedFunction = originalFunction.replace(before, after);
+  return source.replace(originalFunction, mutatedFunction);
+}
+
 function liveContract(source) {
   assert.match(source, /createStandardBreedingEggTransaction/);
   assert.match(source, /hatchBreedingEggTransaction/);
@@ -109,18 +116,20 @@ const mutants = [
   ['require live canonical parent', 'const result=hatchBreedingEggTransaction(state,{eggId,now});', 'getInst(egg.eggHolderOwnedMonsterId);const result=hatchBreedingEggTransaction(state,{eggId,now});'],
   ['guess malformed legacy child', "if(!egg.child||typeof egg.child!=='object'){msg('ไข่ Legacy ไม่มี snapshot ลูก จึงไม่สร้างข้อมูลทดแทน');return;}", "if(!egg.child||typeof egg.child!=='object')makeChild(null,null,null);"],
   ['guess missing legacy identity', "if(typeof egg.child.instanceId!=='string'||!egg.child.instanceId.trim()||!spById[egg.child.speciesId]){msg('snapshot ลูกในไข่ Legacy ไม่ครบ จึงไม่เดารหัสหรือ Species ทดแทน');return;}", 'if(false)return;'],
-  ['use legacy deadline first', 'readyAt=egg.hatchAt??egg.readyAt', 'readyAt=egg.readyAt??egg.hatchAt'],
-  ['ignore hatch ledger marker in render', 'hatched=!!egg.hatchedOwnedMonsterId', 'hatched=false'],
+  ['use legacy deadline first', 'readyAt=egg.hatchAt??egg.readyAt', 'readyAt=egg.readyAt??egg.hatchAt', 'renderBreeding'],
+  ['ignore hatch ledger marker in render', 'hatched=!!egg.hatchedOwnedMonsterId', 'hatched=false', 'renderBreeding'],
   ['ignore hatch ledger marker in countdown', "const hatched=card.dataset.eggHatched==='true';", 'const hatched=false;'],
   ['shift deadline on every load', 'state.eggs=clean.eggs||[];', 'state.eggs=(clean.eggs||[]).map(e=>({...e,readyAt:e.readyAt||Date.now()+30000}));'],
   ['bypass Firebase persistence adapter', 'state:sanitizeStateForPersistence(persistableState(state))', 'state:persistableState(state)'],
   ['drop Firebase schema version', ',saveSchemaVersion:SAVE_SCHEMA_VERSION', ''],
   ['use display lifeStage as authority', 'return inst&&resolveWorkbookEvolutionStage(inst).stage2;', "return inst&&['Adult','Mature'].includes(inst.lifeStage);"],
-  ['use runtime breeding group in parent card', 'profile=workbookBreedingProfile(inst.speciesId)', 'profile={breedingGroup:sp.breedingGroup}'],
+  ['use runtime breeding group in parent card', 'profile=workbookBreedingProfile(inst.speciesId)', 'profile={breedingGroup:sp.breedingGroup}', 'parentButtonHTML'],
 ];
 
-for (const [name, before, after] of mutants) {
-  const source = originalSource.replace(before, after);
+for (const [name, before, after, functionName] of mutants) {
+  const source = functionName
+    ? mutateFunction(originalSource, functionName, before, after)
+    : originalSource.replace(before, after);
   assert.notEqual(source, originalSource, `${name} mutation must alter source`);
   assert.throws(() => liveContract(source), undefined, `${name} must be killed`);
 }
