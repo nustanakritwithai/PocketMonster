@@ -23,6 +23,7 @@ assert.match(pass, /\.manager-head\{font-size:14px/, 'character manager title sh
 assert.match(pass, /\.warp-prompt-card h2\{font-size:13px/, 'warp sheet title shrinks on mobile');
 assert.match(pass, /width:min\(280px,52vw\)/, 'warp sheet stays a compact chip instead of a wide stage banner');
 assert.match(pass, /\.warp-prompt \.stage-select-handle,\.warp-prompt \.stage-select-kicker\{display:none\}/, 'warp sheet drops the handle and WARP POINT kicker');
+assert.match(pass, /\.warp-prompt\{[^}]*pointer-events:none/, 'compact warp sheet does not cover the joystick');
 assert.match(pass, /\.ranch-services-card h2,.ranch-storage-head h2\{font-size:14px/, 'ranch sheet title shrinks on mobile');
 assert.match(pass, /min-height:var\(--menu-touch\)/, 'sheet actions use the denser menu tap target');
 assert.match(pass, /@media \(pointer:coarse\) and \(orientation:landscape\)/, 'landscape phones get a tighter second pass');

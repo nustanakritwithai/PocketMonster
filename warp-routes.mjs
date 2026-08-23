@@ -77,3 +77,9 @@ export function nearestRoute(routes,position,radius=3){
   }
   return nearest?{route:nearest,distance}:{route:null,distance:Infinity};
 }
+
+export function nextWarpPromptState({foundId=null,dismissedId=null}={}){
+  if(!foundId)return Object.freeze({nearbyId:null,dismissedId:null,open:false});
+  if(foundId===dismissedId)return Object.freeze({nearbyId:null,dismissedId,open:false});
+  return Object.freeze({nearbyId:foundId,dismissedId:null,open:true});
+}

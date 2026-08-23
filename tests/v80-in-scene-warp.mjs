@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { WARP_ROUTES, nearestRoute, routesFrom, warpAvailability } from '../warp-routes.mjs';
+import { WARP_ROUTES, nearestRoute, nextWarpPromptState, routesFrom, warpAvailability } from '../warp-routes.mjs';
 
 const html=fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 const progress={unlocked:['grass-meadow','ember-valley'],cleared:['grass-meadow']};
 const unlock=(value,id)=>({ok:value.unlocked.includes(id),reason:value.unlocked.includes(id)?'unlocked':'requires-stage-clear'});
 
@@ -18,9 +19,20 @@ assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='ember
 assert.equal(warpAvailability(progress,WARP_ROUTES.find(route=>route.id==='grass-to-hub'),unlock).ok,true,'Hub return is always safe');
 assert.equal(nearestRoute(routesFrom('grass-meadow'),{x:20,z:0},3.2).route.id,'grass-to-ember','Walking into a warp radius selects the route');
 assert.equal(nearestRoute(routesFrom('grass-meadow'),{x:-20,z:0},3.2).route,null,'Outside warp radius does not prompt');
+const ember='ember-to-misty';
+assert.deepEqual(nextWarpPromptState({foundId:ember,dismissedId:null}),{nearbyId:ember,dismissedId:null,open:true},'Walking onto a warp opens the confirmation');
+assert.deepEqual(nextWarpPromptState({foundId:ember,dismissedId:ember}),{nearbyId:null,dismissedId:ember,open:false},'Cancel keeps the tab closed while still standing on that warp');
+assert.deepEqual(nextWarpPromptState({foundId:null,dismissedId:ember}),{nearbyId:null,dismissedId:null,open:false},'Leaving the warp radius clears the cancel dismiss');
+assert.deepEqual(nextWarpPromptState({foundId:ember,dismissedId:null}),{nearbyId:ember,dismissedId:null,open:true},'Walking back onto the same warp opens it again');
+assert.deepEqual(nextWarpPromptState({foundId:'ember-to-grass',dismissedId:ember}),{nearbyId:'ember-to-grass',dismissedId:null,open:true},'A different warp still opens after cancel');
+assert.match(css,/\.warp-prompt\{[^}]*pointer-events:none/,'Warp dim does not steal the joystick after cancel');
+assert.match(css,/\.warp-prompt-card\{[^}]*pointer-events:auto/,'Cancel and travel buttons stay tappable');
 assert.match(html,/id="warpPrompt"/,'Mobile warp prompt exists');
 assert.match(html,/id="warpPromptAction"/,'Warp confirmation action exists');
 assert.match(js,/updateWarpPrompt\(dt\)/,'Player movement checks in-scene warp proximity');
+assert.match(js,/nextWarpPromptState\(/,'Live loop uses dismiss-until-leave warp prompt state');
+assert.match(js,/dismissedWarpId=nearbyWarp\?\.id/,'Cancel remembers the current warp so the tab does not bounce back');
+assert.doesNotMatch(js,/warpPromptCancel[\s\S]{0,120}warpPromptCooldown=\.35/,'Cancel no longer uses a short cooldown that lets the tab reopen in place');
 const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');
 assert.match(warpBeacon,/boxGeometry\(\.18,1\.8,\.18\)/,'Warp point has a visible vertical light beam');
