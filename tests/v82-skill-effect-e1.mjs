@@ -69,7 +69,7 @@ assert.equal(SKILL_DAMAGE_PROFILES.filter(profile => profile.hitCount === 3).len
 assert.equal(SKILL_DAMAGE_PROFILES.every(profile => profile.formulaVersion === 'DMG_v1.0'), true);
 assert.equal(Object.isFrozen(SKILL_DAMAGE_PROFILES), true);
 assert.equal(Object.isFrozen(SKILL_DAMAGE_PROFILES[0]), true);
-assert.equal(DAMAGE_STATUS_MODIFIERS.length, 11, 'all workbook damage/status modifier rows are normalized');
+assert.equal(DAMAGE_STATUS_MODIFIERS.length, 13, 'all workbook damage/status modifier rows plus live accuracy controls are normalized');
 assert.equal(skillDamageProfile('SK_UNKNOWN_99'), null);
 
 const profileDigest = createHash('sha256').update(JSON.stringify(SKILL_DAMAGE_PROFILES)).digest('hex');
@@ -334,7 +334,7 @@ assert.equal(SKILL_EFFECT_COVERAGE_CONTRACT.length, 108, 'E1 does not alter E0 c
 assert.deepEqual(WORKBOOK_DAMAGE_RULES, {
   formulaVersion: 'DMG_v1.0', levelMin: 1, levelCap: 60, levelScaleDivisor: 5,
   baseFormulaDivisor: 50, baseDamageFlat: 2, stabMultiplier: 1.2,
-  criticalMultiplier: 1.5, baseCritChancePct: 5, critChanceCapPct: 80,
+  criticalMultiplier: 1.5, baseCritChancePct: 5, critChanceCapPct: 80, accuracyMinimumPct: 5,
   varianceMin: 0.9, varianceMax: 1, variancePreview: 0.95,
   minimumSuccessfulDamage: 1, statModifierMin: 0.25, statModifierMax: 2.5,
   damageTakenMin: 0.25, damageTakenMax: 3, armorPierceCapPct: 50,

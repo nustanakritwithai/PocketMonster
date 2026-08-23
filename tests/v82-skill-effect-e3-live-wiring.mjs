@@ -60,8 +60,8 @@ export function assertE3LiveWiring(source) {
   assert.match(blocks, /field\.kind!=='wall'/);
   assert.match(blocks, /Math\.abs\(along\)<=field\.lengthM\/2\+\.35/);
   assert.match(move, /if\(fieldBlocksPosition\(next\)\)return false/);
-  assert.equal((updateWild.match(/moveWildWithFieldCollision\(/g) ?? []).length, 2,
-    'wall collision gates both wander and chase movement');
+  assert.equal((updateWild.match(/moveWildWithFieldCollision\(/g) ?? []).length, 3,
+    'wall collision gates wander, chase, and forced-retreat movement');
 
   assert.match(updateFields, /field\.nextTickSec<=Math\.min\(field\.ageSec,field\.durationSec\)/);
   assert.match(updateFields, /distXZ\(field\.center,w\.mesh\.position\)>field\.radiusM/,
