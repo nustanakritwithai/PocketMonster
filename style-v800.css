@@ -746,9 +746,11 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
     min-width:32px;min-height:32px;padding:4px 8px;font-size:12px
   }
   .merchant-card button,.trainer-card button,.evolution-guide-card button,.breeding-caretaker-card button{min-height:var(--menu-touch)}
-  .merchant-item{padding:6px;gap:6px}
+  .merchant-products{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .merchant-item{display:grid;grid-template-columns:auto 1fr;gap:6px;padding:6px}
   .merchant-icon{font-size:20px}
-  .merchant-item button{padding:6px 8px;font-size:11px}
+  .merchant-info b{font-size:11px}.merchant-info small{font-size:9px}.merchant-info span{font-size:10px}
+  .merchant-item button{grid-column:1/-1;width:100%;padding:6px 8px;font-size:11px}
   .trainer-body .train-btn,.evolution-guide-body .evo-card button,.breeding-open-btn{min-height:var(--menu-touch);padding:6px 8px}
   .breeding-preview-grid{grid-template-columns:1fr 1fr;gap:6px}
   .breeding-preview-grid>div:not(.breeding-heart){min-height:52px;padding:6px}
