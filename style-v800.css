@@ -750,8 +750,10 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .merchant-icon{font-size:20px}
   .merchant-item button{padding:6px 8px;font-size:11px}
   .trainer-body .train-btn,.evolution-guide-body .evo-card button,.breeding-open-btn{min-height:var(--menu-touch);padding:6px 8px}
+  .breeding-preview-grid{grid-template-columns:1fr 1fr;gap:6px}
   .breeding-preview-grid>div:not(.breeding-heart){min-height:52px;padding:6px}
   .breeding-heart{display:none}
+  .breeding-preview-grid strong{font-size:11px}
   .warp-prompt{padding:0}
   .warp-prompt-card{padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0}
   .warp-prompt-card h2{font-size:14px;margin:2px 0}

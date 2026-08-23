@@ -26,6 +26,7 @@ assert.match(pass, /min-height:var\(--menu-touch\)/, 'sheet actions use the dens
 assert.match(pass, /@media \(pointer:coarse\) and \(orientation:landscape\)/, 'landscape phones get a tighter second pass');
 assert.match(pass, /\.npc-btn:after\{content:none\}/, 'NPC talk chip drops the long ผู้ดูแล suffix');
 assert.match(pass, /place-items:end center/, 'NPC overlays dock as bottom-centered sheets');
+assert.match(pass, /\.breeding-preview-grid\{grid-template-columns:1fr 1fr/, 'breeding parent slots stay two-column after the heart is hidden');
 assert.match(pass, /\.merchant-shop,\.trainer-panel,\.evolution-guide-panel,\.breeding-caretaker-panel,\.ranch-services/, 'NPC overlays dock as bottom sheets');
 assert.match(pass, /\.merchant-head small,\.merchant-dialog,\.merchant-foot,\.trainer-kicker,\.trainer-head p,\.trainer-dialog/, 'verbose NPC dialogs and kickers hide on mobile');
 assert.doesNotMatch(pass, /\.action\.skill|\.skill1|\.capture\{/, 'density pass must not shrink combat HUD buttons');
