@@ -5,7 +5,7 @@ import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createS
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, nextWarpPromptState, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
-import { resolveStageObjective, runStageClearReconciliation } from './stage-objectives.mjs';
+import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
 import {
@@ -2163,11 +2163,35 @@ function stageObjectiveText(objective,zoneId=state.currentZone){
   return 'สำรวจพื้นที่และเตรียมทีมสำหรับด่านถัดไป';
 }
 function renderStarterJourney(){
-  const panel=el('stageObjective'),stepEl=el('stageObjectiveStep');
+  const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
   if(!STAGE_BY_ID[state.currentZone]){panel.classList.add('hidden');return;}
   const objective=currentStageObjective();
-  panel.classList.remove('hidden');setTextIfChanged(stepEl,stageObjectiveText(objective));
+  const zoneId=state.currentZone;
+  const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
+  const speciesId=objective.speciesId||ZONES[zoneId]?.progressionBossSpeciesId;
+  const monsterName=speciesId?(spById[speciesId]?.displayName||spById[speciesId]?.name||speciesId):'';
+  const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName});
+  panel.classList.remove('hidden');
+  setTextIfChanged(stepEl,stageObjectiveText(objective));
+  if(titleEl)setTextIfChanged(titleEl,tracker.title);
+  if(!listEl)return;
+  listEl.replaceChildren(...tracker.steps.map(step=>{
+    const item=document.createElement('li');
+    item.className=`quest-step ${step.state}`;
+    const mark=document.createElement('i');
+    mark.setAttribute('aria-hidden','true');
+    const text=document.createElement('span');
+    text.textContent=`${step.mark} ${step.label}`;
+    item.append(mark,text);
+    return item;
+  }));
+  if(tracker.status){
+    const status=document.createElement('li');
+    status.className='quest-step status';
+    status.textContent=tracker.status;
+    listEl.append(status);
+  }
 }
 function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}

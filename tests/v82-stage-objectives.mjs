@@ -4,11 +4,12 @@ import { createStageProgress, recordStageClear, stageUnlockReason } from '../sta
 import { routesFrom, warpAvailability } from '../warp-routes.mjs';
 
 const objectiveModule=await import('../stage-objectives.mjs').catch(()=>({}));
-const { resolveStageObjective, requiresStageClearReconciliation, runStageClearReconciliation }=objectiveModule;
+const { resolveStageObjective, requiresStageClearReconciliation, runStageClearReconciliation, stageObjectiveTracker }=objectiveModule;
 
 assert.equal(typeof resolveStageObjective,'function','Stage progression exposes a deterministic objective resolver');
 assert.equal(typeof requiresStageClearReconciliation,'function','Stage progression exposes interrupted-save reconciliation policy');
 assert.equal(typeof runStageClearReconciliation,'function','Stage progression exposes a behavioral interrupted-save reconciler');
+assert.equal(typeof stageObjectiveTracker,'function','Stage objectives expose an MMO-style tracker view model');
 
 const zone={stageId:'grass-meadow',progressionBossSpeciesId:'mossbun'};
 const fresh={stageProgress:{cleared:[]},starterJourney:{grassMeadow:{captured:false}},eliteProgress:{defeated:{}},bossProgress:{defeated:{}}};
@@ -55,9 +56,23 @@ assert.deepEqual(reconciledStages,['grass-meadow'],'Interrupted save is complete
 assert.equal(warpAvailability(recoveredProgress,forwardWarp,stageUnlockReason).ok,true,'Recovered Boss clear unlocks the forward warp without replaying the Boss');
 assert.equal(runStageClearReconciliation({objective:{phase:'stage-cleared'},stageId:'grass-meadow',completeStageClear:stageId=>reconciledStages.push(stageId)}),false,'Already-cleared stages are not completed twice');
 
+const captureTracker=stageObjectiveTracker({phase:'capture-starter'},{stageId:'grass-meadow',stageName:'Grass Meadow',monsterName:'Mossbun'});
+assert.equal(captureTracker.title,'Grass Meadow','Tracker names the current stage');
+assert.deepEqual(captureTracker.steps.map(step=>step.state),['current','todo','todo'],'Grass capture is the first current tracker step');
+const eliteTracker=stageObjectiveTracker({phase:'defeat-elite',speciesId:'mossbun'},{stageId:'grass-meadow',stageName:'Grass Meadow',monsterName:'Mossbun'});
+assert.deepEqual(eliteTracker.steps.map(step=>step.state),['done','current','todo'],'Completed capture stays checked while Elite is current');
+const laterElite=stageObjectiveTracker({phase:'defeat-elite',speciesId:'flameling'},{stageId:'ember-valley',stageName:'Ember Valley',monsterName:'Flare Slime'});
+assert.deepEqual(laterElite.steps.map(step=>[step.mark,step.state]),[['1/2','current'],['2/2','todo']],'Later stages keep a two-step tracker');
+
 const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 assert.match(html,/id="stageObjective"/,'A persistent player-facing stage objective is present in the HUD');
+assert.match(html,/id="stageObjectiveList"/,'Objective HUD renders an MMO-style step list');
+assert.match(html,/class="quest-tracker starter-journey/,'Objective HUD uses the side quest-tracker shell');
+assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*left:10px/,'Quest tracker docks on the left rail instead of mid-screen');
+assert.doesNotMatch(css,/\.starter-journey\{[^}]*left:50%;transform:translateX\(-50%\)/,'Old centered objective banner must stay removed');
+assert.match(js,/stageObjectiveTracker\(objective,\{stageId:zoneId,stageName,monsterName\}\)/,'Live HUD uses the shared tracker view model');
 assert.match(js,/function ensureProgressionEncounter\([\s\S]*?objective=currentStageObjective\(zone\);\s*renderStarterJourney\(\);\s*if\(!cfg\|\|!objective\.encounter\)/,'Objective HUD refreshes when the Boss clear transitions to a completed stage');
 assert.match(js,/const step=zoneId==='grass-meadow'\?'2\/3':'1\/2'/,'Later stages start their visible objective count at Elite 1/2 instead of Grass 2/3');
 assert.match(js,/if\(objective\.encounter!=='elite'&&cfg\.rareSpawn\?\.length&&Math\.random\(\)<cfg\.rareChance\)/,'Required Elite encounter suppresses a competing random Rare spawn');
