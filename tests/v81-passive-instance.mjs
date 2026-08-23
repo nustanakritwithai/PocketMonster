@@ -23,12 +23,13 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-assert.equal(INSTANCE_SAVE_VERSION, 11);
-assert.equal(SAVE_SCHEMA_VERSION, 11);
+assert.equal(INSTANCE_SAVE_VERSION, 12);
+assert.equal(SAVE_SCHEMA_VERSION, 12);
 assert.deepEqual(SAVE_MIGRATION_REGISTRY.map(entry => [entry.id, entry.targetVersion]), [
   ['monster-instance-v9-skill-runtime', 9],
   ['breeding-egg-v10', 10],
   ['passive-instance-v11', 11],
+  ['canonical-monster-stats-v12', 12],
 ]);
 
 const injected = '<img src=x onerror=globalThis.passivePwned=1>';
@@ -134,7 +135,7 @@ const state = normalizeSavedState({
   processedEventIds: ['evt-root-direct'],
   eventFingerprintById: { 'evt-root-direct': 'fingerprint' },
 }, { now: 1000 });
-assert.equal(state.saveVersion, 11);
+assert.equal(state.saveVersion, 12);
 assert.equal(state.collection[0].passiveId, 'PASS_ROCK_01');
 assert.equal('passive' in state.collection[0], false);
 assert.equal('passiveEventState' in state.collection[0], false);
@@ -164,12 +165,12 @@ writeStoredSave(storage, { state: { ...state, passiveEventState: { processedEven
 const serialized = storage.getItem(SAVE_KEY);
 const serializedBackup = storage.getItem(SAVE_BACKUP_KEY);
 const envelope = JSON.parse(serialized);
-assert.equal(envelope.saveSchemaVersion, 11);
+assert.equal(envelope.saveSchemaVersion, 12);
 assert.equal(envelope.state.collection[0].passiveId, 'PASS_ROCK_01');
 assert.doesNotMatch(serialized, /<img|onerror|PASS_FORGED_99|processedEventIds/);
 assert.doesNotMatch(serializedBackup, /<img|onerror|passiveEventLedger|processedEventIds/,
   'backup payload is sanitized at the same persistence boundary as current save');
-assert.equal(JSON.parse(serializedBackup).saveSchemaVersion, 11);
+assert.equal(JSON.parse(serializedBackup).saveSchemaVersion, 12);
 
 const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 assert.match(gameSource, /typeof instanceContext\?\.passiveId==='string'[\s\S]*?passiveCatalogEntry\(instanceContext\.passiveId\)/,

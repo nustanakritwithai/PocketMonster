@@ -94,7 +94,7 @@ function assertOwnership(state, label) {
 
 function saveReload(state, storage, now, label) {
   const written = writeStoredSave(storage, { state, playerHp: 100 });
-  assert.equal(written.state.saveVersion, 11, `${label}: save schema is current`);
+  assert.equal(written.state.saveVersion, 12, `${label}: save schema is current`);
   const read = readStoredSave(storage);
   assert.equal(read.source, 'current', `${label}: current save reloads`);
   const canonical = normalizeSavedState(read.state, { ranchCap: 6, now });
