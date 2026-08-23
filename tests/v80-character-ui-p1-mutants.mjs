@@ -92,8 +92,10 @@ await expectKilled(
   mutate(controllerSource, 'const { ui: _ui, ...rest } = state;\n  return rest;', 'return state;', 'persist-keeps-ui'),
 );
 
-assert.doesNotMatch(extractFn('renderParty'), /pointerdown,event=>\{event\.preventDefault\(\);event\.stopPropagation\(\);switchPartySlot\(index\);/, 'mutant 5: party tap must not be the old combat switch');
+assert.match(extractFn('renderParty'), /button\.addEventListener\('pointerdown',event=>\{[\s\S]*?switchPartySlot\(index\);/, 'mutant 5: party tap must switch the combat slot immediately');
+assert.doesNotMatch(extractFn('renderParty'), /peekPartySlot\(index\)/, 'mutant 5: party tap must not open character peek');
 assert.match(extractFn('switchPartySlot'), /if\(!gate\.ok\)/, 'mutant 6: switchPartySlot must honor the summon gate');
+assert.doesNotMatch(extractFn('switchPartySlot'), /summonThrow\(|recall\(/, 'mutant 6: selecting a party slot must not throw or recall');
 assert.match(extractFn('openManager'), /requestOpenFull/, 'mutant 7: manager stays behind the NPC gate helper');
 assert.equal(typeof persistableState, 'function');
 assert.equal(typeof createCharacterUIController, 'function');

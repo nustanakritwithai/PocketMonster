@@ -159,19 +159,19 @@ assert.match(extractFn('openManager'), /isNearNpc/, 'full manager stays NPC-gate
 assert.match(extractFn('openManager'), /requestOpenFull/, 'full manager opens through the controller');
 assert.match(extractFn('closeManager'), /closeAll\(\)/, 'closing the manager clears the overlay stack');
 assert.match(extractFn('switchPartySlot'), /requestSwitchParty/, 'combat switch is gated');
-assert.match(extractFn('switchPartySlot'), /summonThrow\(\)/, 'allowed switch still uses the original summon path');
-assert.match(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap peeks');
+assert.doesNotMatch(extractFn('switchPartySlot'), /summonThrow\(|recall\(/, 'selecting a party slot must not throw or recall');
+assert.doesNotMatch(extractFn('renderParty'), /peekPartySlot\(index\)/, 'party tap must not open character peek');
 assert.match(extractFn('renderParty'), /sw\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Switch chip supports keyboard click without duplicating pointer input');
-assert.match(extractFn('renderParty'), /button\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Party peek supports keyboard click without duplicating pointer input');
-assert.match(extractFn('renderParty'), /button\.addEventListener\('keydown',event=>\{if\(event\.key!=='Enter'&&event\.key!==' '\)return;/, 'role=button Party peek handles Enter and Space explicitly');
+assert.match(extractFn('renderParty'), /button\.addEventListener\('click',event=>\{if\(event\.detail!==0\)return;/, 'Party slot supports keyboard click without duplicating pointer input');
+assert.match(extractFn('renderParty'), /button\.addEventListener\('keydown',event=>\{if\(event\.key!=='Enter'&&event\.key!==' '\)return;/, 'role=button Party slot handles Enter and Space explicitly');
 assert.match(extractFn('renderParty'), /dataset.partySwitch/, 'party HUD exposes an explicit Switch control');
 assert.match(extractFn('renderParty'), /switchPartySlot\(index\)/, 'Switch control still calls switchPartySlot');
-assert.doesNotMatch(
+assert.match(
   extractFn('renderParty')
     .replace(/sw\.addEventListener\('pointerdown',[\s\S]*?\},\{passive:false\}\);/, '')
     .replace(/sw\.addEventListener\('click',[\s\S]*?\}\);/, ''),
   /switchPartySlot\(index\)/,
-  'the slot peek handler must not call switchPartySlot',
+  'the party slot tap handler must call switchPartySlot',
 );
 assert.match(extractFn('feedMonster'), /assertCharacterMutable/, 'feed stays read-only during summon');
 assert.match(extractFn('toggleStarterEquip'), /assertCharacterMutable/, 'equipment stays read-only during summon');
