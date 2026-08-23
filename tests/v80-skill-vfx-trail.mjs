@@ -30,8 +30,8 @@ assert.ok(js.includes('spawnSkillTrail('), 'spawnSkillTrail not called in useSki
 // 7. Life and maxLife set
 assert.ok(js.includes('life: 0.3') || js.includes('life:0.3') || js.includes('life:.3'), 'trail: life not set');
 
-// 8. Effects array push
-assert.ok(js.includes('effects.push'), 'trail: effects.push missing');
+// 8. Effects enter the shared active-budget gate
+assert.ok(js.includes('addTransientEffect({mesh,vel'), 'trail: active-budget gate missing');
 
 // 9. castShadow false (VFX don't cast shadows)
 assert.ok(js.includes('castShadow') && js.includes('false'), 'trail: castShadow=false missing');

@@ -30,7 +30,8 @@ assert.match(extractFn('updateEffects'), /easeOut\(t\)/, 'mutant 6: updater must
 assert.match(js, /function clampEmissive/, 'mutant 7: emissive clamp must exist');
 assert.match(extractFn('clampEmissive'), /Math\.min\(\.7,Math\.max\(\.1/, 'mutant 8: emissive stays in 0.1-0.7');
 assert.match(extractFn('spawnElementalFX'), /fxEmissive\(mode,cfg\.intensity\)/, 'mutant 9: combat sparks must use clamped emissive');
-assert.match(js, /maxSize:200/, 'mutant 10: spark pool cap stays 200');
+assert.match(js, /maxParticles:200/, 'mutant 10a: shared particle cap stays 200');
+assert.match(js, /maxSize:VFX_LIMITS\.maxParticles/, 'mutant 10b: spark pool consumes the shared cap');
 assert.doesNotMatch(extractFn('updateSparkType'), /easeOut/, 'mutant 11: type motion does not own the fade curve');
 assert.equal((extractFn('fxGeom').match(/boxGeometry\(/g) || []).length, 18, 'mutant 12: P3 fxGeom stays 18 boxes');
 assert.match(js, /function spawnTrainingEffect/, 'mutant 13: P4 training VFX stays');

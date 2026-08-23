@@ -41,9 +41,12 @@ function materializerFromSource(gameSource, wilds) {
   );
 }
 
-function enemySnapshotsFromSource(gameSource, wilds) {
-  const source = functionSource(gameSource, 'ownedBasicAiEnemySnapshots');
-  return Function('wilds', `'use strict';${source};return ownedBasicAiEnemySnapshots;`)(wilds);
+function aiRequestFromSource(gameSource) {
+  const createSource = functionSource(gameSource, 'createOwnedBasicAiScratch');
+  const fillSource = functionSource(gameSource, 'fillOwnedBasicAiRequest');
+  return Function(
+    `'use strict';${createSource};${fillSource};return {createOwnedBasicAiScratch,fillOwnedBasicAiRequest};`,
+  )();
 }
 
 function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) {
@@ -77,18 +80,20 @@ function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) 
 
 export function assertBasicAiLiveWiring(gameSource) {
   const updateOwned = functionSource(gameSource, 'updateOwned');
+  const fillRequest = functionSource(gameSource, 'fillOwnedBasicAiRequest');
   assert.match(gameSource, /resolveOwnedBasicAiAction/);
-  assert.match(gameSource, /function ownedBasicAiActorSnapshot\(/);
-  assert.match(gameSource, /function ownedBasicAiEnemySnapshots\(/);
+  assert.match(gameSource, /function createOwnedBasicAiScratch\(/);
+  assert.match(gameSource, /function fillOwnedBasicAiRequest\(/);
   assert.match(gameSource, /function materializeOwnedBasicAiTarget\(/);
-  assert.match(gameSource, /alive:wild\?\.dead===false&&Number\.isFinite\(wild\?\.hp\)&&wild\.hp>0/);
-  assert.match(gameSource, /targetable:wild\?\.capturing===undefined\|\|wild\.capturing===false/);
-  assert.match(gameSource, /matches\.length!==1/);
+  assert.match(fillRequest, /target\.alive=wild\?\.dead===false&&Number\.isFinite\(wild\?\.hp\)&&wild\.hp>0/);
+  assert.match(fillRequest, /target\.targetable=wild\?\.capturing===undefined\|\|wild\.capturing===false/);
+  assert.match(gameSource, /matchCount!==1/);
   assert.match(gameSource, /target\.dead!==false/);
   assert.match(gameSource, /!\(target\.capturing===undefined\|\|target\.capturing===false\)/);
   assert.match(gameSource, /target\.hp\)|target\.hp<=0/);
   assert.match(updateOwned, /resolveOwnedBasicAiAction\(/);
-  assert.match(updateOwned, /attackReady:a\.attackCd<=0/);
+  assert.match(updateOwned, /fillOwnedBasicAiRequest\(ownedBasicAiScratch,a,wilds\)/);
+  assert.match(fillRequest, /request\.attackReady=a\?\.attackCd<=0/);
   assert.equal((updateOwned.match(/tickCooldown\(a\.attackCd,dt\)/g) ?? []).length, 1,
     'Basic attack cooldown ticks exactly once per frame');
   assert.match(updateOwned, /a\.attackCd=tickCooldown\(a\.attackCd,dt\);/);
@@ -135,16 +140,22 @@ export function assertBasicAiLiveWiring(gameSource) {
     ...overrides,
   });
   const valid = world();
-  const snapshots = enemySnapshotsFromSource(gameSource, [
+  const { createOwnedBasicAiScratch, fillOwnedBasicAiRequest } = aiRequestFromSource(gameSource);
+  const snapshotOwner = {
+    inst: { instanceId: 'owned', speciesId: 'normalooze', fainted: false, hp: 10 },
+    mesh: { position: { x: 0, z: 0 } },
+    target: null,
+    attackCd: 0,
+  };
+  const requestFor = (owner, liveWilds) => fillOwnedBasicAiRequest(createOwnedBasicAiScratch(), owner, liveWilds);
+  const snapshots = requestFor(snapshotOwner, [
     { id: 'normal', dead: false, hp: 10, mesh: { position: { x: 1, z: 0 } } },
     { id: 'hp-zero', dead: false, hp: 0, mesh: { position: { x: 2, z: 0 } } },
-  ])();
+  ]).enemies;
   assert.equal(snapshots.length, 2, 'malformed or unavailable world records are not silently filtered');
   assert.equal(snapshots[0].alive, true);
   assert.equal(snapshots[0].targetable, true, 'undefined capturing is the normal targetable state');
   assert.equal(snapshots[1].alive, false, 'zero-HP world records are not eligible');
-  assert.equal(Object.isFrozen(snapshots), true);
-  assert.ok(snapshots.every(snapshot => Object.isFrozen(snapshot) && Object.isFrozen(snapshot.position)));
   for (const malformed of [
     { dead: 1 },
     { dead: 'yes' },
@@ -152,7 +163,7 @@ export function assertBasicAiLiveWiring(gameSource) {
     { capturing: 'active' },
     { capturing: null },
   ]) {
-    const [snapshot] = enemySnapshotsFromSource(gameSource, [world(malformed)])();
+    const [snapshot] = requestFor(snapshotOwner, [world(malformed)]).enemies;
     if (Object.prototype.hasOwnProperty.call(malformed, 'dead')) assert.equal(snapshot.alive, false);
     else assert.equal(snapshot.targetable, false);
   }
@@ -185,13 +196,13 @@ export function assertBasicAiLiveWiring(gameSource) {
     decision,
   ), null, 'non-finite live actor position fails closed');
 
-  const actorSnapshotSource = functionSource(gameSource, 'ownedBasicAiActorSnapshot');
-  const actorSnapshot = Function(`'use strict';${actorSnapshotSource};return ownedBasicAiActorSnapshot;`)();
   for (const fainted of [1, 'true', null]) {
-    assert.equal(actorSnapshot({
+    assert.equal(requestFor({
       inst: { instanceId: 'owned', speciesId: 'normalooze', fainted, hp: 10 },
       mesh: { position: { x: 0, z: 0 } },
-    }).alive, false, 'malformed fainted state fails closed');
+      target: null,
+      attackCd: 0,
+    }, []).actor.alive, false, 'malformed fainted state fails closed');
   }
 
   const retainedMove = world({ mesh: { position: { x: 12, z: 0 } } });

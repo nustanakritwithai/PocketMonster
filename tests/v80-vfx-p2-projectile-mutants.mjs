@@ -28,11 +28,13 @@ assert.doesNotMatch(throwFn, /sphereGeometry/, 'mutant 3: throwProjectile must n
 assert.match(throwFn, /boxGeometry\(\.14,\.14,\.14\)/, 'mutant 4: throwProjectile must use the 0.14 cube');
 assert.match(throwFn, /userData\.spin=true/, 'mutant 5: cube must be flagged to spin');
 assert.doesNotMatch(throwFn, /new THREE\.Vector3\(0,1\.15,0\)/, 'mutant 6: throw origin must not hard-code y+1.15');
+assert.match(throwFn, /priority:type==='capture'\?'P0':'P1'/, 'mutant 6a: capture and summon start feedback keep their priority');
 
 const update = extractFn('updateProjectiles');
 assert.match(update, /rotation\.x\+=dt\*10/, 'mutant 7: flight must tumble the cube on X');
 assert.match(update, /rotation\.y\+=dt\*14/, 'mutant 8: flight must tumble the cube on Y');
 assert.match(update, /duration/, 'mutant 9: flight duration path must stay in the updater');
+assert.match(update, /priority:p\.type==='capture'\?'P0':'P1'/, 'mutant 9a: in-flight capture feedback remains P0');
 
 assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'mutant 10: elemental bursts still go through fxGeom');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 11: monster shine stays a sphere');

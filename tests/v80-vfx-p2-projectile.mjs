@@ -31,7 +31,8 @@ assert.match(throwFn, /playerThrowOrigin\(\)/, 'throw still starts at the player
 assert.match(throwFn, /emissiveIntensity:\.45/, 'projectile emissive stays 0.45');
 assert.match(throwFn, /opacity:\.96/, 'projectile opacity stays 0.96');
 assert.match(throwFn, /duration:\.55/, 'flight duration stays 0.55s');
-assert.match(throwFn, /spawnBurst\(mesh\.position\.clone\(\),color,\{count:5,life:\.18,size:\.04\}\)/, 'start burst is unchanged');
+assert.match(throwFn, /spawnBurst\(mesh\.position\.clone\(\),color,\{count:5,life:\.18,size:\.04,priority:type==='capture'\?'P0':'P1'\}\)/,
+  'start burst preserves capture P0 and summon P1 priority');
 assert.match(throwFn, /castShadow=true/, 'projectile still casts a shadow');
 
 assert.match(update, /userData\.spin/, 'flight updater reads the spin flag');
@@ -40,6 +41,7 @@ assert.match(update, /rotation\.y\+=dt\*14/, 'cube tumbles on Y while flying');
 assert.match(update, /lerpVectors\(p\.start,p\.end,t\)/, 'arc lerp is unchanged');
 assert.match(update, /Math\.sin\(t\*Math\.PI\)\*2\.2/, 'throw arc height is unchanged');
 assert.match(update, /spawnElementalFX\(monsterTypes\(inst\)\[0\],p\.mesh\.position\.clone\(\),'trail',0\.55\)/, 'summon trail is unchanged');
+assert.match(update, /priority:p\.type==='capture'\?'P0':'P1'/, 'capture projectile trail remains P0');
 assert.match(update, /removeAndDispose\(scene, p\.mesh\)/, 'impact still disposes the projectile');
 assert.match(update, /p\.onHit\?\.\(\)/, 'impact still fires onHit');
 
@@ -50,7 +52,8 @@ assert.match(extractFn('spawnElementalFX'), /fxGeom\(cfg\.shape/, 'elemental bur
 const poolStart = js.indexOf('const sparkPool=createObjectPool({');
 const pool = js.slice(poolStart, js.indexOf('function setHumanoidAction', poolStart));
 assert.match(pool, /boxGeometry\(1,1,1\)/, 'spark pool from Phase 1 stays boxes');
-assert.match(pool, /maxSize:200/, 'spark pool cap from Phase 1 stays 200');
+assert.match(js, /maxParticles:200/, 'shared particle cap from Phase 1 stays 200');
+assert.match(pool, /maxSize:VFX_LIMITS\.maxParticles/, 'spark pool consumes the shared cap');
 
 assert.match(extractFn('executeCaptureThrow'), /throwProjectile\('capture'/, 'capture still throws through throwProjectile');
 assert.match(extractFn('summonThrow'), /throwProjectile\('summon'/, 'summon still throws through throwProjectile');

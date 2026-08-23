@@ -1,4 +1,4 @@
-import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, selectEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
+import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, fillEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
 import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
@@ -106,7 +106,7 @@ await requireFirebaseLogin();
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
 startupText('กำลังสร้าง Monster Life RPG V8.2.0…');
-const qualityProfile=Object.freeze({tier:'medium',maxDpr:1.25,antialias:true,shadows:false,nearAiHz:24,midAiHz:12,farAiHz:5,labelHz:10});
+const qualityProfile=selectQualityProfile({deviceMemory:navigator.deviceMemory,hardwareConcurrency:navigator.hardwareConcurrency,devicePixelRatio:window.devicePixelRatio,saveData:navigator.connection?.saveData===true});
 const assets=createAssetEngine({THREE,quality:qualityProfile.tier});
 {
   const catalogRes=await fetch(new URL('./assets/catalog/humanoid-core.json',import.meta.url));
@@ -1395,7 +1395,28 @@ const presentationScratch={throwOrigin:new THREE.Vector3(),hitText:new THREE.Vec
 function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentationScratch.throwOrigin); }
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
 if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
+const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
+const VFX_PRIORITY_RANK=Object.freeze({P0:0,P1:1,P2:2,P3:3,P4:4});
 const effects=[];
+function canSpawnVFX(priority='P2'){
+  if(effects.length<VFX_LIMITS.maxConcurrentEffects)return true;
+  const incomingRank=VFX_PRIORITY_RANK[priority]??VFX_PRIORITY_RANK.P2;
+  for(const evictPriority of ['P4','P3']){
+    if(VFX_PRIORITY_RANK[evictPriority]<=incomingRank)continue;
+    for(let index=effects.length-1;index>=0;index--){
+      if(effects[index]?.priority!==evictPriority)continue;
+      releaseTransientEffect(effects[index]);effects.splice(index,1);return true;
+    }
+  }
+  return priority==='P0';
+}
+function addTransientEffect(effect,priority='P2'){
+  if(!effect?.mesh)return false;
+  if(!canSpawnVFX(priority)){releaseTransientEffect(effect);return false;}
+  effect.priority=Object.hasOwn(VFX_PRIORITY_RANK,priority)?priority:'P2';
+  effects.push(effect);
+  return true;
+}
 // Skill sprite texture cache — radial gradient glow per element type
 const skillSpriteCache=new Map();
 function getSkillSpriteTexture(type){
@@ -1474,11 +1495,11 @@ function spawnSkillSprite(type,pos,size=0.3,life=0.4){
   sprite.position.copy(pos);
   sprite.scale.setScalar(size);
   scene.add(sprite);
-  effects.push({mesh:sprite,life:life,maxLife:life,kind:'skill-sprite',pooled:true,spritePool:true,size:size});
+  if(!addTransientEffect({mesh:sprite,life:life,maxLife:life,kind:'skill-sprite',pooled:true,spritePool:true,size:size},'P1'))return null;
   return sprite;
 }
 const sparkPool=createObjectPool({
-  maxSize:200,
+  maxSize:VFX_LIMITS.maxParticles,
   create:()=>new THREE.Mesh(
     boxGeometry(1,1,1),
     new THREE.MeshStandardMaterial({color:0xffffff,roughness:.58,metalness:.12,emissive:0xffffff,emissiveIntensity:.18,transparent:true,opacity:.9}),
@@ -1529,7 +1550,7 @@ function releaseTransientEffect(effect){
   else if(effect.pooled)sparkPool.release(effect.mesh);
   else removeAndDispose(scene,effect.mesh);
 }
-function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
+function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0,priority='P1'}={}){
   const n=Math.min(16,Math.max(0,count|0));
   for(let i=0;i<n;i++){
     const m=sparkPool.acquire();
@@ -1544,13 +1565,13 @@ function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0}={}){
     scene.add(m);
     const a=(Math.PI*2*i)/n+Math.random()*.2;
     const speed=.8+Math.random()*1.6;
-    effects.push({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true});
+    addTransientEffect({mesh:m,vel:new THREE.Vector3(Math.cos(a)*speed,.4+Math.random()*1.2,Math.sin(a)*speed),life,maxLife:life,kind:'spark',gravity,size,pooled:true},priority);
   }
 }
-function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08}={}){
+function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08,priority='P1'}={}){
   const size=scale*1.2;
   const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
-  mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); effects.push({mesh,life,maxLife:life,kind:'ring'});
+  mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); addTransientEffect({mesh,life,maxLife:life,kind:'ring'},priority);
 }
 const TRAIN_FX_COLOR={power:0xef6c32,defense:0x4f87e8,speed:0xe8bd22,technique:0x63b34b,spirit:0xa78bfa};
 const FOOD_FX_COLOR={protein:0xf97316,healthy:0x22c55e,favorite:0xec4899,trainingChow:0xe8bd22,mineralBite:0xaab0c8,emberFruit:0xef6c32,moonFruit:0xc4b5fd};
@@ -1579,24 +1600,24 @@ function spawnTrainingEffect(pos,focus){
     m.scale.setScalar(0.04+Math.random()*0.03);
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     scene.add(m);
-    effects.push({mesh:m,life:0.4,maxLife:0.4,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.3,0.8+Math.random()*0.4,Math.sin(angle)*0.3),size:m.scale.x,gravity:0});
+    addTransientEffect({mesh:m,life:0.4,maxLife:0.4,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.3,0.8+Math.random()*0.4,Math.sin(angle)*0.3),size:m.scale.x,gravity:0},'P2');
   }
-  spawnRingPulse(pos.clone(),color,{scale:0.5,life:0.3,y:0.08});
+  spawnRingPulse(pos.clone(),color,{scale:0.5,life:0.3,y:0.08,priority:'P2'});
 }
 function spawnEvolutionEffect(pos,oldColor,newColor){
   if(!pos)return;
   const aura=new THREE.Mesh(boxGeometry(1.2,2.0,1.2),new THREE.MeshBasicMaterial({color:newColor,transparent:true,opacity:0,wireframe:true}));
   aura.position.copy(pos); aura.position.y+=1.0; scene.add(aura);
-  effects.push({mesh:aura,life:1.2,maxLife:1.2,kind:'evolution-aura',phase:0,newColor});
+  addTransientEffect({mesh:aura,life:1.2,maxLife:1.2,kind:'evolution-aura',phase:0,newColor},'P2');
   for(let i=0;i<20;i++){
     const m=takeSpark(i%2?newColor:oldColor),angle=(i/20)*Math.PI*2;
     m.position.set(pos.x+Math.cos(angle)*0.8,pos.y+0.5+Math.random()*1.5,pos.z+Math.sin(angle)*0.8);
     m.scale.setScalar(0.06);
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     scene.add(m);
-    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.5,1.0,Math.sin(angle)*0.5),size:0.06,gravity:0.5});
+    addTransientEffect({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.5,1.0,Math.sin(angle)*0.5),size:0.06,gravity:0.5},'P2');
   }
-  spawnRingPulse(pos.clone(),newColor,{scale:1.2,life:0.4,y:0.08});
+  spawnRingPulse(pos.clone(),newColor,{scale:1.2,life:0.4,y:0.08,priority:'P2'});
   triggerCameraShake(0.12,0.2);
 }
 function spawnBreedingEffect(posA,posB){
@@ -1607,9 +1628,9 @@ function spawnBreedingEffect(posA,posB){
     m.position.set(mid.x+(Math.random()-0.5)*0.6,mid.y+i*0.15,mid.z+(Math.random()-0.5)*0.6);
     m.scale.setScalar(0.08);
     scene.add(m);
-    effects.push({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.5+Math.random()*0.3,0),size:0.08,gravity:-0.2});
+    addTransientEffect({mesh:m,life:0.8,maxLife:0.8,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.5+Math.random()*0.3,0),size:0.08,gravity:-0.2},'P2');
   }
-  spawnRingPulse(mid,0xec4899,{scale:0.8,life:0.35,y:0});
+  spawnRingPulse(mid,0xec4899,{scale:0.8,life:0.35,y:0,priority:'P2'});
 }
 function spawnHatchEffect(pos){
   if(!pos)return;
@@ -1619,9 +1640,9 @@ function spawnHatchEffect(pos){
     m.scale.setScalar(0.05);
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     scene.add(m);
-    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*1.5,0.8+Math.random()*0.5,(Math.random()-0.5)*1.5),size:0.05,gravity:1.0});
+    addTransientEffect({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*1.5,0.8+Math.random()*0.5,(Math.random()-0.5)*1.5),size:0.05,gravity:1.0},'P2');
   }
-  spawnRingPulse(pos.clone(),0xfde68a,{scale:0.8,life:0.4,y:0.1});
+  spawnRingPulse(pos.clone(),0xfde68a,{scale:0.8,life:0.4,y:0.1,priority:'P2'});
   triggerCameraShake(0.08,0.15);
 }
 function spawnFeedEffect(pos,foodColor=0x22c55e){
@@ -1631,14 +1652,14 @@ function spawnFeedEffect(pos,foodColor=0x22c55e){
     m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+1.5+Math.random()*0.3,pos.z+(Math.random()-0.5)*0.3);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,-1.0,0),size:0.05,gravity:0});
+    addTransientEffect({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,-1.0,0),size:0.05,gravity:0},'P3');
   }
   for(let i=0;i<3;i++){
     const m=takeSpark(0xec4899);
     m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z);
     m.scale.setScalar(0.04);
     scene.add(m);
-    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.6,0),size:0.04,gravity:-0.1});
+    addTransientEffect({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.6,0),size:0.04,gravity:-0.1},'P3');
   }
 }
 function spawnRestEffect(pos){
@@ -1648,7 +1669,7 @@ function spawnRestEffect(pos){
     m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+1.0+i*0.2,pos.z+0.2);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.4,0.1),size:0.05,gravity:-0.05});
+    addTransientEffect({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.4,0.1),size:0.05,gravity:-0.05},'P3');
   }
 }
 function spawnPlayEffect(pos){
@@ -1659,7 +1680,7 @@ function spawnPlayEffect(pos){
     m.scale.setScalar(0.06);
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     scene.add(m);
-    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.8,0.5,Math.sin(angle)*0.8),size:0.06,gravity:0.3});
+    addTransientEffect({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*0.8,0.5,Math.sin(angle)*0.8),size:0.06,gravity:0.3},'P3');
   }
 }
 function spawnLevelUpEffect(pos){
@@ -1670,9 +1691,9 @@ function spawnLevelUpEffect(pos){
     m.position.set(pos.x+(Math.random()-0.5)*0.3,pos.y+0.1,pos.z+(Math.random()-0.5)*0.3);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,1.5+Math.random()*0.5,0),size:0.05,gravity:-0.2});
+    addTransientEffect({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3(0,1.5+Math.random()*0.5,0),size:0.05,gravity:-0.2},'P2');
   }
-  spawnRingPulse(pos.clone(),0xfde047,{scale:0.7,life:0.3,y:0.08});
+  spawnRingPulse(pos.clone(),0xfde047,{scale:0.7,life:0.3,y:0.08,priority:'P2'});
 }
 function spawnBondUpEffect(pos){
   if(!pos)return;
@@ -1681,7 +1702,7 @@ function spawnBondUpEffect(pos){
     m.position.set(pos.x+(Math.random()-0.5)*0.4,pos.y+0.8,pos.z+(Math.random()-0.5)*0.4);
     m.scale.setScalar(0.06);
     scene.add(m);
-    effects.push({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*0.2,0.8,0),size:0.06,gravity:-0.1});
+    addTransientEffect({mesh:m,life:0.5,maxLife:0.5,kind:'spark',pooled:true,vel:new THREE.Vector3((Math.random()-0.5)*0.2,0.8,0),size:0.06,gravity:-0.1},'P3');
   }
 }
 function spawnMasteryUpEffect(pos){
@@ -1692,9 +1713,9 @@ function spawnMasteryUpEffect(pos){
     m.scale.setScalar(0.07);
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     scene.add(m);
-    effects.push({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*1.2,0.5+Math.random()*0.5,Math.sin(angle)*1.2),size:0.07,gravity:0.4});
+    addTransientEffect({mesh:m,life:0.6,maxLife:0.6,kind:'spark',pooled:true,vel:new THREE.Vector3(Math.cos(angle)*1.2,0.5+Math.random()*0.5,Math.sin(angle)*1.2),size:0.07,gravity:0.4},'P2');
   }
-  spawnRingPulse(pos.clone().add(new THREE.Vector3(0,0.8,0)),0xfde047,{scale:0.6,life:0.3,y:0});
+  spawnRingPulse(pos.clone().add(new THREE.Vector3(0,0.8,0)),0xfde047,{scale:0.6,life:0.3,y:0,priority:'P2'});
 }
 function spawnConditionBadEffect(pos){
   if(!pos)return;
@@ -1703,7 +1724,7 @@ function spawnConditionBadEffect(pos){
     m.position.set(pos.x+(Math.random()-0.5)*0.5,pos.y+0.5+Math.random()*0.5,pos.z+(Math.random()-0.5)*0.5);
     m.scale.setScalar(0.08);
     scene.add(m);
-    effects.push({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05});
+    addTransientEffect({mesh:m,life:0.3,maxLife:0.3,kind:'spark',pooled:true,vel:new THREE.Vector3(0,0.2,0),size:0.08,gravity:-0.05},'P3');
   }
 }
 function easeOut(t){t=Math.max(0,Math.min(1,t));return 1-(1-t)*(1-t);}
@@ -1770,9 +1791,10 @@ function fxGeom(shape='orb',size=0.06){
 function spawnElementalFX(type,pos,mode='impact',power=1){
   if(!pos)return;
   const cfg=typeFx(type),base=safeVec3(pos);
+  const priority=mode==='trail'?'P4':mode==='aura'?'P2':'P1';
   const count=fxParticleCount(mode,power,cfg.intensity);
   const c=cfg.core,a=cfg.accent;
-  if(mode!=='trail') spawnRingPulse(base.clone(),c,{scale:(mode==='summon'?0.68:0.48)*Math.max(0.9,power),life:mode==='aura'?0.45:0.24,y:0.08});
+  if(mode!=='trail') spawnRingPulse(base.clone(),c,{scale:(mode==='summon'?0.68:0.48)*Math.max(0.9,power),life:mode==='aura'?0.45:0.24,y:0.08,priority});
   for(let i=0;i<count;i++){
     const pSize=(0.028+Math.random()*0.04)*(mode==='summon'?1.25:1);
     const mesh=new THREE.Mesh(
@@ -1786,7 +1808,7 @@ function spawnElementalFX(type,pos,mode='impact',power=1){
     const vx=(mode==='trail'?0.4:(0.7+Math.random()*1.2))*cfg.speed;
     const vy=mode==='trail'?0.12:(0.35+Math.random())*cfg.speed;
     const vel=new THREE.Vector3(Math.cos(angle)*vx,vy,Math.sin(angle)*vx);
-    effects.push({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8,size:pSize,typeCfg:cfg});
+    addTransientEffect({mesh,vel,life:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),maxLife:mode==='trail'?0.12:(mode==='summon'?0.36:0.24),kind:'spark',gravity:(cfg.shape==='mist'||cfg.shape==='halo')?0:0.8,size:pSize,typeCfg:cfg},priority);
   }
 }
 function setTextIfChanged(node,text){const value=String(text);if(node&&node.textContent!==value)node.textContent=value;}
@@ -1956,8 +1978,8 @@ function initCharacterPreview3D(){
   const canvas=el('characterPreviewCanvas');
   if(!canvas||typeof THREE==='undefined')return;
   try{
-    characterPreviewRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'low-power'});
-    characterPreviewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+    characterPreviewRenderer=new THREE.WebGLRenderer({canvas,antialias:qualityProfile.antialias,alpha:true,powerPreference:'low-power'});
+    characterPreviewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,qualityProfile.maxDpr));
     characterPreviewRenderer.setClearColor(0x000000,0);
     characterPreviewScene=new THREE.Scene();
     characterPreviewCamera=new THREE.PerspectiveCamera(28,1,.1,30);
@@ -2005,6 +2027,19 @@ function monsterLookYaw(dir,mesh){ return Math.atan2(dir.x,dir.z) + (mesh?.userD
 // ---------- V7.0 Combat feedback: floating damage, camera shake, elemental ground decals ----------
 const floatingTexts=[];
 const groundDecals=[];
+const floatingTextProjectionScratch={world:new THREE.Vector3(),screen:{x:-9999,y:-9999,visible:false,z:2}};
+function addFloatingText(entry){
+  if(!entry?.el)return false;
+  if(floatingTexts.length>=VFX_LIMITS.maxFloatingTexts)floatingTexts.shift()?.el?.remove();
+  floatingTexts.push(entry);
+  return true;
+}
+function addGroundDecal(entry){
+  if(!entry?.group)return false;
+  if(groundDecals.length>=VFX_LIMITS.maxGroundDecals){const oldest=groundDecals.shift();if(oldest?.group)removeAndDispose(scene,oldest.group);}
+  groundDecals.push(entry);
+  return true;
+}
 const cameraShake={time:0,duration:0,mag:0,phase:0};
 function triggerCameraShake(mag=0.08,duration=0.14){
   cameraShake.time=Math.max(cameraShake.time,duration);
@@ -2021,13 +2056,13 @@ function spawnDamageNumber(amount,pos,{type='Normal',eff=1,healing=false,label='
   const effectLabelText=label||(eff>=4?'VERY EFFECTIVE':eff>1?'SUPER':eff===0?'IMMUNE':eff<1?'RESIST':'');
   d.innerHTML=`<b>${sign}${Math.round(amount)}</b>${effectLabelText?`<small>${effectLabelText}</small>`:''}`;
   layer.appendChild(d);
-  floatingTexts.push({el:d,pos:safeVec3(pos),life:0.9,maxLife:0.9,rise:0,drift:(Math.random()-.5)*24});
+  addFloatingText({el:d,pos:safeVec3(pos),life:0.9,maxLife:0.9,rise:0,drift:(Math.random()-.5)*24});
 }
 function updateFloatingTexts(dt){
   for(let i=floatingTexts.length-1;i>=0;i--){
     const f=floatingTexts[i]; f.life-=dt; f.rise+=dt*1.1;
-    const p=safeVec3(f.pos).add(new THREE.Vector3(0,f.rise,0));
-    const s=worldToScreen(p),t=Math.max(0,f.life/f.maxLife);
+    const p=floatingTextProjectionScratch.world.copy(f.pos);p.y+=f.rise;
+    const s=worldToScreen(p,floatingTextProjectionScratch.screen,p),t=Math.max(0,f.life/f.maxLife);
     f.el.style.left=`${s.x+f.drift*(1-t)}px`; f.el.style.top=`${s.y}px`; f.el.style.opacity=s.visible?String(Math.min(1,t*1.6)):'0';
     f.el.style.transform=`translate(-50%,-50%) scale(${0.88+(1-t)*0.28})`;
     if(f.life<=0){f.el.remove();floatingTexts.splice(i,1);}
@@ -2043,7 +2078,7 @@ function spawnGroundDecal(type,pos,{radius=1.1,duration=1.25,intensity=1}={}){
   const inner=new THREE.Mesh(boxGeometry(size*.24,.02,size*.24),new THREE.MeshBasicMaterial({color:cfg.core,transparent:true,opacity:0.48*intensity,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,wireframe:true}));
   inner.position.y=.041; group.add(inner);
   group.position.set(pos.x,0,pos.z); scene.add(group);
-  groundDecals.push({group,disc,ring,inner,life:duration,maxLife:duration,type,spin:(Math.random()<.5?-1:1)*(.3+Math.random()*.25)});
+  addGroundDecal({group,disc,ring,inner,life:duration,maxLife:duration,type,spin:(Math.random()<.5?-1:1)*(.3+Math.random()*.25)});
 }
 function updateGroundDecals(dt){
   for(let i=groundDecals.length-1;i>=0;i--){
@@ -2913,11 +2948,13 @@ joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joy
 function joyEnd(e){if(e.pointerId!==joy.pid)return;joy.active=false;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}joyEl.addEventListener('pointerup',joyEnd);joyEl.addEventListener('pointercancel',joyEnd);
 function forward(){return new THREE.Vector3(-Math.sin(cameraYaw),0,-Math.cos(cameraYaw)).normalize();}
 function cameraRight(){const f=forward();return new THREE.Vector3(-f.z,0,f.x).normalize();}
-function worldToScreen(pos){
-  if(!pos)return {x:-9999,y:-9999,visible:false,z:2};
-  const v=safeVec3(pos).project(camera);
+function worldToScreen(pos,output=null,vectorScratch=null){
+  const result=output||{x:-9999,y:-9999,visible:false,z:2};
+  if(!pos){result.x=-9999;result.y=-9999;result.visible=false;result.z=2;return result;}
+  const v=vectorScratch?vectorScratch.copy(pos):safeVec3(pos);v.project(camera);
   const visible=v.z>-1&&v.z<1&&Math.abs(v.x)<1.18&&Math.abs(v.y)<1.18;
-  return {x:(v.x*.5+.5)*innerWidth,y:(-.5*v.y+.5)*innerHeight,visible,z:v.z};
+  result.x=(v.x*.5+.5)*innerWidth;result.y=(-.5*v.y+.5)*innerHeight;result.visible=visible;result.z=v.z;
+  return result;
 }
 function animateEntity(mesh,dt,moving=false,intensity=1){
   if(!mesh)return;
@@ -3098,7 +3135,7 @@ function wildDamage(w,inst){
     atkBuff:1
   });
 }
-function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
+function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04,priority:type==='capture'?'P0':'P1'});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
 function captureChance(w){
   const input=captureCalculatorInput(w,{referenceLevel:w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit:true});
   if(!input)return 0;
@@ -3119,12 +3156,12 @@ let captureSequence=null;
 function spawnCaptureResultEffect(pos,success){
   if(!pos)return;
   if(success){
-    spawnBurst(pos.clone().add(new THREE.Vector3(0,.5,0)),0x22c55e,{count:16,life:.5,size:.06});
-    spawnRingPulse(pos.clone(),0x22c55e,{scale:.9,life:.4,y:.1});
-    spawnRingPulse(pos.clone(),0x22c55e,{scale:1.2,life:.5,y:.1});
+    spawnBurst(pos.clone().add(new THREE.Vector3(0,.5,0)),0x22c55e,{count:16,life:.5,size:.06,priority:'P0'});
+    spawnRingPulse(pos.clone(),0x22c55e,{scale:.9,life:.4,y:.1,priority:'P0'});
+    spawnRingPulse(pos.clone(),0x22c55e,{scale:1.2,life:.5,y:.1,priority:'P0'});
   }else{
-    spawnBurst(pos.clone().add(new THREE.Vector3(0,.45,0)),0xef4444,{count:8,life:.3,size:.05,gravity:1});
-    spawnRingPulse(pos.clone(),0xef4444,{scale:.5,life:.22,y:.1});
+    spawnBurst(pos.clone().add(new THREE.Vector3(0,.45,0)),0xef4444,{count:8,life:.3,size:.05,gravity:1,priority:'P0'});
+    spawnRingPulse(pos.clone(),0xef4444,{scale:.5,life:.22,y:.1,priority:'P0'});
   }
 }
 function abortCaptureSequence(){
@@ -3156,8 +3193,8 @@ function startCaptureSequence(w,ballMesh,attemptId,resolution){
   ballMesh.position.copy(pos);
   ballMesh.position.y=.7;
   playSFX('sfx_capture_tension');
-  spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05});
-  spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1});
+  spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05,priority:'P0'});
+  spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1,priority:'P0'});
   const chance=resolution.finalChancePct/100;
   captureSequence={attemptId,wild:w,ballMesh,pos,sp,name,chance,resolution,success:resolution.captureSucceeded,phaseTime:0,phase:'tension'};
 }
@@ -3261,7 +3298,7 @@ function spawnOwned(inst,pos){
   mesh.userData.instanceId=inst.instanceId;
   mesh.position.copy(pos);mesh.position.y=0;scene.add(mesh);setupMonsterMotion(mesh,sp,inst);
   spawnElementalFX(monsterTypes(inst)[0],pos.clone().add(new THREE.Vector3(0,.45,0)),'summon',1.05);
-  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),attackBuff:1,buffTimer:0,shieldReduction:0,shieldTimer:0};
+  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),skillUiElapsed:.1,aiDecision:null,aiDecisionElapsed:0,attackBuff:1,buffTimer:0,shieldReduction:0,shieldTimer:0};
   inst.bond=clamp(inst.bond+.4);
   msg(`${displayName(inst)} ลงสนาม • AI จะเลือกศัตรูใกล้ที่สุดและโจมตีพื้นฐานเอง`);
   renderParty();renderSkillButtons();renderHUD();
@@ -3325,7 +3362,7 @@ function spawnSkillTrail(type, fromPos, toPos) {
       case 'star': vel.y = 0.08; break;
       default: vel.set(0, 0.1, 0);
     }
-    effects.push({mesh: m, life: 0.3, maxLife: 0.3, kind: 'spark', pooled: true, vel, size: m.scale.x, gravity: 0.2});
+    addTransientEffect({mesh: m, life: 0.3, maxLife: 0.3, kind: 'spark', pooled: true, vel, size: m.scale.x, gravity: 0.2}, 'P4');
   }
 }
 function spawnAreaWave(type, pos, range) {
@@ -3339,7 +3376,7 @@ function spawnAreaWave(type, pos, range) {
   wave.position.y = 0.06;
   wave.castShadow = false;
   scene.add(wave);
-  effects.push({mesh: wave, life: 0.5, maxLife: 0.5, kind: 'area-wave', expandTo: range * 2});
+  addTransientEffect({mesh: wave, life: 0.5, maxLife: 0.5, kind: 'area-wave', expandTo: range * 2}, 'P1');
   for (let i = 0; i < 8; i++) {
     const m = sparkPool.acquire();
     if (!m) break;
@@ -3353,7 +3390,7 @@ function spawnAreaWave(type, pos, range) {
     m.position.set(pos.x, pos.y + 0.2, pos.z);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh: m, life: 0.4, maxLife: 0.4, kind: 'spark', pooled: true, vel: new THREE.Vector3(Math.cos(angle) * range, 0.3, Math.sin(angle) * range), size: 0.05, gravity: 0.3});
+    addTransientEffect({mesh: m, life: 0.4, maxLife: 0.4, kind: 'spark', pooled: true, vel: new THREE.Vector3(Math.cos(angle) * range, 0.3, Math.sin(angle) * range), size: 0.05, gravity: 0.3}, 'P1');
   }
 }
 function spawnHealSkillEffect(pos, type) {
@@ -3371,9 +3408,9 @@ function spawnHealSkillEffect(pos, type) {
     m.position.set(pos.x + Math.cos(angle) * 0.5, pos.y + 0.2 + Math.random() * 0.3, pos.z + Math.sin(angle) * 0.5);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh: m, life: 0.8, maxLife: 0.8, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.0 + Math.random() * 0.3, 0), size: 0.05, gravity: -0.1});
+    addTransientEffect({mesh: m, life: 0.8, maxLife: 0.8, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.0 + Math.random() * 0.3, 0), size: 0.05, gravity: -0.1}, 'P2');
   }
-  spawnRingPulse(pos.clone(), 0x4ade80, {scale: 0.8, life: 0.4, y: 0.1});
+  spawnRingPulse(pos.clone(), 0x4ade80, {scale: 0.8, life: 0.4, y: 0.1, priority: 'P2'});
   spawnElementalFX(type, pos, 'aura', 0.5);
 }
 function spawnShieldSkillEffect(pos, type, duration) {
@@ -3383,7 +3420,7 @@ function spawnShieldSkillEffect(pos, type, duration) {
   shieldMesh.position.y += 0.9;
   shieldMesh.castShadow = false;
   scene.add(shieldMesh);
-  effects.push({mesh: shieldMesh, life: duration, maxLife: duration, kind: 'shield-aura'});
+  addTransientEffect({mesh: shieldMesh, life: duration, maxLife: duration, kind: 'shield-aura'}, 'P2');
   for (let i = 0; i < 8; i++) {
     const m = sparkPool.acquire();
     if (!m) break;
@@ -3397,7 +3434,7 @@ function spawnShieldSkillEffect(pos, type, duration) {
     m.position.set(pos.x + Math.cos(angle) * 0.6, pos.y + 0.1, pos.z + Math.sin(angle) * 0.6);
     m.scale.setScalar(0.04);
     scene.add(m);
-    effects.push({mesh: m, life: 0.6, maxLife: 0.6, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 0.8, 0), size: 0.04, gravity: -0.05});
+    addTransientEffect({mesh: m, life: 0.6, maxLife: 0.6, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 0.8, 0), size: 0.04, gravity: -0.05}, 'P2');
   }
 }
 function spawnBuffAtkSkillEffect(pos, type, duration) {
@@ -3415,15 +3452,15 @@ function spawnBuffAtkSkillEffect(pos, type, duration) {
     m.position.set(pos.x + Math.cos(angle) * 0.4, pos.y + 0.1, pos.z + Math.sin(angle) * 0.4);
     m.scale.setScalar(0.05);
     scene.add(m);
-    effects.push({mesh: m, life: 0.7, maxLife: 0.7, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.5 + Math.random() * 0.5, 0), size: 0.05, gravity: -0.3});
+    addTransientEffect({mesh: m, life: 0.7, maxLife: 0.7, kind: 'spark', pooled: true, vel: new THREE.Vector3(0, 1.5 + Math.random() * 0.5, 0), size: 0.05, gravity: -0.3}, 'P2');
   }
-  spawnRingPulse(pos.clone(), cfg.accent, {scale: 0.7, life: 0.35, y: 0.1});
+  spawnRingPulse(pos.clone(), cfg.accent, {scale: 0.7, life: 0.35, y: 0.1, priority: 'P2'});
   const auraMesh = new THREE.Mesh(boxGeometry(1.2, 2.0, 1.2), new THREE.MeshBasicMaterial({color: cfg.accent, transparent: true, opacity: 0, wireframe: true, depthWrite: false}));
   auraMesh.position.copy(pos);
   auraMesh.position.y += 1.0;
   auraMesh.castShadow = false;
   scene.add(auraMesh);
-  effects.push({mesh: auraMesh, life: duration, maxLife: duration, kind: 'buff-aura'});
+  addTransientEffect({mesh: auraMesh, life: duration, maxLife: duration, kind: 'buff-aura'}, 'P2');
 }
 let skillCommandSequence=0;
 const skillGroundRaycaster=new THREE.Raycaster();
@@ -3570,27 +3607,64 @@ function useSkill(index,intent={}){
   if(!result.ok){msg(skillFailureMessage(move,result));renderSkillButtons();}
   return result;
 }
-function ownedBasicAiActorSnapshot(a){
-  return Object.freeze({
-    id:a?.inst?.instanceId,
-    speciesId:a?.inst?.speciesId,
-    alive:(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0,
-    position:Object.freeze({x:a?.mesh?.position?.x,z:a?.mesh?.position?.z}),
-  });
+function createOwnedBasicAiScratch(){
+  const actor={id:null,speciesId:null,alive:false,position:{x:0,z:0}};
+  return {request:{actor,enemies:[],currentTargetId:null,attackReady:false},enemyPool:[]};
 }
-function ownedBasicAiEnemySnapshots(){
-  return Object.freeze(wilds.map(wild=>Object.freeze({
-    id:wild?.id,
-    alive:wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0,
-    targetable:wild?.capturing===undefined||wild.capturing===false,
-    position:Object.freeze({x:wild?.mesh?.position?.x,z:wild?.mesh?.position?.z}),
-  })));
+function fillOwnedBasicAiRequest(scratch,a,liveWilds){
+  const request=scratch.request,actor=request.actor;
+  actor.id=a?.inst?.instanceId;
+  actor.speciesId=a?.inst?.speciesId;
+  actor.alive=(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0;
+  actor.position.x=a?.mesh?.position?.x;
+  actor.position.z=a?.mesh?.position?.z;
+  const count=Array.isArray(liveWilds)?liveWilds.length:0;
+  for(let index=0;index<count;index++){
+    const wild=liveWilds[index];
+    let target=scratch.enemyPool[index];
+    if(!target){target={id:null,alive:false,targetable:false,position:{x:0,z:0}};scratch.enemyPool[index]=target;}
+    target.id=wild?.id;
+    target.alive=wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0;
+    target.targetable=wild?.capturing===undefined||wild.capturing===false;
+    target.position.x=wild?.mesh?.position?.x;
+    target.position.z=wild?.mesh?.position?.z;
+    request.enemies[index]=target;
+  }
+  request.enemies.length=count;
+  request.currentTargetId=a?.target?.id??null;
+  request.attackReady=a?.attackCd<=0;
+  return request;
+}
+const ownedBasicAiScratch=createOwnedBasicAiScratch();
+const ownedBasicAiMoveScratch=new THREE.Vector3();
+const ownedBasicAiImpactScratch=new THREE.Vector3();
+function shouldRunOwnedCadence(state,elapsedField,dt,hz,force=false){
+  const interval=Number.isFinite(hz)&&hz>0?1/hz:Infinity;
+  const elapsed=(Number.isFinite(state?.[elapsedField])?state[elapsedField]:0)+(Number.isFinite(dt)&&dt>0?dt:0);
+  if(force||elapsed+Number.EPSILON>=interval){state[elapsedField]=force?0:Math.max(0,elapsed-interval);return true;}
+  state[elapsedField]=elapsed;
+  return false;
+}
+function updateOwnedSkillCooldownUi(a){
+  for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){
+    const cd=a.skillCds[i],btn=el(`skill${i+1}Btn`);if(!btn)continue;
+    if(cd>0){
+      if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');
+      let cdEl=btn.querySelector('.cd-overlay');
+      if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}
+      cdEl.textContent=cd.toFixed(1)+'s';
+    }else{
+      if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');
+      const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();
+    }
+  }
 }
 function materializeOwnedBasicAiTarget(a,decision){
   if(!decision?.ok||decision.targetId===null)return null;
-  const matches=wilds.filter(wild=>wild?.id===decision.targetId);
-  if(matches.length!==1)return null;
-  const target=matches[0],actorPosition=a?.mesh?.position,targetPosition=target?.mesh?.position;
+  let target=null,matchCount=0;
+  for(const wild of wilds){if(wild?.id===decision.targetId){target=wild;matchCount++;if(matchCount>1)return null;}}
+  if(matchCount!==1)return null;
+  const actorPosition=a?.mesh?.position,targetPosition=target?.mesh?.position;
   if(target.dead!==false||!Number.isFinite(target.hp)||target.hp<=0
     ||!(target.capturing===undefined||target.capturing===false)
     ||!Number.isFinite(actorPosition?.x)||!Number.isFinite(actorPosition?.z)
@@ -3601,33 +3675,52 @@ function materializeOwnedBasicAiTarget(a,decision){
   return target;
 }
 function updateOwned(dt){
-  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=tickCooldown(a.attackCd,dt);a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){const cd=a.skillCds[i];const btn=el(`skill${i+1}Btn`);if(!btn)continue;if(cd>0){if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');let cdEl=btn.querySelector('.cd-overlay');if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}cdEl.textContent=cd.toFixed(1)+'s';}else{if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();}}if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
-  const decision=resolveOwnedBasicAiAction({actor:ownedBasicAiActorSnapshot(a),enemies:ownedBasicAiEnemySnapshots(),currentTargetId:a.target?.id??null,attackReady:a.attackCd<=0});
-  const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;let moving=false;
+  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=tickCooldown(a.attackCd,dt);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-dt);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
+  if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision))a.aiDecision=resolveOwnedBasicAiAction(fillOwnedBasicAiRequest(ownedBasicAiScratch,a,wilds));
+  const decision=a.aiDecision;
+  const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;if(!t&&decision?.targetId!==null)a.aiDecision=null;let moving=false;
   if(t&&decision.action==='move'){
-    moving=true;const dir=new THREE.Vector3(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
+    moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
   }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0){
     const liveTarget=materializeOwnedBasicAiTarget(a,decision);
-    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(monsterTypes(a.inst)[0],liveTarget.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,a.attackBuff,{allowSkillMastery:false});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
+    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,a.attackBuff,{allowSkillMastery:false});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
   }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
+const wildAggressorCandidates=[];
+const wildAggressorCandidatePool=[];
+const engagedWildIdsScratch=new Set();
 function selectWildAggressors(){
   const target=(activeSummon&&activeSummon.mesh)?activeSummon.mesh:player;
-  if(!target?.position)return new Set();
-  const candidates=wilds.map(w=>({
-    id:w.id,
-    dead:w.dead,
-    engaged:w.engaged,
-    targetValid:!!w.mesh?.position,
-    distanceToTarget:w.mesh?.position?distXZ(w.mesh.position,target.position):Infinity,
-    distanceFromHome:w.mesh?.position&&w.home?distXZ(w.mesh.position,w.home):Infinity
-  }));
-  return new Set(selectEngagedWildIds(candidates,ENCOUNTER_POLICY));
+  if(!target?.position){engagedWildIdsScratch.clear();return engagedWildIdsScratch;}
+  for(let index=0;index<wilds.length;index++){
+    const w=wilds[index];
+    let candidate=wildAggressorCandidatePool[index];
+    if(!candidate){candidate={id:null,dead:true,engaged:false,targetValid:false,distanceToTarget:Infinity,distanceFromHome:Infinity};wildAggressorCandidatePool[index]=candidate;}
+    candidate.id=w?.id;
+    candidate.dead=w?.dead;
+    candidate.engaged=w?.engaged;
+    candidate.targetValid=!!w?.mesh?.position;
+    candidate.distanceToTarget=w?.mesh?.position?distXZ(w.mesh.position,target.position):Infinity;
+    candidate.distanceFromHome=w?.mesh?.position&&w?.home?distXZ(w.mesh.position,w.home):Infinity;
+    wildAggressorCandidates[index]=candidate;
+  }
+  wildAggressorCandidates.length=wilds.length;
+  return fillEngagedWildIds(wildAggressorCandidates,ENCOUNTER_POLICY,engagedWildIdsScratch);
 }
+const wildUpdateScratch={
+  statusRequest:{toSec:0,targetHp:0,targetMaxHp:1},
+  resetRequest:{engaged:false,targetValid:false,distanceToTarget:Infinity,distanceFromHome:Infinity,leashRadius:ENCOUNTER_POLICY.leashRadius,disengageRadius:ENCOUNTER_POLICY.disengageRadius},
+  collision:new THREE.Vector3(),
+  next:new THREE.Vector3(),
+  direction:new THREE.Vector3(),
+  impact:new THREE.Vector3(),
+};
 function updateWild(w,dt,canEngage=false){
   if(!w||w.dead||!w.mesh||w.capturing)return;
-  const statusAdvance=advanceEncounterEffects(w.statusState,{toSec:w.statusState.currentTimeSec+dt,targetHp:w.hp,targetMaxHp:w.maxHp});
+  const statusRequest=wildUpdateScratch.statusRequest;
+  statusRequest.toSec=w.statusState.currentTimeSec+dt;statusRequest.targetHp=w.hp;statusRequest.targetMaxHp=w.maxHp;
+  const statusAdvance=advanceEncounterEffects(w.statusState,statusRequest);
   if(statusAdvance.ok){w.statusState=statusAdvance.state;if(statusAdvance.damage>0){damageWild(w,Math.max(1,Math.round(statusAdvance.damage)),{type:wildTypes(w)[0],eff:1,statusDamage:true});if(w.dead)return;}}
   w.attackCd=tickCooldown(w.attackCd,dt);
   w.wanderT=(Number.isFinite(w.wanderT)?w.wanderT:0)-dt;
@@ -3638,18 +3731,13 @@ function updateWild(w,dt,canEngage=false){
   const targetValid=!!target?.position;
   const distanceToTarget=targetValid?distXZ(w.mesh.position,target.position):Infinity;
   const distanceFromHome=w.home?distXZ(w.mesh.position,w.home):Infinity;
-  if(shouldResetEncounter({
-    engaged:w.engaged,
-    targetValid,
-    distanceToTarget,
-    distanceFromHome,
-    leashRadius:ENCOUNTER_POLICY.leashRadius,
-    disengageRadius:ENCOUNTER_POLICY.disengageRadius
-  })) resetWild(w);
+  const resetRequest=wildUpdateScratch.resetRequest;
+  resetRequest.engaged=w.engaged;resetRequest.targetValid=targetValid;resetRequest.distanceToTarget=distanceToTarget;resetRequest.distanceFromHome=distanceFromHome;
+  if(shouldResetEncounter(resetRequest)) resetWild(w);
 
   if(!canEngage||!targetValid){
     if(w.engaged)resetWild(w);
-    for(const other of wilds){if(other===w||other.dead)continue;const d=distXZ(w.mesh.position,other.mesh.position);if(d<1.2&&d>0.001){const push=safeVec3(w.mesh.position).sub(other.mesh.position);push.y=0;push.normalize().multiplyScalar((1.2-d)*dt*2);w.mesh.position.add(push);}}
+    for(const other of wilds){if(other===w||other.dead)continue;const d=distXZ(w.mesh.position,other.mesh.position);if(d<1.2&&d>0.001){const push=wildUpdateScratch.collision.copy(w.mesh.position).sub(other.mesh.position);push.y=0;push.normalize().multiplyScalar((1.2-d)*dt*2);w.mesh.position.add(push);}}
     if(w.wanderT<=0){
       w.state='wander';
       w.wanderT=1.6+Math.random()*2.2;
@@ -3658,7 +3746,7 @@ function updateWild(w,dt,canEngage=false){
     }
     let moving=false;
     if(w.state==='wander'){
-      const next=safeVec3(w.mesh.position).add(safeVec3(w.dir,0,0,-1).multiplyScalar(dt*.9));
+      const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(w.dir,dt*.9);
       if(w.home&&distXZ(next,w.home)>2.2){w.dir.multiplyScalar(-1);w.wanderDir=w.dir;}
       w.mesh.position.addScaledVector(w.dir,dt*.9);
       w.mesh.rotation.y=monsterLookYaw(w.dir,w.mesh);
@@ -3676,28 +3764,31 @@ function updateWild(w,dt,canEngage=false){
   const distance=distXZ(w.mesh.position,target.position);
   if(distance>1.25){
     moving=true;
-    const dir=safeVec3(target.position).sub(w.mesh.position);dir.y=0;
+    const dir=wildUpdateScratch.direction.copy(target.position).sub(w.mesh.position);dir.y=0;
     if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
     w.mesh.position.addScaledVector(dir,(w.spd*.16+1.2)*dt);
     w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
   }else if(w.attackCd<=0){
     w.attackCd=w.boss?.85:1.2;
     triggerMonsterAction(w.mesh,'attack',0.22);
-    spawnElementalFX(wildTypes(w)[0],safeVec3(target.position).add(new THREE.Vector3(0,.55,0)),'impact',0.65);
+    const impact=wildUpdateScratch.impact.copy(target.position);impact.y+=.55;
+    spawnElementalFX(wildTypes(w)[0],impact,'impact',0.65);
     if(activeSummon&&activeSummon.mesh){
       const res=wildDamage(w,activeSummon.inst),reduction=activeSummon.shieldTimer>0?activeSummon.shieldReduction:0,dmg=Math.round(res.damage*(1-reduction));
       activeSummon.inst.hp-=dmg;
-      spawnDamageNumber(dmg,safeVec3(activeSummon.mesh.position).add(new THREE.Vector3(0,1.25,0)),{type:wildTypes(w)[0],eff:res.eff});
+      impact.copy(activeSummon.mesh.position);impact.y+=1.25;
+      spawnDamageNumber(dmg,impact,{type:wildTypes(w)[0],eff:res.eff});
       triggerCameraShake(w.boss?.15:.09,w.boss?.2:.14);
       if(activeSummon.inst.hp<=0)faintActive();
       renderParty();
     }else if(playerData.invuln<=0){
       const playerDmg=Math.round(w.atk*(w.boss?.7:.48));
       playerData.hp-=playerDmg;playerData.invuln=.5;
-      spawnDamageNumber(playerDmg,safeVec3(playerHitText()),{type:wildTypes(w)[0]});
+      spawnDamageNumber(playerDmg,playerHitText(),{type:wildTypes(w)[0]});
       triggerCameraShake(w.boss?.17:.1,w.boss?.22:.15);
       playerVisual.play('hurt',{duration:.24});
-      spawnBurst(safeVec3(player.position).add(new THREE.Vector3(0,1,0)),0xef4444,{count:8,life:.22,size:.04,gravity:1});
+      impact.copy(player.position);impact.y+=1;
+      spawnBurst(impact,0xef4444,{count:8,life:.22,size:.04,gravity:1});
       if(playerData.hp<=0){playerData.hp=playerData.maxHp;msg('ผู้เล่นหมด HP • กลับ Ranch Hub');switchZone('hub',true);}
       renderHUD();
     }
@@ -3705,7 +3796,7 @@ function updateWild(w,dt,canEngage=false){
   animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
   animateMonster(w.mesh,dt,moving);
 }
-function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03});}}if(t>=1){const mesh=p.mesh;projectiles.splice(i,1);if(p.type==='capture'){p.onHit?.(mesh);continue;}spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04});removeAndDispose(scene, mesh);p.onHit?.();}}}
+function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03,priority:p.type==='capture'?'P0':'P1'});}}if(t>=1){const mesh=p.mesh;projectiles.splice(i,1);if(p.type==='capture'){p.onHit?.(mesh);continue;}spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04,priority:'P1'});removeAndDispose(scene, mesh);p.onHit?.();}}}
 
 // ---------- V8.2.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
@@ -3882,10 +3973,10 @@ function syncRanchVisuals(){
   if(state.currentZone!=='hub')return;
   state.ranchActive=state.ranchActive.filter(id=>state.storage.includes(id)).slice(0,RANCH_ACTIVE_MAX);
   const ids=state.ranchActive;
-  ids.forEach((id,i)=>{const inst=getInst(id);if(!inst)return;const sp=spById[inst.speciesId],mesh=monsterMesh(sp,true,inst),a=(i/Math.max(1,ids.length))*Math.PI*2;mesh.userData.worldRole='ranchVisual';mesh.userData.instanceId=inst.instanceId;mesh.position.set(ranchCenter.x+Math.cos(a)*1.8,0,ranchCenter.z+Math.sin(a)*1.8);scene.add(mesh);if(typeof setupMonsterMotion==='function')setupMonsterMotion(mesh,sp,inst);ranchVisuals.set(id,{mesh,phase:Math.random()*10,home:mesh.position.clone()});});
+  ids.forEach((id,i)=>{const inst=getInst(id);if(!inst)return;const sp=spById[inst.speciesId],mesh=monsterMesh(sp,true,inst),a=(i/Math.max(1,ids.length))*Math.PI*2;mesh.userData.worldRole='ranchVisual';mesh.userData.instanceId=inst.instanceId;mesh.position.set(ranchCenter.x+Math.cos(a)*1.8,0,ranchCenter.z+Math.sin(a)*1.8);scene.add(mesh);if(typeof setupMonsterMotion==='function')setupMonsterMotion(mesh,sp,inst);ranchVisuals.set(id,{mesh,phase:Math.random()*10,home:mesh.position.clone(),direction:new THREE.Vector3()});});
 }
 
-function updateRanchVisuals(dt){let i=0;for(const obj of ranchVisuals.values()){obj.phase+=dt*.55;const radius=.45+(i%3)*.12,tx=obj.home.x+Math.cos(obj.phase)*radius,tz=obj.home.z+Math.sin(obj.phase*.8)*radius;const moving=Math.hypot(tx-obj.mesh.position.x,tz-obj.mesh.position.z)>.08;obj.mesh.position.x+=(tx-obj.mesh.position.x)*dt*.8;obj.mesh.position.z+=(tz-obj.mesh.position.z)*dt*.8;const dir=new THREE.Vector3(tx-obj.mesh.position.x,0,tz-obj.mesh.position.z);if(dir.lengthSq()>.0001)obj.mesh.rotation.y=monsterLookYaw(dir.normalize(),obj.mesh);animateEntity(obj.mesh,dt,true,.65);animateMonster(obj.mesh,dt,moving);i++;}}
+function updateRanchVisuals(dt){let i=0;for(const obj of ranchVisuals.values()){obj.phase+=dt*.55;const radius=.45+(i%3)*.12,tx=obj.home.x+Math.cos(obj.phase)*radius,tz=obj.home.z+Math.sin(obj.phase*.8)*radius;const moving=Math.hypot(tx-obj.mesh.position.x,tz-obj.mesh.position.z)>.08;obj.mesh.position.x+=(tx-obj.mesh.position.x)*dt*.8;obj.mesh.position.z+=(tz-obj.mesh.position.z)*dt*.8;const dir=obj.direction.set(tx-obj.mesh.position.x,0,tz-obj.mesh.position.z);if(dir.lengthSq()>.0001)obj.mesh.rotation.y=monsterLookYaw(dir.normalize(),obj.mesh);animateEntity(obj.mesh,dt,true,.65);animateMonster(obj.mesh,dt,moving);i++;}}
 function toggleRanchActive(id){if(!assertRanchOperation())return;if(!state.storage.includes(id))return;if(state.ranchActive.includes(id)){state.ranchActive=state.ranchActive.filter(x=>x!==id);msg('เก็บมอนออกจากลาน Ranch แล้ว');}else{if(state.ranchActive.length>=RANCH_ACTIVE_MAX){msg(`Ranch Active เต็ม ${RANCH_ACTIVE_MAX} ตัว`);return;}state.ranchActive.push(id);msg(`ปล่อย ${displayName(getInst(id))} ออกมาเดินใน Ranch`);}syncRanchVisuals();renderManager();renderRanchStoragePage();renderHUD();saveGame(false);}
 
 // ---------- Breeding / genetics ----------
@@ -5380,6 +5471,7 @@ async function syncCloudSave(){
 }
 void syncCloudSave();
 let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
+const wildFrameSnapshot=[];
 function loop(now){
   try{
     const dt=Math.min(.033,(now-last)/1000);
@@ -5399,7 +5491,10 @@ function loop(now){
     updateRanchVisuals(dt);
     ensureWildPopulation(dt);
     const engagedWildIds=selectWildAggressors();
-    for(const w of [...wilds]){
+    wildFrameSnapshot.length=wilds.length;
+    for(let wildIndex=0;wildIndex<wilds.length;wildIndex++)wildFrameSnapshot[wildIndex]=wilds[wildIndex];
+    for(let wildIndex=0;wildIndex<wildFrameSnapshot.length;wildIndex++){
+      const w=wildFrameSnapshot[wildIndex];
       const distance=distXZ(player.position,w.mesh.position);
       const aiDt=distanceTickScheduler.advance(w.id,distance,dt,engagedWildIds.has(w.id));
       if(aiDt>0)updateWild(w,aiDt,engagedWildIds.has(w.id));

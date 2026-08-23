@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 import { pixelDiffRatio } from '../asset-presentation/four-side/apply.mjs';
 import { GROUND_COARSE, GROUND_GRID, paintGroundGrid } from '../asset-presentation/blocky-ground.mjs';
+import { selectQualityProfile } from '../performance-runtime.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const painterSrc = fs.readFileSync(new URL('../asset-presentation/blocky-ground.mjs', import.meta.url), 'utf8');
@@ -43,7 +44,8 @@ assert.match(incubatorSrc, /emissiveIntensity:\.15/, 'incubator egg glow matches
 assert.match(addDeco, /mesh\.traverse\(obj=>\{ if\(obj\.isMesh\)\{ obj\.castShadow=true; obj\.receiveShadow=true; \} \}\)/, 'every decoration mesh casts and receives shadow');
 assert.match(incubatorSrc, /baseInc\.castShadow=true/, 'incubator base casts a shadow when the quality tier allows it');
 assert.match(js, /renderer\.shadowMap\.enabled=qualityProfile\.shadows/, 'shadow map still follows the quality profile');
-assert.match(js, /tier:'medium',maxDpr:1\.25,antialias:true,shadows:false/, 'medium profile keeps shadows off so FPS does not drop');
+assert.equal(selectQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, devicePixelRatio: 2 }).shadows, false,
+  'adaptive medium profile keeps shadows off so FPS does not drop');
 assert.match(js, /if\(qualityProfile\.shadows\)/, 'high-tier shadow camera is ready without forcing shadows on medium');
 assert.match(js, /sun\.shadow\.mapSize\.set\(1024,1024\)/, 'shadow map stays 1024 when enabled');
 assert.match(js, /makePad\(7,3,3\.4,0x22c55e,\.42\)/, 'ranch pad floor is more visible on green grass');

@@ -64,6 +64,7 @@ assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'monster shine stays a s
 
 const pool = js.slice(js.indexOf('const sparkPool=createObjectPool({'), js.indexOf('function setHumanoidAction'));
 assert.match(pool, /boxGeometry\(1,1,1\)/, 'spark pool from Phase 1 stays boxes');
-assert.match(pool, /maxSize:200/, 'spark pool cap from Phase 1 stays 200');
+assert.match(js, /maxParticles:200/, 'shared particle cap from Phase 1 stays 200');
+assert.match(pool, /maxSize:VFX_LIMITS\.maxParticles/, 'spark pool consumes the shared cap');
 
 console.log('V8.0 VFX P3 fxGeom: PASS');

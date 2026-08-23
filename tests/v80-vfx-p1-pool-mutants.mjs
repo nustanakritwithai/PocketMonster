@@ -26,7 +26,8 @@ assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: spark poo
 const poolStart = js.indexOf('const sparkPool=createObjectPool({');
 const pool = js.slice(poolStart, js.indexOf('function setHumanoidAction', poolStart));
 assert.doesNotMatch(pool, /sphereGeometry/, 'mutant 3: spark pool must not fall back to spheres');
-assert.match(pool, /maxSize:200/, 'mutant 4: pool cap must stay 200');
+assert.match(js, /maxParticles:200/, 'mutant 4a: shared particle cap must stay 200');
+assert.match(pool, /maxSize:VFX_LIMITS\.maxParticles/, 'mutant 4b: pool must consume the shared cap');
 assert.match(pool, /mesh\.rotation\.set\(0,0,0\)/, 'mutant 5: reset must clear rotation or reused boxes keep old tumble');
 assert.match(extractFn('spawnBurst'), /sparkPool\.acquire\(\)/, 'mutant 6: bursts must keep using the pool');
 assert.match(extractFn('releaseTransientEffect'), /sparkPool\.release\(effect\.mesh\)/, 'mutant 7: pooled sparks must not be disposed as unique meshes');

@@ -70,20 +70,32 @@ export function shouldResetEncounter({
   return distanceFromHome > leashRadius || distanceToTarget > disengageRadius;
 }
 
-export function selectEngagedWildIds(candidates, policy = ENCOUNTER_POLICY) {
+export function fillEngagedWildIds(candidates, policy = ENCOUNTER_POLICY, output = new Set()) {
   const aggroRadius = Number.isFinite(policy.aggroRadius) ? policy.aggroRadius : ENCOUNTER_POLICY.aggroRadius;
   const leashRadius = Number.isFinite(policy.leashRadius) ? policy.leashRadius : ENCOUNTER_POLICY.leashRadius;
   const disengageRadius = Number.isFinite(policy.disengageRadius) ? policy.disengageRadius : ENCOUNTER_POLICY.disengageRadius;
   const maxEngaged = Number.isInteger(policy.maxEngaged) && policy.maxEngaged >= 0 ? policy.maxEngaged : ENCOUNTER_POLICY.maxEngaged;
-
-  return candidates
-    .filter(candidate => {
-      if (!candidate || candidate.dead || !candidate.targetValid) return false;
-      if (!Number.isFinite(candidate.distanceToTarget) || !Number.isFinite(candidate.distanceFromHome)) return false;
+  if (!Array.isArray(candidates) || !(output instanceof Set)) throw new TypeError('engagement buffers are invalid');
+  output.clear();
+  for (let selectedCount = 0; selectedCount < maxEngaged; selectedCount += 1) {
+    let selected = null;
+    for (const candidate of candidates) {
+      if (output.has(candidate?.id)) continue;
+      if (!candidate || candidate.dead || !candidate.targetValid) continue;
+      if (!Number.isFinite(candidate.distanceToTarget) || !Number.isFinite(candidate.distanceFromHome)) continue;
       const targetRadius = candidate.engaged ? disengageRadius : aggroRadius;
-      return candidate.distanceFromHome <= leashRadius && candidate.distanceToTarget <= targetRadius;
-    })
-    .sort((a, b) => a.distanceToTarget - b.distanceToTarget || String(a.id).localeCompare(String(b.id)))
-    .slice(0, maxEngaged)
-    .map(candidate => candidate.id);
+      if (candidate.distanceFromHome > leashRadius || candidate.distanceToTarget > targetRadius) continue;
+      if (!selected
+        || candidate.distanceToTarget < selected.distanceToTarget
+        || candidate.distanceToTarget === selected.distanceToTarget
+          && String(candidate.id).localeCompare(String(selected.id)) < 0) selected = candidate;
+    }
+    if (!selected) break;
+    output.add(selected.id);
+  }
+  return output;
+}
+
+export function selectEngagedWildIds(candidates, policy = ENCOUNTER_POLICY) {
+  return [...fillEngagedWildIds(candidates, policy)];
 }

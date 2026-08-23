@@ -23,22 +23,22 @@ function replaceNth(source, before, after, occurrence) {
 const materializeCall = 'materializeOwnedBasicAiTarget(a,decision)';
 const mutants = [
   ['snapshot accepts malformed dead state', mutate(
-    'alive:wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0',
-    'alive:wild?.dead!==true&&Number.isFinite(wild?.hp)&&wild.hp>0',
+    'target.alive=wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0',
+    'target.alive=wild?.dead!==true&&Number.isFinite(wild?.hp)&&wild.hp>0',
   )],
   ['snapshot accepts HP-zero target', mutate(
-    'alive:wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0',
-    'alive:wild?.dead===false',
+    'target.alive=wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0',
+    'target.alive=wild?.dead===false',
   )],
   ['snapshot accepts malformed capturing state', mutate(
-    'targetable:wild?.capturing===undefined||wild.capturing===false',
-    'targetable:wild?.capturing!==true',
+    'target.targetable=wild?.capturing===undefined||wild.capturing===false',
+    'target.targetable=wild?.capturing!==true',
   )],
   ['snapshot accepts malformed fainted actor', mutate(
-    "alive:(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0",
-    'alive:a?.inst?.fainted!==true&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0',
+    'actor.alive=(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0',
+    'actor.alive=a?.inst?.fainted!==true&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0',
   )],
-  ['materialize duplicate target', mutate('if(matches.length!==1)return null;', 'if(matches.length===0)return null;')],
+  ['materialize duplicate target', mutate('if(matchCount!==1)return null;', 'if(matchCount===0)return null;')],
   ['materialize malformed dead target', mutate('target.dead!==false||', 'target.dead===true||')],
   ['materialize HP-zero target', mutate('!Number.isFinite(target.hp)||target.hp<=0', 'false')],
   ['materialize malformed capturing target', mutate(
@@ -79,8 +79,8 @@ const mutants = [
     'const t=nearestWild(9,a.mesh.position);',
   )],
   ['call manual skill boundary', mutate(
-    'const decision=resolveOwnedBasicAiAction(',
-    'useSkill(0);const decision=resolveOwnedBasicAiAction(',
+    'a.aiDecision=resolveOwnedBasicAiAction(',
+    'useSkill(0);a.aiDecision=resolveOwnedBasicAiAction(',
   )],
   ['allow manual mastery in Basic call', mutate('{allowSkillMastery:false}', '{allowSkillMastery:true}')],
   ['restore unconditional mastery lookup', mutate(
