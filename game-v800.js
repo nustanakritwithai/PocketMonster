@@ -40,7 +40,7 @@ import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
-import { calculateCanonicalWildStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, refreshCanonicalOwnedStats, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { calculateCanonicalWildStats, computeCoreStats, evoDefFromPath, formatCrReport, growthExpForLevel, liveClassedMoveDamage, ranchTrainingGain, refreshCanonicalOwnedStats, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
   applySpeciesProgression,
@@ -680,6 +680,7 @@ function canonicalCombatSkills(inst){
       name:definition.nameTH||definition.nameEN,
       nameEN:definition.nameEN,
       type:definition.runtimeType,
+      category:definition.category,
       power:definition.power,
       targetType:definition.targetType,
       effect:definition.effect,
@@ -3132,10 +3133,11 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=t
   const skillRec=allowSkillMastery?(getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0])):null;
   const mastery=skillRec?masteryRawPower(skillRec.masteryRank):0;
   const derived=derivedStats(instanceCombatBuildSafe(attackerInst));
-  return liveMoveDamage({
+  return liveClassedMoveDamage({
+    category:move.category||'Physical',
     movePower:move.power||0,
-    atk:attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10,
-    def:defender.def||10,
+    attackerStats:{atk:attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10,spAtk:attackerInst.spAtk||attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10},
+    defenderStats:{def:defender.def||10,spDef:defender.spDef||defender.def||10},
     attackerLevel:attackerInst.level||1,
     defenderLevel:defender.level||1,
     stab,
@@ -3153,12 +3155,13 @@ function instanceCombatBuildSafe(inst){
   return computeCoreStats(inst,sp,getEvolutionPath(inst),getEquipmentFlat(inst)).build;
 }
 function wildDamage(w,inst,defenseMultiplier=1){
-  const sp=spById[w.speciesId],move={type:sp.types[0],power:w.boss?24:18};
+  const sp=spById[w.speciesId],move={type:sp.types[0],category:'Physical',power:w.boss?24:18};
   const eff=typeEffectiveness(move.type,monsterTypes(inst));
-  return liveMoveDamage({
+  return liveClassedMoveDamage({
+    category:move.category,
     movePower:move.power,
-    atk:w.atk||sp.base.atk,
-    def:(inst.def||10)*defenseMultiplier,
+    attackerStats:{atk:w.atk||sp.base.atk,spAtk:w.spAtk||w.atk||sp.base.atk},
+    defenderStats:{def:(inst.def||10)*defenseMultiplier,spDef:(inst.spDef||inst.def||10)*defenseMultiplier},
     attackerLevel:w.level||1,
     defenderLevel:inst.level||1,
     stab:1.5,
@@ -3963,7 +3966,7 @@ function updateOwned(dt){
     moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
   }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0){
     const liveTarget=materializeOwnedBasicAiTarget(a,decision);
-    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
+    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],category:'Physical',power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
   }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
@@ -4421,10 +4424,11 @@ function renderFocusedEvolutionBuildPreview(){
     const requirement=evoRequirementStatus(inst,path);
     const preview=previewEvolution(inst,def,build);
     const mods=path.statMods||{};
-    const delta=['hp','atk','def','spd'].map(stat=>{
+    const delta=['hp','atk','def','spAtk','spDef','spd'].map(stat=>{
       const current=stat==='hp'?inst.maxHp:inst[stat];
       const next=Math.round((current||0)*(mods[stat]||1));
-      return `${stat.toUpperCase()} ${next-current>=0?'+':''}${next-current}`;
+      const label=stat==='spAtk'?'SP.ATK':stat==='spDef'?'SP.DEF':stat.toUpperCase();
+      return `${label} ${next-current>=0?'+':''}${next-current}`;
     }).join(' • ');
     const types=[sp.types[0],preview.secondaryType||path.secondaryType||inst.secondaryType].filter(Boolean).map(type=>TYPE_TH[type]||type).join(' / ');
     const carry=preview.skillCarry.map(skill=>`${skill.from} → ${skill.to} ${Math.round(skill.carry*100)}%`).join(', ')||'ไม่มี Skill Carry';
@@ -4444,14 +4448,14 @@ function renderEvolution(targetPanel=null){
   const budget=`<span class="evo-budget-badge ok">Power Budget ${budgetMin}-${budgetMax}%</span>`;
   if(!paths.length){
     const p=getEvolutionPath(inst);
-    box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div>${identity}${evoHistoryHTML(inst)}</div>`;
+    box.innerHTML=`<div class="evo-card"><div class="evo-title"><b>${displayName(inst)}</b><span>${p?'Form ปัจจุบัน':'ยังไม่มีสาขา'}</span></div><div class="evo-details">${p?`วิวัฒนาการแล้ว • Type ${monsterTypes(inst).map(t=>TYPE_TH[t]).join('/')} • HP ${inst.maxHp} ATK ${inst.atk} DEF ${inst.def} SP.ATK ${inst.spAtk} SP.DEF ${inst.spDef} SPD ${inst.spd}`:`${sp.name} ยังไม่มี Evolution Path จากฟอร์มนี้`}</div>${identity}${evoHistoryHTML(inst)}</div>`;
     return;
   }
   box.innerHTML=renderFocusedEvolutionBuildPreview();
   for(const p of paths){
     const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');
     d.className='evo-card';
-    d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div>${carry}${identity}<div style="margin-top:6px">${budget}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>${evoHistoryHTML(inst)}`;
+    d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SP.ATK ×${mods.spAtk||1} • SP.DEF ×${mods.spDef||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div>${carry}${identity}<div style="margin-top:6px">${budget}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>${evoHistoryHTML(inst)}`;
     d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);
     box.appendChild(d);
   }
@@ -4630,9 +4634,12 @@ function equipMiniHTML(inst){
 function geneHTML(inst){return `Gene HP ${inst.genes.hp} • ATK ${inst.genes.atk} • DEF ${inst.genes.def} • SPD ${inst.genes.spd} • Trait: ${inst.genes.trait||'-'}`;}
 function breakdownHTML(inst){
   const br=inst.statBreakdown||{};
-  const atk=br.atk,def=br.def;
-  if(!atk)return '';
-  return `<div class="stat-breakdown">ATK ${atk.final} = base ${Math.round(atk.speciesBase)} + lv ${Math.round(atk.levelGrowth)} + train ${Math.round(atk.training)} + eq ${Math.round(atk.equipmentFlat)} × gene ${atk.geneRank} × evo ${atk.evolutionProfile} × cond ${atk.conditionModifier.toFixed(2)} • DEF ${def?.final??'-'}</div>`;
+  const labels={hp:'HP',atk:'ATK',def:'DEF',spAtk:'SP.ATK',spDef:'SP.DEF',spd:'SPD'};
+  const lines=['hp','atk','def','spAtk','spDef','spd'].map(stat=>{
+    const detail=br[stat];if(!detail)return '';
+    return `${labels[stat]} ${detail.final} = floor((2×${detail.baseStat} + Pot ${detail.potential} + Train ${detail.training}/4) × Lv.${detail.level}/100) + ${detail.flatBonus} + Nut ${detail.nutritionFlat} + Eq ${detail.equipmentFlat} × Cond ${detail.conditionMultiplier.toFixed(2)} × Passive ${detail.passiveMultiplier.toFixed(2)}`;
+  }).filter(Boolean);
+  return lines.length?`<div class="stat-breakdown">${lines.join('<br>')}</div>`:'';
 }
 function familyHTML(inst){
   const a=getInst(inst.parents?.a||inst.parentAId),b=getInst(inst.parents?.b||inst.parentBId);
@@ -4685,7 +4692,7 @@ function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';if(state.ui?.focusedMonsterId===inst.instanceId)wrap.classList.add('focused-monster');const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
   const eq=inst.equipment||{};
   const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SP.ATK ${inst.spAtk} • SP.DEF ${inst.spDef} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));
   wrap.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>careAction(inst.instanceId,b.dataset.care));
   wrap.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>toggleStarterEquip(inst.instanceId,b.dataset.equip));
@@ -4863,21 +4870,14 @@ function renderFullCharacterStatBreakdown(){
   const presentation=focusedCharacterPresentation();
   const inst=presentation.id?getInst(presentation.id):null;
   if(!inst)return '';
-  const species=spById[inst.speciesId];
-  const path=getEvolutionPath(inst);
-  const equipmentFlat=getEquipmentFlat(inst);
-  const details=[
-    ['HP',explainStat(inst,species,path,equipmentFlat,'hp')],
-    ['ATK',explainStat(inst,species,path,equipmentFlat,'atk')],
-    ['DEF',explainStat(inst,species,path,equipmentFlat,'def')],
-    ['SPD',explainStat(inst,species,path,equipmentFlat,'spd')],
-  ];
+  const labels={hp:'HP',atk:'ATK',def:'DEF',spAtk:'SP.ATK',spDef:'SP.DEF',spd:'SPD'};
+  const details=['hp','atk','def','spAtk','spDef','spd'].map(stat=>[labels[stat],inst.statBreakdown?.[stat]]).filter(([,detail])=>detail);
   const source=(label,value)=>`<span><b>${label}</b> ${value}</span>`;
   return `<details class="character-stat-breakdown"><summary>Stat Breakdown</summary>${details.map(([label,detail])=>`<section class="character-stat-source"><h4>${label} ${fmt(detail.final)}</h4><div>${[
-    source('Species Base',fmt(detail.speciesBase)),source('Level Growth',fmt(detail.levelGrowth)),
+    source('Workbook Base',fmt(detail.baseStat)),source('Level',fmt(detail.level)),source('Potential',fmt(detail.potential)),
     source('Training',fmt(detail.training)),source('Nutrition',fmt(detail.nutritionFlat)),
-    source('Equipment',fmt(detail.equipmentFlat)),source('Gene',detail.geneRank),
-    source('Evolution',detail.evolutionProfile.toFixed(2)),source('Condition',detail.conditionModifier.toFixed(2)),
+    source('Equipment',fmt(detail.equipmentFlat)),source('Condition',detail.conditionMultiplier.toFixed(2)),
+    source('Passive',detail.passiveMultiplier.toFixed(2)),
   ].join('')}</div></section>`).join('')}</details>`;
 }
 function renderFullCharacterStatus(){
@@ -4894,6 +4894,8 @@ function renderFullCharacterStatus(){
     <div class="character-status-hp"><b>HP</b><span>${fmt(presentation.hp??0)}/${fmt(presentation.maxHp??0)}</span></div>
     <div class="character-status-atk"><b>ATK</b><span>${fmt(presentation.atk??0)}</span></div>
     <div class="character-status-def"><b>DEF</b><span>${fmt(presentation.def??0)}</span></div>
+    <div class="character-status-spatk"><b>SP.ATK</b><span>${fmt(inst.spAtk??0)}</span></div>
+    <div class="character-status-spdef"><b>SP.DEF</b><span>${fmt(inst.spDef??0)}</span></div>
     <div class="character-status-spd"><b>SPD</b><span>${fmt(presentation.spd??0)}</span></div>
     <div class="character-status-cr"><b>CR</b><span>${presentation.cr??'—'}</span></div>
     <div class="character-status-condition"><b>Condition</b><span>${condition}</span></div>
@@ -4923,11 +4925,11 @@ function renderCrDebug(){
   }
   try{
     const report=formatCrReport(inst,spById[inst.speciesId],getEvolutionPath(inst),getEquipmentFlat(inst));
-    const b=report.breakdown,d=report.derived,r=report.rated;
+    const b=inst.statBreakdown||{},d=report.derived,r=report.rated,labels={hp:'HP',atk:'ATK',def:'DEF',spAtk:'SP.ATK',spDef:'SP.DEF',spd:'SPD'};
     box.classList.add('open');
-    box.innerHTML=`<div class="event-title">CR Debug • ${displayName(inst)} Lv.${inst.level} • CR ${r.cr} • DPS ${Math.round(r.dps)} • EHP ${Math.round(r.ehp)}</div>
-    <div class="cr-lines">${['hp','atk','def','spd'].map(stat=>{const s=b[stat];return `${stat.toUpperCase()} ${s.final} = base ${Math.round(s.speciesBase)} + lv ${Math.round(s.levelGrowth)} + train ${Math.round(s.training)} + nut ${Math.round(s.nutritionFlat)} + eq ${Math.round(s.equipmentFlat)} × gene ${s.geneRank}(${s.geneMultiplier}) × evo ${s.evolutionProfile} × cond ${s.conditionModifier.toFixed(2)}`;}).join('<br>')}
-    <br>Derived crit ${(d.critRate*100).toFixed(1)}% / ×${d.critDamage.toFixed(2)} • tempo ${(d.attackTempo*100).toFixed(1)}% • CDR ${(d.cooldownReduction*100).toFixed(1)}%</div>`;
+    box.innerHTML=`<div class="event-title">Stat Debug • ${displayName(inst)} Lv.${inst.level} • Legacy CR ${r.cr} • DPS ${Math.round(r.dps)} • EHP ${Math.round(r.ehp)}</div>
+    <div class="cr-lines">${['hp','atk','def','spAtk','spDef','spd'].map(stat=>{const s=b[stat];return s?`${labels[stat]} ${s.final} = base ${s.baseStat} + potential ${s.potential} + training ${s.training}/4 + nutrition ${s.nutritionFlat} + equipment ${s.equipmentFlat} × condition ${s.conditionMultiplier.toFixed(2)} × passive ${s.passiveMultiplier.toFixed(2)}`:`${labels[stat]} —`;}).join('<br>')}
+    <br>Legacy Derived crit ${(d.critRate*100).toFixed(1)}% / ×${d.critDamage.toFixed(2)} • tempo ${(d.attackTempo*100).toFixed(1)}% • CDR ${(d.cooldownReduction*100).toFixed(1)}%</div>`;
     return r;
   }catch(err){
     box.classList.add('open');
@@ -5175,7 +5177,7 @@ function renderCharacterAccess(){
   const cr=inst?monsterCrValue(inst):null;
   setTextIfChanged(el('characterAccessCr'),inst?`CR ${cr??'—'}`:'CR —');
   setTextIfChanged(el('characterAccessPlace'),inst?roster.label:'');
-  setTextIfChanged(el('characterAccessStats'),inst?`ATK ${inst.atk} · DEF ${inst.def} · SPD ${inst.spd}`:'ATK — · DEF — · SPD —');
+  setTextIfChanged(el('characterAccessStats'),inst?`ATK ${inst.atk} · DEF ${inst.def} · SP.ATK ${inst.spAtk} · SP.DEF ${inst.spDef} · SPD ${inst.spd}`:'ATK — · DEF — · SP.ATK — · SP.DEF — · SPD —');
   const reason=el('characterAccessReason');
   const showReason=Boolean(open&&snap.readOnly);
   setClassTokenIfChanged(reason,'hidden',!showReason);

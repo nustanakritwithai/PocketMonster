@@ -24,6 +24,12 @@ import { EQUIPMENT_CATALOG, personalityTrainingMultiplier } from './content-cata
 export const LEVEL_GROWTH_SCALE = Object.freeze({ hp: 0.14, atk: 0.08, def: 0.08, spd: 0.05 });
 export const STARTER_EQUIPMENT = EQUIPMENT_CATALOG.filter(item => ['ranch_band', 'guard_charm', 'swift_lens'].includes(item.id));
 export const CANONICAL_LIVE_STAT_VERSION = 'canonical-live-stats/v1';
+export const LIVE_DAMAGE_CLASS_POLICY = Object.freeze({
+  Physical: Object.freeze({ attackStat: 'atk', defenseStat: 'def', workbookAttackStat: 'ATK', workbookDefenseStat: 'DEF' }),
+  Special: Object.freeze({ attackStat: 'spAtk', defenseStat: 'spDef', workbookAttackStat: 'SPATK', workbookDefenseStat: 'SPDEF' }),
+  basicAttackClass: 'Physical',
+  nonPhysicalDirectClass: 'Special',
+});
 export const WILD_STAT_VARIANT_MULTIPLIERS = Object.freeze({
   Normal: Object.freeze({ hp: 1, atk: 1, def: 1, spAtk: 1, spDef: 1, spd: 1 }),
   Rare: Object.freeze({ hp: 1, atk: 1, def: 1, spAtk: 1, spDef: 1, spd: 1 }),
@@ -269,6 +275,37 @@ export function liveMoveDamage({
     Math.round(base * mitigation.damageMultiplier * stab * effectiveness * mastery * traitBonus * crit),
   );
   return { damage, stab, eff: effectiveness, mitigation, crit: crit > 1 };
+}
+
+export function resolveLiveDamageClass({ category = LIVE_DAMAGE_CLASS_POLICY.basicAttackClass, attackerStats, defenderStats } = {}) {
+  const damageClass = category === 'Physical' ? 'Physical' : LIVE_DAMAGE_CLASS_POLICY.nonPhysicalDirectClass;
+  const route = LIVE_DAMAGE_CLASS_POLICY[damageClass];
+  const attackValue = attackerStats?.[route.attackStat];
+  const defenseValue = defenderStats?.[route.defenseStat];
+  if (!Number.isFinite(attackValue) || attackValue < 1) {
+    return Object.freeze({ ok: false, reason: 'invalid_attack_stat', damageClass, stat: route.attackStat, value: attackValue ?? null });
+  }
+  if (!Number.isFinite(defenseValue) || defenseValue < 1) {
+    return Object.freeze({ ok: false, reason: 'invalid_defense_stat', damageClass, stat: route.defenseStat, value: defenseValue ?? null });
+  }
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    damageClass,
+    attackStat: route.attackStat,
+    defenseStat: route.defenseStat,
+    workbookAttackStat: route.workbookAttackStat,
+    workbookDefenseStat: route.workbookDefenseStat,
+    attackValue,
+    defenseValue,
+  });
+}
+
+export function liveClassedMoveDamage({ category = LIVE_DAMAGE_CLASS_POLICY.basicAttackClass, attackerStats, defenderStats, ...damageInput } = {}) {
+  const route = resolveLiveDamageClass({ category, attackerStats, defenderStats });
+  if (!route.ok) return Object.freeze({ ...route, damage: 0, stab: damageInput.stab ?? 1, eff: damageInput.effectiveness ?? 1, crit: false });
+  const result = liveMoveDamage({ ...damageInput, atk: route.attackValue, def: route.defenseValue });
+  return Object.freeze({ ok: true, reason: null, ...result, ...route });
 }
 
 export function evoDefFromPath(path, speciesId) {
