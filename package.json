@@ -16,7 +16,8 @@
     "test:v81:capture": "node tests/v81-capture-calculator.mjs && node tests/v81-capture-calculator-mutants.mjs && node tests/v81-capture-transaction.mjs && node tests/v81-capture-transaction-mutants.mjs && node tests/v81-capture-live-wiring.mjs && node tests/v81-capture-live-wiring-mutants.mjs",
     "test:v81:passive": "node tests/v81-passive-catalog.mjs && node tests/v81-passive-resolver.mjs && node tests/v81-passive-instance.mjs && node tests/v81-passive-mutants.mjs && node tests/v81-passive-live-mutants.mjs",
     "test:v81:ai": "node tests/v81-ai-profile.mjs && node tests/v81-basic-ai-resolver.mjs && node tests/v81-basic-ai-live-wiring.mjs && node tests/v81-ai-mutants.mjs && node tests/v81-ai-live-mutants.mjs",
-    "ci": "npm run check && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding && npm run test:v81:skill-memory && npm run test:v81:capture && npm run test:v81:passive && npm run test:v81:ai"
+    "test:v81:icons": "node tests/v81-skill-icon-descriptor.mjs && node tests/v81-skill-icon-descriptor-mutants.mjs",
+    "ci": "npm run check && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding && npm run test:v81:skill-memory && npm run test:v81:capture && npm run test:v81:passive && npm run test:v81:ai && npm run test:v81:icons"
   },
   "description": "Monster Life RPG V8.2.0 - Progression Core live loop (balance, raising, battle growth, care, skills, equipment, evolution, events, breeding)"
 }
