@@ -21,7 +21,8 @@ for (const rule of [
 }
 assert.match(pass, /\.manager-head\{font-size:14px/, 'character manager title shrinks on mobile');
 assert.match(pass, /\.warp-prompt-card h2\{font-size:13px/, 'warp sheet title shrinks on mobile');
-assert.match(pass, /width:min\(280px,52vw\)/, 'warp sheet stays a compact chip instead of a wide stage banner');
+assert.match(pass, /width:min\(200px,32vw\)/, 'warp sheet stays a compact chip instead of a wide stage banner');
+assert.match(pass, /\.warp-prompt\{[^}]*place-items:start start/, 'warp chip docks on the left rail instead of the party slots');
 assert.match(pass, /\.warp-prompt \.stage-select-handle,\.warp-prompt \.stage-select-kicker\{display:none\}/, 'warp sheet drops the handle and WARP POINT kicker');
 assert.match(pass, /\.warp-prompt\{[^}]*pointer-events:none/, 'compact warp sheet does not cover the joystick');
 assert.match(pass, /\.ranch-services-card h2,.ranch-storage-head h2\{font-size:14px/, 'ranch sheet title shrinks on mobile');
