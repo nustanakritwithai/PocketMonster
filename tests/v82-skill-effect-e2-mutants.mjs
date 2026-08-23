@@ -126,7 +126,7 @@ const runtimeMutations = [
   ['disable crit modifier', "critChancePct: clamp(magnitudeFor('CritChance'), 0, WORKBOOK_DAMAGE_RULES.critChanceCapPct),", 'critChancePct: 0,'],
   ['use defender clock for actor buffs', 'const attackerStatuses = activeStatusIds(attacker, attackerNowSec);', 'const attackerStatuses = activeStatusIds(attacker, defenderNowSec);'],
   ['skip composite actor resolution', 'if (E2_READY_SKILLS.has(skillId)) {\n    e2 = resolveE2SkillEffects', 'if (false) {\n    e2 = resolveE2SkillEffects'],
-  ['leave E2 component deferred', '|| component.slice === E2_SELF_EFFECT_POLICY.phase\n    || component.slice === E3_FIELD_EFFECT_POLICY.phase;', '|| false\n    || component.slice === E3_FIELD_EFFECT_POLICY.phase;'],
+  ['leave E2 component deferred', '|| component.slice === E2_SELF_EFFECT_POLICY.phase\n    || component.slice === E3_FIELD_EFFECT_POLICY.phase\n    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;', '|| false\n    || component.slice === E3_FIELD_EFFECT_POLICY.phase\n    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;'],
 ];
 
 for (const [name, from, to] of runtimeMutations) {
