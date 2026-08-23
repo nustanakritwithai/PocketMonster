@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { MONSTER_CATALOG, validateMonsterCatalog } from './monster-catalog.mjs';
-import { STAGE_CATALOG, validateZoneEncounterConfig } from './stage-catalog.mjs';
+import { STAGE_CATALOG, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { validateWarpRoutes } from './warp-routes.mjs';
 
 function deepFreeze(value, seen = new Set()) {
@@ -45,6 +45,7 @@ const WORKBOOK_IMPLEMENTED_STAGE_IDS = [
   'rocky-canyon', 'sky-ruins', 'poison-marsh', 'dream-shrine',
 ];
 const CANONICAL_ADDED_STAGE_IDS = ['haunted-woods', 'shadow-city', 'steel-factory'];
+const CANONICAL_FINAL_STAGE_IDS = ['dragon-crater', 'fairy-garden', 'combat-colosseum', 'normal-wildlands'];
 const WORKBOOK_ROUTE_IDS = [
   'hub-to-grass', 'grass-to-hub', 'grass-to-ember', 'ember-to-grass',
   'ember-to-misty', 'misty-to-ember', 'misty-to-storm', 'storm-to-misty',
@@ -56,13 +57,15 @@ const CANONICAL_ADDED_ROUTE_IDS = [
   'grassland-to-hub', 'dream-to-haunted', 'haunted-to-dream', 'haunted-to-shadow',
   'shadow-to-haunted', 'shadow-to-steel', 'steel-to-shadow', 'steel-to-hub',
 ];
-const PLANNED_NO_RUNTIME_STAGE_IDS = [
-  'dragon-crater', 'fairy-garden', 'combat-colosseum', 'normal-wildlands',
+const CANONICAL_FINAL_ROUTE_IDS = [
+  'steel-to-dragon', 'dragon-to-steel', 'dragon-to-fairy', 'fairy-to-dragon',
+  'fairy-to-combat', 'combat-to-fairy', 'combat-to-normal', 'normal-to-combat',
+  'normal-to-hub',
 ];
 const STAGE_CATALOG_IDS = [
   ...WORKBOOK_IMPLEMENTED_STAGE_IDS,
   ...CANONICAL_ADDED_STAGE_IDS,
-  ...PLANNED_NO_RUNTIME_STAGE_IDS,
+  ...CANONICAL_FINAL_STAGE_IDS,
 ];
 
 const LANDMARKS = [
@@ -98,6 +101,13 @@ const CANONICAL_ADDED_ZONE_METADATA = [
   ['steel-factory', 'Steel Factory • Steel + Electric + Rock', 'steel-factory', 'steel-factory', ['Steel'], ['Electric', 'Rock'], 'ironbug', 'stage-ready'],
 ];
 
+const CANONICAL_FINAL_ZONE_METADATA = [
+  ['dragon-crater', 'Dragon Crater • Dragon + Fire + Rock', 'dragon-crater', 'dragon-crater', ['Dragon'], ['Fire', 'Rock'], 'emberdrake', 'stage-ready'],
+  ['fairy-garden', 'Fairy Garden • Fairy + Grass + Psychic', 'fairy-garden', 'fairy-garden', ['Fairy'], ['Grass', 'Psychic'], 'fairimp', 'stage-ready'],
+  ['combat-colosseum', 'Combat Colosseum • Fighting + Normal + Steel', 'combat-colosseum', 'combat-colosseum', ['Fighting'], ['Normal', 'Steel'], 'punchcub', 'stage-ready'],
+  ['normal-wildlands', 'Normal Wildlands • Normal + All Types', 'normal-wildlands', 'normal-wildlands', ['Normal'], ['Grass','Bug','Fire','Water','Electric','Ice','Rock','Ground','Flying','Poison','Psychic','Ghost','Dark','Steel','Dragon','Fairy','Fighting'], 'normalooze', 'stage-ready'],
+];
+
 export const WORKBOOK_WORLD_BASELINE = deepFreeze({
   validationSurface: 'ci_only_no_runtime_xlsx_read',
   workbookFile: 'PocketMonster_Detailed_v2.1_SkillButtonIcons.xlsx',
@@ -115,7 +125,7 @@ export const WORKBOOK_WORLD_BASELINE = deepFreeze({
   zoneIds: WORKBOOK_ZONE_IDS,
   implementedStageIds: WORKBOOK_IMPLEMENTED_STAGE_IDS,
   stageCatalogIds: STAGE_CATALOG_IDS,
-  plannedNoRuntimeStageIds: PLANNED_NO_RUNTIME_STAGE_IDS,
+  plannedNoRuntimeStageIds: CANONICAL_FINAL_STAGE_IDS,
   routeIds: WORKBOOK_ROUTE_IDS,
   zoneMetadata: WORKBOOK_ZONE_METADATA,
   spawnPlacements: {
@@ -162,7 +172,42 @@ export const CANONICAL_MAIN_WORLD_ADDITIONS = deepFreeze({
   },
 });
 
-export const WORLD_WARNING_BASELINE = deepFreeze([
+export const CANONICAL_LEVEL_RESOLUTION = deepFreeze({
+  policyBaseCommit: 'e373d350e8ee996e858335c14fd2d80f89e46d18',
+  authority: 'stage-catalog.mjs',
+  resolvedAuditIds: ['MAP-A01:ember-valley','MAP-A01:misty-lake','MAP-A01:storm-field','MAP-A01:frozen-pass','MAP-A01:rocky-canyon','MAP-A01:sky-ruins','MAP-A01:poison-marsh','MAP-A06'],
+  stageIds: ['ember-valley','misty-lake','storm-field','frozen-pass','rocky-canyon','sky-ruins','poison-marsh'],
+  spawnPlacements: {
+    count: 109,
+    digest: 'ffaef02fa95bdcd6d17bf258aa34b1bc9576595c20688908ed617e98a0d7a3ac',
+  },
+  stages: {
+    count: 9,
+    digest: '7c16946b377095907fe8bd4d376ed9767c2534757f855a3e22cf7e93e172b2f6',
+  },
+});
+
+export const CANONICAL_FINAL_WORLD_ADDITIONS = deepFreeze({
+  policyBaseCommit: 'e373d350e8ee996e858335c14fd2d80f89e46d18',
+  zoneIds: CANONICAL_FINAL_STAGE_IDS,
+  implementedStageIds: CANONICAL_FINAL_STAGE_IDS,
+  routeIds: CANONICAL_FINAL_ROUTE_IDS,
+  zoneMetadata: CANONICAL_FINAL_ZONE_METADATA,
+  spawnPlacements: {
+    count: 32,
+    digest: '315af5a853a4ddd04b765828479d71e4b6cd244929be9fed65c5b076e531e656',
+  },
+  routes: {
+    count: 9,
+    digest: '5a7aa79073481145c44b99469fcdfb50001f64aaa64f0b40c7e5ab36176ed6e4',
+  },
+  stages: {
+    count: 4,
+    digest: 'ff5ac7f28d89a8304e9bd4c3141a5ae4a4b622c895ec564b0da3a2f85f9b7f9a',
+  },
+});
+
+export const WORKBOOK_WORLD_WARNING_SNAPSHOT = deepFreeze([
   { id: 'MAP-A01:ember-valley', auditId: 'MAP-A01', severity: 'HIGH', code: 'level_range_mismatch', mapId: 'ember-valley', runtimeLevel: '4-8', catalogLevel: '4-7', sourceCell: 'Map_Audit!A18:D18' },
   { id: 'MAP-A01:misty-lake', auditId: 'MAP-A01', severity: 'HIGH', code: 'level_range_mismatch', mapId: 'misty-lake', runtimeLevel: '7-12', catalogLevel: '5-8', sourceCell: 'Map_Audit!A19:D19' },
   { id: 'MAP-A01:storm-field', auditId: 'MAP-A01', severity: 'HIGH', code: 'level_range_mismatch', mapId: 'storm-field', runtimeLevel: '12-18', catalogLevel: '6-10', sourceCell: 'Map_Audit!A20:D20' },
@@ -172,6 +217,21 @@ export const WORLD_WARNING_BASELINE = deepFreeze([
   { id: 'MAP-A01:poison-marsh', auditId: 'MAP-A01', severity: 'HIGH', code: 'level_range_mismatch', mapId: 'poison-marsh', runtimeLevel: '30-38', catalogLevel: '16-20', sourceCell: 'Map_Audit!A24:D24' },
   { id: 'MAP-A03', auditId: 'MAP-A03', severity: 'HIGH', code: 'fairy_light_deferred', runtimeSpeciesId: 'fairimp', runtimeType: 'Fairy', workbookTypeCandidate: 'LIGHT', sourceCell: 'Map_Audit!F6' },
   { id: 'MAP-A06', auditId: 'MAP-A06', severity: 'HIGH', code: 'poison_dream_level_inversion', fromMapId: 'poison-marsh', fromLevel: '30-38', toMapId: 'dream-shrine', toLevel: '20-24', sourceCell: 'Map_Audit!F9' },
+]);
+
+export const WORLD_RESOLUTION_BASELINE = deepFreeze([
+  {id:'MAP-A01:ember-valley',code:'level_range_resolved',mapId:'ember-valley',catalogLevel:'4-7'},
+  {id:'MAP-A01:misty-lake',code:'level_range_resolved',mapId:'misty-lake',catalogLevel:'5-8'},
+  {id:'MAP-A01:storm-field',code:'level_range_resolved',mapId:'storm-field',catalogLevel:'6-10'},
+  {id:'MAP-A01:frozen-pass',code:'level_range_resolved',mapId:'frozen-pass',catalogLevel:'10-14'},
+  {id:'MAP-A01:rocky-canyon',code:'level_range_resolved',mapId:'rocky-canyon',catalogLevel:'12-16'},
+  {id:'MAP-A01:sky-ruins',code:'level_range_resolved',mapId:'sky-ruins',catalogLevel:'14-18'},
+  {id:'MAP-A01:poison-marsh',code:'level_range_resolved',mapId:'poison-marsh',catalogLevel:'16-20'},
+  {id:'MAP-A06',code:'level_inversion_resolved',fromMapId:'poison-marsh',fromLevel:'16-20',toMapId:'dream-shrine',toLevel:'20-24'},
+]);
+
+export const WORLD_WARNING_BASELINE = deepFreeze([
+  { id: 'MAP-A03', auditId: 'MAP-A03', severity: 'HIGH', code: 'fairy_light_deferred', runtimeSpeciesId: 'fairimp', runtimeType: 'Fairy', workbookTypeCandidate: 'LIGHT', sourceCell: 'Map_Audit!F6' },
 ]);
 
 function variantFrom(listName, options) {
@@ -315,27 +375,10 @@ function addDigestIssues(rows, policy, issues, codes) {
   }
 }
 
-function rangeText(range) {
-  return Number.isFinite(range?.min) && Number.isFinite(range?.max) ? `${range.min}-${range.max}` : null;
-}
-
 function validateKnownWarnings(zones, stages, mappings, issues) {
-  const stageById = new Map((Array.isArray(stages) ? stages : []).map(stage => [stage?.id, stage]));
-  for (const warning of WORLD_WARNING_BASELINE.filter(row => row.code === 'level_range_mismatch')) {
-    const runtimeLevel = rangeText(zones?.[warning.mapId]?.recommendedLevel);
-    const catalogLevel = rangeText(stageById.get(warning.mapId)?.recommendedLevel);
-    if (runtimeLevel !== warning.runtimeLevel || catalogLevel !== warning.catalogLevel) {
-      issues.push({ code: 'known_warning_mismatch', warningId: warning.id, runtimeLevel, catalogLevel });
-    }
-  }
   const fairimp = (Array.isArray(mappings) ? mappings : []).find(mapping => mapping?.runtimeSpeciesId === 'fairimp');
   if (fairimp?.runtimeType !== 'Fairy' || fairimp?.workbookTypeCandidate !== 'LIGHT' || fairimp?.typeActivation !== 'deferred') {
     issues.push({ code: 'known_warning_mismatch', warningId: 'MAP-A03' });
-  }
-  const poisonLevel = rangeText(zones?.['poison-marsh']?.recommendedLevel);
-  const dreamLevel = rangeText(zones?.['dream-shrine']?.recommendedLevel);
-  if (poisonLevel !== '30-38' || dreamLevel !== '20-24') {
-    issues.push({ code: 'known_warning_mismatch', warningId: 'MAP-A06', fromLevel: poisonLevel, toLevel: dreamLevel });
   }
 }
 
@@ -405,11 +448,12 @@ function validateZoneMetadata(zones, issues) {
   for (const [partition, expectedRows] of [
     ['workbook', WORKBOOK_WORLD_BASELINE.zoneMetadata],
     ['canonical', CANONICAL_MAIN_WORLD_ADDITIONS.zoneMetadata],
+    ['final', CANONICAL_FINAL_WORLD_ADDITIONS.zoneMetadata],
   ]) {
     for (const expected of expectedRows) {
       const actual = zoneMetadataRow(expected[0], zones?.[expected[0]]);
       if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-        issues.push({ code: partition === 'workbook' ? 'workbook_zone_mismatch' : 'canonical_zone_mismatch', zoneId: expected[0] });
+        issues.push({ code: partition === 'workbook' ? 'workbook_zone_mismatch' : partition === 'canonical' ? 'canonical_zone_mismatch' : 'final_zone_mismatch', zoneId: expected[0] });
       }
     }
   }
@@ -476,11 +520,12 @@ export function validateWorldContentSuperset(input = {}) {
   const safeStages = Array.isArray(stages) ? stages : [];
 
   for (const issue of validateZoneEncounterConfig(zones).issues) issues.push(safeCopy(issue));
+  for (const issue of validateStageLevelProgression(zones,{stages:safeStages}).issues) issues.push(safeCopy(issue));
   for (const issue of validateWarpRoutes(routes === undefined ? null : routes, { knownZoneIds: Object.keys(safeZones) }).issues) issues.push(safeCopy(issue));
   validateMappings(speciesMappings, issues);
   validateSpawnRecordShapes(safeZones, issues);
 
-  const expectedZoneIds = [...WORKBOOK_WORLD_BASELINE.zoneIds, ...CANONICAL_MAIN_WORLD_ADDITIONS.zoneIds];
+  const expectedZoneIds = [...WORKBOOK_WORLD_BASELINE.zoneIds, ...CANONICAL_MAIN_WORLD_ADDITIONS.zoneIds, ...CANONICAL_FINAL_WORLD_ADDITIONS.zoneIds];
   validateExactIds(Object.keys(safeZones), expectedZoneIds, issues, 'missing_workbook_zone', 'unexpected_zone', 'zoneId');
   validateLegacyAndHubMetadata(safeZones, issues);
   validateZoneMetadata(safeZones, issues);
@@ -505,8 +550,11 @@ export function validateWorldContentSuperset(input = {}) {
   for (const id of CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds) {
     if (!implementedSet.has(id)) issues.push({ code: 'missing_canonical_stage', stageId: id });
   }
+  for (const id of CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds) {
+    if (!implementedSet.has(id)) issues.push({ code: 'missing_final_stage', stageId: id });
+  }
   for (const id of implementedSet) {
-    if (!WORKBOOK_WORLD_BASELINE.implementedStageIds.includes(id) && !CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds.includes(id)) {
+    if (!WORKBOOK_WORLD_BASELINE.implementedStageIds.includes(id) && !CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds.includes(id) && !CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds.includes(id)) {
       issues.push({ code: 'unexpected_implemented_stage', stageId: id });
     }
   }
@@ -514,7 +562,8 @@ export function validateWorldContentSuperset(input = {}) {
   const spawnRows = normalizeSpawnRows(safeZones);
   const workbookSpawnRows = spawnRows.filter(row => WORKBOOK_WORLD_BASELINE.zoneIds.includes(row[0]));
   const canonicalSpawnRows = spawnRows.filter(row => CANONICAL_MAIN_WORLD_ADDITIONS.zoneIds.includes(row[0]));
-  addDigestIssues(workbookSpawnRows, WORKBOOK_WORLD_BASELINE.spawnPlacements, issues, {
+  const finalSpawnRows = spawnRows.filter(row => CANONICAL_FINAL_WORLD_ADDITIONS.zoneIds.includes(row[0]));
+  addDigestIssues(workbookSpawnRows, CANONICAL_LEVEL_RESOLUTION.spawnPlacements, issues, {
     missing: 'missing_workbook_spawn', unexpected: 'unexpected_spawn', duplicate: 'duplicate_spawn_signature',
     mismatch: 'workbook_spawn_digest_mismatch',
   });
@@ -522,11 +571,16 @@ export function validateWorldContentSuperset(input = {}) {
     missing: 'missing_canonical_spawn', unexpected: 'unexpected_spawn', duplicate: 'duplicate_spawn_signature',
     mismatch: 'canonical_spawn_digest_mismatch',
   });
+  addDigestIssues(finalSpawnRows, CANONICAL_FINAL_WORLD_ADDITIONS.spawnPlacements, issues, {
+    missing: 'missing_final_spawn', unexpected: 'unexpected_spawn', duplicate: 'duplicate_spawn_signature',
+    mismatch: 'final_spawn_digest_mismatch',
+  });
 
   const routeRows = normalizeRouteRows(safeRoutes);
   const workbookRouteRows = routeRows.filter(row => WORKBOOK_WORLD_BASELINE.routeIds.includes(row[0]));
   const canonicalRouteRows = routeRows.filter(row => CANONICAL_MAIN_WORLD_ADDITIONS.routeIds.includes(row[0]));
-  const unknownRouteRows = routeRows.filter(row => !WORKBOOK_WORLD_BASELINE.routeIds.includes(row[0]) && !CANONICAL_MAIN_WORLD_ADDITIONS.routeIds.includes(row[0]));
+  const finalRouteRows = routeRows.filter(row => CANONICAL_FINAL_WORLD_ADDITIONS.routeIds.includes(row[0]));
+  const unknownRouteRows = routeRows.filter(row => !WORKBOOK_WORLD_BASELINE.routeIds.includes(row[0]) && !CANONICAL_MAIN_WORLD_ADDITIONS.routeIds.includes(row[0]) && !CANONICAL_FINAL_WORLD_ADDITIONS.routeIds.includes(row[0]));
   if (unknownRouteRows.length > 0) issues.push({ code: 'unexpected_route', routeIds: unknownRouteRows.map(row => row[0]) });
   addDigestIssues(workbookRouteRows, WORKBOOK_WORLD_BASELINE.routes, issues, {
     missing: 'missing_workbook_route', unexpected: 'unexpected_route', duplicate: 'duplicate_route_signature',
@@ -536,18 +590,22 @@ export function validateWorldContentSuperset(input = {}) {
     missing: 'missing_canonical_route', unexpected: 'unexpected_route', duplicate: 'duplicate_route_signature',
     mismatch: 'canonical_route_digest_mismatch',
   });
+  addDigestIssues(finalRouteRows, CANONICAL_FINAL_WORLD_ADDITIONS.routes, issues, {
+    missing: 'missing_final_route', unexpected: 'unexpected_route', duplicate: 'duplicate_route_signature',
+    mismatch: 'final_route_digest_mismatch',
+  });
 
   const workbookStageRows = normalizeStageRows(safeZones, safeStages, WORKBOOK_WORLD_BASELINE.implementedStageIds);
   const canonicalStageRows = normalizeStageRows(safeZones, safeStages, CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds);
-  const plannedStageRows = normalizeStageRows({}, safeStages, WORKBOOK_WORLD_BASELINE.plannedNoRuntimeStageIds);
-  if (worldContentDigest(workbookStageRows) !== WORKBOOK_WORLD_BASELINE.stages.digest) {
+  const finalStageRows = normalizeStageRows(safeZones, safeStages, CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds);
+  if (worldContentDigest(workbookStageRows) !== CANONICAL_LEVEL_RESOLUTION.stages.digest) {
     issues.push({ code: 'stage_catalog_mismatch', partition: 'workbook' });
   }
   if (worldContentDigest(canonicalStageRows) !== CANONICAL_MAIN_WORLD_ADDITIONS.stages.digest) {
     issues.push({ code: 'stage_catalog_mismatch', partition: 'canonical' });
   }
-  if (worldContentDigest(plannedStageRows) !== WORKBOOK_WORLD_BASELINE.plannedStages.digest) {
-    issues.push({ code: 'stage_catalog_mismatch', partition: 'planned_no_runtime' });
+  if (worldContentDigest(finalStageRows) !== CANONICAL_FINAL_WORLD_ADDITIONS.stages.digest) {
+    issues.push({ code: 'stage_catalog_mismatch', partition: 'final' });
   }
   validateKnownWarnings(safeZones, safeStages, speciesMappings, issues);
 
@@ -558,15 +616,19 @@ export function validateWorldContentSuperset(input = {}) {
     actualZoneEntries: Object.keys(safeZones).length,
     workbookZoneEntries: WORKBOOK_WORLD_BASELINE.zoneIds.length,
     canonicalAddedZoneEntries: CANONICAL_MAIN_WORLD_ADDITIONS.zoneIds.length,
+    finalAddedZoneEntries: CANONICAL_FINAL_WORLD_ADDITIONS.zoneIds.length,
     actualSpawnPlacements: spawnRows.length,
     workbookSpawnPlacements: workbookSpawnRows.length,
     canonicalAddedSpawnPlacements: canonicalSpawnRows.length,
+    finalAddedSpawnPlacements: finalSpawnRows.length,
     actualRoutes: routeRows.length,
     workbookRoutes: workbookRouteRows.length,
     canonicalAddedRoutes: canonicalRouteRows.length,
+    finalAddedRoutes: finalRouteRows.length,
     actualImplementedStages: implementedSet.size,
     workbookImplementedStages: WORKBOOK_WORLD_BASELINE.implementedStageIds.length,
     canonicalAddedImplementedStages: CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds.length,
+    finalAddedImplementedStages: CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds.length,
     stageCatalogEntries: safeStages.length,
     landmarks: WORKBOOK_WORLD_BASELINE.landmarks.length,
   });
