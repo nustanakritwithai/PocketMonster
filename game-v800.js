@@ -40,7 +40,7 @@ import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
-import { computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, refreshCoreStats, STARTER_EQUIPMENT } from './live-progression.mjs';
+import { calculateCanonicalWildStats, computeCoreStats, evoDefFromPath, explainStat, formatCrReport, growthExpForLevel, liveMoveDamage, ranchTrainingGain, refreshCanonicalOwnedStats, STARTER_EQUIPMENT } from './live-progression.mjs';
 import { derivedStats } from './combat-rating.mjs';
 import {
   applySpeciesProgression,
@@ -616,7 +616,6 @@ const spById=speciesCatalogAdapter.byId;
 const personalities=['Brave','Calm','Playful','Lazy','Aggressive','Curious'];
 const POTENTIALS=['D','C','B','A','S'];
 // V7.2 Balance Foundation gene scale: narrow 8% spread (D=0.96 → S=1.04)
-const POTENTIAL_MOD={D:0.96, C:0.98, B:1.00, A:1.02, S:1.04};
 const GENE_RANKS=['D','C','B','A','S'];
 const TRAIN_FOCUS={power:'Power',defense:'Defense',speed:'Speed',technique:'Technique',spirit:'Spirit'};
 const MASTERY_DOTS={novice:'●○○○○',familiar:'●●○○○',skilled:'●●●○○',expert:'●●●●○',master:'●●●●●'};
@@ -695,8 +694,8 @@ function canonicalCombatSkills(inst){
   });
 }
 function randomGenes(sp){ return {hp:rand(POTENTIALS),atk:rand(POTENTIALS),def:rand(POTENTIALS),spd:rand(POTENTIALS),trait:rand(sp.traitPool),skillGene:sp.skills[0].name,typeAffinity:sp.types[0]}; }
+function randomPotential(){return {hp:Math.floor(Math.random()*32),atk:Math.floor(Math.random()*32),def:Math.floor(Math.random()*32),spAtk:Math.floor(Math.random()*32),spDef:Math.floor(Math.random()*32),spd:Math.floor(Math.random()*32)};}
 function lifeStageFor(inst){ if(inst.origin==='bred'&&inst.level<=1)return 'Baby'; if(inst.level<=2)return 'Juvenile'; if(inst.level<6)return 'Adult'; return 'Mature'; }
-function statValue(base,level,pot,scale,bonus=0){ return Math.max(1,Math.round(base*(1+(level-1)*scale)*(POTENTIAL_MOD[pot]||1)+bonus)); }
 function refreshStats(inst,heal=false){
   const sp=spById[inst.speciesId]; if(!sp)return;
   syncToBodyMind(inst);
@@ -704,7 +703,7 @@ function refreshStats(inst,heal=false){
   inst.training=inst.training||{power:0,defense:0,speed:0,technique:0,spirit:0};
   inst._condition=deriveCondition(inst);
   const path=getEvolutionPath(inst);
-  const computed=refreshCoreStats(inst,sp,path,getEquipmentFlat(inst),{heal});
+  const computed=refreshCanonicalOwnedStats(inst,getEquipmentFlat(inst),{heal});
   inst.statBreakdown=computed.breakdown;
   inst.lifeStage=lifeStageFor(inst);
   syncFromBodyMind(inst);
@@ -723,6 +722,7 @@ function makeInstance(sp,level=1,opts={}){
     personalityId:personality,
     gender:opts.gender||rollGender(sp),
     genes,
+    potential:opts.potential,
     aptitude:opts.aptitude||sp.aptitudeBase,
     speciesTags:sp.types,
     favoriteTags:sp.favoriteTags||[],
@@ -2787,17 +2787,20 @@ function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp?.elite,rare=!!opts.rare;
   const encounterProfile=resolveEncounterProfile({stageId:STAGE_BY_ID[state.currentZone]?state.currentZone:null,runtimeSpeciesId:sp?.id,variant:encounterVariantFromFlags({boss,elite,rare}),level});
   if(!encounterProfile.ok){console.warn('Encounter profile rejected',encounterProfile.issues);return null;}
-  const evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
+  const evolutionPath=opts.evolutionPath??((level>=2)&&sp.evolutionPaths?.[0]?.id||null),potential=opts.potential??randomPotential(),variant=boss?'Boss':elite?'Elite':rare?'Rare':'Normal';
+  const canonicalStats=calculateCanonicalWildStats({runtimeSpeciesId:sp.id,stage:evolutionPath?2:1,level,potential,training:{hp:0,atk:0,def:0,spAtk:0,spDef:0,spd:0},variant});
+  if(!canonicalStats.ok){console.warn('Canonical wild stats rejected',canonicalStats);return null;}
+  const renderInst=evolutionPath?{speciesId:sp.id,evolutionPath,lifeStage:level<=2?'Juvenile':'Adult'}:null,mesh=monsterMesh(sp,false,renderInst,elite,boss);
   mesh.position.set(x,0,z);
   mesh.scale.multiplyScalar(boss?1.12:(rare?1.1:1.06));
   const markerColor=boss?0xfb7185:(elite?0xfde047:(rare?0xf0abfc:0x86efac));
   const markerSize=boss?.22:(rare?.19:.16);
   const marker=new THREE.Mesh(octahedronGeometry(markerSize),new THREE.MeshStandardMaterial({color:markerColor,emissive:markerColor,emissiveIntensity:rare?.9:.65,roughness:.35}));
   marker.position.set(0,boss?2.45:(rare?2.2:2.05),0);marker.name='wildMarker';mesh.add(marker);
-  scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),maxHp=Math.round(statValue(sp.base.hp,level,genes.hp,.14,0)*(boss?2.0:(elite?1.3:1)));
+  scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),{hp:maxHp,atk,def,spAtk,spDef,spd}=canonicalStats.stats;
   const capturePolicy=encounterProfile.capturePolicy;
   const wildId='w'+nextId++;
-  const w={id:wildId,speciesId:sp.id,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk:Math.round(statValue(sp.base.atk,level,genes.atk,.08,0)*(boss?1.35:(elite?1.12:1))),def:Math.round(statValue(sp.base.def,level,genes.def,.08,0)*(boss?1.3:(elite?1.1:1))),spd:statValue(sp.base.spd,level,genes.spd,.05,0),genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
+  const w={id:wildId,speciesId:sp.id,canonicalFormId:canonicalStats.formId,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk,def,spAtk,spDef,spd,potential,genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');
   if(boss)markBossProgress(w,'found');
@@ -3237,7 +3240,7 @@ function finishCaptureSuccess(cs){
   spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.2,duration:.8,intensity:.85});
   triggerCameraShake(.1,.2);
   if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
-  const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,gender:w.gender,bond:captureProfile.baseBond,formId:captureProfile.stage===2?captureProfile.monsterId:undefined,evolutionPath:w.evolutionPath,secondaryType:identity.runtimeSecondary});
+  const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,potential:w.potential,gender:w.gender,bond:captureProfile.baseBond,formId:captureProfile.stage===2?captureProfile.monsterId:undefined,evolutionPath:w.evolutionPath,secondaryType:identity.runtimeSecondary});
   if(state.currentZone==='grass-meadow')markStarterJourney('captured');
   state.collection.push(inst);
   const empty=state.party.findIndex(x=>x===null);

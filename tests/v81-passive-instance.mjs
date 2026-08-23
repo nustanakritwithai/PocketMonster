@@ -176,7 +176,7 @@ const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 
 assert.match(gameSource, /typeof instanceContext\?\.passiveId==='string'[\s\S]*?passiveCatalogEntry\(instanceContext\.passiveId\)/,
   'UI type-checks the saved ID and resolves the passive only through the catalog');
 assert.doesNotMatch(gameSource, /inst\.passive\|\|inst\.genes\?\.trait/, 'raw saved passive markup is not rendered');
-assert.match(gameSource, /refreshCoreStats\(inst,sp,path,getEquipmentFlat\(inst\),\{heal\}\)/,
-  'live refresh uses the atomic revive/stat transaction');
+assert.match(gameSource, /refreshCanonicalOwnedStats\(inst,getEquipmentFlat\(inst\),\{heal\}\)/,
+  'live refresh uses the canonical six-stat atomic revive/stat transaction');
 
 console.log('V8.1 A34 passive instance/save/live stat wiring: PASS');

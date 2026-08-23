@@ -120,7 +120,7 @@ for (const needle of [
   'beginCaptureAttempt(',
   'liveMoveDamage(',
   'computeCoreStats(',
-  'refreshCoreStats(',
+  'refreshCanonicalOwnedStats(',
   'ranchTrainingGain(',
   'let res=null',
   'renderRaisingEventBanner',
