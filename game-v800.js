@@ -31,6 +31,7 @@ import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getS
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
+import { canExecuteE1SkillEffect, resolveE1SkillEffects, skillDamageProfile, validateE1SkillEffectRequest } from './skill-effect-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -684,7 +685,7 @@ function canonicalCombatSkills(inst){
       targetType:definition.targetType,
       effect:definition.effect,
       directDamage:definition.directDamage,
-      effectAvailable:definition.directDamage&&definition.targetType!=='Self'&&definition.targetType!=='GroundPoint',
+      effectAvailable:canExecuteE1SkillEffect(definition.id),
       unavailableReason:'Targeting พร้อมแล้ว • เอฟเฟกต์นี้รอระบบสกิลขั้นถัดไป',
       currentUses:entry.skill.currentUses,
       maxUses:definition.maxUses,
@@ -3518,10 +3519,53 @@ function materializeSkillTargets(a,command){
   }
   return targets;
 }
-function canApplyLiveSkill(command){
-  const definition=skillCatalogEntry(command.skillId);
-  return Boolean(definition?.directDamage
-    && (command.targetKind==='NearestEnemy'||command.targetKind==='EnemyArea'));
+function canonicalSkillEffectAttacker(a,move){
+  const profile=skillDamageProfile(move.skillId),sp=spById[a.inst.speciesId];
+  if(!profile||!sp)return null;
+  const attack=Number.isFinite(a.inst.atk)?a.inst.atk:(sp.base.atk||10);
+  const specialAttack=Number.isFinite(a.inst.spAtk)?a.inst.spAtk:(Number.isFinite(a.inst.spatk)?a.inst.spatk:attack);
+  const skillRec=getSkill(a.inst,move.skillId),derived=derivedStats(instanceCombatBuildSafe(a.inst));
+  return Object.freeze({
+    id:a.inst.instanceId,
+    level:a.inst.level,
+    types:Object.freeze([...monsterTypes(a.inst)]),
+    stats:Object.freeze({ATK:attack,SPATK:specialAttack}),
+    statusState:a.statusState??null,
+    critChancePct:derived.critRate*100,
+    powerBonusPct:skillRec?masteryRawPower(skillRec.masteryRank)*100:0,
+    damageDealtPct:a.inst.genes?.trait==='Fierce'?8:0,
+  });
+}
+function canonicalSkillEffectTargets(materialized){
+  return Object.freeze(materialized.map(entry=>{
+    const w=entry.world,defense=Number.isFinite(w.def)?w.def:10;
+    const specialDefense=Number.isFinite(w.spDef)?w.spDef:(Number.isFinite(w.spdef)?w.spdef:defense);
+    return Object.freeze({
+      id:w.id,
+      level:w.level,
+      types:Object.freeze([...wildTypes(w)]),
+      stats:Object.freeze({DEF:defense,SPDEF:specialDefense}),
+      hp:w.hp,
+      maxHp:w.maxHp,
+      statusState:w.statusState,
+      nowSec:w.statusState?.currentTimeSec??0,
+      statusResistancePct:0,
+      damageTakenPct:0,
+      elementResistPct:0,
+    });
+  }));
+}
+function canonicalE1SkillEffectRequest(a,move,command,materialized){
+  return Object.freeze({
+    command,
+    attacker:canonicalSkillEffectAttacker(a,move),
+    targets:canonicalSkillEffectTargets(materialized),
+    nowSec:0,
+  });
+}
+function canApplyLiveSkill(a,move,command,materialized){
+  if(!canExecuteE1SkillEffect(command.skillId))return false;
+  return validateE1SkillEffectRequest(canonicalE1SkillEffectRequest(a,move,command,materialized)).ok;
 }
 function awardAcceptedSkillMastery(a,move,res){
   const skillRec=getSkill(a.inst,move.skillId);
@@ -3537,41 +3581,51 @@ function awardAcceptedSkillMastery(a,move,res){
 function applyAcceptedSkillCommand(a,index,move,command,materialized){
   // Uses has already committed. Cooldown is the first live mutation here; all
   // presentation, damage, bond, mastery, and logs follow the acceptance guard.
+  const planned=resolveE1SkillEffects(canonicalE1SkillEffectRequest(a,move,command,materialized),{rng:Math.random});
+  if(!planned.ok)throw new Error(`canonical skill effect failed: ${planned.reason}`);
   a.skillCds[index]=command.startCooldownSec;
   const targets=materialized.map(target=>target.world);
   playSFX(`sfx_skill_${move.type.toLowerCase()}`);
   let res=null,total=0;
   if(command.targetKind==='NearestEnemy'){
-    const target=targets[0];
+    const target=targets[0],effect=planned.targetResults[0],damageResult=effect.damageResult;
+    res={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
     playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);
     spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);
     spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));
-    spawnSkillSprite(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);
-    spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);
-    res=monsterDamage(a.inst,move,target,a.attackBuff);
-    spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});
-    damageWild(target,res.damage,{type:move.type,eff:res.eff});triggerCameraShake(res.eff>1?0.14:0.09,0.16);
-    const [label]=effectLabel(res.eff);
-    msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${label}${res.stab>1?' • STAB':''}`);
-    logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
+    if(effect.hit){
+      spawnSkillSprite(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);
+      spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);
+      spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});
+      damageWild(target,res.damage,{type:move.type,eff:res.eff});
+      if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;
+      triggerCameraShake(res.eff>1?0.14:0.09,0.16);
+      const [label]=effectLabel(res.eff);
+      msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${label}${res.stab>1?' • STAB':''}${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
+      logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
+    }else msg(`${displayName(a.inst)} ใช้ ${move.name} • MISS`);
   }else{
     const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
     playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
     spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);
     spawnGroundDecal(move.type,anchor,{radius:Math.min(2.8,command.radiusM),duration:1.45,intensity:1.15});
     spawnAreaWave(move.type,anchor,command.radiusM);triggerCameraShake(.11,.17);
-    for(const target of targets){
+    for(let targetIndex=0;targetIndex<targets.length;targetIndex++){
+      const target=targets[targetIndex],effect=planned.targetResults[targetIndex],damageResult=effect.damageResult;
+      res={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
+      if(!effect.hit)continue;
       spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);
-      res=monsterDamage(a.inst,move,target,a.attackBuff);
       spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});
-      damageWild(target,res.damage,{type:move.type,eff:res.eff});total+=res.damage;
+      damageWild(target,res.damage,{type:move.type,eff:res.eff});
+      if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;
+      total+=res.damage;
     }
-    msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${targets.length} ตัว • รวม ${total} Damage`);
+    msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${planned.hitCount}/${targets.length} ตัว • รวม ${total} Damage${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
   }
   a.inst.bond=clamp(a.inst.bond+.3);
   awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
-  return Object.freeze({effectMode:'legacy_damage_compatibility',hitCount:targets.length,totalDamage:command.targetKind==='EnemyArea'?total:res?.damage||0});
+  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,rngDraws:planned.rngDraws});
 }
 function skillFailureMessage(move,result){
   const reasons={
@@ -3601,7 +3655,7 @@ function useSkill(index,intent={}){
     cooldownRemainingSec:a.skillCds[index]||0,
   },{
     materializeTargets:command=>materializeSkillTargets(a,command),
-    canApply:command=>canApplyLiveSkill(command),
+    canApply:(command,targets)=>canApplyLiveSkill(a,move,command,targets),
     applyAccepted:(command,targets)=>applyAcceptedSkillCommand(a,index,move,command,targets),
   });
   if(!result.ok){msg(skillFailureMessage(move,result));renderSkillButtons();}

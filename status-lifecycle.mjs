@@ -104,6 +104,10 @@ function validState(state) {
     && state.controlDr.lastAppliedAtSec === (history.at(-1)?.atSec ?? null);
 }
 
+export function isEncounterStatusState(state) {
+  return validState(state);
+}
+
 function interactionFor(incomingStatusId, existingStatusId) {
   return STATUS_INTERACTIONS.find(rule => rule.incomingStatusId === incomingStatusId
     && rule.existingStatusId === existingStatusId) ?? null;

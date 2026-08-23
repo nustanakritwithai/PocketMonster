@@ -116,7 +116,7 @@ function usesBySlot(instance) {
 assert.equal(CONTENT_PROVENANCE.sha256, A40_ACCEPTANCE_POLICY.workbookSha256);
 assert.equal(WORKBOOK_CAPTURE_ADAPTER.rollAuthority, 'future_server_boundary');
 assert.equal(SKILL_RECOVERY_POLICY.serverAuthorityClaim, false);
-assert.equal(SKILL_COMMAND_RUNTIME_POLICY.canonicalEffectsResolved, false);
+assert.equal(SKILL_COMMAND_RUNTIME_POLICY.canonicalEffectsResolved, 'phase_gated');
 assert.equal(BUILD_PRESET_POLICY.activation, 'catalog_only');
 assert.equal(workbookEvolutionPathForSpecies('flameling').activation, 'preview_only');
 assert.equal(A40_ACCEPTANCE_POLICY.serverAuthorityClaim, false);
