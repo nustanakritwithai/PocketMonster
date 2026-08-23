@@ -23,7 +23,7 @@ import { EQUIPMENT_CATALOG, personalityTrainingMultiplier } from './content-cata
 
 export const LEVEL_GROWTH_SCALE = Object.freeze({ hp: 0.14, atk: 0.08, def: 0.08, spd: 0.05 });
 export const STARTER_EQUIPMENT = EQUIPMENT_CATALOG.filter(item => ['ranch_band', 'guard_charm', 'swift_lens'].includes(item.id));
-export const CANONICAL_LIVE_STAT_VERSION = 'canonical-live-stats/v1';
+export const CANONICAL_LIVE_STAT_VERSION = 'canonical-live-stats/v2';
 export const LIVE_DAMAGE_CLASS_POLICY = Object.freeze({
   Physical: Object.freeze({ attackStat: 'atk', defenseStat: 'def', workbookAttackStat: 'ATK', workbookDefenseStat: 'DEF' }),
   Special: Object.freeze({ attackStat: 'spAtk', defenseStat: 'spDef', workbookAttackStat: 'SPATK', workbookDefenseStat: 'SPDEF' }),
@@ -65,7 +65,8 @@ export function computeCanonicalOwnedStats(inst, equipmentFlat = null) {
       ownerFainted: inst?.fainted === true || (Number.isFinite(inst?.hp) && inst.hp <= 0),
     }).filter(modifier => modifier.kind === 'stat_multiplier' && modifier.stat === stat.toUpperCase());
     const passiveMultiplier = passiveModifiers.reduce((value, modifier) => value * modifier.multiplier, 1);
-    stats[stat] = Math.max(1, Math.round(beforePassive * passiveMultiplier));
+    const durabilityMultiplier = stat === 'hp' ? BALANCE_CONFIG.combat.liveHpMultiplier : 1;
+    stats[stat] = Math.max(1, Math.round(beforePassive * passiveMultiplier * durabilityMultiplier));
     breakdown[stat] = Object.freeze({
       ...formula.breakdown[stat],
       nutritionFlat: nutrition,
@@ -74,6 +75,7 @@ export function computeCanonicalOwnedStats(inst, equipmentFlat = null) {
       conditionMultiplier,
       beforePassive,
       passiveMultiplier,
+      durabilityMultiplier,
       passiveSources: Object.freeze(passiveModifiers.map(modifier => modifier.sourcePassiveId)),
       final: stats[stat],
     });
@@ -133,10 +135,10 @@ export function calculateCanonicalWildStats({
   if (!multipliers) return canonicalLiveFailure('unknown_wild_variant', 'variant', variant ?? null);
   const formula = calculateMonsterStats({ formId: form.formId, level, potential, training });
   if (!formula.ok) return Object.freeze({ ...formula, activation: 'runtime_rejected' });
-  const stats = Object.freeze(Object.fromEntries(MONSTER_STAT_KEYS.map(stat => [
-    stat,
-    Math.max(1, Math.round(formula.stats[stat] * multipliers[stat])),
-  ])));
+  const stats = Object.freeze(Object.fromEntries(MONSTER_STAT_KEYS.map(stat => {
+    const durabilityMultiplier = stat === 'hp' ? BALANCE_CONFIG.combat.liveHpMultiplier : 1;
+    return [stat, Math.max(1, Math.round(formula.stats[stat] * multipliers[stat] * durabilityMultiplier))];
+  })));
   return Object.freeze({
     ok: true,
     reason: null,

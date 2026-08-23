@@ -27,14 +27,14 @@ function ownedInput(overrides = {}) {
 }
 
 function assertLive(module) {
-  assert.equal(module.CANONICAL_LIVE_STAT_VERSION, 'canonical-live-stats/v1');
+  assert.equal(module.CANONICAL_LIVE_STAT_VERSION, 'canonical-live-stats/v2');
   const owned = ownedInput({ maxHp: 100, hp: 25 });
   const computed = module.computeCanonicalOwnedStats(owned, { hp: 3, atk: 2, def: 1, spAtk: 4, spDef: 5, spd: 6 });
   assert.equal(computed.ok, true);
-  assert.deepEqual(computed.stats, { hp: 44, atk: 20, def: 18, spAtk: 27, spDef: 23, spd: 27 });
+  assert.deepEqual(computed.stats, { hp: 264, atk: 20, def: 18, spAtk: 27, spDef: 23, spd: 27 });
   module.refreshCanonicalOwnedStats(owned);
-  assert.equal(owned.maxHp, 41);
-  assert.equal(owned.hp, 10);
+  assert.equal(owned.maxHp, 246);
+  assert.equal(owned.hp, 62);
   assert.equal(owned.spAtk, 23);
   assert.equal(owned.spDef, 18);
 
@@ -48,11 +48,11 @@ function assertLive(module) {
   });
   assert.equal(stage2.ok, true);
   assert.equal(stage2.formId, 'MON_020');
-  assert.deepEqual(stage2.stats, { hp: 69, atk: 30, def: 29, spAtk: 39, spDef: 30, spd: 31 });
+  assert.deepEqual(stage2.stats, { hp: 413, atk: 30, def: 29, spAtk: 39, spDef: 30, spd: 31 });
   const boss = module.calculateCanonicalWildStats({
     runtimeSpeciesId: 'flameling', stage: 1, level: 15, potential, training, variant: 'Boss',
   });
-  assert.deepEqual(boss.stats, { hp: 82, atk: 24, def: 22, spAtk: 31, spDef: 23, spd: 21 });
+  assert.deepEqual(boss.stats, { hp: 492, atk: 24, def: 22, spAtk: 31, spDef: 23, spd: 21 });
   assert.equal(module.calculateCanonicalWildStats({
     runtimeSpeciesId: 'flameling', stage: 1, level: 15, potential, training, variant: 'Mythic',
   }).ok, false);
@@ -70,7 +70,7 @@ assertLive(await loadSource(sources.live[1], sources.live[0], 'monster-stat-live
 assertGame(sources.game[1]);
 
 const mutations = [
-  ['live', 'change live version', "'canonical-live-stats/v1'", "'legacy-live-stats'", assertLive],
+  ['live', 'change live version', "'canonical-live-stats/v2'", "'legacy-live-stats'", assertLive],
   ['live', 'resolve owned by species ID', 'inst?.canonicalFormId ?? canonicalFormIdForInstance(inst)', 'inst?.speciesId', assertLive],
   ['live', 'use legacy training vector', 'training: inst?.statTraining,', 'training: inst?.training,', assertLive],
   ['live', 'drop equipment modifier', 'const equipment = Number.isFinite(equipmentFlat?.[stat]) ? equipmentFlat[stat] : 0;', 'const equipment = 0;', assertLive],
@@ -80,7 +80,7 @@ const mutations = [
   ['live', 'force wild Stage 1', 'monsterStatCatalogFormForStage(runtimeSpeciesId, stage)', 'monsterStatCatalogFormForStage(runtimeSpeciesId, 1)', assertLive],
   ['live', 'weaken Elite HP', 'hp: 1.3, atk: 1.12', 'hp: 1, atk: 1.12', assertLive],
   ['live', 'weaken Elite SPATK', 'spAtk: 1.12, spDef: 1.1', 'spAtk: 1, spDef: 1.1', assertLive],
-  ['live', 'floor wild multipliers', 'Math.round(formula.stats[stat] * multipliers[stat])', 'Math.floor(formula.stats[stat] * multipliers[stat])', assertLive],
+  ['live', 'floor wild multipliers', 'Math.round(formula.stats[stat] * multipliers[stat] * durabilityMultiplier)', 'Math.floor(formula.stats[stat] * multipliers[stat] * durabilityMultiplier)', assertLive],
   ['live', 'accept unknown wild variant', 'if (!multipliers) return canonicalLiveFailure', 'if (false) return canonicalLiveFailure', assertLive],
   ['game', 'restore legacy owned refresh', 'refreshCanonicalOwnedStats(inst,getEquipmentFlat(inst),{heal})', 'refreshCoreStats(inst,sp,path,getEquipmentFlat(inst),{heal})', assertGame],
   ['game', 'drop wild special stats', '{hp:maxHp,atk,def,spAtk,spDef,spd}=canonicalStats.stats', '{hp:maxHp,atk,def,spd}=canonicalStats.stats', assertGame],

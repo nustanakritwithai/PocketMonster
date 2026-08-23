@@ -161,6 +161,15 @@ export const BALANCE_CONFIG = Object.freeze({
     fallbackK: 180,
   }),
 
+  // Ring 2 playtest tuning — the workbook stat formula remains the source of
+  // truth, while live combat gets a shared durability scale.  Applying the
+  // same scale to owned and wild monsters preserves matchup symmetry, HP
+  // ratios, capture thresholds and all existing variant multipliers.
+  combat: Object.freeze({
+    liveHpMultiplier: 6,
+    minimumEqualLevelNeutralBasicHits: 3,
+  }),
+
   // R6 — Derived-stat baselines and caps.
   derived: Object.freeze({
     critRate: Object.freeze({ base: 0.05, soft: 0.2, hard: 0.3 }),
