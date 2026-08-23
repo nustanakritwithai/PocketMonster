@@ -275,9 +275,96 @@ const ground=new THREE.Mesh(planeGeometry(90,90),new THREE.MeshStandardMaterial(
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
 const decorations=new THREE.Group(); decorations.name='worldDecorations'; scene.add(decorations);
+const WORLD_STREAM=Object.freeze({
+  loadRadius:22,
+  unloadRadius:32,
+  attachPerFrame:5,
+  zoneAttachBudget:12,
+  wildHideRadius:36,
+  wildShowRadius:26,
+});
+const decoAttachQueue=[];
+let decoStreaming=false;
+const STREAM_HITCH={armed:false,samples:0,sumMs:0,lastMs:0,maxMs:0,over33:0,over50:0};
+let lastSwitchZoneMs=0;
+let lastSwitchParts={ground:0,populate:0,flush:0,spawn:0,save:0};
+function resetStreamHitch(){
+  STREAM_HITCH.samples=0;STREAM_HITCH.sumMs=0;STREAM_HITCH.lastMs=0;STREAM_HITCH.maxMs=0;STREAM_HITCH.over33=0;STREAM_HITCH.over50=0;STREAM_HITCH.armed=true;
+}
+function streamHitchSnapshot(){
+  const avg=STREAM_HITCH.samples?STREAM_HITCH.sumMs/STREAM_HITCH.samples:0;
+  return {
+    samples:STREAM_HITCH.samples,
+    fps:STREAM_HITCH.samples?Number((1000/avg).toFixed(1)):0,
+    avgMs:Number(avg.toFixed(2)),
+    maxMs:Number(STREAM_HITCH.maxMs.toFixed(2)),
+    over33:STREAM_HITCH.over33,
+    over50:STREAM_HITCH.over50,
+    switchMs:Number(lastSwitchZoneMs.toFixed(2)),
+    switchParts:lastSwitchParts,
+    drawCalls:renderer.info.render.calls,
+    triangles:renderer.info.render.triangles,
+    tier:qualityProfile.tier,
+  };
+}
+function isKeepAliveDeco(mesh){
+  return !!(mesh?.userData?.warpRouteId||mesh?.userData?.stageMarker);
+}
+function decoDistanceSq(mesh,ox,oz){
+  const dx=(mesh.userData.streamX??mesh.position.x)-ox;
+  const dz=(mesh.userData.streamZ??mesh.position.z)-oz;
+  return dx*dx+dz*dz;
+}
 function addDeco(mesh){
+  mesh.userData.streamX=mesh.position.x;
+  mesh.userData.streamZ=mesh.position.z;
   mesh.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
+  if(decoStreaming&&!isKeepAliveDeco(mesh)){
+    decoAttachQueue.push(mesh);
+    return mesh;
+  }
   decorations.add(mesh); return mesh;
+}
+function flushNearbyDecos(origin,budget=WORLD_STREAM.zoneAttachBudget){
+  if(!origin)return 0;
+  const ox=origin.x,oz=origin.z;
+  const loadR2=WORLD_STREAM.loadRadius*WORLD_STREAM.loadRadius;
+  let attached=0;
+  while(attached<budget){
+    let best=-1,bestD=loadR2;
+    for(let i=0;i<decoAttachQueue.length;i++){
+      const distance=decoDistanceSq(decoAttachQueue[i],ox,oz);
+      if(distance<=bestD){bestD=distance;best=i;}
+    }
+    if(best<0)break;
+    decorations.add(decoAttachQueue.splice(best,1)[0]);
+    attached++;
+  }
+  return attached;
+}
+function updateWorldStream(){
+  const ox=player.position.x,oz=player.position.z;
+  flushNearbyDecos(player.position,WORLD_STREAM.attachPerFrame);
+  const unloadR2=WORLD_STREAM.unloadRadius*WORLD_STREAM.unloadRadius;
+  for(let i=decorations.children.length-1;i>=0;i--){
+    const child=decorations.children[i];
+    if(isKeepAliveDeco(child))continue;
+    if(decoDistanceSq(child,ox,oz)>unloadR2){
+      decorations.remove(child);
+      decoAttachQueue.push(child);
+    }
+  }
+  const hideR2=WORLD_STREAM.wildHideRadius*WORLD_STREAM.wildHideRadius;
+  const showR2=WORLD_STREAM.wildShowRadius*WORLD_STREAM.wildShowRadius;
+  for(let i=0;i<wilds.length;i++){
+    const w=wilds[i];
+    if(!w.mesh)continue;
+    if(w.engaged||w.capturing){w.mesh.visible=true;continue;}
+    const dx=w.mesh.position.x-ox,dz=w.mesh.position.z-oz;
+    const d2=dx*dx+dz*dz;
+    if(d2>hideR2)w.mesh.visible=false;
+    else if(d2<showR2)w.mesh.visible=true;
+  }
 }
 function makeRock(x,z,s=1,tone=0x945a38){
   const cluster=new THREE.Group();
@@ -426,8 +513,11 @@ function makeWarpBeacon(route){
 }
 function clearDecorations(){
   while(decorations.children.length) removeAndDispose(decorations,decorations.children[0]);
+  for(let i=0;i<decoAttachQueue.length;i++)disposeObject3D(decoAttachQueue[i]);
+  decoAttachQueue.length=0;
 }
 function populateWorld(zone='hub'){
+  decoStreaming=true;
   clearDecorations();
   for(const route of routesFrom(zone))makeWarpBeacon(route);
   if(zone==='hub'){
@@ -523,6 +613,7 @@ function populateWorld(zone='hub'){
     [[-10,6,1.4,0x57534e],[9,-7,1.6,0x44403c],[14,4,1.2,0x78716c],[-15,-5,1.5,0x57534e],[3,-15,1.8,0x3f3f46],[-4,16,1.3,0x52525b]].forEach(v=>makeRock(...v));
     [[-8,-4,1.1],[6,-9,1.3],[-12,9,1.4],[11,8,1.2],[0,-12,1.6],[15,-2,1],[-6,12,1.25]].forEach(v=>makeStalagmite(...v));
   }
+  decoStreaming=false;
 }
 populateWorld('hub');
 function makePad(x,z,halfSize,color,opacity=.2){
@@ -1390,6 +1481,7 @@ const evolutionVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'ev
 const breedingVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'breeding',appearanceId:'appearance.human.breeding-pink.v1',quality:qualityProfile.tier});
 await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready,trainerVisual.ready,evolutionVisual.ready,breedingVisual.ready].filter(Boolean));
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
+flushNearbyDecos(player.position,WORLD_STREAM.zoneAttachBudget);
 const playerData={hp:100,maxHp:100,speed:5.7,invuln:0};
 const npc=keeperVisual.root; npc.position.set(4,0,3); scene.add(npc);
 const merchantNpc=merchantVisual.root; merchantNpc.position.set(9,0,3); scene.add(merchantNpc);
@@ -1399,7 +1491,22 @@ const breedingNpc=breedingVisual.root; breedingNpc.position.set(7,0,10); scene.a
 const presentationScratch={throwOrigin:new THREE.Vector3(),hitText:new THREE.Vector3()};
 function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentationScratch.throwOrigin); }
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
-if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
+if(typeof window!=='undefined'){
+  window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
+  const worldStream=()=>({
+    attached:decorations.children.length,
+    queued:decoAttachQueue.length,
+    keepAlive:decorations.children.filter(child=>child.userData.warpRouteId||child.userData.stageMarker).length,
+    loadRadius:WORLD_STREAM.loadRadius,
+    unloadRadius:WORLD_STREAM.unloadRadius,
+    x:+player.position.x.toFixed(2),
+    z:+player.position.z.toFixed(2),
+    hitch:streamHitchSnapshot(),
+  });
+  worldStream.resetHitch=resetStreamHitch;
+  worldStream.moveTo=(x,z)=>{player.position.x=x;player.position.z=z;};
+  window.MLRPG_WORLD_STREAM=worldStream;
+}
 const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
 const VFX_PRIORITY_RANK=Object.freeze({P0:0,P1:1,P2:2,P3:3,P4:4});
 const effects=[];
@@ -2913,6 +3020,7 @@ function switchZone(zone,silent=false){
   if(STAGE_BY_ID[zone]&&!stageUnlockReason(state.stageProgress,zone).ok){msg(`${STAGE_BY_ID[zone].displayName} ยังล็อกอยู่ • เคลียร์ด่านก่อนหน้า`);return false;}
   if(zone!=='hub'&&healthyPartyCount()===0){msg('Party ไม่มีมอนพร้อมสู้ • กลับไป Heal ฟรีกับผู้ดูแลมอนก่อน');return false;}
   const safetyBalls=zone!=='hub'&&ensureCaptureBallSafety();
+  const switchStarted=performance.now();
   zoneGeneration++;
   abortCaptureSequence();
   if(activeSummon)recall(false,false);
@@ -2942,21 +3050,29 @@ function switchZone(zone,silent=false){
   playBGM(zone);
   startAmbient(zone);
   const cfg=ZONES[zone];
+  let mark=performance.now();
   setZoneGround(zone);
+  const groundMs=performance.now()-mark;mark=performance.now();
   populateWorld(zone);
+  const populateMs=performance.now()-mark;mark=performance.now();
   const start=warpSpawnOverride||cfg.playerStart||[0,0,5];
   warpSpawnOverride=null;
   player.position.set(...start);
+  flushNearbyDecos(player.position,WORLD_STREAM.zoneAttachBudget);
+  const flushMs=performance.now()-mark;mark=performance.now();
   playerData.hp=Math.max(1,playerData.hp);
   setHubVisibility(zone==='hub');
   spawnZone(zone);
   if(zone!=='hub'&&livingWilds().length===0)spawnZone(zone);
+  const spawnMs=performance.now()-mark;mark=performance.now();
   syncRanchVisuals();
   syncHubCompanion();
   renderZoneUI();
   renderStarterJourney();
   if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
+  lastSwitchParts={ground:Number(groundMs.toFixed(2)),populate:Number(populateMs.toFixed(2)),flush:Number(flushMs.toFixed(2)),spawn:Number(spawnMs.toFixed(2)),save:Number((performance.now()-mark).toFixed(2))};
+  lastSwitchZoneMs=performance.now()-switchStarted;
   return true;
 }
 
@@ -5786,9 +5902,17 @@ let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 const wildFrameSnapshot=[];
 function loop(now){
   try{
-    const dt=Math.min(.033,(now-last)/1000);
+    const frameMs=now-last;
+    const dt=Math.min(.033,frameMs/1000);
     last=now;
+    if(STREAM_HITCH.armed){
+      STREAM_HITCH.samples++;STREAM_HITCH.sumMs+=frameMs;STREAM_HITCH.lastMs=frameMs;
+      if(frameMs>STREAM_HITCH.maxMs)STREAM_HITCH.maxMs=frameMs;
+      if(frameMs>33.4)STREAM_HITCH.over33++;
+      if(frameMs>50)STREAM_HITCH.over50++;
+    }
     updatePlayer(dt);
+    updateWorldStream();
     updateWarpPrompt(dt);
     updateCamera(dt);
     updateWorldLabels(dt);
