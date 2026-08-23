@@ -59,7 +59,7 @@ function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) 
     'masteryRawPower',
     'derivedStats',
     'instanceCombatBuildSafe',
-    'liveMoveDamage',
+    'liveClassedMoveDamage',
     'spById',
     `'use strict';${source};return monsterDamage;`,
   )(

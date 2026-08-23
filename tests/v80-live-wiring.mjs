@@ -118,7 +118,7 @@ for (const needle of [
   'hatchBreedingEggTransaction(',
   'resolveWorkbookCapture(',
   'beginCaptureAttempt(',
-  'liveMoveDamage(',
+  'liveClassedMoveDamage(',
   'computeCoreStats(',
   'refreshCanonicalOwnedStats(',
   'ranchTrainingGain(',
