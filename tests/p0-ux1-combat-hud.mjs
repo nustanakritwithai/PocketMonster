@@ -94,6 +94,8 @@ assert.match(js, /getSkillIcon\(/, 'Skill icon function should exist');
 assert.match(js, /const skillButton=button\.classList\.contains\('skill'\);/, 'skill buttons must stay natively enabled so pointerdown still fires');
 assert.match(js, /if\(skillButton\)\{\s*if\(button\.disabled\)button\.disabled=false;/, 'disabled skill buttons would swallow taps into the camera pad');
 assert.match(js, /function announceCombatReason\(text\)\{/, 'skill tap feedback must stay visible on short landscape');
+assert.match(js, /combatReasonHoldUntil=Date\.now\(\)\+2500/, 'skill tap reason must outlive the next HUD refresh');
+assert.match(js, /visibleCombatReason\(presentation\.actionReason\)/, 'held skill reason is what the chip renders');
 assert.match(js, /announceCombatReason\('ต้องปาเรียกมอนออกมาก่อน'\)/, 'tapping a skill before summon still explains why it did not fire');
 assert.match(css, /\.controls-right\{position:absolute;z-index:9;/, 'skill cluster stays above the party bar');
 

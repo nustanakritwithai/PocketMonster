@@ -3865,10 +3865,17 @@ function skillFailureMessage(move,result){
   };
   return reasons[result.reason]||`${move?.name||'สกิล'} ใช้ไม่ได้ (${result.reason})`;
 }
+let combatReasonHoldText='';
+let combatReasonHoldUntil=0;
 function announceCombatReason(text){
   if(!text)return;
   msg(text);
+  combatReasonHoldText=text;
+  combatReasonHoldUntil=Date.now()+2500;
   setTextIfChanged(el('actionReason'),text);
+}
+function visibleCombatReason(fallback){
+  return Date.now()<combatReasonHoldUntil&&combatReasonHoldText?combatReasonHoldText:fallback;
 }
 function useSkill(index,intent={}){
   if(!activeSummon){announceCombatReason('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
@@ -5017,7 +5024,7 @@ function renderCombatPresentation(){
   applyActionPresentation(summon,presentation.actions.summon,'ปาเรียก');
   applyActionPresentation(recallButton,presentation.actions.recall,'Recall คู่หู');
   capture.classList.toggle('aiming',presentation.actions.capture.state==='aiming');
-  setTextIfChanged(el('actionReason'),presentation.actionReason);
+  setTextIfChanged(el('actionReason'),visibleCombatReason(presentation.actionReason));
   const activeLabel=el('activeMonsterStatus');
   setTextIfChanged(activeLabel,!activeSummon&&!pendingSummon&&hubCompanion?`${displayName(hubCompanion.inst)} • Ranch`:presentation.activeLabel);
 }
