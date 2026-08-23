@@ -6,6 +6,7 @@
 
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
+import { MONSTER_STAT_KEYS, MONSTER_STAT_SOURCE_LIMITS } from './monster-stat-contract.mjs';
 import { defaultPassiveIdForSpecies, isPassiveEligibleForSpecies } from './passive-catalog.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { createRng } from './rng.mjs';
@@ -16,11 +17,20 @@ import {
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 11;
+export const INSTANCE_SAVE_VERSION = 12;
+export const INSTANCE_STAT_SCHEMA_VERSION = 'monster-instance-stats/v1';
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);
 export const CORE_GENES = Object.freeze(['hp', 'atk', 'def', 'spd']);
-export const INSTANCE_POTENTIAL_STATS = Object.freeze(['hp', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
+export const INSTANCE_POTENTIAL_STATS = MONSTER_STAT_KEYS;
 export const INSTANCE_POTENTIAL_LIMITS = Object.freeze({ min: 0, max: 31 });
+export const INSTANCE_STAT_TRAINING_MAP = Object.freeze({
+  hp: null,
+  atk: 'power',
+  def: 'defense',
+  spAtk: 'technique',
+  spDef: 'spirit',
+  spd: 'speed',
+});
 export const INSTANCE_BREEDING_VERSION = 'BRD_v1.0';
 export const TRANSIENT_COOLDOWN_FIELDS = Object.freeze([
   'cooldownRemaining',
@@ -77,6 +87,12 @@ function persistedPotentialValue(raw, stat) {
   return raw?.[stat];
 }
 
+function persistedStatValue(raw, stat) {
+  if (stat === 'spAtk') return raw?.spAtk ?? raw?.spatk;
+  if (stat === 'spDef') return raw?.spDef ?? raw?.spdef;
+  return raw?.[stat];
+}
+
 function deterministicPotentialRoll(instanceId, stat) {
   return createRng(`monster-instance-v10:${String(instanceId)}:${stat}`)
     .int(INSTANCE_POTENTIAL_LIMITS.min, INSTANCE_POTENTIAL_LIMITS.max);
@@ -109,6 +125,57 @@ export function potentialForPersistence(raw, instanceId) {
     spdef: potential.spDef,
     spd: potential.spd,
   };
+}
+
+export function normalizeInstanceStatTraining(raw, legacyTraining = {}) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const legacy = legacyTraining && typeof legacyTraining === 'object' && !Array.isArray(legacyTraining)
+    ? legacyTraining
+    : {};
+  const training = {};
+  let remaining = MONSTER_STAT_SOURCE_LIMITS.training.totalMax;
+  for (const stat of MONSTER_STAT_KEYS) {
+    const canonicalValue = persistedStatValue(source, stat);
+    const legacyLine = INSTANCE_STAT_TRAINING_MAP[stat];
+    const legacyValue = legacyLine ? legacy[legacyLine] : 0;
+    const candidate = Number.isFinite(canonicalValue) ? canonicalValue : legacyValue;
+    const bounded = clamp(
+      Math.floor(Number.isFinite(candidate) ? candidate : 0),
+      0,
+      MONSTER_STAT_SOURCE_LIMITS.training.perStatMax,
+    );
+    training[stat] = Math.min(bounded, remaining);
+    remaining -= training[stat];
+  }
+  return training;
+}
+
+export function statTrainingForPersistence(raw, legacyTraining = {}) {
+  const training = normalizeInstanceStatTraining(raw, legacyTraining);
+  return {
+    hp: training.hp,
+    atk: training.atk,
+    def: training.def,
+    spatk: training.spAtk,
+    spdef: training.spDef,
+    spd: training.spd,
+  };
+}
+
+export function canonicalFormIdForInstance(source = {}) {
+  const mapping = monsterCatalogEntry(source?.speciesId);
+  if (!mapping) return null;
+  if (source.canonicalFormId === mapping.workbookBaseMonsterId
+    || source.canonicalFormId === mapping.workbookStage2MonsterId) {
+    return source.canonicalFormId;
+  }
+  if (source.formId === mapping.workbookStage2MonsterId) return mapping.workbookStage2MonsterId;
+  if (source.formId === mapping.workbookBaseMonsterId) return mapping.workbookBaseMonsterId;
+  const hasEvolutionPath = typeof source.evolutionPath === 'string' && source.evolutionPath.length > 0;
+  const hasEvolutionHistory = Array.isArray(source.evolutionHistory) && source.evolutionHistory.length > 0;
+  return hasEvolutionPath || hasEvolutionHistory
+    ? mapping.workbookStage2MonsterId
+    : mapping.workbookBaseMonsterId;
 }
 
 function withoutTransientCooldownFields(raw) {
@@ -153,6 +220,9 @@ export function sanitizeMonsterInstanceForPersistence(raw) {
     ? raw.skills.map(normalizeOwnedSkillRecord)
     : [];
   instance.potential = potentialForPersistence(raw.potential, raw.instanceId);
+  instance.statTraining = statTrainingForPersistence(raw.statTraining, raw.training);
+  instance.canonicalFormId = canonicalFormIdForInstance(raw);
+  instance.statSchemaVersion = INSTANCE_STAT_SCHEMA_VERSION;
   instance.passiveId = normalizedPassiveId(raw);
   return instance;
 }
@@ -221,6 +291,9 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
     level,
     growthExp,
     potential: normalizeInstancePotential(source.potential, instanceId),
+    statTraining: normalizeInstanceStatTraining(source.statTraining, source.training),
+    canonicalFormId: canonicalFormIdForInstance(source),
+    statSchemaVersion: INSTANCE_STAT_SCHEMA_VERSION,
     genes: normalizeGenes(source.genes),
     aptitude: normalizeAptitude(source.aptitude),
     training: normalizeTraining(source.training),
@@ -359,6 +432,25 @@ export function trainingUsed(instance, config = BALANCE_CONFIG) {
   return totalTrainingUsed(instance.training, config);
 }
 
+export function statTrainingUsed(instance) {
+  return MONSTER_STAT_KEYS.reduce((total, stat) => {
+    const value = instance?.statTraining?.[stat];
+    return total + (Number.isInteger(value) && value > 0 ? value : 0);
+  }, 0);
+}
+
+export function addStatTraining(instance, stat, amount) {
+  if (!instance || !MONSTER_STAT_KEYS.includes(stat)) return 0;
+  instance.statTraining = normalizeInstanceStatTraining(instance.statTraining, instance.training);
+  const gain = Math.max(0, Math.floor(num(amount, 0)));
+  const current = instance.statTraining[stat];
+  const statRoom = MONSTER_STAT_SOURCE_LIMITS.training.perStatMax - current;
+  const totalRoom = MONSTER_STAT_SOURCE_LIMITS.training.totalMax - statTrainingUsed(instance);
+  const applied = Math.min(gain, statRoom, totalRoom);
+  instance.statTraining[stat] += applied;
+  return applied;
+}
+
 export function trainingRemaining(instance, config = BALANCE_CONFIG) {
   const capacity = Math.min(trainingCapacity(instance.level, config), config.training.allocationLimits.totalMax);
   return Math.max(0, capacity - trainingUsed(instance, config));
@@ -368,12 +460,15 @@ export function trainingRemaining(instance, config = BALANCE_CONFIG) {
 export function addTrainingExp(instance, line, gain, config = BALANCE_CONFIG) {
   if (!TRAINING_LINES.includes(line)) return 0;
   if (!instance.training || typeof instance.training !== 'object') instance.training = normalizeTraining({}, config);
+  instance.statTraining = normalizeInstanceStatTraining(instance.statTraining, instance.training);
   const remaining = Math.max(0, trainingRemaining(instance, config));
   const perLineMax = config.training.allocationLimits.perLineMax;
   const current = clamp(num(instance.training[line], 0), 0, perLineMax);
   const lineRemaining = perLineMax - current;
   const applied = Math.min(Math.max(0, num(gain, 0)), remaining, lineRemaining);
   instance.training[line] = current + applied;
+  const canonicalStat = MONSTER_STAT_KEYS.find(stat => INSTANCE_STAT_TRAINING_MAP[stat] === line);
+  if (canonicalStat) addStatTraining(instance, canonicalStat, applied);
   return applied;
 }
 
