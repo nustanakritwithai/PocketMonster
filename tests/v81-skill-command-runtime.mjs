@@ -78,8 +78,8 @@ assert.deepEqual(SKILL_COMMAND_RUNTIME_POLICY, {
   readinessBeforeCommit: true,
   usesCommitBeforeApply: true,
   applyFailure: 'accepted_consumed_no_retry',
-  canonicalEffectsResolved: false,
-  applicationMode: 'compatibility_callback',
+  canonicalEffectsResolved: 'phase_gated',
+  applicationMode: 'canonical_effect_callback',
 });
 
 const state = fixture();
@@ -238,8 +238,8 @@ const groundSubstitution = executeEquippedSkillCommand(
 assert.equal(groundSubstitution.reason, SKILL_COMMAND_RUNTIME_REASONS.TARGET_COUNT_MISMATCH);
 assertNoMutation(groundRejectState, beforeUses, beforeCounters, 'GroundPoint entity injection');
 
-assert.equal(SKILL_COMMAND_RUNTIME_POLICY.canonicalEffectsResolved, false,
-  'A25 executor does not claim later canonical effect mechanics');
+assert.equal(SKILL_COMMAND_RUNTIME_POLICY.canonicalEffectsResolved, 'phase_gated',
+  'the executor exposes canonical mechanics only through live phase gates');
 
 const applyFailureState = fixture();
 let failingApplyCalls = 0;

@@ -1,8 +1,8 @@
 // PocketMonster V8.1 — gameplay execution boundary for equipped skill commands.
 //
-// Targeting and Uses are canonical. The final callback deliberately remains a
-// compatibility executor until the later effect-system tasks activate workbook
-// damage, healing, status, and field mechanics.
+// Targeting and Uses are canonical. The final callback is the accepted effect
+// executor; the live adapter phase-gates canonical effect families while this
+// boundary remains the sole Uses commit owner.
 
 import {
   commitEquippedSkillCommand,
@@ -15,8 +15,8 @@ export const SKILL_COMMAND_RUNTIME_POLICY = Object.freeze({
   readinessBeforeCommit: true,
   usesCommitBeforeApply: true,
   applyFailure: 'accepted_consumed_no_retry',
-  canonicalEffectsResolved: false,
-  applicationMode: 'compatibility_callback',
+  canonicalEffectsResolved: 'phase_gated',
+  applicationMode: 'canonical_effect_callback',
 });
 
 export const SKILL_COMMAND_RUNTIME_REASONS = Object.freeze({
@@ -95,7 +95,7 @@ function validateMaterializedTargets(command, materialized) {
 }
 
 // Resolve -> materialize exact live entities -> readiness -> commit Uses ->
-// invoke the compatibility executor once. A caller cannot supply a prepared
+// invoke the accepted effect executor once. A caller cannot supply a prepared
 // command, a SkillID, target IDs, geometry, or resource values through this API.
 export function executeEquippedSkillCommand(instance, request = {}, hooks = {}) {
   if (!validHooks(hooks)) {

@@ -100,12 +100,11 @@ export function assertGoldenPathLiveWiring({ js, packageJson }) {
   assert.match(useSkill, /slot=MANUAL_SKILL_SLOTS\[index\]/, 'manual buttons resolve through slots s1-s4');
   assert.match(useSkill, /executeEquippedSkillCommand\(/, 'manual skills enter the canonical command runtime');
   assert.match(useSkill, /groundPoint:intent\.groundPoint\?\?null/, 'GroundPoint reaches the canonical command runtime');
-  assert.match(useSkill, /canApply:command=>canApplyLiveSkill\(command\)/, 'live readiness cannot be bypassed by the button adapter');
+  assert.match(useSkill, /canApply:\(command,targets\)=>canApplyLiveSkill\(a,move,command,targets\)/, 'live readiness cannot be bypassed by the button adapter');
   assert.match(useSkill, /applyAccepted:\(command,targets\)=>applyAcceptedSkillCommand\(a,index,move,command,targets\)/, 'accepted commands reach the live effect boundary exactly once');
   assert.match(createSkillDispatchIntent, /move\?\.targetType==='GroundPoint'\?reticleGroundPoint\(\):null/, 'GroundPoint is sourced from the live reticle');
-  assert.match(canApplyLiveSkill, /definition\?\.directDamage/, 'live compatibility effects remain limited to approved direct damage');
-  assert.match(canApplyLiveSkill, /NearestEnemy.*EnemyArea/, 'Self and GroundPoint effects remain explicitly deferred');
-  assert.doesNotMatch(canApplyLiveSkill, /Self|GroundPoint/, 'deferred targets cannot be activated by the live readiness gate');
+  assert.match(canApplyLiveSkill, /canExecuteE1SkillEffect\(command\.skillId\)/, 'live effects are gated by the reviewed E1 coverage');
+  assert.match(canApplyLiveSkill, /validateE1SkillEffectRequest\(canonicalE1SkillEffectRequest/, 'live readiness validates the exact effect request before Uses commit');
   for (let index = 1; index <= 4; index += 1) {
     assert.match(js, new RegExp(`bindActionPress\\(el\\('skill${index}Btn'\\),\\(\\)=>dispatchSkill\\(${index - 1}\\)\\)`), `combat hotbar slot ${index} is wired`);
   }

@@ -22,7 +22,8 @@
     "test:v81:build-presets": "node tests/v81-build-preset-catalog.mjs && node tests/v81-build-preset-catalog-mutants.mjs",
     "test:v81:golden-path": "node tests/v81-monster-content-golden-path.mjs && node tests/v81-monster-content-golden-path-mutants.mjs",
     "test:v82:skill-effects": "node tests/v82-skill-effect-contract.mjs && node tests/v82-skill-effect-contract-mutants.mjs",
-    "ci": "npm run check && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding && npm run test:v81:skill-memory && npm run test:v81:capture && npm run test:v81:passive && npm run test:v81:ai && npm run test:v81:icons && npm run test:v81:character-skills && npm run test:v81:world && npm run test:v81:build-presets && npm run test:v81:golden-path && npm run test:v82:skill-effects"
+    "test:v82:skill-effects:e1": "node tests/v82-skill-effect-e1.mjs && node tests/v82-skill-effect-e1-live-wiring.mjs && node tests/v82-skill-effect-e1-mutants.mjs",
+    "ci": "npm run check && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding && npm run test:v81:skill-memory && npm run test:v81:capture && npm run test:v81:passive && npm run test:v81:ai && npm run test:v81:icons && npm run test:v81:character-skills && npm run test:v81:world && npm run test:v81:build-presets && npm run test:v81:golden-path && npm run test:v82:skill-effects && npm run test:v82:skill-effects:e1"
   },
   "description": "Monster Life RPG V8.2.0 - Progression Core live loop (balance, raising, battle growth, care, skills, equipment, evolution, events, breeding)"
 }
