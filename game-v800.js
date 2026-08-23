@@ -1510,6 +1510,12 @@ if(typeof window!=='undefined'){
   });
   worldStream.resetHitch=resetStreamHitch;
   worldStream.moveTo=(x,z)=>{player.position.x=x;player.position.z=z;};
+  worldStream.lookAt=(x,z)=>{cameraYaw=Math.atan2(-(x-player.position.x),-(z-player.position.z));};
+  worldStream.captureProbe=()=>({
+    flying:projectiles.some(p=>p.type==='capture'),
+    shaking:!!captureSequence?.ballMesh,
+    wildHidden:!!(captureSequence?.wild?.mesh&&captureSequence.wild.mesh.visible===false),
+  });
   window.MLRPG_WORLD_STREAM=worldStream;
 }
 const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
@@ -3346,8 +3352,9 @@ function startCaptureSequence(w,ballMesh,attemptId,resolution){
   if(!ballMesh){
     ballMesh=new THREE.Mesh(boxGeometry(.28,.28,.28),new THREE.MeshStandardMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:clampEmissive(.35),roughness:.2,metalness:.6,transparent:true,opacity:.96}));
     scene.add(ballMesh);
+    ballMesh.scale.setScalar(1.85);
   }else{
-    ballMesh.scale.setScalar(2);
+    ballMesh.scale.setScalar(3.6);
   }
   ballMesh.position.copy(pos);
   ballMesh.position.y=.7;
