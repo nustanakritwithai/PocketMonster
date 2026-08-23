@@ -149,7 +149,7 @@ const runtimeMutations = [
   ['move actor on miss', 'const successfulHit = hitResults.some(result => result.hit);', 'const successfulHit = true;'],
   ['displace lethal target', 'if (hit.hit && !hit.fainted) chance = resolveEffectChance', 'if (hit.hit) chance = resolveEffectChance'],
   ['skip E4 generic resolution', 'if (E4_READY_SKILLS.has(skillId)) {\n    e4 = resolveE4SkillEffects', 'if (false) {\n    e4 = resolveE4SkillEffects'],
-  ['leave E4 component deferred', '|| component.slice === E4_MOBILITY_EFFECT_POLICY.phase;', '|| false;'],
+  ['leave E4 component deferred', "|| component.slice === E4_MOBILITY_EFFECT_POLICY.phase\n    || (E5_READY_SKILLS.has(skillId) && ['summon', 'heal_modifier'].includes(component.kind));", "|| false\n    || (E5_READY_SKILLS.has(skillId) && ['summon', 'heal_modifier'].includes(component.kind));"],
   ['drop movement result receipt', 'movementResult: e4?.movementResult ?? null,', 'movementResult: null,'],
 ];
 

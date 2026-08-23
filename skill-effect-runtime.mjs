@@ -124,6 +124,12 @@ export const E4_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
 
 const E4_READY_SKILLS = new Set(E4_READY_SKILL_IDS);
 
+export const E5_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
+  .filter(row => row.components.some(component => ['summon', 'heal_modifier'].includes(component.kind)))
+  .map(row => row.skillId));
+
+const E5_READY_SKILLS = new Set(E5_READY_SKILL_IDS);
+
 export const REVIEWED_SKILL_EFFECT_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
   .filter(row => E1_READY_SKILLS.has(row.skillId) || E2_READY_SKILLS.has(row.skillId) || E3_READY_SKILLS.has(row.skillId))
   .map(row => row.skillId));
@@ -170,6 +176,22 @@ export const E4_MOBILITY_EFFECT_POLICY = Object.freeze({
   magnitudeSource: 'runtime_fallback_workbook_mechanic_without_distance_magnitude',
   movementTrigger: 'at_least_one_successful_hit',
   displacementTrigger: 'successful_nonlethal_hit',
+  sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
+  sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
+});
+
+export const E5_CLOSURE_EFFECT_POLICY = Object.freeze({
+  phase: 'E5_EFFECT_CLOSURE',
+  activation: 'live',
+  lifeStealDamageRatio: 0.3,
+  summonCount: 3,
+  summonDurationSec: 6,
+  summonTickIntervalSec: 1.5,
+  summonTickDamageRatio: 0.15,
+  summonTargeting: 'nearest_living_wild_in_command_radius',
+  chanceSource: 'workbook_effect_chance_pct',
+  magnitudeSource: 'runtime_fallback_workbook_mechanic_without_heal_or_summon_magnitude',
+  cleanupBoundary: 'recall_faint_or_zone_change',
   sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
 });
@@ -271,6 +293,10 @@ export function canExecuteE3SkillEffect(skillId) {
 
 export function canExecuteE4SkillEffect(skillId) {
   return E4_READY_SKILLS.has(skillId);
+}
+
+export function canExecuteE5SkillEffect(skillId) {
+  return E5_READY_SKILLS.has(skillId);
 }
 
 export function canExecuteReviewedSkillEffect(skillId) {
@@ -932,6 +958,93 @@ export function resolveE4SkillEffects({ command, attacker, targets, hitResults }
   });
 }
 
+function validE5Request(command, attacker, targets) {
+  if (!command || command.ok !== true || typeof command.skillId !== 'string'
+    || !E5_READY_SKILLS.has(command.skillId)) return 'effect_not_ready';
+  const skill = skillCatalogEntry(command.skillId);
+  if (!skill || command.targetKind !== skill.targetType) return 'invalid_command';
+  if (!attacker || typeof attacker.id !== 'string' || !Number.isFinite(attacker.hp)
+    || !Number.isFinite(attacker.maxHp) || attacker.hp <= 0 || attacker.maxHp <= 0
+    || attacker.hp > attacker.maxHp) return 'invalid_actor_health';
+  if (!Array.isArray(command.targetIds) || command.targetIds.length === 0 || !Array.isArray(targets)
+    || targets.length !== command.targetIds.length
+    || targets.some((target, index) => target?.id !== command.targetIds[index]
+      || !Number.isFinite(target.hp) || target.hp <= 0)) return 'invalid_targets';
+  if (skill.effect === 'SummonSwarm'
+    && (!validFieldPoint(command.targetPoint) || !Number.isFinite(command.radiusM) || command.radiusM <= 0)) {
+    return 'invalid_summon_geometry';
+  }
+  return null;
+}
+
+export function validateE5SkillEffectRequest(request = {}) {
+  const reason = validE5Request(request.command, request.attacker, request.targets);
+  return effectResult(reason === null, reason);
+}
+
+export function resolveE5SkillEffects({ command, attacker, targets, hitResults } = {}, { rng } = {}) {
+  const invalid = validE5Request(command, attacker, targets);
+  if (invalid) return effectResult(false, invalid, { rngDraws: 0 });
+  if (!Array.isArray(hitResults) || hitResults.length !== targets.length
+    || hitResults.some((result, index) => result?.targetId !== targets[index].id
+      || typeof result.hit !== 'boolean' || !Number.isFinite(result.damage) || result.damage < 0)) {
+    return effectResult(false, 'invalid_hit_results', { rngDraws: 0 });
+  }
+  const skill = skillCatalogEntry(command.skillId);
+  const damageBasis = hitResults.reduce((total, result, index) => total
+    + (result.hit ? Math.min(result.damage, targets[index].hp) : 0), 0);
+  let chance = effectResult(true, 'no_damage', { applied: false, roll: null, rngDraws: 0 });
+  if (damageBasis > 0) chance = resolveEffectChance(skill.effectChancePct, rng, `closure:${skill.id}`);
+  if (!chance.ok) return effectResult(false, chance.reason, { rngDraws: chance.rngDraws });
+  let healModifierResult = null;
+  let summonResult = null;
+  if (skill.effect === 'LifeSteal') {
+    const requestedHealing = chance.applied
+      ? Math.max(1, Math.round(damageBasis * E5_CLOSURE_EFFECT_POLICY.lifeStealDamageRatio)) : 0;
+    const healing = Math.min(attacker.maxHp - attacker.hp, requestedHealing);
+    healModifierResult = Object.freeze({
+      skillId: command.skillId,
+      actorId: attacker.id,
+      kind: 'heal_modifier',
+      damageBasis,
+      healRatio: E5_CLOSURE_EFFECT_POLICY.lifeStealDamageRatio,
+      requestedHealing,
+      healing,
+      predictedHp: attacker.hp + healing,
+      effectChancePct: skill.effectChancePct,
+      effectRoll: chance.roll,
+      applied: chance.applied && healing > 0,
+      reason: chance.applied && healing <= 0 ? 'already_full_health' : chance.reason,
+    });
+  } else {
+    summonResult = Object.freeze({
+      summonId: `swarm:${command.castId ?? command.commandId}`,
+      skillId: command.skillId,
+      actorId: attacker.id,
+      kind: 'summon',
+      center: frozenPoint(command.targetPoint),
+      radiusM: command.radiusM,
+      summonCount: E5_CLOSURE_EFFECT_POLICY.summonCount,
+      durationSec: E5_CLOSURE_EFFECT_POLICY.summonDurationSec,
+      tickIntervalSec: E5_CLOSURE_EFFECT_POLICY.summonTickIntervalSec,
+      tickDamageRatio: E5_CLOSURE_EFFECT_POLICY.summonTickDamageRatio,
+      effectChancePct: skill.effectChancePct,
+      effectRoll: chance.roll,
+      applied: chance.applied,
+      reason: chance.reason,
+    });
+  }
+  return effectResult(true, null, {
+    effectMode: 'canonical_e5_effect_closure',
+    skillId: command.skillId,
+    healModifierResult,
+    summonResult,
+    appliedCount: (healModifierResult?.applied ? 1 : 0) + (summonResult?.applied ? 1 : 0),
+    activeComponentKinds: Object.freeze([skill.effect === 'LifeSteal' ? 'heal_modifier' : 'summon']),
+    rngDraws: chance.rngDraws,
+  });
+}
+
 export function validateReviewedSkillEffectRequest(request = {}) {
   const skillId = request.command?.skillId;
   if (!REVIEWED_SKILL_EFFECTS.has(skillId)) return effectResult(false, 'effect_not_ready');
@@ -951,6 +1064,10 @@ export function validateReviewedSkillEffectRequest(request = {}) {
     const e4 = validateE4SkillEffectRequest(request);
     if (!e4.ok) return e4;
   }
+  if (E5_READY_SKILLS.has(skillId)) {
+    const e5 = validateE5SkillEffectRequest(request);
+    if (!e5.ok) return e5;
+  }
   return effectResult(true, null);
 }
 
@@ -962,6 +1079,7 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
   let e2 = null;
   let e3 = null;
   let e4 = null;
+  let e5 = null;
   let rngDraws = 0;
   if (E1_READY_SKILLS.has(skillId)) {
     e1 = resolveE1SkillEffects(request, { rng });
@@ -982,11 +1100,17 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
     if (!e4.ok) return effectResult(false, e4.reason, { rngDraws: rngDraws + e4.rngDraws });
     rngDraws += e4.rngDraws;
   }
+  if (E5_READY_SKILLS.has(skillId)) {
+    e5 = resolveE5SkillEffects({ ...request, hitResults: e1?.targetResults ?? Object.freeze([]) }, { rng });
+    if (!e5.ok) return effectResult(false, e5.reason, { rngDraws: rngDraws + e5.rngDraws });
+    rngDraws += e5.rngDraws;
+  }
   const coverage = skillEffectCoverageEntry(skillId);
   const active = component => e1ComponentActive(component)
     || component.slice === E2_SELF_EFFECT_POLICY.phase
     || component.slice === E3_FIELD_EFFECT_POLICY.phase
-    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;
+    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase
+    || (E5_READY_SKILLS.has(skillId) && ['summon', 'heal_modifier'].includes(component.kind));
   return effectResult(true, null, {
     effectMode: 'canonical_reviewed_effects',
     skillId,
@@ -995,9 +1119,11 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
     fieldResult: e3?.fieldResult ?? null,
     movementResult: e4?.movementResult ?? null,
     displacementResults: e4?.displacementResults ?? Object.freeze([]),
+    healModifierResult: e5?.healModifierResult ?? null,
+    summonResult: e5?.summonResult ?? null,
     hitCount: e1?.hitCount ?? 0,
     totalDamage: e1?.totalDamage ?? 0,
-    healing: e2?.healing ?? 0,
+    healing: (e2?.healing ?? 0) + (e5?.healModifierResult?.healing ?? 0),
     statusAppliedCount: (e1?.statusAppliedCount ?? 0) + (e2?.statusAppliedCount ?? 0),
     activeComponentKinds: Object.freeze(coverage.components.filter(active).map(component => component.kind)),
     deferredComponentKinds: Object.freeze(coverage.components.filter(component => !active(component)).map(component => component.kind)),
