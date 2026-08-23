@@ -30,7 +30,7 @@ assert.deepEqual(
   { from: 'MON_002', to: 'MON_020', name: 'จิ้งจอกเพลิง', skill: 'SK_FIRE_06', sourceBST: 256, targetBST: 464, gain: 208 },
 );
 assert.equal(workbookEvolutionPathForSpecies('fairimp').unlockSkillId, 'SK_LIGHT_06');
-assert.equal(workbookEvolutionPathForSpecies('fairimp').runtimeEvolutionDecision, 'D4_LIVE_LV2_UNCHANGED');
+assert.equal(workbookEvolutionPathForSpecies('fairimp').runtimeEvolutionDecision, 'M6_CANONICAL_STAGE2_LIVE');
 
 const duplicate = structuredClone(WORKBOOK_EVOLUTION_PATHS);
 duplicate[1].id = duplicate[0].id;
@@ -41,9 +41,9 @@ assert.ok(validateWorkbookEvolutionCatalog(badMapping).issues.some(issue => issu
 const badSkill = structuredClone(WORKBOOK_EVOLUTION_PATHS);
 badSkill[0].unlockSkillId = 'SK_FIRE_01';
 assert.ok(validateWorkbookEvolutionCatalog(badSkill).issues.some(issue => issue.code === 'invalid_unlock_skill'));
-const activated = structuredClone(WORKBOOK_EVOLUTION_PATHS);
-activated[0].activation = 'runtime';
-assert.ok(validateWorkbookEvolutionCatalog(activated).issues.some(issue => issue.code === 'runtime_activation_forbidden'));
+const deactivated = structuredClone(WORKBOOK_EVOLUTION_PATHS);
+deactivated[0].activation = 'preview_only';
+assert.ok(validateWorkbookEvolutionCatalog(deactivated).issues.some(issue => issue.code === 'runtime_activation_mismatch'));
 
 const source = normalizeInstance({
   instanceId: 'preview', speciesId: 'flameling', formId: 'flameling', level: 15,
@@ -53,7 +53,8 @@ const before = structuredClone(source);
 const workbookPreview = previewWorkbookEvolution(source);
 assert.equal(workbookPreview.ok, true);
 assert.equal(workbookPreview.sourceEligible, true);
-assert.equal(workbookPreview.canCommit, false, 'Workbook Lv.15 path remains preview-only');
+assert.equal(workbookPreview.canCommit, true, 'Workbook Lv.15 + Bond 50 path can commit');
+assert.equal(workbookPreview.readOnly, false);
 assert.equal(workbookPreview.unlockSkill.id, 'SK_FIRE_06');
 assert.deepEqual(source, before, 'Workbook preview never mutates the instance');
 
@@ -63,13 +64,13 @@ const presentation = getFocusedEvolutionCatalogPresentation({
   resolveEvolutionPreview: previewWorkbookEvolution,
 });
 assert.equal(presentation.toWorkbookMonsterId, 'MON_020');
-assert.equal(presentation.canCommit, false);
-assert.equal(presentation.readOnly, true);
+assert.equal(presentation.canCommit, true);
+assert.equal(presentation.readOnly, false);
 assert.equal(Object.isFrozen(presentation), true);
 assert.deepEqual(source, before, 'UI presentation is read-only');
 assert.equal(previewWorkbookEvolution({ speciesId: 'missing' }).reason, 'unknown_id');
 
-const runtime = normalizeInstance({ instanceId: 'runtime', speciesId: 'flameling', formId: 'flameling', level: 2 }, { now: 1000 });
+const runtime = normalizeInstance({ instanceId: 'runtime', speciesId: 'flameling', formId: 'flameling', level: 15, mind: { bond: 50 } }, { now: 1000 });
 const runtimeDef = {
   id: 'flameling_lv2', fromFormId: 'flameling', toFormId: 'flameling_lv2',
   requirements: { required: [{ field: 'level', op: 'gte', value: 2 }] },
@@ -82,7 +83,10 @@ assert.equal(commitEvolution(runtime, { id: 'bad', fromFormId: 'flameling' }).re
 assert.deepEqual(runtime, runtimeBefore, 'invalid path cannot partially commit');
 
 const firstCommit = commitEvolution(runtime, runtimeDef, { now: 2000 });
-assert.equal(firstCommit.ok, true, 'locked live Lv.2 path still commits');
+assert.equal(firstCommit.ok, true, 'Workbook-qualified runtime path commits');
+assert.equal(runtime.canonicalFormId, 'MON_020');
+assert.equal(firstCommit.canonicalFromFormId, 'MON_002');
+assert.equal(firstCommit.canonicalToFormId, 'MON_020');
 const afterFirst = structuredClone(runtime);
 const repeated = commitEvolution(runtime, runtimeDef, { now: 3000 });
 assert.equal(repeated.ok, false);

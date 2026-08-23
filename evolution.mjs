@@ -9,8 +9,10 @@ import { clamp } from './balance-formulas.mjs';
 import { combatRating, CORE_STATS } from './combat-rating.mjs';
 import { evaluateEligibility } from './requirements.mjs';
 import { masteryRankFromExp } from './skill-progression.mjs';
-import { appendHistory } from './monster-instance.mjs';
+import { appendHistory, canonicalFormIdForInstance } from './monster-instance.mjs';
 import { MONSTER_CATALOG, monsterCatalogEntry } from './monster-catalog.mjs';
+import { monsterStatCatalogEntry } from './monster-stat-catalog.mjs';
+import { calculateMonsterStats } from './monster-stat-formula.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 
 function num(value, fallback = 0) {
@@ -39,7 +41,9 @@ const WORKBOOK_EVOLUTION_TARGET_DATA = Object.freeze({
 });
 
 export const WORKBOOK_EVOLUTION_PATHS = Object.freeze(MONSTER_CATALOG.map(mapping => {
-  const [toNameTH, unlockSkillId, sourceBST, targetBST] = WORKBOOK_EVOLUTION_TARGET_DATA[mapping.workbookStage2MonsterId];
+  const [toNameTH, unlockSkillId] = WORKBOOK_EVOLUTION_TARGET_DATA[mapping.workbookStage2MonsterId];
+  const sourceForm = monsterStatCatalogEntry(mapping.workbookBaseMonsterId);
+  const targetForm = monsterStatCatalogEntry(mapping.workbookStage2MonsterId);
   return Object.freeze({
     id: `EVO_${mapping.workbookBaseMonsterId}_${mapping.workbookStage2MonsterId}`,
     runtimeSpeciesId: mapping.runtimeSpeciesId,
@@ -47,18 +51,18 @@ export const WORKBOOK_EVOLUTION_PATHS = Object.freeze(MONSTER_CATALOG.map(mappin
     toWorkbookMonsterId: mapping.workbookStage2MonsterId,
     toNameTH,
     conditionType: 'Level',
-    requiredLevelReference: 15,
-    requiredBondReference: 50,
+    requiredLevelReference: sourceForm.evolution.requiredLevel,
+    requiredBondReference: sourceForm.evolution.requiredBond,
     requiredItemId: null,
     extraCondition: null,
     previewRule: 'form_type_stats_skills_before_confirm',
     unlockSkillId,
-    sourceBST,
-    targetBST,
-    bstGain: targetBST - sourceBST,
+    sourceBST: sourceForm.bst,
+    targetBST: targetForm.bst,
+    bstGain: targetForm.bst - sourceForm.bst,
     oneWay: true,
-    activation: 'preview_only',
-    runtimeEvolutionDecision: 'D4_LIVE_LV2_UNCHANGED',
+    activation: 'runtime_live',
+    runtimeEvolutionDecision: 'M6_CANONICAL_STAGE2_LIVE',
     secondaryTypeActivation: 'deferred_to_A29',
     unlockSkillActivation: 'deferred_to_A16',
     sourceWorkbookVersion: mapping.sourceWorkbookVersion,
@@ -103,8 +107,8 @@ export function validateWorkbookEvolutionCatalog(records) {
     if (!Number.isFinite(path.sourceBST) || !Number.isFinite(path.targetBST) || path.bstGain !== path.targetBST - path.sourceBST) {
       issues.push(evolutionCatalogIssue('invalid_bst_projection', index, 'bstGain'));
     }
-    if (path.activation !== 'preview_only' || path.runtimeEvolutionDecision !== 'D4_LIVE_LV2_UNCHANGED' || path.oneWay !== true) {
-      issues.push(evolutionCatalogIssue('runtime_activation_forbidden', index, 'activation'));
+    if (path.activation !== 'runtime_live' || path.runtimeEvolutionDecision !== 'M6_CANONICAL_STAGE2_LIVE' || path.oneWay !== true) {
+      issues.push(evolutionCatalogIssue('runtime_activation_mismatch', index, 'activation'));
     }
   });
   return Object.freeze({ ok: issues.length === 0, issues: Object.freeze(issues) });
@@ -133,6 +137,10 @@ export function resolveWorkbookEvolutionStage(instance) {
   if (instance.formId === path.toWorkbookMonsterId) {
     return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'workbook_stage2_form', path });
   }
+  if (history.some(entry => entry?.workbookEvolutionId === path.id
+    && entry?.toWorkbookMonsterId === path.toWorkbookMonsterId)) {
+    return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'canonical_evolution_history', path });
+  }
   if (history.some(entry => entry?.evolutionId === path.id && entry?.to === path.toWorkbookMonsterId)) {
     return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'workbook_evolution_history', path });
   }
@@ -154,6 +162,9 @@ export function resolveWorkbookEvolutionStage(instance) {
       liveEvolution: Object.freeze({ ...liveEvolution }),
     });
   }
+  if (instance.canonicalFormId === path.toWorkbookMonsterId) {
+    return Object.freeze({ ok: true, reason: null, stage2: true, stageEvidence: 'canonical_form_id', path });
+  }
   return Object.freeze({ ok: true, reason: 'evolution_required', stage2: false, stageEvidence: null, path });
 }
 
@@ -164,9 +175,30 @@ export function previewWorkbookEvolution(instance) {
   const level = Number.isFinite(instance.level) ? instance.level : 1;
   const bond = Number.isFinite(instance.mind?.bond) ? instance.mind.bond : num(instance.bond, 0);
   const sourceEligible = level >= path.requiredLevelReference && bond >= path.requiredBondReference;
+  const canonicalFormId = canonicalFormIdForInstance(instance);
   const alreadyCommitted = (Array.isArray(instance.evolutionHistory) ? instance.evolutionHistory : [])
     .some(entry => entry?.evolutionId === path.id)
+    || canonicalFormId === path.toWorkbookMonsterId
     || instance.formId === path.toWorkbookMonsterId;
+  const sourceStats = calculateMonsterStats({
+    formId: path.fromWorkbookMonsterId,
+    level,
+    potential: instance.potential,
+    training: instance.statTraining,
+  });
+  const targetStats = calculateMonsterStats({
+    formId: path.toWorkbookMonsterId,
+    level,
+    potential: instance.potential,
+    training: instance.statTraining,
+  });
+  if (!sourceStats.ok || !targetStats.ok) {
+    return Object.freeze({ ok: false, reason: 'invalid_canonical_stats', sourceStats, targetStats });
+  }
+  const statDelta = Object.freeze(Object.fromEntries(Object.keys(sourceStats.stats).map(stat => [
+    stat,
+    targetStats.stats[stat] - sourceStats.stats[stat],
+  ])));
   const unlockSkill = skillCatalogEntry(path.unlockSkillId);
   return Object.freeze({
     ok: true,
@@ -177,8 +209,12 @@ export function previewWorkbookEvolution(instance) {
     bond,
     sourceEligible,
     alreadyCommitted,
-    canCommit: false,
-    readOnly: true,
+    canCommit: sourceEligible && !alreadyCommitted && canonicalFormId === path.fromWorkbookMonsterId,
+    readOnly: false,
+    canonicalFormId,
+    sourceStats: sourceStats.stats,
+    targetStats: targetStats.stats,
+    statDelta,
     unlockSkill: Object.freeze({ id: unlockSkill.id, nameTH: unlockSkill.nameTH, nameEN: unlockSkill.nameEN }),
     activation: path.activation,
     runtimeEvolutionDecision: path.runtimeEvolutionDecision,
@@ -283,6 +319,24 @@ export function commitEvolution(instance, evoDef, { now = Date.now(), ownedItemC
   const eligibility = evaluateEvolution(evoDef, instance);
   if (!eligibility.eligible) return { ok: false, reason: eligibility.reason ?? 'not_eligible', eligibility };
 
+  const workbookPath = workbookEvolutionPathForSpecies(instance.speciesId);
+  const canonicalFormId = canonicalFormIdForInstance(instance);
+  const isWorkbookStageTransition = workbookPath
+    && canonicalFormId === workbookPath.fromWorkbookMonsterId
+    && evoDef.fromFormId === instance.formId;
+  let workbookPreview = null;
+  if (isWorkbookStageTransition) {
+    workbookPreview = previewWorkbookEvolution(instance);
+    if (!workbookPreview.ok) return { ok: false, reason: workbookPreview.reason, workbookPreview };
+    if (!workbookPreview.canCommit) {
+      return {
+        ok: false,
+        reason: workbookPreview.alreadyCommitted ? 'already_committed' : 'workbook_requirements_not_met',
+        workbookPreview,
+      };
+    }
+  }
+
   const fromFormId = instance.formId ?? null;
 
   // Identity anchors that MUST NOT change.
@@ -329,6 +383,13 @@ export function commitEvolution(instance, evoDef, { now = Date.now(), ownedItemC
   // Append to evolution + life history (never reset — P1).
   if (!Array.isArray(instance.evolutionHistory)) instance.evolutionHistory = [];
   instance.evolutionHistory.push({ from: fromFormId, to: evoDef.toFormId, evolutionId: evoDef.id, at: now });
+  if (workbookPreview) {
+    instance.canonicalFormId = workbookPath.toWorkbookMonsterId;
+    const historyEntry = instance.evolutionHistory.at(-1);
+    historyEntry.workbookEvolutionId = workbookPath.id;
+    historyEntry.fromWorkbookMonsterId = workbookPath.fromWorkbookMonsterId;
+    historyEntry.toWorkbookMonsterId = workbookPath.toWorkbookMonsterId;
+  }
   appendHistory(instance, { type: 'evolution', from: fromFormId, to: evoDef.toFormId }, now);
 
   // Assert identity anchors survived.
@@ -337,5 +398,14 @@ export function commitEvolution(instance, evoDef, { now = Date.now(), ownedItemC
   instance.generation = preservedGeneration;
   instance.genes = preservedGenes;
 
-  return { ok: true, fromFormId, toFormId: evoDef.toFormId, carried, unequipped };
+  return {
+    ok: true,
+    fromFormId,
+    toFormId: evoDef.toFormId,
+    canonicalFromFormId: workbookPreview?.path.fromWorkbookMonsterId ?? null,
+    canonicalToFormId: workbookPreview?.path.toWorkbookMonsterId ?? null,
+    canonicalStats: workbookPreview?.targetStats ?? null,
+    carried,
+    unequipped,
+  };
 }

@@ -37,7 +37,7 @@ import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffect
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
-import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
+import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
 import { calculateCanonicalWildStats, computeCoreStats, evoDefFromPath, formatCrReport, growthExpForLevel, liveClassedMoveDamage, ranchTrainingGain, refreshCanonicalOwnedStats, STARTER_EQUIPMENT } from './live-progression.mjs';
@@ -54,6 +54,7 @@ import {
   foodById,
 } from './content-catalog.mjs';
 import { createSpeciesCatalogAdapter, monsterCatalogEntry } from './monster-catalog.mjs';
+import { monsterStatCatalogEntry } from './monster-stat-catalog.mjs';
 import {
   RUNTIME_TYPES as TYPES,
   TYPE_LABEL_TH as TYPE_TH,
@@ -638,7 +639,7 @@ function rollGender(sp){
 }
 function getEvolutionPath(inst){ const sp=spById[inst?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===inst.formId||p.id===inst.evolutionPath)||null; }
 function availableEvolutionPaths(inst){ const sp=spById[inst?.speciesId]; if(!sp)return []; const from=inst.formId||sp.id; return (sp.evolutionPaths||[]).filter(p=>(p.fromFormId||sp.id)===from&&p.id!==inst.formId); }
-function displayName(inst){ return getEvolutionPath(inst)?.name||spById[inst.speciesId]?.name||'Monster'; }
+function displayName(inst){ const canonical=monsterStatCatalogEntry(inst?.canonicalFormId);return canonical?.stage===2?canonical.nameTH:(getEvolutionPath(inst)?.name||spById[inst.speciesId]?.name||'Monster'); }
 function monsterTypes(instOrSp){
   if(!instOrSp)return ['Normal'];
   if(instOrSp.instanceId){
@@ -648,7 +649,7 @@ function monsterTypes(instOrSp){
   return instOrSp.types.filter(Boolean);
 }
 function wildPath(w){ const sp=spById[w?.speciesId]; return sp?.evolutionPaths?.find(p=>p.id===w?.evolutionPath)||null; }
-function wildDisplayName(w){ return wildPath(w)?.name||spById[w?.speciesId]?.name||'Monster'; }
+function wildDisplayName(w){ const canonical=monsterStatCatalogEntry(w?.canonicalFormId);return canonical?.stage===2?canonical.nameTH:(wildPath(w)?.name||spById[w?.speciesId]?.name||'Monster'); }
 function wildTypes(w){ const sp=spById[w?.speciesId]; const path=wildPath(w); return [sp?.types?.[0]||'Normal', path?.secondaryType??sp?.types?.[1]].filter(Boolean); }
 function getMonsterSkills(inst){
   const sp=spById[inst.speciesId];
@@ -4377,6 +4378,13 @@ function hatchEgg(eggId){if(!assertRanchOperation())return;const egg=state.eggs.
 function evoRequirementStatus(inst,path){
   const sp=spById[inst.speciesId];
   syncToBodyMind(inst);
+  const workbook=path.fromFormId===sp.id?previewWorkbookEvolution(inst):null;
+  if(workbook?.ok){
+    const items=[];
+    if(workbook.level<workbook.path.requiredLevelReference)items.push(`✗ level gte ${workbook.path.requiredLevelReference}`);
+    if(workbook.bond<workbook.path.requiredBondReference)items.push(`✗ bond gte ${workbook.path.requiredBondReference}`);
+    return {ok:workbook.canCommit,text:items.length?items.join(' • '):(workbook.canCommit?'ผ่านเงื่อนไขทั้งหมด':'วิวัฒนาการแล้ว'),result:workbook};
+  }
   const def=evoDefFromPath(path,sp.id);
   const result=evaluateEvolution(def,inst);
   const items=(result.failedRequired||[]).map(r=>`✗ ${r.field} ${r.op} ${r.value}`);
@@ -4394,7 +4402,8 @@ function evolveMonster(id,pathId){if(!assertCharacterMutable(id))return;const in
   const def=evoDefFromPath(path,sp.id);
   const st=evoRequirementStatus(inst,path);
   if(!st.ok){msg(st.text||'ยังไม่ผ่านเงื่อนไข Evolution');return;}
-  if(!confirm(`Evolution ย้อนกลับไม่ได้\n${displayName(inst)} → ${path.name}\nยืนยันหรือไม่?`))return;
+  const workbookPreview=path.fromFormId===sp.id?previewWorkbookEvolution(inst):null,targetName=workbookPreview?.ok?workbookPreview.path.toNameTH:path.name;
+  if(!confirm(`Evolution ย้อนกลับไม่ได้\n${displayName(inst)} → ${targetName}\nยืนยันหรือไม่?`))return;
   const oldColor=colorNum(monsterTypes(inst)[0]);
   const committed=commitEvolution(inst,def,{now:Date.now()});
   if(!committed.ok){msg(committed.reason||'Evolution ไม่สำเร็จ');return;}
@@ -4404,7 +4413,7 @@ function evolveMonster(id,pathId){if(!assertCharacterMutable(id))return;const in
   const newColor=colorNum(monsterTypes(inst)[0]);
   spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
   playSFX('sfx_evolution');
-  refreshStats(inst,true);msg(`${sp.name} Evolution → ${path.name} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();if(!el('evolutionPanel').classList.contains('hidden'))renderEvolutionGuide();saveGame(false);}
+  refreshStats(inst,false);msg(`${sp.name} Evolution → ${targetName} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();if(!el('evolutionPanel').classList.contains('hidden'))renderEvolutionGuide();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
   if(!hist.length)return '';
@@ -4420,20 +4429,19 @@ function renderFocusedEvolutionBuildPreview(){
   const build=instanceCombatBuildSafe(inst);
   const candidates=paths.map(path=>{
     const def=evoDefFromPath(path,sp.id);
-    const eligibility=evaluateEvolution(def,inst);
     const requirement=evoRequirementStatus(inst,path);
-    const preview=previewEvolution(inst,def,build);
+    const preview=previewEvolution(inst,def,build),workbook=path.fromFormId===sp.id?previewWorkbookEvolution(inst):null;
     const mods=path.statMods||{};
     const delta=['hp','atk','def','spAtk','spDef','spd'].map(stat=>{
-      const current=stat==='hp'?inst.maxHp:inst[stat];
-      const next=Math.round((current||0)*(mods[stat]||1));
+      const current=workbook?.ok?workbook.sourceStats[stat]:(stat==='hp'?inst.maxHp:inst[stat]);
+      const next=workbook?.ok?workbook.targetStats[stat]:Math.round((current||0)*(mods[stat]||1));
       const label=stat==='spAtk'?'SP.ATK':stat==='spDef'?'SP.DEF':stat.toUpperCase();
       return `${label} ${next-current>=0?'+':''}${next-current}`;
     }).join(' • ');
     const types=[sp.types[0],preview.secondaryType||path.secondaryType||inst.secondaryType].filter(Boolean).map(type=>TYPE_TH[type]||type).join(' / ');
     const carry=preview.skillCarry.map(skill=>`${skill.from} → ${skill.to} ${Math.round(skill.carry*100)}%`).join(', ')||'ไม่มี Skill Carry';
     const trait=path.evolutionTrait||path.trait||'—';
-    return `<div class="evo-card"><div class="evo-title"><b>${displayName(inst)} → ${path.name}</b><span>${eligibility.eligible?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">Form: ${path.id} • Type: ${types}<br>${delta}<br>Skill Carry: ${carry}<br>Passive / Evolution Trait: ${trait}<br>Requirement: ${requirement.text}</div></div>`;
+    return `<div class="evo-card"><div class="evo-title"><b>${displayName(inst)} → ${workbook?.ok?workbook.path.toNameTH:path.name}</b><span>${requirement.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">Form: ${workbook?.ok?workbook.path.toWorkbookMonsterId:path.id} • Type: ${types}<br>${delta}<br>Skill Carry: ${carry}<br>Passive / Evolution Trait: ${trait}<br>Requirement: ${requirement.text}</div></div>`;
   }).join('');
   return `<section class="focused-evolution-preview"><div class="skills-section-title">Evolution Build • ${presentation.name}</div>${candidates}</section>`;
 }
@@ -4453,9 +4461,10 @@ function renderEvolution(targetPanel=null){
   }
   box.innerHTML=renderFocusedEvolutionBuildPreview();
   for(const p of paths){
-    const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');
+    const st=evoRequirementStatus(inst,p),types=[sp.types[0],p.secondaryType??inst.secondaryType??sp.types[1]].filter(Boolean),mods=p.statMods||{},workbook=p.fromFormId===sp.id?previewWorkbookEvolution(inst):null,skills=getMonsterSkills(inst).map(s=>s.name).join(', '),d=document.createElement('div');
     d.className='evo-card';
-    d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SP.ATK ×${mods.spAtk||1} • SP.DEF ×${mods.spDef||1} • SPD ×${mods.spd||1}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div>${carry}${identity}<div style="margin-top:6px">${budget}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>${evoHistoryHTML(inst)}`;
+    const statText=workbook?.ok?['hp','atk','def','spAtk','spDef','spd'].map(stat=>`${stat==='spAtk'?'SP.ATK':stat==='spDef'?'SP.DEF':stat.toUpperCase()} ${workbook.targetStats[stat]}`).join(' • '):`HP ×${mods.hp||1} • ATK ×${mods.atk||1} • DEF ×${mods.def||1} • SP.ATK ×${mods.spAtk||1} • SP.DEF ×${mods.spDef||1} • SPD ×${mods.spd||1}`;
+    d.innerHTML=`<div class="evo-title"><b>${displayName(inst)} → ${workbook?.ok?workbook.path.toNameTH:p.name}</b><span>${st.ok?'พร้อม':'ยังไม่พร้อม'}</span></div><div class="evo-details">รูปร่าง: ${workbook?.ok?workbook.path.toNameTH:p.name} (Form/สี/ขนาดใหม่)<br>Type: ${types.map(t=>TYPE_TH[t]).join(' / ')} — Primary ${TYPE_TH[sp.types[0]]} ล็อกตาม Species<br>Stats: ${statText}<br>Skills หลัง Evolution: ${skills}<br>เงื่อนไข: ${st.text}</div>${carry}${identity}<div style="margin-top:6px">${budget}</div><button ${st.ok?'':'disabled'} title="${st.text}">${st.ok?'ยืนยัน Evolution':st.text}</button>${evoHistoryHTML(inst)}`;
     d.querySelector('button').onclick=()=>evolveMonster(inst.instanceId,p.id);
     box.appendChild(d);
   }

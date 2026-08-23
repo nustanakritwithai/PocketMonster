@@ -54,9 +54,9 @@ const wolf = evoDefFromPath(species[0].evolutionPaths.find(p => p.id === 'flame_
 assert.equal(wolf.fromFormId, 'flameling_lv2');
 assert.deepEqual(wolf.requirements.required.map(r => r.field), ['level', 'training.power', 'career.eliteWins']);
 
-const young = normalizeInstance({ instanceId: 'y', speciesId: 'flameling', formId: 'flameling_lv2', level: 10, training: { power: 10 } });
+const young = normalizeInstance({ instanceId: 'y', speciesId: 'flameling', formId: 'flameling_lv2', evolutionPath: 'flameling_lv2', level: 10, training: { power: 10 } });
 const ready = normalizeInstance({
-  instanceId: 'r', speciesId: 'flameling', formId: 'flameling_lv2', level: 20,
+  instanceId: 'r', speciesId: 'flameling', formId: 'flameling_lv2', evolutionPath: 'flameling_lv2', level: 20,
   training: { power: 80, defense: 10, speed: 20, technique: 10, spirit: 5 },
   career: { eliteWins: 2 },
   genes: { hp: 'B', atk: 'A', def: 'C', spd: 'B' },

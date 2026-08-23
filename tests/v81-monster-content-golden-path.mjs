@@ -118,7 +118,7 @@ assert.equal(WORKBOOK_CAPTURE_ADAPTER.rollAuthority, 'future_server_boundary');
 assert.equal(SKILL_RECOVERY_POLICY.serverAuthorityClaim, false);
 assert.equal(SKILL_COMMAND_RUNTIME_POLICY.canonicalEffectsResolved, 'phase_gated');
 assert.equal(BUILD_PRESET_POLICY.activation, 'catalog_only');
-assert.equal(workbookEvolutionPathForSpecies('flameling').activation, 'preview_only');
+assert.equal(workbookEvolutionPathForSpecies('flameling').activation, 'runtime_live');
 assert.equal(A40_ACCEPTANCE_POLICY.serverAuthorityClaim, false);
 assert.equal(A40_ACCEPTANCE_POLICY.manualSkillCoverage, 'four_slot_command_boundary');
 assert.deepEqual(A40_ACCEPTANCE_POLICY.targetKinds, ['NearestEnemy', 'EnemyArea', 'Self', 'GroundPoint']);
@@ -126,8 +126,8 @@ assert.deepEqual(A40_ACCEPTANCE_POLICY.deferredManualTargets, ['Self', 'GroundPo
 const workbookEvolutionPreview = workbookEvolutionPathForSpecies('flameling');
 assert.equal(workbookEvolutionPreview.requiredLevelReference, 15);
 assert.equal(workbookEvolutionPreview.requiredBondReference, 50);
-assert.equal(workbookEvolutionPreview.activation, 'preview_only');
-assert.equal(workbookEvolutionPreview.runtimeEvolutionDecision, 'D4_LIVE_LV2_UNCHANGED');
+assert.equal(workbookEvolutionPreview.activation, 'runtime_live');
+assert.equal(workbookEvolutionPreview.runtimeEvolutionDecision, 'M6_CANONICAL_STAGE2_LIVE');
 
 const liveLevelTwoEvolutionProbe = normalizeInstance({
   instanceId: 'golden-live-lv2-evolution',
@@ -144,8 +144,9 @@ const liveLevelTwoDefinition = evoDefFromPath({
   statMods: { hp: 1.08, atk: 1.18, def: 1.06, spd: 1.10 },
   requires: { level: 2 },
 }, liveLevelTwoEvolutionProbe.speciesId);
-assert.equal(commitEvolution(liveLevelTwoEvolutionProbe, liveLevelTwoDefinition, { now: NOW + 1 }).ok, true);
-assert.equal(liveLevelTwoEvolutionProbe.formId, 'flameling_lv2', 'live Lv.2 evolution baseline remains active');
+const liveLevelTwoBefore = structuredClone(liveLevelTwoEvolutionProbe);
+assert.equal(commitEvolution(liveLevelTwoEvolutionProbe, liveLevelTwoDefinition, { now: NOW + 1 }).reason, 'workbook_requirements_not_met');
+assert.deepEqual(liveLevelTwoEvolutionProbe, liveLevelTwoBefore, 'Lv.2 cannot bypass Workbook Lv.15 + Bond 50');
 
 const fresh = normalizeSavedState({}, { ranchCap: 6, now: NOW });
 assert.deepEqual(fresh.party, [null, null, null]);
@@ -535,9 +536,10 @@ const heroIdentityBeforeEvolution = hero.instanceId;
 const evolution = commitEvolution(hero, evoDefFromPath(liveFlamelingPath, hero.speciesId), { now: NOW + 20 });
 assert.equal(evolution.ok, true, evolution.reason);
 assert.equal(hero.instanceId, heroIdentityBeforeEvolution);
+assert.equal(hero.canonicalFormId, 'MON_020');
 const heroStage = resolveWorkbookEvolutionStage(hero);
 assert.equal(heroStage.stage2, true);
-assert.equal(heroStage.stageEvidence, 'live_evolution_history');
+assert.equal(heroStage.stageEvidence, 'canonical_evolution_history');
 operationalTrace.push('Evolution');
 
 const heroPartySlot = state.party.indexOf(HERO_ID);
