@@ -22,6 +22,10 @@ assert.match(css, /\.ranch-storage-page[\s\S]*grid-template-columns/, 'Storage p
 assert.match(css, /@media\s*\(max-width:700px\)[\s\S]*\.ranch-storage-page/, 'Storage page keeps the narrow fallback');
 const lounge = css.match(/\/\* Ranch Club lounge \*\/([\s\S]*?)\/\* Keeper \/ Ranch Storage mobile bottom sheet \*\//)?.[1] || '';
 assert.ok(lounge, 'Ranch Club lounge CSS block is required');
+assert.match(lounge, /grid-template-rows:auto minmax\(120px,max-content\) minmax\(0,1fr\)/, 'list row keeps a 120px floor so the preview cannot collapse it');
+assert.match(lounge, /minmax\(96px,\.42fr\)/, 'short landscape keeps a list-row floor');
+assert.match(lounge, /38dvh|30dvh/, 'club stage scales with viewport height');
+assert.doesNotMatch(lounge, /grid-template-rows:auto minmax\(0,1fr\) auto/, 'list row must not be the unbounded leftover track');
 for (const cls of ['.ranch-club-kicker', '.ranch-club-card', '.ranch-club-stage', '.ranch-club-dossier', '.ranch-club-avatar', '.ranch-club-chip', '.ranch-club-vault', '.ranch-club-carry', '.ranch-club-preview-canvas']) {
   assert.ok(lounge.includes(cls), `club lounge CSS missing ${cls}`);
 }
