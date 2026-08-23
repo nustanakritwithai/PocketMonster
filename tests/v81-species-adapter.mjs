@@ -43,7 +43,7 @@ assert.equal(legacyIdentity.ok, false);
 assert.equal(legacyIdentity.reason, 'unknown_species_id');
 
 const game = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-assert.match(game, /import \{ createSpeciesCatalogAdapter \} from '\.\/monster-catalog\.mjs'/, 'live runtime imports the catalog adapter');
+assert.match(game, /import\s*\{[^}]*\bcreateSpeciesCatalogAdapter\b[^}]*\}\s*from '\.\/monster-catalog\.mjs'/s, 'live runtime imports the catalog adapter');
 assert.match(game, /const speciesCatalogAdapter=createSpeciesCatalogAdapter\(species\)/, 'live runtime validates the current species roster');
 assert.match(game, /const spById=speciesCatalogAdapter\.byId/, 'live lookups use the adapter index');
 assert.doesNotMatch(game, /const spById=Object\.fromEntries\(species\.map/, 'legacy direct index construction is removed');
