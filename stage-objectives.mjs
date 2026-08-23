@@ -37,12 +37,12 @@ export function stageObjectiveTracker(objective,{stageId,stageName='',monsterNam
   const name=monsterName||'มอนด่าน';
   const grass=stageId==='grass-meadow';
   const raw=phase==='free-explore'?[]:grass?[
-    {id:'capture-starter',mark:'1/3',label:'จับมอนสเตอร์ 1 ตัว • Recall คู่หูก่อนใช้ Capture Ball'},
-    {id:'defeat-elite',mark:'2/3',label:`ปราบ ELITE ${name} ที่ปรากฏในด่าน`},
-    {id:'defeat-boss',mark:'3/3',label:`ปราบ BOSS ${name} เพื่อเปิดจุดวาปด่านถัดไป`},
+    {id:'capture-starter',mark:'1/3',label:'จับมอน 1 ตัว'},
+    {id:'defeat-elite',mark:'2/3',label:`ปราบ ELITE ${name}`},
+    {id:'defeat-boss',mark:'3/3',label:`ปราบ BOSS ${name}`},
   ]:[
-    {id:'defeat-elite',mark:'1/2',label:`ปราบ ELITE ${name} ที่ปรากฏในด่าน`},
-    {id:'defeat-boss',mark:'2/2',label:`ปราบ BOSS ${name} เพื่อเปิดจุดวาปด่านถัดไป`},
+    {id:'defeat-elite',mark:'1/2',label:`ปราบ ELITE ${name}`},
+    {id:'defeat-boss',mark:'2/2',label:`ปราบ BOSS ${name}`},
   ];
   const current=raw.findIndex(step=>step.id===phase);
   const finished=phase==='stage-cleared'||phase==='stage-clear-pending';
