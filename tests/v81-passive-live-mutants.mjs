@@ -161,12 +161,25 @@ function assertLiveContract(module) {
   assert.equal(revivedRock.def, 110);
   assert.equal(revivedRock.fainted, false);
   assert.equal(revivedRock.hp, revivedRock.maxHp);
+
+  const canonicalRock = {
+    instanceId: 'canonical-rock', speciesId: 'rockhorn', canonicalFormId: 'MON_007', level: 1,
+    potential: { hp: 15, atk: 15, def: 15, spAtk: 15, spDef: 15, spd: 15 },
+    statTraining: { hp: 0, atk: 0, def: 0, spAtk: 0, spDef: 0, spd: 0 },
+    passiveId: 'PASS_ROCK_01', hp: 0, maxHp: 20, fainted: true, _condition: 'normal',
+    body: {}, mind: {}, nutrition: { allocations: {} },
+  };
+  const canonicalRevived = module.refreshCanonicalOwnedStats(canonicalRock, null, { heal: true });
+  assert.equal(canonicalRevived.ok, true);
+  assert.equal(canonicalRock.def, 7);
+  assert.equal(canonicalRock.hp, canonicalRock.maxHp);
+  assert.equal(canonicalRock.fainted, false);
 }
 
 function assertGameContract(source) {
   assert.match(source, /typeof instanceContext\?\.passiveId==='string'[\s\S]*?passiveCatalogEntry\(instanceContext\.passiveId\)/);
   assert.doesNotMatch(source, /inst\.passive\|\|inst\.genes\?\.trait/);
-  assert.match(source, /refreshCoreStats\(inst,sp,path,getEquipmentFlat\(inst\),\{heal\}\)/);
+  assert.match(source, /refreshCanonicalOwnedStats\(inst,getEquipmentFlat\(inst\),\{heal\}\)/);
 }
 
 assertMonsterContract(await loadSource(SOURCES.monster[1], SOURCES.monster[0], 'passive-live-monster-current'));
@@ -216,7 +229,7 @@ assert.throws(() => assertGameContract(unsafeGame));
 killed += 1;
 
 const staleReviveGame = SOURCES.game[1].replace(
-  'const computed=refreshCoreStats(inst,sp,path,getEquipmentFlat(inst),{heal});',
+  'const computed=refreshCanonicalOwnedStats(inst,getEquipmentFlat(inst),{heal});',
   'const computed=computeCoreStats(inst,sp,path,getEquipmentFlat(inst));',
 );
 assert.notEqual(staleReviveGame, SOURCES.game[1]);

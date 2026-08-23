@@ -5,6 +5,7 @@
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import {
   captureChance as formulaCaptureChance,
+  conditionCombatModifier,
   cumulativeExpToLevel,
   defenseMitigation,
   trainingCapacity,
@@ -13,11 +14,138 @@ import {
 } from './balance-formulas.mjs';
 import { combatRating, DEFAULT_CONVERSION, derivedStats, finalStats, statBreakdown } from './combat-rating.mjs';
 import { activeTrainingFoodMultiplier, nutritionFlat } from './food-care.mjs';
-import { deriveCondition } from './monster-instance.mjs';
+import { canonicalFormIdForInstance, deriveCondition } from './monster-instance.mjs';
+import { MONSTER_STAT_KEYS } from './monster-stat-contract.mjs';
+import { monsterStatCatalogFormForStage } from './monster-stat-catalog.mjs';
+import { calculateMonsterStats } from './monster-stat-formula.mjs';
+import { resolvePassiveStaticModifier } from './passive-resolver.mjs';
 import { EQUIPMENT_CATALOG, personalityTrainingMultiplier } from './content-catalog.mjs';
 
 export const LEVEL_GROWTH_SCALE = Object.freeze({ hp: 0.14, atk: 0.08, def: 0.08, spd: 0.05 });
 export const STARTER_EQUIPMENT = EQUIPMENT_CATALOG.filter(item => ['ranch_band', 'guard_charm', 'swift_lens'].includes(item.id));
+export const CANONICAL_LIVE_STAT_VERSION = 'canonical-live-stats/v1';
+export const WILD_STAT_VARIANT_MULTIPLIERS = Object.freeze({
+  Normal: Object.freeze({ hp: 1, atk: 1, def: 1, spAtk: 1, spDef: 1, spd: 1 }),
+  Rare: Object.freeze({ hp: 1, atk: 1, def: 1, spAtk: 1, spDef: 1, spd: 1 }),
+  Elite: Object.freeze({ hp: 1.3, atk: 1.12, def: 1.1, spAtk: 1.12, spDef: 1.1, spd: 1 }),
+  Boss: Object.freeze({ hp: 2, atk: 1.35, def: 1.3, spAtk: 1.35, spDef: 1.3, spd: 1 }),
+});
+
+function canonicalLiveFailure(reason, field, value = null) {
+  return Object.freeze({ ok: false, reason, field, value, activation: 'runtime_live' });
+}
+
+export function computeCanonicalOwnedStats(inst, equipmentFlat = null) {
+  const formId = inst?.canonicalFormId ?? canonicalFormIdForInstance(inst);
+  const formula = calculateMonsterStats({
+    formId,
+    level: inst?.level,
+    potential: inst?.potential,
+    training: inst?.statTraining,
+  });
+  if (!formula.ok) return Object.freeze({ ...formula, activation: 'runtime_rejected' });
+
+  const condition = inst?._condition ?? deriveCondition(inst);
+  const conditionMultiplier = 1 + conditionCombatModifier(condition);
+  const stats = {};
+  const breakdown = {};
+  for (const stat of MONSTER_STAT_KEYS) {
+    const nutrition = nutritionFlat(inst, stat);
+    const equipment = Number.isFinite(equipmentFlat?.[stat]) ? equipmentFlat[stat] : 0;
+    const beforePassive = Math.max(1, Math.round((formula.stats[stat] + nutrition + equipment) * conditionMultiplier));
+    const passiveModifiers = resolvePassiveStaticModifier({
+      passiveId: inst?.passiveId,
+      ownerSpeciesId: inst?.speciesId,
+      ownerFainted: inst?.fainted === true || (Number.isFinite(inst?.hp) && inst.hp <= 0),
+    }).filter(modifier => modifier.kind === 'stat_multiplier' && modifier.stat === stat.toUpperCase());
+    const passiveMultiplier = passiveModifiers.reduce((value, modifier) => value * modifier.multiplier, 1);
+    stats[stat] = Math.max(1, Math.round(beforePassive * passiveMultiplier));
+    breakdown[stat] = Object.freeze({
+      ...formula.breakdown[stat],
+      nutritionFlat: nutrition,
+      equipmentFlat: equipment,
+      condition,
+      conditionMultiplier,
+      beforePassive,
+      passiveMultiplier,
+      passiveSources: Object.freeze(passiveModifiers.map(modifier => modifier.sourcePassiveId)),
+      final: stats[stat],
+    });
+  }
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    formId,
+    runtimeSpeciesId: formula.runtimeSpeciesId,
+    level: formula.level,
+    stats: Object.freeze(stats),
+    breakdown: Object.freeze(breakdown),
+    formula,
+    version: CANONICAL_LIVE_STAT_VERSION,
+    activation: 'runtime_live',
+  });
+}
+
+export function applyCanonicalOwnedStats(inst, result, { heal = false } = {}) {
+  if (!inst || !result?.ok) return false;
+  const oldMax = Number.isFinite(inst.maxHp) && inst.maxHp > 0 ? inst.maxHp : result.stats.hp;
+  const oldHp = Number.isFinite(inst.hp) ? inst.hp : oldMax;
+  const ratio = oldMax > 0 ? oldHp / oldMax : 1;
+  inst.maxHp = result.stats.hp;
+  inst.atk = result.stats.atk;
+  inst.def = result.stats.def;
+  inst.spAtk = result.stats.spAtk;
+  inst.spDef = result.stats.spDef;
+  inst.spd = result.stats.spd;
+  inst.hp = heal ? inst.maxHp : Math.max(0, Math.min(inst.maxHp, Math.round(inst.maxHp * ratio)));
+  inst.fainted = inst.hp <= 0;
+  return true;
+}
+
+export function refreshCanonicalOwnedStats(inst, equipmentFlat = null, { heal = false } = {}) {
+  if (heal) {
+    inst.fainted = false;
+    if (Number.isFinite(inst.hp) && inst.hp <= 0) inst.hp = 1;
+  }
+  const result = computeCanonicalOwnedStats(inst, equipmentFlat);
+  if (!result.ok) return result;
+  applyCanonicalOwnedStats(inst, result, { heal });
+  return result;
+}
+
+export function calculateCanonicalWildStats({
+  runtimeSpeciesId,
+  stage = 1,
+  level,
+  potential,
+  training,
+  variant = 'Normal',
+} = {}) {
+  const form = monsterStatCatalogFormForStage(runtimeSpeciesId, stage);
+  if (!form) return canonicalLiveFailure('unknown_wild_form', 'runtimeSpeciesId', runtimeSpeciesId ?? null);
+  const multipliers = WILD_STAT_VARIANT_MULTIPLIERS[variant];
+  if (!multipliers) return canonicalLiveFailure('unknown_wild_variant', 'variant', variant ?? null);
+  const formula = calculateMonsterStats({ formId: form.formId, level, potential, training });
+  if (!formula.ok) return Object.freeze({ ...formula, activation: 'runtime_rejected' });
+  const stats = Object.freeze(Object.fromEntries(MONSTER_STAT_KEYS.map(stat => [
+    stat,
+    Math.max(1, Math.round(formula.stats[stat] * multipliers[stat])),
+  ])));
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    formId: form.formId,
+    runtimeSpeciesId,
+    stage,
+    level: formula.level,
+    variant,
+    multipliers,
+    stats,
+    formula,
+    version: CANONICAL_LIVE_STAT_VERSION,
+    activation: 'runtime_live',
+  });
+}
 
 export function speciesRatingProfile(sp) {
   const base = sp?.base ?? { hp: 1, atk: 1, def: 1, spd: 1 };
