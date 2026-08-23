@@ -91,13 +91,13 @@ const mutants = [
   ['erase visible state label', mutate('source', 'setCharacterSkillsText(card.state,row.state);', "setCharacterSkillsText(card.state,'');")],
   ['erase visible category', mutate(
     'source',
-    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
-    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • — • ${row.targetType}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
+    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType} • ระยะ ${row.rangeText}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
+    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • — • ${row.targetType} • ระยะ ${row.rangeText}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
   )],
   ['erase visible target', mutate(
     'source',
-    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
-    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • —${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
+    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType} • ระยะ ${row.rangeText}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
+    "setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • — • ระยะ ${row.rangeText}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));",
   )],
   ['erase mastery projection', mutate(
     'source',

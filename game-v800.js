@@ -2449,7 +2449,7 @@ function updateCharacterSkillsManualCard(card,row){
   setCharacterSkillsText(card.effectIcon,row.effectOverlay);
   const typeText=row.sourceType?`${row.sourceType}${row.runtimeType&&row.runtimeType!==row.sourceType?` / runtime ${row.runtimeType}`:''}`:'—';
   const coverage=row.documentedRuntimeCoverage==='CURRENT_GAP'?' • documented fallback / CURRENT_GAP':'';
-  setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));
+  setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType} • ระยะ ${row.rangeText}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));
   setCharacterSkillsText(card.resources,`Uses ${row.usesText} • CD ${row.cooldownText}`);
   const mutation=row.mutationId?` • Mutation ${row.mutationId}`:'';
   setCharacterSkillsText(card.mastery,row.equipped?`Mastery ${row.masteryRank} • EXP ${row.masteryExp}${mutation}`:'Mastery —');

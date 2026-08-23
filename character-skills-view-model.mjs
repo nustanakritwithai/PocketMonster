@@ -14,6 +14,7 @@ import {
   skillButtonStateDescriptor,
   skillIconDescriptor,
 } from './skill-icon-descriptor.mjs';
+import { skillRangeCatalogEntry } from './skill-catalog.mjs';
 
 const MANUAL_SLOTS = Object.freeze([...MANUAL_SKILL_SLOTS]);
 const SYSTEM_SLOT_SET = new Set(['basicAI', 'passive', 'evolutionTrait']);
@@ -147,6 +148,9 @@ function emptyManualRow(slot, state = 'Locked/Not Learned', reason = null) {
     category: null,
     categoryMarker: '',
     targetType: null,
+    rangeM: null,
+    radiusM: null,
+    rangeText: '—',
     documentedIconKind: invalid ? 'invalid' : 'empty',
     documentedMainSymbol: invalid ? '!' : '🔒',
     documentedRuntimeCoverage: invalid ? 'INVALID' : 'WORKBOOK DESIGN',
@@ -199,6 +203,7 @@ function invalidManualRow(slot, { skillId = null, descriptor = null, reason = 'i
 
 function manualRow(slot, equipped) {
   const descriptor = skillIconDescriptor(equipped.skillId);
+  const geometry = skillRangeCatalogEntry(equipped.skillId);
   const record = equipped.skill;
   const currentUses = record.currentUses == null ? descriptor.maxUses : record.currentUses;
   const masteryExp = record.masteryExp == null ? 0 : record.masteryExp;
@@ -228,6 +233,13 @@ function manualRow(slot, equipped) {
     category: descriptor.category,
     categoryMarker: descriptor.categoryMarker,
     targetType: descriptor.targetType,
+    rangeM: geometry?.rangeM ?? null,
+    radiusM: geometry?.radiusM ?? null,
+    rangeText: geometry?.targetType === 'Self'
+      ? 'Self'
+      : geometry?.targetType === 'EnemyArea'
+        ? `${geometry.rangeM}m / AoE ${geometry.radiusM}m`
+        : geometry ? `${geometry.rangeM}m` : '—',
     documentedIconKind: descriptor.documentedIconKind,
     documentedMainSymbol: descriptor.documentedMainSymbol,
     documentedRuntimeCoverage: descriptor.documentedRuntimeCoverage,
@@ -244,7 +256,7 @@ function manualRow(slot, equipped) {
     masteryRank,
     mutationId,
     descriptor,
-    accessibilityLabelTH: `${slot.toUpperCase()}, ${descriptor.accessibilityLabelTH}, Uses เหลือ ${usesText}, สถานะ ${state}`,
+    accessibilityLabelTH: `${slot.toUpperCase()}, ${descriptor.accessibilityLabelTH}, ระยะ ${geometry?.targetType === 'Self' ? 'ตัวเอง' : `${geometry?.rangeM ?? 0} เมตร`}${geometry?.targetType === 'EnemyArea' ? `, รัศมี ${geometry.radiusM} เมตร` : ''}, Uses เหลือ ${usesText}, สถานะ ${state}`,
   });
 }
 

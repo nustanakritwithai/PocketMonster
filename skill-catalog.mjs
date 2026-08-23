@@ -181,7 +181,24 @@ export const SKILL_CATALOG = Object.freeze(RAW_SKILLS.map(([
   sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
 })));
 
+export const SKILL_RANGE_CATALOG_VERSION = 'skill-range/v1';
+export const SKILL_RANGE_CATALOG = Object.freeze(SKILL_CATALOG.map(skill => {
+  const geometry = SKILL_TARGET_GEOMETRY[skill.targetType];
+  if (!geometry) throw new TypeError(`Missing Skill_Advanced geometry for ${skill.id}`);
+  return Object.freeze({
+    skillId: skill.id,
+    targetType: skill.targetType,
+    rangeM: geometry.rangeM,
+    radiusM: geometry.radiusM,
+    geometrySource: 'Skill_Advanced!I:J',
+    activation: 'runtime_live',
+    sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
+    sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
+  });
+}));
+
 const SKILL_BY_ID = new Map(SKILL_CATALOG.map(skill => [skill.id, skill]));
+const SKILL_RANGE_BY_ID = new Map(SKILL_RANGE_CATALOG.map(range => [range.skillId, range]));
 const FORBIDDEN_RUNTIME_FIELDS = Object.freeze(['currentUses', 'cooldownRemaining', 'instanceId', 'masteryXp', 'equippedSlot']);
 
 function skillIssue(code, index, field, detail = {}) {
@@ -233,4 +250,45 @@ export function validateSkillCatalog(records) {
 
 export function skillCatalogEntry(skillId) {
   return SKILL_BY_ID.get(skillId) ?? null;
+}
+
+export function validateSkillRangeCatalog(records, skills = SKILL_CATALOG) {
+  if (!Array.isArray(records) || !Array.isArray(skills)) {
+    return Object.freeze({ ok: false, issues: Object.freeze([skillIssue('invalid_range_catalog', -1, 'root')]) });
+  }
+  const issues = [];
+  if (records.length !== 108 || records.length !== skills.length) {
+    issues.push(skillIssue('range_count_mismatch', -1, 'length', { value: records.length }));
+  }
+  const ids = new Set();
+  records.forEach((range, index) => {
+    const skill = skills[index];
+    if (!range || typeof range !== 'object' || Array.isArray(range)) {
+      issues.push(skillIssue('invalid_range_row', index, 'root'));
+      return;
+    }
+    if (ids.has(range.skillId)) issues.push(skillIssue('duplicate_range_skill_id', index, 'skillId', { id: range.skillId }));
+    ids.add(range.skillId);
+    const expected = skill ? SKILL_TARGET_GEOMETRY[skill.targetType] : null;
+    if (!skill || range.skillId !== skill.id || range.targetType !== skill.targetType) {
+      issues.push(skillIssue('range_identity_mismatch', index, 'skillId'));
+    }
+    if (!expected || range.rangeM !== expected.rangeM || range.radiusM !== expected.radiusM) {
+      issues.push(skillIssue('range_geometry_mismatch', index, 'rangeM'));
+    }
+    if (!Number.isFinite(range.rangeM) || range.rangeM < 0
+      || !Number.isFinite(range.radiusM) || range.radiusM < 0) {
+      issues.push(skillIssue('invalid_range_geometry', index, 'rangeM'));
+    }
+    if (range.geometrySource !== 'Skill_Advanced!I:J' || range.activation !== 'runtime_live'
+      || range.sourceWorkbookVersion !== CONTENT_PROVENANCE.workbookVersion
+      || range.sourceWorkbookSha256 !== CONTENT_PROVENANCE.sha256) {
+      issues.push(skillIssue('range_provenance_mismatch', index, 'sourceWorkbookSha256'));
+    }
+  });
+  return Object.freeze({ ok: issues.length === 0, issues: Object.freeze(issues) });
+}
+
+export function skillRangeCatalogEntry(skillId) {
+  return SKILL_RANGE_BY_ID.get(skillId) ?? null;
 }
