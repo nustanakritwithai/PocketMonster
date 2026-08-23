@@ -30,6 +30,8 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, setManualSkillSlot, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
+import { skillButtonIconContract } from './skill-icon-runtime.mjs';
+import { enemyAreaIconProfile } from './skill-area-icon-profile.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, resolveWorkbookDirectDamage, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
@@ -1972,6 +1974,8 @@ function renderCombatStatusList(node,statusState,{limit=5}={}){
 }
 const skillIconCache=new Map();
 function skillIconKind(skill){
+  const contract=skillButtonIconContract(skill?.skillId);
+  if(contract)return contract.mainKind;
   if(!skill||typeof skill==='string')return skill?'enemy':'empty';
   if(skill.targetType==='area'||skill.targetType==='EnemyArea'||skill.targetType==='GroundPoint')return 'area';
   if(skill.targetType==='self'||skill.targetType==='Self'){
@@ -1981,9 +1985,29 @@ function skillIconKind(skill){
   }
   return 'enemy';
 }
+function drawSkillIconText(ctx,text,x,y,size,align='center'){
+  if(!text)return;
+  ctx.save();ctx.shadowBlur=3;ctx.lineWidth=2;ctx.textAlign=align;ctx.textBaseline='middle';ctx.font=`900 ${size}px system-ui,"Noto Color Emoji",sans-serif`;ctx.strokeStyle='rgba(0,0,0,.78)';ctx.fillStyle='#fff';ctx.strokeText(text,x,y);ctx.fillText(text,x,y);ctx.restore();
+}
+function drawAreaSkillIcon(ctx,profile){
+  ctx.beginPath();ctx.arc(0,0,21,0,Math.PI*2);ctx.lineWidth=3;ctx.stroke();
+  ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.setLineDash([3,4]);ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);
+  if(!profile){ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.stroke();return;}
+  drawSkillIconText(ctx,profile.familyGlyph,0,1,22);
+  for(let i=0;i<3;i++){const angle=-Math.PI/2+i*Math.PI*2/3;drawSkillIconText(ctx,profile.particleGlyph,Math.cos(angle)*18,Math.sin(angle)*18,8);}
+}
+function drawSkillSemanticLayers(ctx,contract){
+  if(!contract)return;
+  drawSkillIconText(ctx,contract.typeSymbol,-25,-23,10,'left');
+  drawSkillIconText(ctx,contract.categoryMarker,25,-23,10,'right');
+  drawSkillIconText(ctx,contract.effectOverlay,-25,24,9,'left');
+  if(contract.canCrit)drawSkillIconText(ctx,contract.critMarker||'✹',25,24,8,'right');
+}
 function getSkillIcon(skill){
   const kind=skillIconKind(skill);
-  if(skillIconCache.has(kind))return skillIconCache.get(kind);
+  const contract=skillButtonIconContract(skill?.skillId),areaProfile=enemyAreaIconProfile(skill?.skillId);
+  const cacheKey=areaProfile?.compositeCacheKey||contract?.cacheKey||kind;
+  if(skillIconCache.has(cacheKey))return skillIconCache.get(cacheKey);
   const c=document.createElement('canvas');c.width=64;c.height=64;
   const ctx=c.getContext('2d');
   ctx.translate(32,32);
@@ -1997,10 +2021,12 @@ function getSkillIcon(skill){
       ctx.beginPath();ctx.moveTo(-16,4);ctx.lineTo(-8,-4);ctx.moveTo(-8,12);ctx.lineTo(0,4);ctx.lineWidth=3;ctx.stroke();
       break;
     case'area':
-      ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.stroke();
-      ctx.beginPath();ctx.arc(0,0,16,0,Math.PI*2);ctx.stroke();
-      ctx.beginPath();ctx.arc(0,0,23,0,Math.PI*2);ctx.lineWidth=3;ctx.stroke();
-      for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;ctx.beginPath();ctx.moveTo(Math.cos(a)*10,Math.sin(a)*10);ctx.lineTo(Math.cos(a)*20,Math.sin(a)*20);ctx.lineWidth=3;ctx.stroke();}
+      drawAreaSkillIcon(ctx,areaProfile);
+      break;
+    case'groundpoint':
+      ctx.beginPath();ctx.arc(0,-3,18,0,Math.PI*2);ctx.lineWidth=3;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-25,-3);ctx.lineTo(-11,-3);ctx.moveTo(11,-3);ctx.lineTo(25,-3);ctx.moveTo(0,-28);ctx.lineTo(0,-14);ctx.moveTo(0,8);ctx.lineTo(0,22);ctx.stroke();
+      ctx.strokeRect(-9,13,18,10);
       break;
     case'heal':
       ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(0,16);ctx.moveTo(-16,0);ctx.lineTo(16,0);ctx.lineWidth=7;ctx.stroke();
@@ -2016,8 +2042,9 @@ function getSkillIcon(skill){
     default:
       ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(0,0,16,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
   }
+  drawSkillSemanticLayers(ctx,contract);
   const url=c.toDataURL();
-  skillIconCache.set(kind,url);
+  skillIconCache.set(cacheKey,url);
   return url;
 }
 function applyButtonIcon(btn,url,size='70%'){
@@ -4255,17 +4282,10 @@ function shouldRunOwnedCadence(state,elapsedField,dt,hz,force=false){
   return false;
 }
 function updateOwnedSkillCooldownUi(a){
+  const skills=canonicalCombatSkills(a?.inst);
   for(let i=0;i<MANUAL_SKILL_SLOTS.length;i++){
     const cd=a.skillCds[i],btn=el(`skill${i+1}Btn`);if(!btn)continue;
-    if(cd>0){
-      if(!btn.classList.contains('on-cooldown'))btn.classList.add('on-cooldown');
-      let cdEl=btn.querySelector('.cd-overlay');
-      if(!cdEl){cdEl=document.createElement('div');cdEl.className='cd-overlay';btn.appendChild(cdEl);}
-      cdEl.textContent=cd.toFixed(1)+'s';
-    }else{
-      if(btn.classList.contains('on-cooldown'))btn.classList.remove('on-cooldown');
-      const cdEl=btn.querySelector('.cd-overlay');if(cdEl)cdEl.remove();
-    }
+    syncSkillButtonResourceUi(btn,skills[i],cd);
   }
 }
 function materializeOwnedBasicAiTarget(a,decision){
@@ -5481,6 +5501,23 @@ function applyActionPresentation(button,presentation,label){
   setAttributeIfChanged(button,'aria-label',`${label} • ${presentation.reason||presentation.statusText}`);
   if(button.title!==(presentation.reason||presentation.statusText))button.title=presentation.reason||presentation.statusText;
 }
+function skillButtonOverlay(button,className){
+  let node=button.querySelector(`.${className}`);
+  if(!node){node=document.createElement('span');node.className=className;node.setAttribute('aria-hidden','true');button.appendChild(node);}
+  return node;
+}
+function syncSkillButtonResourceUi(button,skill,cooldownSeconds=0){
+  if(!button)return;
+  const uses=skillButtonOverlay(button,'uses-overlay'),cooldown=skillButtonOverlay(button,'cd-overlay');
+  const hasSkill=Boolean(skill),current=Number.isFinite(skill?.currentUses)?skill.currentUses:0,max=Number.isFinite(skill?.maxUses)?skill.maxUses:0;
+  setTextIfChanged(uses,hasSkill?`${current}/${max}`:'');
+  setClassTokenIfChanged(uses,'hidden',!hasSkill);
+  setClassTokenIfChanged(button,'no-uses',hasSkill&&current<=0);
+  const remaining=Number.isFinite(cooldownSeconds)?Math.max(0,cooldownSeconds):0;
+  setTextIfChanged(cooldown,remaining>0?`${remaining.toFixed(1)}s`:'');
+  setClassTokenIfChanged(cooldown,'hidden',remaining<=0);
+  setClassTokenIfChanged(button,'on-cooldown',remaining>0);
+}
 function renderCombatPresentation(){
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
   const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
@@ -5489,12 +5526,13 @@ function renderCombatPresentation(){
   MANUAL_SKILL_SLOTS.forEach((_,index)=>{
     const button=el(`skill${index+1}Btn`),skill=skillDefs[index],view=presentation.skills[index];
     const iconUrl=getSkillIcon(skill);
-    applyButtonIcon(button,iconUrl,'70%');
+    applyButtonIcon(button,iconUrl,'86%');
+    syncSkillButtonResourceUi(button,skill,activeSummon?.skillCds?.[index]||0);
     const skillName=skill?.name||`สกิล ${index+1}`;
-    if(button.title!==skillName)button.title=skillName;
-    if(button.getAttribute('aria-label')!==skillName)button.setAttribute('aria-label',skillName);
     setActionStyle(button,skill?.type||activeType,`S${index+1}`,view.statusText);
-    applyActionPresentation(button,view,`Skill ${index+1} ${skillName}`);
+    const iconContract=skillButtonIconContract(skill?.skillId);
+    const accessibility=iconContract?`${iconContract.accessibilityLabelTH} • คงเหลือ ${skill.currentUses}/${skill.maxUses}`:`Skill ${index+1} ${skillName}`;
+    applyActionPresentation(button,view,accessibility);
     if(skillStatusLocked){button.dataset.state='disabled';button.dataset.sub='ติดสถานะ';setAttributeIfChanged(button,'aria-disabled','true');setAttributeIfChanged(button,'aria-label',`Skill ${index+1} ${skillName} • ใช้ไม่ได้ขณะติดสถานะควบคุม`);button.title='ใช้ไม่ได้ขณะติดสถานะควบคุม';}
   });
   const capture=el('captureBtn'),summon=el('summonBtn'),recallButton=el('recallBtn');
