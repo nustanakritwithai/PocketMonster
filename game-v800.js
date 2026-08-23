@@ -359,7 +359,12 @@ function updateWorldStream(){
   for(let i=0;i<wilds.length;i++){
     const w=wilds[i];
     if(!w.mesh)continue;
-    if(w.engaged||w.capturing){w.mesh.visible=true;continue;}
+    if(w.capturing){
+      if(captureSequence?.wild===w)continue;
+      w.mesh.visible=true;
+      continue;
+    }
+    if(w.engaged){w.mesh.visible=true;continue;}
     const dx=w.mesh.position.x-ox,dz=w.mesh.position.z-oz;
     const d2=dx*dx+dz*dz;
     if(d2>hideR2)w.mesh.visible=false;
@@ -1505,6 +1510,12 @@ if(typeof window!=='undefined'){
   });
   worldStream.resetHitch=resetStreamHitch;
   worldStream.moveTo=(x,z)=>{player.position.x=x;player.position.z=z;};
+  worldStream.lookAt=(x,z)=>{cameraYaw=Math.atan2(-(x-player.position.x),-(z-player.position.z));};
+  worldStream.captureProbe=()=>({
+    flying:projectiles.some(p=>p.type==='capture'),
+    shaking:!!captureSequence?.ballMesh,
+    wildHidden:!!(captureSequence?.wild?.mesh&&captureSequence.wild.mesh.visible===false),
+  });
   window.MLRPG_WORLD_STREAM=worldStream;
 }
 const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
@@ -3141,7 +3152,7 @@ function createWildLabel(w){
 function removeWildLabel(w){ if(w?.labelEl){w.labelEl.remove();w.labelEl=null;} }
 function updateWorldLabels(dt){
   for(const w of wilds){
-    if(w.dead||!w.labelEl){if(w.labelEl)w.labelEl.classList.add('hidden');continue;}
+    if(w.dead||!w.labelEl||(w.capturing&&captureSequence?.wild===w)){if(w.labelEl)w.labelEl.classList.add('hidden');continue;}
     const d=distXZ(player.position,w.mesh.position);
     if(!labelTickScheduler.advance(`label:${w.id}`,d,dt,w.engaged))continue;
     const screen=worldToScreen(w.mesh.position.clone().add(new THREE.Vector3(0,w.boss?2.55:2.15,0)));
@@ -3341,8 +3352,9 @@ function startCaptureSequence(w,ballMesh,attemptId,resolution){
   if(!ballMesh){
     ballMesh=new THREE.Mesh(boxGeometry(.28,.28,.28),new THREE.MeshStandardMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:clampEmissive(.35),roughness:.2,metalness:.6,transparent:true,opacity:.96}));
     scene.add(ballMesh);
+    ballMesh.scale.setScalar(1.85);
   }else{
-    ballMesh.scale.setScalar(2);
+    ballMesh.scale.setScalar(3.6);
   }
   ballMesh.position.copy(pos);
   ballMesh.position.y=.7;

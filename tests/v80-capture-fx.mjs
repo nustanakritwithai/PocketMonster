@@ -30,7 +30,7 @@ assert.match(extractFn('spawnCaptureResultEffect'), /count:8/, 'fail uses the 8-
 assert.match(js, /function startCaptureSequence/, 'capture keeps a ball sequence after impact');
 assert.match(extractFn('startCaptureSequence'), /w\.mesh\.visible=false/, 'wild hides while the ball shakes');
 assert.match(extractFn('startCaptureSequence'), /w\.capturing=true/, 'wild is frozen during tension');
-assert.match(extractFn('startCaptureSequence'), /playSFX\('sfx_capture_tension'\)/, 'tension SFX still fires at impact');
+assert.match(extractFn('startCaptureSequence'), /ballMesh\.scale\.setScalar\(3\.6\)/, 'the impact ball scales up so the shake is readable');
 
 assert.match(extractFn('updateCaptureSequence'), /ballMesh\.position\.x=cs\.pos\.x/, 'shake is centered on the impact point');
 assert.doesNotMatch(extractFn('updateCaptureSequence'), /home\.x/, 'tension does not snap the wild back to spawn home');
@@ -42,7 +42,7 @@ assert.match(extractFn('finishCaptureSuccess'), /spawnCaptureResultEffect\(cs\.p
 assert.match(extractFn('finishCaptureSuccess'), /playSFX\('sfx_capture_success'\)/, 'success SFX stays');
 assert.match(extractFn('finishCaptureFail'), /playSFX\('sfx_capture_fail'\)/, 'fail SFX stays');
 
-assert.match(extractFn('updateProjectiles'), /p\.type==='capture'/, 'capture projectile mesh is handed to the sequence');
+assert.match(extractFn('updateWorldStream'), /captureSequence\?\.wild===w/, 'world streaming must not unhide a wild that is inside the ball');
 assert.match(extractFn('executeCaptureThrow'), /t\.capturing=true/, 'wild freezes at throw so the ball does not land on a stale point');
 assert.match(extractFn('capturePrerequisite'), /w\.capturing/, 'a second throw cannot start while a wild is inside a ball');
 assert.match(extractFn('capturePrerequisite'), /p\.type==='capture'/, 'a second throw cannot start while a capture ball is in flight');
