@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
 assert.match(html, /id="ranchStoragePage"[^>]*ranch-club/, 'Storage page uses the Monster Club skin');
-assert.match(html, /class="ranch-club-kicker">MONSTER CLUB/, 'Club kicker brands the Storage header');
+assert.match(html, /id="ranchClubVault"/, 'Storage vault column exists');
+assert.match(html, /ranch-club-carry/, 'Party carry column is marked on the roster');
+assert.match(css, /\.ranch-club \.ranch-storage-roster\{grid-column:1/, 'Party stay on the left');
+assert.match(css, /\.ranch-club \.ranch-club-vault\{grid-column:2/, 'Storage stay on the right');
 for (const id of ['ranchStorageRoster', 'ranchStoragePreview', 'ranchStorageDetails', 'ranchStorageCount', 'ranchActiveCount']) {
   assert.match(html, new RegExp(`id="${id}"`), `${id} mount remains`);
 }
@@ -14,7 +17,7 @@ assert.match(css, /\.ranch-storage-page[\s\S]*grid-template-columns/, 'Storage p
 assert.match(css, /@media\s*\(max-width:700px\)[\s\S]*\.ranch-storage-page/, 'Storage page keeps the narrow fallback');
 const lounge = css.match(/\/\* Ranch Club lounge \*\/([\s\S]*?)\/\* Keeper \/ Ranch Storage mobile bottom sheet \*\//)?.[1] || '';
 assert.ok(lounge, 'Ranch Club lounge CSS block is required');
-for (const cls of ['.ranch-club-kicker', '.ranch-club-card', '.ranch-club-stage', '.ranch-club-dossier', '.ranch-club-avatar', '.ranch-club-chip']) {
+for (const cls of ['.ranch-club-kicker', '.ranch-club-card', '.ranch-club-stage', '.ranch-club-dossier', '.ranch-club-avatar', '.ranch-club-chip', '.ranch-club-vault', '.ranch-club-carry']) {
   assert.ok(lounge.includes(cls), `club lounge CSS missing ${cls}`);
 }
 assert.match(lounge, /#facc15|#fde68a/, 'club lounge uses a gold accent');
@@ -25,6 +28,9 @@ assert.notEqual(start, -1, 'renderRanchStoragePage exists');
 const storage = js.slice(start, js.indexOf('\nfunction ', start + 1));
 assert.match(storage, /state\.storage\.filter\(Boolean\)/, 'renderer still uses canonical Storage IDs');
 assert.match(storage, /ranch-club-card/, 'renderer emits club member cards');
+assert.match(storage, /fillColumn\(roster,'พกอยู่',partyIds/, 'Party fills the left carry column');
+assert.match(storage, /fillColumn\(vault,'ในคลัง',ids/, 'Storage fills the right vault column');
+assert.match(storage, /el\('ranchClubVault'\)/, 'renderer owns the Storage vault mount');
 assert.match(storage, /ranch-club-stage/, 'renderer emits the featured club stage');
 assert.match(storage, /ranch-club-dossier/, 'renderer emits club member details');
 assert.match(storage, /Storage ว่าง/, 'empty Storage copy remains');

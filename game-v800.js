@@ -5158,7 +5158,7 @@ function renderFullCharacterInfoTab(){
 }
 let ranchStorageFocusId=null;
 function renderRanchStoragePage(){
-  const roster=el('ranchStorageRoster'),preview=el('ranchStoragePreview'),details=el('ranchStorageDetails');
+  const roster=el('ranchStorageRoster'),vault=el('ranchClubVault'),preview=el('ranchStoragePreview'),details=el('ranchStorageDetails');
   if(!roster||!preview||!details)return;
   const ids=state.storage.filter(Boolean);
   const partyIds=state.party.filter(Boolean);
@@ -5169,23 +5169,23 @@ function renderRanchStoragePage(){
   const clubCardHTML=(inst,kind)=>{
     const ranch=state.ranchActive.includes(inst.instanceId);
     const faint=inst.fainted||inst.hp<=0;
-    const chip=kind==='party'?'Party':ranch?'Ranch':'คลัง';
+    const chip=kind==='party'?'พกอยู่':ranch?'Ranch':'คลัง';
     return `<span class="ranch-club-avatar" style="background:${clubTint(inst)}">${displayName(inst).slice(0,1)}</span><span class="ranch-club-card-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="ranch-club-chip">${chip}</span>`;
   };
-  roster.innerHTML='';
-  if(!selectableIds.length){
-    roster.innerHTML='<div class="manager-empty ranch-club-empty">ยังไม่มีมอนสเตอร์</div>';
-    preview.innerHTML='<div class="ranch-club-stage ranch-club-empty-stage"><div class="ranch-club-stage-art">♣</div><div class="focused-name">Monster Club</div><p>ฝากมอนจาก Party เพื่อเข้าคลับ</p></div>';
-    details.innerHTML='';
-    return;
-  }
-  if(!selectableIds.includes(ranchStorageFocusId))ranchStorageFocusId=ids[0]||partyIds[0];
-  const addGroup=(title,group,kind)=>{
-    if(!group.length)return;
+  const fillColumn=(mount,title,group,kind,emptyText)=>{
+    if(!mount)return;
+    mount.innerHTML='';
     const head=document.createElement('div');
     head.className='manager-empty ranch-club-group';
     head.textContent=title;
-    roster.appendChild(head);
+    mount.appendChild(head);
+    if(!group.length){
+      const empty=document.createElement('div');
+      empty.className='manager-empty ranch-club-empty';
+      empty.textContent=emptyText;
+      mount.appendChild(empty);
+      return;
+    }
     group.forEach(id=>{
       const i=getInst(id);
       if(!i)return;
@@ -5198,16 +5198,17 @@ function renderRanchStoragePage(){
       card.classList.toggle('is-party',kind==='party');
       card.classList.toggle('is-ranch',state.ranchActive.includes(id));
       card.onclick=()=>{ranchStorageFocusId=id;renderRanchStoragePage();};
-      roster.appendChild(card);
+      mount.appendChild(card);
     });
   };
-  addGroup('Party',partyIds,'party');
-  if(!ids.length){
-    const empty=document.createElement('div');
-    empty.className='manager-empty ranch-club-empty';
-    empty.textContent='Storage ว่าง';
-    roster.appendChild(empty);
-  }else addGroup('Storage',ids,'storage');
+  if(!selectableIds.includes(ranchStorageFocusId))ranchStorageFocusId=ids[0]||partyIds[0]||null;
+  fillColumn(roster,'พกอยู่',partyIds,'party','ยังไม่มีมอนที่พก');
+  fillColumn(vault,'ในคลัง',ids,'storage','Storage ว่าง');
+  if(!selectableIds.length){
+    preview.innerHTML='<div class="ranch-club-stage ranch-club-empty-stage"><div class="ranch-club-stage-art">♣</div><div class="focused-name">Monster Club</div><p>ฝากมอนจาก Party เพื่อเข้าคลับ</p></div>';
+    details.innerHTML='';
+    return;
+  }
   const focused=getInst(ranchStorageFocusId),inParty=focused&&state.party.includes(focused.instanceId);
   if(!focused){
     preview.innerHTML='';

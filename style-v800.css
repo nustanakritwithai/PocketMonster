@@ -604,12 +604,21 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 
 /* Ranch Club lounge */
 .ranch-storage-page.ranch-club{
+  display:grid;
+  grid-template-columns:minmax(240px,1fr) minmax(240px,1fr);
+  grid-template-rows:auto minmax(0,1fr) auto;
   background:
     radial-gradient(ellipse at 16% -12%,#166534aa 0 26%,transparent 58%),
     radial-gradient(ellipse at 92% 108%,#854d0e77 0 24%,transparent 56%),
     linear-gradient(180deg,#022c22f0,#020617f5);
   padding:16px;
 }
+.ranch-club .ranch-storage-head{grid-column:1/-1}
+.ranch-club-carry{min-width:0}
+.ranch-club .ranch-storage-roster{grid-column:1;grid-row:2}
+.ranch-club .ranch-club-vault{grid-column:2;grid-row:2}
+.ranch-club .ranch-storage-preview{grid-column:1;grid-row:3}
+.ranch-club .ranch-storage-details{grid-column:2;grid-row:3}
 .ranch-services-card [data-ranch-service="storage"]{
   background:linear-gradient(135deg,#14532d,#166534);
   border-color:#facc1555;
@@ -634,15 +643,18 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   font-weight:900;font-size:11px;padding:7px 11px
 }
 .ranch-club .ranch-storage-roster,
+.ranch-club .ranch-club-vault,
 .ranch-club .ranch-storage-preview,
 .ranch-club .ranch-storage-details{
+  min-width:0;min-height:0;overflow:auto;
   border:1px solid #facc1536;
   background:linear-gradient(180deg,#10251d,#0b1220);
   box-shadow:inset 0 1px 0 #ffffff10,0 10px 28px #0005;
+  border-radius:14px;padding:10px;
 }
 .ranch-club-group{opacity:.95;color:#fde68a;font-weight:1000;letter-spacing:.8px;font-size:10px;padding:4px 6px 8px}
 .ranch-club-empty{text-align:center;color:#bbf7d0;opacity:.9}
-.ranch-club .ranch-storage-roster .manager-item.ranch-club-card{
+.ranch-club .ranch-club-card{
   display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:8px;
   width:100%;margin:0 0 6px;padding:8px;text-align:left;cursor:pointer;touch-action:manipulation;
   background:linear-gradient(135deg,#163226,#111827);border:1px solid #ffffff1a;
@@ -650,7 +662,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 }
 .ranch-club-card.is-party{border-color:#38bdf866}
 .ranch-club-card.is-ranch{border-color:#86efac88}
-.ranch-club .ranch-storage-roster .manager-item.ranch-club-card.focused-monster{
+.ranch-club .ranch-club-card.focused-monster{
   border-color:#facc15;outline:none;box-shadow:0 0 0 1px #facc1555,0 8px 22px #854d0e55
 }
 .ranch-club-avatar{
@@ -688,8 +700,8 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .ranch-services-card button:active{transform:scale(.98);background:#1d4ed8}
 .ranch-services-card [data-ranch-service="storage"]:active{background:#166534}
 .ranch-storage-head .npc-sheet-handle{display:none}
-.ranch-storage-roster .manager-item{width:100%;text-align:left;cursor:pointer;touch-action:manipulation}
-.ranch-storage-roster .manager-item:active{transform:scale(.985);border-color:#93c5fd88}
+.ranch-storage-roster .manager-item,.ranch-club-vault .manager-item{width:100%;text-align:left;cursor:pointer;touch-action:manipulation}
+.ranch-storage-roster .manager-item:active,.ranch-club-vault .manager-item:active{transform:scale(.985);border-color:#93c5fd88}
 .ranch-storage-preview .focused-name{font-size:18px;font-weight:1000;color:#fff;margin-bottom:5px}
 .storage-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
 .storage-actions button{min-height:var(--touch-min);border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:900;touch-action:manipulation}
@@ -710,14 +722,21 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .ranch-club-kicker{display:none}
   .ranch-club-stats{flex-direction:column;align-items:flex-end;gap:4px}
   .ranch-club-stats span{font-size:8px;padding:3px 6px}
-  .ranch-storage-roster{display:flex;gap:6px;min-height:76px;max-height:92px;padding:7px;overflow-x:auto;overflow-y:hidden;flex-shrink:0;scroll-snap-type:x proximity}
-  .ranch-storage-roster .manager-empty{min-width:max-content;align-self:center}.ranch-storage-roster .manager-item{flex:0 0 auto;width:max-content;min-width:116px;margin:0;padding:8px;scroll-snap-align:start}
-  .ranch-club .ranch-storage-roster{max-height:108px;align-items:stretch}
-  .ranch-club .ranch-storage-roster .ranch-club-group{writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px;min-width:auto}
-  .ranch-club .ranch-storage-roster .manager-item.ranch-club-card{min-width:148px;width:max-content;grid-template-columns:32px minmax(0,1fr);padding:7px}
+  .ranch-storage-page.ranch-club{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(92px,auto) auto minmax(0,1fr);align-items:stretch;justify-content:stretch;align-content:stretch}
+  .ranch-club .ranch-storage-head{grid-column:1/-1;grid-row:1}
+  .ranch-club .ranch-storage-roster{grid-column:1;grid-row:2}
+  .ranch-club .ranch-club-vault{grid-column:2;grid-row:2}
+  .ranch-club .ranch-storage-preview{grid-column:1/-1;grid-row:3}
+  .ranch-club .ranch-storage-details{grid-column:1/-1;grid-row:4}
+  .ranch-storage-roster,.ranch-club-vault{display:flex;gap:6px;min-height:76px;max-height:92px;padding:7px;overflow-x:auto;overflow-y:hidden;flex-shrink:0;scroll-snap-type:x proximity}
+  .ranch-storage-roster .manager-empty,.ranch-club-vault .manager-empty{min-width:max-content;align-self:center}.ranch-storage-roster .manager-item,.ranch-club-vault .manager-item{flex:0 0 auto;width:max-content;min-width:116px;margin:0;padding:8px;scroll-snap-align:start}
+  .ranch-club .ranch-storage-roster,.ranch-club .ranch-club-vault{max-height:108px;align-items:stretch}
+  .ranch-club .ranch-club-group{writing-mode:horizontal-tb;transform:none;padding:4px 6px;flex:0 0 auto}
+  .ranch-club .ranch-club-card{min-width:148px;width:max-content;grid-template-columns:32px minmax(0,1fr);padding:7px}
   .ranch-club-chip{display:none}
   .ranch-club-avatar{width:32px;height:32px;border-radius:11px;font-size:13px}
   .ranch-storage-roster .manager-empty:not(:first-child){display:none}
+  .ranch-club .ranch-storage-roster .manager-empty:not(:first-child),.ranch-club .ranch-club-vault .manager-empty:not(:first-child){display:flex}
   .ranch-storage-preview{min-height:102px;max-height:125px;padding:10px;flex-shrink:0}
   .ranch-club .ranch-storage-preview{max-height:168px}
   .ranch-club-stage{padding:2px 4px}
@@ -733,7 +752,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 }
 @media(max-width:380px){
   .ranch-storage-page{padding:8px}.ranch-storage-head h2{font-size:15px}.ranch-storage-head span{font-size:8px}.ranch-storage-roster .manager-item{min-width:104px;font-size:10px}.ranch-storage-preview .focused-name{font-size:16px}
-  .ranch-club .ranch-storage-roster .manager-item.ranch-club-card{min-width:132px}
+  .ranch-club .ranch-club-card{min-width:132px}
 }
 
 .world-monster-label.rare{border-color:#f0abfccc;background:rgba(76,29,78,.84);box-shadow:0 0 0 1px #f0abfc55,0 0 16px #e879f955}
