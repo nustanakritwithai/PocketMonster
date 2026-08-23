@@ -164,9 +164,9 @@ for (const [name, from, to] of runtimeMutations) {
 
 assertE1LiveWiring(gameSource);
 const liveMutations = [
-  ['enable every HUD skill', 'effectAvailable:canExecuteE1SkillEffect(definition.id),', 'effectAvailable:true,'],
-  ['bypass pre-commit readiness', 'return validateE1SkillEffectRequest(canonicalE1SkillEffectRequest(a,move,command,materialized)).ok;', 'return true;'],
-  ['commit cooldown before planning', 'const planned=resolveE1SkillEffects(canonicalE1SkillEffectRequest(a,move,command,materialized),{rng:Math.random});', 'a.skillCds[index]=command.startCooldownSec;\n  const planned=resolveE1SkillEffects(canonicalE1SkillEffectRequest(a,move,command,materialized),{rng:Math.random});'],
+  ['enable every HUD skill', 'effectAvailable:canExecuteReviewedSkillEffect(definition.id),', 'effectAvailable:true,'],
+  ['bypass pre-commit readiness', 'return validateReviewedSkillEffectRequest(canonicalSkillEffectRequest(a,move,command,materialized)).ok;', 'return true;'],
+  ['commit cooldown before planning', 'const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});', 'a.skillCds[index]=command.startCooldownSec;\n  const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});'],
   ['duplicate cooldown commit', 'a.skillCds[index]=command.startCooldownSec;', 'a.skillCds[index]=command.startCooldownSec;\n  a.skillCds[index]=command.startCooldownSec;'],
   ['drop live status commit', 'if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;', 'void effect.nextStatusState;'],
   ['restore legacy effect receipt', 'effectMode:planned.effectMode', "effectMode:'legacy_damage_compatibility'"],
