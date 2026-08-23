@@ -3865,10 +3865,15 @@ function skillFailureMessage(move,result){
   };
   return reasons[result.reason]||`${move?.name||'สกิล'} ใช้ไม่ได้ (${result.reason})`;
 }
+function announceCombatReason(text){
+  if(!text)return;
+  msg(text);
+  setTextIfChanged(el('actionReason'),text);
+}
 function useSkill(index,intent={}){
-  if(!activeSummon){msg('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
+  if(!activeSummon){announceCombatReason('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
   const a=activeSummon,slot=MANUAL_SKILL_SLOTS[index],move=canonicalCombatSkills(a.inst)[index];
-  if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});msg(skillFailureMessage(move,result));return result;}
+  if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});announceCombatReason(skillFailureMessage(move,result));return result;}
   const result=executeEquippedSkillCommand(a.inst,{
     slot,
     commandId:intent.commandId,
@@ -3881,7 +3886,11 @@ function useSkill(index,intent={}){
     canApply:(command,targets)=>canApplyLiveSkill(a,move,command,targets),
     applyAccepted:(command,targets)=>applyAcceptedSkillCommand(a,index,move,command,targets),
   });
-  if(!result.ok){msg(skillFailureMessage(move,result));renderSkillButtons();}
+  if(!result.ok){
+    const text=skillFailureMessage(move,result);
+    renderSkillButtons();
+    announceCombatReason(text);
+  }
   return result;
 }
 function createOwnedBasicAiScratch(){
@@ -4973,7 +4982,10 @@ function combatHudPresentation(){
   });
 }
 function applyActionPresentation(button,presentation,label){
-  if(button.disabled!==presentation.disabled)button.disabled=presentation.disabled;
+  const skillButton=button.classList.contains('skill');
+  if(skillButton){
+    if(button.disabled)button.disabled=false;
+  }else if(button.disabled!==presentation.disabled)button.disabled=presentation.disabled;
   if(button.dataset.state!==presentation.state)button.dataset.state=presentation.state;
   if(button.dataset.sub!==presentation.statusText)button.dataset.sub=presentation.statusText;
   button.classList.toggle('cooldown',presentation.state==='cooldown');
