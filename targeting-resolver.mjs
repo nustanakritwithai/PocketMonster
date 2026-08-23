@@ -3,7 +3,7 @@
 // presentation callers may request a cast but cannot inject range or resolve hits.
 
 import { CONTENT_PROVENANCE, assertContentProvenance } from './content-provenance.mjs';
-import { SKILL_TARGET_GEOMETRY, skillCatalogEntry } from './skill-catalog.mjs';
+import { skillCatalogEntry, skillRangeCatalogEntry } from './skill-catalog.mjs';
 import {
   MANUAL_SKILL_SLOTS,
   consumeSkillUse,
@@ -99,8 +99,8 @@ export function resolveSkillCommand({
   if (currentUses === 0) return result(false, 'no_uses', { commandId: normalizedCommandId, skillId });
 
   const targetKind = skill.targetType;
-  const geometry = SKILL_TARGET_GEOMETRY[targetKind];
-  if (!geometry) return result(false, 'unsupported_target_kind', {
+  const geometry = skillRangeCatalogEntry(skillId);
+  if (!geometry || geometry.targetType !== targetKind) return result(false, 'unsupported_target_kind', {
     commandId: normalizedCommandId, skillId, targetKind,
   });
   let targetIds = [];

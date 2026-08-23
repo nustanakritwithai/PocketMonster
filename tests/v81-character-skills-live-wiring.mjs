@@ -264,13 +264,13 @@ export function assertCharacterSkillsLiveWiring(source = gameSource, css = cssSo
   assert.equal(firstTree.manual.get('s1').categoryIcon.textContent, '╱');
   assert.equal(firstTree.manual.get('s1').effectIcon.textContent, '🔥');
   assert.equal(firstTree.manual.get('s1').state.textContent, 'No Uses');
-  assert.equal(firstTree.manual.get('s1').meta.textContent, 'FIRE / runtime Fire • Physical • NearestEnemy');
-  assert.equal(firstTree.manual.get('s3').meta.textContent, 'ICE / runtime Ice • Defense • GroundPoint • documented fallback / CURRENT_GAP');
+  assert.equal(firstTree.manual.get('s1').meta.textContent, 'FIRE / runtime Fire • Physical • NearestEnemy • ระยะ 2.2m');
+  assert.equal(firstTree.manual.get('s3').meta.textContent, 'ICE / runtime Ice • Defense • GroundPoint • ระยะ 5m • documented fallback / CURRENT_GAP');
   assert.equal(firstTree.manual.get('s1').resources.textContent, 'Uses 0/28 • CD 1.8s');
   assert.equal(firstTree.manual.get('s1').mastery.textContent, 'Mastery familiar • EXP 100 • Mutation <spark>');
   assert.equal(
     firstTree.manual.get('s1').root.getAttribute('aria-label'),
-    'S1, สะเก็ดไฟ, ธาตุ ไฟ, Physical, เป้าหมาย NearestEnemy, ใช้ได้สูงสุด 28 ครั้ง, คูลดาวน์ 1.8 วินาที, เอฟเฟกต์ Burn, คริติคอลได้, Uses เหลือ 0/28, สถานะ No Uses',
+    'S1, สะเก็ดไฟ, ธาตุ ไฟ, Physical, เป้าหมาย NearestEnemy, ใช้ได้สูงสุด 28 ครั้ง, คูลดาวน์ 1.8 วินาที, เอฟเฟกต์ Burn, คริติคอลได้, ระยะ 2.2 เมตร, Uses เหลือ 0/28, สถานะ No Uses',
   );
   assert.match(firstTree.manual.get('s4').meta.textContent, /LIGHT \/ runtime Fairy/);
   assert.equal(firstTree.system.get('basicAI').detail.textContent, 'Power 15 • CD 0.9s • ไม่ใช้ Uses');
