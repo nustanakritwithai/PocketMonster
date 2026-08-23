@@ -40,7 +40,10 @@ function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v
   assert.match(html,/id="stageObjective"[\s\S]*?STAGE OBJECTIVE/);
   assert.match(html,/id="stageObjectiveList"/);
   assert.match(html,/class="quest-tracker starter-journey/);
-  assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*left:10px/);
+  assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*left:var\(--safe-left\)/);
+  assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*top:calc\(var\(--safe-top\) \+ var\(--touch-min\) \+ 20px\)/);
+  assert.match(css,/width:min\(156px,24vw\)/);
+  assert.match(css,/\.quest-step\.todo\{display:none\}/);
   assert.doesNotMatch(css,/\.starter-journey\{[^}]*left:50%;transform:translateX\(-50%\)/);
   assert.match(game,/stageObjectiveTracker\(objective,\{stageId:zoneId,stageName,monsterName\}\)/);
   assert.match(game,/objective=currentStageObjective\(zone\);\s*renderStarterJourney\(\);\s*if\(!cfg\|\|!objective\.encounter\)/);
@@ -82,7 +85,8 @@ for(const [name,mutant] of resolverMutants){
 
 const runtimeMutants=[
   ['remove objective HUD',gameSource,htmlSource.replace('id="stageObjective"','id="removedObjective"')],
-  ['restore centered objective banner',gameSource,htmlSource,fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8').replace('top:54px;left:10px;transform:none','top:132px;left:50%;transform:translateX(-50%)')],
+  ['restore centered objective banner',gameSource,htmlSource,fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8').replace('top:calc(var(--safe-top) + var(--touch-min) + 20px);left:var(--safe-left);transform:none','top:132px;left:50%;transform:translateX(-50%)')],
+  ['keep the oversized tracker under the top menu',gameSource,htmlSource,fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8').replace('top:calc(var(--safe-top) + var(--touch-min) + 20px)','top:54px').replace('width:min(156px,24vw)','width:min(212px,36vw)')],
   ['drop MMO tracker list',gameSource,htmlSource.replace('id="stageObjectiveList"','id="removedObjectiveList"')],
   ['stop using tracker view model',gameSource.replace('stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName})','({title:stageName,status:"",steps:[]})'),htmlSource],
   ['leave completed objective stale',gameSource.replace('renderStarterJourney();\n  if(!cfg||!objective.encounter)return null;','if(!cfg||!objective.encounter)return null;'),htmlSource],
