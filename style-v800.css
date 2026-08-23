@@ -723,16 +723,35 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .ranch-storage-page{padding:8px;gap:6px}
   .ranch-storage-head h2{font-size:14px}
   .ranch-storage-preview .focused-name{font-size:14px}
-  .merchant-card,.trainer-card,.evolution-guide-card,.breeding-caretaker-card,.monster-picker-card{padding:8px 10px;border-radius:16px 16px 12px 12px;max-height:min(78dvh,560px)}
+  .npc-btn{min-height:32px;padding:4px 8px;font-size:11px;border-radius:999px}
+  .npc-btn:after{content:none}
+  .merchant-shop,.trainer-panel,.evolution-guide-panel,.breeding-caretaker-panel,.ranch-services{
+    align-items:end;justify-items:center;place-items:unset;overflow:hidden;
+    padding:0 max(6px,var(--safe-right)) max(6px,var(--safe-bottom)) max(6px,var(--safe-left));
+  }
+  .ranch-services{display:grid}
+  .npc-sheet-handle{display:block;width:36px;height:4px;margin:0 auto 6px}
+  .merchant-card,.trainer-card,.evolution-guide-card,.breeding-caretaker-card,.monster-picker-card{
+    width:min(100%,520px);max-width:none;padding:8px 10px;border-radius:16px 16px 12px 12px;max-height:min(62dvh,440px)
+  }
+  .ranch-services-card{width:min(100%,480px);margin:0}
   .merchant-head,.trainer-head,.evolution-guide-head,.breeding-caretaker-head,.picker-head{font-size:14px;gap:6px}
   .merchant-head b,.trainer-head h2,.evolution-guide-head h2,.breeding-caretaker-head h2{font-size:14px;margin:0}
+  .merchant-head small,.merchant-dialog,.merchant-foot,.trainer-kicker,.trainer-head p,.trainer-dialog,
+  .evolution-kicker,.evolution-guide-head p,.evolution-guide-dialog,.breeding-kicker,.breeding-caretaker-head p,
+  .breeding-caretaker-dialog,.breeding-safety-list,.ranch-services-card p{display:none}
+  .merchant-card button,.trainer-card button,.evolution-guide-card button,.breeding-caretaker-card button,
+  .merchant-head button,.trainer-head button,.evolution-guide-head button,.breeding-caretaker-head button,
+  .ranch-services-card header button{
+    min-width:32px;min-height:32px;padding:4px 8px;font-size:12px
+  }
   .merchant-card button,.trainer-card button,.evolution-guide-card button,.breeding-caretaker-card button{min-height:var(--menu-touch)}
-  .merchant-dialog,.trainer-dialog,.evolution-guide-dialog,.breeding-caretaker-dialog{margin:6px 0;padding:6px 8px;font-size:10px}
   .merchant-item{padding:6px;gap:6px}
   .merchant-icon{font-size:20px}
   .merchant-item button{padding:6px 8px;font-size:11px}
   .trainer-body .train-btn,.evolution-guide-body .evo-card button,.breeding-open-btn{min-height:var(--menu-touch);padding:6px 8px}
-  .breeding-preview-grid>div:not(.breeding-heart){min-height:64px;padding:8px}
+  .breeding-preview-grid>div:not(.breeding-heart){min-height:52px;padding:6px}
+  .breeding-heart{display:none}
   .warp-prompt{padding:0}
   .warp-prompt-card{padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0}
   .warp-prompt-card h2{font-size:14px;margin:2px 0}
@@ -757,7 +776,11 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .manager-toolbar .secondary-btn{min-height:32px;padding:4px 6px}
   .character-preview-art{width:min(72px,12vw)}
   .character-preview-name{font-size:12px}
-  .ranch-services-card{max-height:min(58dvh,340px);padding:7px 9px}
+  .ranch-services-card{max-height:min(52dvh,300px);padding:7px 9px}
+  .merchant-card,.trainer-card,.evolution-guide-card,.breeding-caretaker-card{
+    max-height:min(52dvh,340px);padding:7px 9px
+  }
+  .npc-btn{min-height:30px;padding:3px 7px;font-size:10px}
   .warp-prompt-card{width:min(420px,72vw);margin:0 auto}
 }
 /* Mobile menu density pass end */

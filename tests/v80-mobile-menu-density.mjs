@@ -24,6 +24,9 @@ assert.match(pass, /\.warp-prompt-card h2\{font-size:14px/, 'warp sheet title sh
 assert.match(pass, /\.ranch-services-card h2,.ranch-storage-head h2\{font-size:14px/, 'ranch sheet title shrinks on mobile');
 assert.match(pass, /min-height:var\(--menu-touch\)/, 'sheet actions use the denser menu tap target');
 assert.match(pass, /@media \(pointer:coarse\) and \(orientation:landscape\)/, 'landscape phones get a tighter second pass');
+assert.match(pass, /\.npc-btn:after\{content:none\}/, 'NPC talk chip drops the long ผู้ดูแล suffix');
+assert.match(pass, /\.merchant-shop,\.trainer-panel,\.evolution-guide-panel,\.breeding-caretaker-panel,\.ranch-services/, 'NPC overlays dock as bottom sheets');
+assert.match(pass, /\.merchant-head small,\.merchant-dialog,\.merchant-foot,\.trainer-kicker,\.trainer-head p,\.trainer-dialog/, 'verbose NPC dialogs and kickers hide on mobile');
 assert.doesNotMatch(pass, /\.action\.skill|\.skill1|\.capture\{/, 'density pass must not shrink combat HUD buttons');
 
 console.log('V8.2 mobile menu density pass: PASS');
