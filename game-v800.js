@@ -28,7 +28,7 @@ import { normalizeInstance, createInstance, migrateState, addGrowthExp, addTrain
 import { resolveBattleGrowth, applyBattleGrowth, resolvePartyShareGrowth } from './battle-growth.mjs';
 import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVolume, toggleMute, isMuted, getVolume } from './audio-engine.mjs';
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
-import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
+import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, setManualSkillSlot, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
@@ -2605,7 +2605,7 @@ function ensureCharacterSkillsRightTabTree(panel,documentRef=document){
   const root=characterSkillsElement(documentRef,'section','character-skills-a37');
   root.setAttribute('aria-live','polite');
   const title=characterSkillsElement(documentRef,'h4','character-skills-title','Skill Loadout');
-  const notice=characterSkillsElement(documentRef,'p','character-skills-notice','ข้อมูลแบบอ่านอย่างเดียว • การใช้สกิลเกิดในสนามต่อสู้');
+  const notice=characterSkillsElement(documentRef,'p','character-skills-notice','ดูสถานะการต่อสู้แบบอ่านอย่างเดียว • จัด Loadout ได้ที่ Keeper > Skills');
   const empty=characterSkillsElement(documentRef,'div','character-info-empty','เลือกมอนสเตอร์จากรายการเพื่อดู Skill Loadout');
   const manualHeading=characterSkillsElement(documentRef,'h5','character-skills-group-title','Manual Skills • S1–S4');
   const manualGrid=characterSkillsElement(documentRef,'div','character-skills-manual-grid');
@@ -2724,6 +2724,7 @@ function renderSkills(targetPanel=null){
   const thresholds=BALANCE_CONFIG.skill.masteryThresholds;
   const thresholdList={novice:0,familiar:thresholds.familiar,skilled:thresholds.skilled,expert:thresholds.expert,master:thresholds.master};
   const learnedHTML=(inst.skills||[]).map(s=>{
+    const canonical=skillCatalogEntry(s.skillId);
     const def=speciesSkills.find(d=>d.name===s.skillId)||(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===s.skillId)?.move||{};
     const rank=s.masteryRank||'novice';
     const exp=s.masteryExp||0;
@@ -2736,7 +2737,11 @@ function renderSkills(targetPanel=null){
     const bandSize=nextThresh?(nextThresh-prevThresh):1;
     const pct=isMaster?100:Math.min(100,Math.round(expInBand/Math.max(1,bandSize)*100));
     const rawPowerPct=Math.round((SKILL_MASTERY[rank]?.rawPower??0)*100);
-    return `<div class="skill-card"><div class="skill-card-header"><b>${def.name||s.skillId} ${typeBadge(def.type||'Normal')}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank} ${MASTERY_DOTS[rank]||''}</span></div><div class="skill-exp-text">EXP: <strong>${exp}</strong>${nextThresh?`/${nextThresh}`:''} ${!isMaster?`→ ${MASTERY_NEXT_TH[rank]}`:' (สูงสุด)'}</div><div class="skill-mastery-bar"><div class="skill-mastery-fill ${rank}" style="width:${pct}%"></div></div><div class="skill-detail">Power: ${def.power??'—'} • CD: ${def.cooldown??'—'}s • ${def.targetType||'enemy'}</div><div class="skill-detail"><span class="power-bonus">Raw Power bonus: +${rawPowerPct}%</span>${s.mutationId?` • Mutation: ${s.mutationId}`:''}</div></div>`;
+    const skillName=canonical?`${canonical.nameTH} (${canonical.nameEN})`:def.name||s.skillId;
+    const skillType=canonical?.runtimeType||def.type||'Normal';
+    const equippedSlot=MANUAL_SKILL_SLOTS.includes(s.slot)?s.slot:'';
+    const slotControl=canonical?`<label class="skill-loadout-control">ติดตั้งช่อง <select data-skill-loadout="${s.skillId}" aria-label="เลือกสล็อตสำหรับ ${skillName}"><option value="" ${equippedSlot?'':'selected'}>ยังไม่ติดตั้ง</option>${MANUAL_SKILL_SLOTS.map(slot=>`<option value="${slot}" ${equippedSlot===slot?'selected':''}>${slot.toUpperCase()}</option>`).join('')}</select></label>`:'';
+    return `<div class="skill-card"><div class="skill-card-header"><b>${skillName} ${typeBadge(skillType)}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank} ${MASTERY_DOTS[rank]||''}</span></div><div class="skill-exp-text">EXP: <strong>${exp}</strong>${nextThresh?`/${nextThresh}`:''} ${!isMaster?`→ ${MASTERY_NEXT_TH[rank]}`:' (สูงสุด)'}</div><div class="skill-mastery-bar"><div class="skill-mastery-fill ${rank}" style="width:${pct}%"></div></div><div class="skill-detail">Power: ${canonical?.power??def.power??'—'} • CD: ${canonical?.cooldownSec??def.cooldown??'—'}s • ${canonical?.targetType||def.targetType||'enemy'}</div><div class="skill-detail"><span class="power-bonus">Raw Power bonus: +${rawPowerPct}%</span>${s.mutationId?` • Mutation: ${s.mutationId}`:''}</div>${slotControl}</div>`;
   }).join('');
   const learnedIds=new Set((inst.skills||[]).map(s=>s.skillId));
   const lockedMoves=speciesSkills.filter(s=>!learnedIds.has(s.name)).map(s=>`<div class="skill-card skill-locked"><div class="skill-card-header"><b>${s.name} ${typeBadge(s.type)}</b></div><div class="skill-detail">Power: ${s.power??'—'} • CD: ${s.cooldown??'—'}s • ${s.targetType||'enemy'}</div><div class="skill-detail">ใช้สกิลในการต่อสู้เพื่อสะสม EXP → เรียนรู้อัตโนมัติ</div></div>`).join('');
@@ -2746,10 +2751,11 @@ function renderSkills(targetPanel=null){
   }).join('');
   const memoryEligibility=resolveInheritedSkillMemoryEligibility(inst);
   const memoryHTML=inst.inheritedSkillMemoryId?`<div class="skills-section-title">Skill Memory จากการผสมพันธุ์</div><div class="skill-card ${memoryEligibility.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${memoryEligibility.definition?.nameTH||inst.inheritedSkillMemoryId} • ${inst.inheritedSkillMemoryId}</b><span class="skill-mastery-label">${memoryEligibility.method||'Memory'}</span></div><div class="skill-detail">บันทึกจาก Partner • ไม่ติดตั้งสล็อตอัตโนมัติ</div>${memoryEligibility.eligible?`<button data-learn-memory="${inst.instanceId}">เรียนจาก Memory</button>`:`<div class="skill-req">${SKILL_MEMORY_REASON_TH[memoryEligibility.reason]||memoryEligibility.reason}</div>`}</div>`:'';
-  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="skill-help"><b>จัด Loadout:</b> เลือก S1–S4 จากสกิลที่เรียนแล้ว • ถ้าช่องมีสกิลอยู่ ระบบจะสลับหรือถอดตัวเดิมโดยไม่รีเซ็ต Uses/Cooldown/Mastery</div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
   panel.querySelectorAll('[data-learn-memory]').forEach(b=>b.onclick=()=>learnSkillMemory(b.dataset.learnMemory));
+  panel.querySelectorAll('[data-skill-loadout]').forEach(select=>select.onchange=()=>setMonsterSkillLoadout(inst.instanceId,select.dataset.skillLoadout,select.value||null));
 }
 function renderFocusedEquipmentLoadout(){
   const presentation=focusedCharacterPresentation();
@@ -4756,7 +4762,9 @@ function evolveMonster(id,pathId){if(!assertCharacterMutable(id))return;const in
   const newColor=colorNum(monsterTypes(inst)[0]);
   spawnEvolutionEffect(fxWorldPos(id),oldColor,newColor);
   playSFX('sfx_evolution');
-  refreshStats(inst,false);msg(`${sp.name} Evolution → ${targetName} สำเร็จ!`);syncRanchVisuals();renderAll();renderManager();if(!el('evolutionPanel').classList.contains('hidden'))renderEvolutionGuide();saveGame(false);}
+  const unlocked=committed.unlockedSkill?.newlyLearned?skillCatalogEntry(committed.unlockedSkill.skillId):null;
+  const unlockText=unlocked?` • เรียน ${unlocked.nameTH} แล้ว (ยังไม่ติดตั้ง)` : '';
+  refreshStats(inst,false);msg(`${sp.name} Evolution → ${targetName} สำเร็จ!${unlockText}`);syncRanchVisuals();renderAll();renderManager();if(!el('evolutionPanel').classList.contains('hidden'))renderEvolutionGuide();saveGame(false);}
 function evoHistoryHTML(inst){
   const hist=inst.evolutionHistory||[];
   if(!hist.length)return '';
@@ -5117,6 +5125,24 @@ function learnSkillMemory(id){
   if(!result.ok){msg(`Skill Memory ยังเรียนไม่ได้ • ${SKILL_MEMORY_REASON_TH[result.reason]||result.reason}`);return;}
   msg(`${displayName(inst)} เรียน ${result.skill.skillId} จาก Skill Memory • ยังไม่ติดตั้งในสล็อต`);
   renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
+}
+function setMonsterSkillLoadout(id,skillId,requestedSlot){
+  const inst=getInst(id);if(!inst)return;
+  if(!assertCharacterMutable(id)){renderSkills();return;}
+  const learned=getSkill(inst,skillId);
+  if(!learned){msg(`ติดตั้ง ${skillId} ไม่ได้ • มอนยังไม่ได้เรียนสกิลนี้`);renderSkills();return;}
+  const currentSlot=MANUAL_SKILL_SLOTS.includes(learned.slot)?learned.slot:null;
+  if(requestedSlot===currentSlot)return;
+  const result=requestedSlot
+    ?setManualSkillSlot(inst,{skillId,slot:requestedSlot})
+    :currentSlot?setManualSkillSlot(inst,{skillId:null,slot:currentSlot}):{ok:true};
+  if(!result.ok){msg(`จัด Loadout ไม่สำเร็จ • ${result.reason}`);renderSkills();return;}
+  const definition=skillCatalogEntry(skillId),name=definition?.nameTH||skillId;
+  if(requestedSlot){
+    const displaced=result.displacedSkillId?` • ${result.swapped?'สลับกับ':'ถอด'} ${result.displacedSkillId}`:'';
+    msg(`${displayName(inst)} ติดตั้ง ${name} ที่ ${requestedSlot.toUpperCase()}${displaced}`);
+  }else msg(`${displayName(inst)} ถอด ${name} ออกจาก ${currentSlot.toUpperCase()}`);
+  renderManager();renderSkills();saveGame(false);
 }
 function mutateOwnedSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;

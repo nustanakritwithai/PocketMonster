@@ -240,6 +240,60 @@ export function equipSkill(instance, { skillId, slot } = {}) {
   return equipResult(true, null, { skillId, slot, definition });
 }
 
+// Atomically apply a player-selected manual loadout change. Moving an already
+// equipped skill swaps the target occupant back into its previous slot; moving
+// an unequipped skill displaces the target occupant without deleting either
+// skill record. Passing null as skillId clears only the requested manual slot.
+// Mastery, Uses, mutation and cooldown fields stay on the same learned record.
+export function setManualSkillSlot(instance, { skillId = null, slot } = {}) {
+  if (!instance || typeof instance !== 'object' || !Array.isArray(instance.skills)) {
+    return equipResult(false, 'invalid_state');
+  }
+  if (!MANUAL_SKILL_SLOTS.includes(slot)) {
+    return equipResult(false, 'slot_locked', { slot: slot ?? null });
+  }
+  const validation = validateSkillSlotState(instance);
+  if (!validation.ok) {
+    return equipResult(false, 'invalid_slot_state', { issues: validation.issues });
+  }
+  const occupant = instance.skills.find(skill => skill?.slot === slot) ?? null;
+  if (skillId === null) {
+    if (occupant) occupant.slot = null;
+    return equipResult(true, null, {
+      skillId: null,
+      slot,
+      previousSlot: slot,
+      displacedSkillId: occupant?.skillId ?? null,
+      swapped: false,
+    });
+  }
+  const definition = skillCatalogEntry(skillId);
+  if (!definition) return equipResult(false, 'unknown_id', { skillId });
+  const learned = getSkill(instance, skillId);
+  if (!learned) return equipResult(false, 'not_learned', { skillId });
+  const previousSlot = MANUAL_SKILL_SLOTS.includes(learned.slot) ? learned.slot : null;
+  if (occupant === learned) {
+    return equipResult(true, null, {
+      skillId,
+      slot,
+      previousSlot,
+      displacedSkillId: null,
+      swapped: false,
+      definition,
+    });
+  }
+  if (occupant) occupant.slot = previousSlot;
+  learned.slot = slot;
+  return equipResult(true, null, {
+    skillId,
+    slot,
+    previousSlot,
+    displacedSkillId: occupant?.skillId ?? null,
+    swapped: Boolean(occupant && previousSlot),
+    definition,
+  });
+}
+
 export function resolveStage1Learnset(instance) {
   if (!instance || typeof instance !== 'object') {
     return Object.freeze({ ok: false, reason: 'invalid_state', entries: Object.freeze([]), candidates: Object.freeze([]) });

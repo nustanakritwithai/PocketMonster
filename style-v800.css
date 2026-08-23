@@ -331,6 +331,9 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .skill-req{font-size:9px;color:#fca5a5;margin-top:3px}
 .skill-help{font-size:9px;color:#64748b;margin-top:12px;padding:8px;background:#0b1220;border-radius:8px;line-height:1.5}
 .skill-help b{color:#94a3b8}
+.skill-loadout-control{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:7px;border-top:1px solid #ffffff14;color:#bfdbfe;font-size:10px;font-weight:700}
+.skill-loadout-control select{min-width:116px;min-height:34px;border:1px solid #60a5fa66;border-radius:9px;background:#0b1220;color:#fff;padding:5px 26px 5px 8px;font:inherit}
+.skill-loadout-control select:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 
 /* V8.1 A37 — Character Information / Skills (read-only right tab) */
 .character-info-body .character-skills-a37{min-width:0;display:grid;gap:7px;overflow-wrap:anywhere}

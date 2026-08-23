@@ -36,6 +36,7 @@ function assertEvolution(module) {
   const path = module.workbookEvolutionPathForSpecies('flameling');
   assert.equal(path.activation, 'runtime_live');
   assert.equal(path.runtimeEvolutionDecision, 'M6_CANONICAL_STAGE2_LIVE');
+  assert.equal(path.unlockSkillActivation, 'learned_unequipped_on_evolution_commit');
   assert.equal(path.requiredLevelReference, 15);
   assert.equal(path.requiredBondReference, 50);
   assert.equal(module.validateWorkbookEvolutionCatalog(module.WORKBOOK_EVOLUTION_PATHS).ok, true);
@@ -55,6 +56,8 @@ function assertEvolution(module) {
   assert.equal(ready.canonicalFormId, 'MON_020');
   assert.equal(committed.canonicalFromFormId, 'MON_002');
   assert.equal(committed.canonicalToFormId, 'MON_020');
+  assert.deepEqual(committed.unlockedSkill, { skillId: 'SK_FIRE_06', newlyLearned: true, slot: null });
+  assert.equal(ready.skills.find(skill => skill.skillId === 'SK_FIRE_06')?.slot, null);
   assert.deepEqual(committed.canonicalStats, preview.targetStats);
   assert.deepEqual(ready.potential, beforePotential);
   assert.equal(ready.evolutionHistory[0].toWorkbookMonsterId, 'MON_020');
@@ -77,6 +80,7 @@ function assertGame(source) {
   assert.match(requirement, /requiredLevelReference/);
   assert.match(requirement, /requiredBondReference/);
   assert.match(evolve, /refreshStats\(inst,false\)/);
+  assert.match(evolve, /committed\.unlockedSkill\?\.newlyLearned/);
   assert.doesNotMatch(evolve, /refreshStats\(inst,true\)/);
   assert.match(preview, /workbook\.sourceStats\[stat\]/);
   assert.match(preview, /workbook\.targetStats\[stat\]/);
@@ -96,6 +100,7 @@ assertController(sources.controller[1]);
 const mutations = [
   ['evolution', 'deactivate runtime', "activation: 'runtime_live'", "activation: 'preview_only'", assertEvolution],
   ['evolution', 'restore old decision', "runtimeEvolutionDecision: 'M6_CANONICAL_STAGE2_LIVE'", "runtimeEvolutionDecision: 'D4_LIVE_LV2_UNCHANGED'", assertEvolution],
+  ['evolution', 'defer unlock again', "unlockSkillActivation: 'learned_unequipped_on_evolution_commit'", "unlockSkillActivation: 'deferred_to_A16'", assertEvolution],
   ['evolution', 'weaken level gate', 'requiredLevelReference: sourceForm.evolution.requiredLevel', 'requiredLevelReference: 2', assertEvolution],
   ['evolution', 'remove bond gate', 'requiredBondReference: sourceForm.evolution.requiredBond', 'requiredBondReference: 0', assertEvolution],
   ['evolution', 'ignore canonical already-commit', '|| canonicalFormId === path.toWorkbookMonsterId', '|| false', assertEvolution],
@@ -109,10 +114,13 @@ const mutations = [
   ['evolution', 'retain Stage-1 canonical ID', 'instance.canonicalFormId = workbookPath.toWorkbookMonsterId', 'instance.canonicalFormId = workbookPath.fromWorkbookMonsterId', assertEvolution],
   ['evolution', 'drop canonical history target', 'historyEntry.toWorkbookMonsterId = workbookPath.toWorkbookMonsterId', 'historyEntry.toWorkbookMonsterId = null', assertEvolution],
   ['evolution', 'report wrong canonical target', 'canonicalToFormId: workbookPreview?.path.toWorkbookMonsterId ?? null', 'canonicalToFormId: workbookPreview?.path.fromWorkbookMonsterId ?? null', assertEvolution],
+  ['evolution', 'drop evolution skill grant', 'const learned = learnSkill(instance, { skillId, slot: null });', 'const learned = null;', assertEvolution],
+  ['evolution', 'force evolution skill into S1', 'const learned = learnSkill(instance, { skillId, slot: null });', "const learned = learnSkill(instance, { skillId, slot: 's1' });", assertEvolution],
   ['game', 'heal on evolution', 'refreshStats(inst,false);msg(`${sp.name} Evolution', 'refreshStats(inst,true);msg(`${sp.name} Evolution', assertGame],
   ['game', 'drop Workbook requirement resolver', 'path.fromFormId===sp.id?previewWorkbookEvolution(inst):null', 'null', assertGame],
   ['game', 'preview target from current stat', 'workbook?.ok?workbook.targetStats[stat]', 'workbook?.ok?current', assertGame],
   ['game', 'drop canonical Stage-2 name', "canonical?.stage===2?canonical.nameTH", 'false', assertGame],
+  ['game', 'hide evolution skill unlock', 'committed.unlockedSkill?.newlyLearned', 'false', assertGame],
   ['controller', 'force preview read-only', 'readOnly: preview.readOnly', 'readOnly: true', assertController],
   ['controller', 'hide commit capability', 'canCommit: preview.canCommit', 'canCommit: false', assertController],
 ];
