@@ -4,7 +4,7 @@ import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mj
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
 import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
-import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
+import { nearestRoute, nextWarpPromptState, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
@@ -2620,7 +2620,7 @@ function ensureStarter(){
 
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
-let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null;
+let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null,dismissedWarpId=null;
 characterUI=createCharacterUIController({
   getState:()=>state,
   getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
@@ -2895,6 +2895,7 @@ function switchZone(zone,silent=false){
   clearSkillFields();
   clearSkillSwarms();
   closeWarpPrompt();
+  dismissedWarpId=null;
   closeStageSelect();
   closeStageReward();
   el('monsterManager').classList.add('hidden');
@@ -5356,8 +5357,13 @@ function updateWarpPrompt(dt){
   warpPromptCooldown=Math.max(0,warpPromptCooldown-dt);
   if(warpBusy||warpPromptCooldown>0){return;}
   const found=nearestRoute(routesFrom(state.currentZone),player.position,3.2).route;
-  if(found?.id!==nearbyWarp?.id){nearbyWarp=found;renderWarpPrompt();}
-  if(!found&&nearbyWarp){closeWarpPrompt();}
+  const next=nextWarpPromptState({foundId:found?.id||null,dismissedId:dismissedWarpId});
+  dismissedWarpId=next.dismissedId;
+  if(next.open){
+    if(nearbyWarp?.id!==next.nearbyId){nearbyWarp=found;renderWarpPrompt();}
+    return;
+  }
+  if(nearbyWarp)closeWarpPrompt();
 }
 function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
@@ -5673,7 +5679,7 @@ el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV
 el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('warpPromptAction').onclick=()=>startWarp();
-el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');closeWarpPrompt();warpPromptCooldown=.35;};
+el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');dismissedWarpId=nearbyWarp?.id||null;closeWarpPrompt();};
 el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
