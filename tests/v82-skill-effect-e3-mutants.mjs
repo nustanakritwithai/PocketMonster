@@ -98,7 +98,7 @@ const runtimeMutations = [
   ['break wall tangent', 'Object.freeze({ x: -normal.z, z: normal.x })', 'Object.freeze({ x: normal.x, z: normal.z })'],
   ['discard hazard radius', 'radiusM: command.radiusM,', 'radiusM: 1,'],
   ['skip E3 generic resolution', 'if (E3_READY_SKILLS.has(skillId)) {\n    e3 = resolveE3SkillEffects', 'if (false) {\n    e3 = resolveE3SkillEffects'],
-  ['leave field component deferred', '|| component.slice === E3_FIELD_EFFECT_POLICY.phase;', '|| false;'],
+  ['leave field component deferred', '|| component.slice === E3_FIELD_EFFECT_POLICY.phase\n    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;', '|| false\n    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;'],
 ];
 
 for (const [name, from, to] of runtimeMutations) {

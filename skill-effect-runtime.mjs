@@ -118,6 +118,12 @@ export const E3_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
 
 const E3_READY_SKILLS = new Set(E3_READY_SKILL_IDS);
 
+export const E4_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
+  .filter(row => row.components.some(component => component.slice === 'E4_MOVEMENT_DISPLACEMENT'))
+  .map(row => row.skillId));
+
+const E4_READY_SKILLS = new Set(E4_READY_SKILL_IDS);
+
 export const REVIEWED_SKILL_EFFECT_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
   .filter(row => E1_READY_SKILLS.has(row.skillId) || E2_READY_SKILLS.has(row.skillId) || E3_READY_SKILLS.has(row.skillId))
   .map(row => row.skillId));
@@ -149,6 +155,21 @@ export const E3_FIELD_EFFECT_POLICY = Object.freeze({
   hazardTickDamageRatio: 0.2,
   magnitudeSource: 'runtime_fallback_workbook_mechanic_without_duration_or_tick_magnitude',
   cleanupBoundary: 'zone_change',
+  sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
+  sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
+});
+
+export const E4_MOBILITY_EFFECT_POLICY = Object.freeze({
+  phase: 'E4_MOVEMENT_DISPLACEMENT',
+  activation: 'live',
+  movementDistanceM: Object.freeze({ Burrow: 3, Dash: 3, Blink: 4 }),
+  nearestEnemyStopDistanceM: 1,
+  knockbackDistanceM: 1.5,
+  pullDistanceM: 2,
+  chanceSource: 'workbook_effect_chance_pct',
+  magnitudeSource: 'runtime_fallback_workbook_mechanic_without_distance_magnitude',
+  movementTrigger: 'at_least_one_successful_hit',
+  displacementTrigger: 'successful_nonlethal_hit',
   sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
 });
@@ -246,6 +267,10 @@ export function canExecuteE2SkillEffect(skillId) {
 
 export function canExecuteE3SkillEffect(skillId) {
   return E3_READY_SKILLS.has(skillId);
+}
+
+export function canExecuteE4SkillEffect(skillId) {
+  return E4_READY_SKILLS.has(skillId);
 }
 
 export function canExecuteReviewedSkillEffect(skillId) {
@@ -760,6 +785,153 @@ export function resolveE3SkillEffects({ command, attacker } = {}) {
   });
 }
 
+function validE4Request(command, attacker, targets) {
+  if (!command || command.ok !== true || typeof command.skillId !== 'string'
+    || !E4_READY_SKILLS.has(command.skillId)) return 'effect_not_ready';
+  const skill = skillCatalogEntry(command.skillId);
+  if (!skill || command.targetKind !== skill.targetType) return 'invalid_command';
+  if (!attacker || typeof attacker.id !== 'string' || !validFieldPoint(attacker.position)) return 'invalid_actor_position';
+  if (!Array.isArray(command.targetIds) || command.targetIds.length === 0 || !Array.isArray(targets)
+    || targets.length !== command.targetIds.length
+    || targets.some((target, index) => target?.id !== command.targetIds[index]
+      || !validFieldPoint(target.position))) return 'invalid_target_positions';
+  if (command.targetKind === 'EnemyArea' && !validFieldPoint(command.targetPoint)) return 'invalid_target_point';
+  return null;
+}
+
+function frozenPoint(point) {
+  return Object.freeze({ x: point.x, z: point.z });
+}
+
+function moveToward(from, toward, maximumDistance, stopDistance = 0) {
+  const dx = toward.x - from.x;
+  const dz = toward.z - from.z;
+  const length = Math.hypot(dx, dz);
+  const distanceM = Math.max(0, Math.min(maximumDistance, length - stopDistance));
+  if (length <= Number.EPSILON || distanceM <= Number.EPSILON) {
+    return Object.freeze({ destination: frozenPoint(from), distanceM: 0 });
+  }
+  return Object.freeze({
+    destination: Object.freeze({ x: from.x + (dx / length) * distanceM, z: from.z + (dz / length) * distanceM }),
+    distanceM,
+  });
+}
+
+function moveAway(from, anchor, maximumDistance, fallbackAnchor) {
+  let dx = from.x - anchor.x;
+  let dz = from.z - anchor.z;
+  let length = Math.hypot(dx, dz);
+  if (length <= Number.EPSILON && fallbackAnchor) {
+    dx = from.x - fallbackAnchor.x;
+    dz = from.z - fallbackAnchor.z;
+    length = Math.hypot(dx, dz);
+  }
+  if (length <= Number.EPSILON) { dx = 0; dz = -1; length = 1; }
+  return Object.freeze({
+    destination: Object.freeze({
+      x: from.x + (dx / length) * maximumDistance,
+      z: from.z + (dz / length) * maximumDistance,
+    }),
+    distanceM: maximumDistance,
+  });
+}
+
+function resolveEffectChance(effectChancePct, rng, label) {
+  if (effectChancePct <= 0) return effectResult(true, 'effect_chance_zero', { applied: false, roll: null, rngDraws: 0 });
+  if (effectChancePct >= 100) return effectResult(true, null, { applied: true, roll: null, rngDraws: 0 });
+  const draw = readRoll(rng, label);
+  if (!draw.ok) return draw;
+  const applied = draw.roll < effectChancePct / 100;
+  return effectResult(true, applied ? null : 'effect_roll_failed', { applied, roll: draw.roll, rngDraws: draw.rngDraws });
+}
+
+export function validateE4SkillEffectRequest(request = {}) {
+  const reason = validE4Request(request.command, request.attacker, request.targets);
+  return effectResult(reason === null, reason);
+}
+
+export function resolveE4SkillEffects({ command, attacker, targets, hitResults } = {}, { rng } = {}) {
+  const invalid = validE4Request(command, attacker, targets);
+  if (invalid) return effectResult(false, invalid, { rngDraws: 0 });
+  if (!Array.isArray(hitResults) || hitResults.length !== targets.length
+    || hitResults.some((result, index) => result?.targetId !== targets[index].id
+      || typeof result.hit !== 'boolean' || typeof result.fainted !== 'boolean')) {
+    return effectResult(false, 'invalid_hit_results', { rngDraws: 0 });
+  }
+  const skill = skillCatalogEntry(command.skillId);
+  let rngDraws = 0;
+  let movementResult = null;
+  let displacementResults = Object.freeze([]);
+
+  if (skill.effectClass === 'Movement') {
+    const successfulHit = hitResults.some(result => result.hit);
+    let chance = effectResult(true, 'attack_missed', { applied: false, roll: null, rngDraws: 0 });
+    if (successfulHit) chance = resolveEffectChance(skill.effectChancePct, rng, `movement:${skill.id}`);
+    if (!chance.ok) return effectResult(false, chance.reason, { rngDraws: rngDraws + chance.rngDraws });
+    rngDraws += chance.rngDraws;
+    const anchor = command.targetKind === 'EnemyArea' ? command.targetPoint : targets[0]?.position;
+    const maximumDistance = E4_MOBILITY_EFFECT_POLICY.movementDistanceM[skill.effect];
+    const movement = chance.applied
+      ? moveToward(attacker.position, anchor, maximumDistance,
+        command.targetKind === 'NearestEnemy' ? E4_MOBILITY_EFFECT_POLICY.nearestEnemyStopDistanceM : 0)
+      : Object.freeze({ destination: frozenPoint(attacker.position), distanceM: 0 });
+    movementResult = Object.freeze({
+      skillId: command.skillId,
+      actorId: attacker.id,
+      kind: 'movement',
+      movementKind: skill.effect,
+      from: frozenPoint(attacker.position),
+      destination: movement.destination,
+      distanceM: movement.distanceM,
+      effectChancePct: skill.effectChancePct,
+      effectRoll: chance.roll,
+      applied: chance.applied && movement.distanceM > 0,
+      reason: chance.applied && movement.distanceM <= 0 ? 'already_at_destination' : chance.reason,
+    });
+  } else {
+    const resolvedTargets = [];
+    for (let index = 0; index < targets.length; index += 1) {
+      const target = targets[index];
+      const hit = hitResults[index];
+      let chance = effectResult(true, hit.hit ? 'target_fainted' : 'attack_missed', { applied: false, roll: null, rngDraws: 0 });
+      if (hit.hit && !hit.fainted) chance = resolveEffectChance(skill.effectChancePct, rng, `displacement:${skill.id}:${target.id}`);
+      if (!chance.ok) return effectResult(false, chance.reason, { rngDraws: rngDraws + chance.rngDraws });
+      rngDraws += chance.rngDraws;
+      let movement = Object.freeze({ destination: frozenPoint(target.position), distanceM: 0 });
+      if (chance.applied) {
+        const anchor = command.targetKind === 'EnemyArea' ? command.targetPoint : attacker.position;
+        movement = skill.effect === 'Pull'
+          ? moveToward(target.position, anchor, E4_MOBILITY_EFFECT_POLICY.pullDistanceM)
+          : moveAway(target.position, anchor, E4_MOBILITY_EFFECT_POLICY.knockbackDistanceM, attacker.position);
+      }
+      resolvedTargets.push(Object.freeze({
+        skillId: command.skillId,
+        targetId: target.id,
+        kind: 'displacement',
+        displacementKind: skill.effect,
+        from: frozenPoint(target.position),
+        destination: movement.destination,
+        distanceM: movement.distanceM,
+        effectChancePct: skill.effectChancePct,
+        effectRoll: chance.roll,
+        applied: chance.applied && movement.distanceM > 0,
+        reason: chance.applied && movement.distanceM <= 0 ? 'already_at_destination' : chance.reason,
+      }));
+    }
+    displacementResults = Object.freeze(resolvedTargets);
+  }
+
+  return effectResult(true, null, {
+    effectMode: 'canonical_e4_movement_displacement',
+    skillId: command.skillId,
+    movementResult,
+    displacementResults,
+    appliedCount: (movementResult?.applied ? 1 : 0) + displacementResults.filter(result => result.applied).length,
+    activeComponentKinds: Object.freeze([skill.effectClass === 'Movement' ? 'movement' : 'displacement']),
+    rngDraws,
+  });
+}
+
 export function validateReviewedSkillEffectRequest(request = {}) {
   const skillId = request.command?.skillId;
   if (!REVIEWED_SKILL_EFFECTS.has(skillId)) return effectResult(false, 'effect_not_ready');
@@ -775,6 +947,10 @@ export function validateReviewedSkillEffectRequest(request = {}) {
     const e3 = validateE3SkillEffectRequest(request);
     if (!e3.ok) return e3;
   }
+  if (E4_READY_SKILLS.has(skillId)) {
+    const e4 = validateE4SkillEffectRequest(request);
+    if (!e4.ok) return e4;
+  }
   return effectResult(true, null);
 }
 
@@ -785,6 +961,7 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
   let e1 = null;
   let e2 = null;
   let e3 = null;
+  let e4 = null;
   let rngDraws = 0;
   if (E1_READY_SKILLS.has(skillId)) {
     e1 = resolveE1SkillEffects(request, { rng });
@@ -800,16 +977,24 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
     e3 = resolveE3SkillEffects(request);
     if (!e3.ok) return effectResult(false, e3.reason, { rngDraws });
   }
+  if (E4_READY_SKILLS.has(skillId)) {
+    e4 = resolveE4SkillEffects({ ...request, hitResults: e1?.targetResults ?? Object.freeze([]) }, { rng });
+    if (!e4.ok) return effectResult(false, e4.reason, { rngDraws: rngDraws + e4.rngDraws });
+    rngDraws += e4.rngDraws;
+  }
   const coverage = skillEffectCoverageEntry(skillId);
   const active = component => e1ComponentActive(component)
     || component.slice === E2_SELF_EFFECT_POLICY.phase
-    || component.slice === E3_FIELD_EFFECT_POLICY.phase;
+    || component.slice === E3_FIELD_EFFECT_POLICY.phase
+    || component.slice === E4_MOBILITY_EFFECT_POLICY.phase;
   return effectResult(true, null, {
     effectMode: 'canonical_reviewed_effects',
     skillId,
     targetResults: e1?.targetResults ?? Object.freeze([]),
     actorResult: e2?.actorResult ?? null,
     fieldResult: e3?.fieldResult ?? null,
+    movementResult: e4?.movementResult ?? null,
+    displacementResults: e4?.displacementResults ?? Object.freeze([]),
     hitCount: e1?.hitCount ?? 0,
     totalDamage: e1?.totalDamage ?? 0,
     healing: e2?.healing ?? 0,

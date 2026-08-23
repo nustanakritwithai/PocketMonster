@@ -3549,6 +3549,7 @@ function canonicalSkillEffectTargets(materialized){
       id:w.id,
       level:w.level,
       types:Object.freeze([...wildTypes(w)]),
+      position:Object.freeze({x:w.mesh.position.x,z:w.mesh.position.z}),
       stats:Object.freeze({DEF:defense,SPDEF:specialDefense}),
       hp:w.hp,
       maxHp:w.maxHp,
@@ -3668,6 +3669,35 @@ function applyPlannedActorEffect(a,move,actorResult){
   if(appliedStatusIds.length)details.push(`Status ${appliedStatusIds.join(', ')} ${duration}s`);
   if(details.length)msg(`${displayName(a.inst)} ใช้ ${move.name} • ${details.join(' • ')}`);
 }
+function clampSkillEffectDestination(destination){
+  const bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};
+  return{x:THREE.MathUtils.clamp(destination.x,bounds.minX,bounds.maxX),z:THREE.MathUtils.clamp(destination.z,bounds.minZ,bounds.maxZ)};
+}
+function applyPlannedMobilityEffects(a,move,movementResult,displacementResults,targets){
+  let appliedCount=0;
+  if(movementResult?.applied){
+    const destination=clampSkillEffectDestination(movementResult.destination);
+    const from=a.mesh.position.clone(),dx=destination.x-from.x,dz=destination.z-from.z;
+    a.mesh.position.x=destination.x;a.mesh.position.z=destination.z;
+    if(Math.hypot(dx,dz)>Number.EPSILON)a.mesh.rotation.y=Math.atan2(dx,dz)+Math.PI;
+    a.aiDecision=null;
+    spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.5,0)),a.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));
+    spawnBurst(a.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),typeFx(move.type).core,{count:8,life:.22,size:.045,priority:'P0'});
+    appliedCount++;
+  }
+  for(let index=0;index<displacementResults.length;index++){
+    const result=displacementResults[index],target=targets[index];
+    if(!result?.applied||!target||target.dead||!target.mesh?.position)continue;
+    const destination=clampSkillEffectDestination(result.destination);
+    if(fieldBlocksPosition(destination))continue;
+    const from=target.mesh.position.clone();
+    target.mesh.position.x=destination.x;target.mesh.position.z=destination.z;
+    spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.45,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)));
+    spawnBurst(target.mesh.position.clone().add(new THREE.Vector3(0,.4,0)),typeFx(move.type).accent,{count:6,life:.2,size:.04,priority:'P0'});
+    appliedCount++;
+  }
+  return appliedCount;
+}
 function applyAcceptedSkillCommand(a,index,move,command,materialized){
   // Uses has already committed. Cooldown is the first live mutation here; all
   // presentation, damage, bond, mastery, and logs follow the acceptance guard.
@@ -3725,10 +3755,11 @@ function applyAcceptedSkillCommand(a,index,move,command,materialized){
   }
   applyPlannedActorEffect(a,move,planned.actorResult);
   activateSkillField(a,move,planned.fieldResult);
+  const mobilityAppliedCount=applyPlannedMobilityEffects(a,move,planned.movementResult,planned.displacementResults,targets);
   a.inst.bond=clamp(a.inst.bond+.3);
   awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
-  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,rngDraws:planned.rngDraws});
+  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,mobilityAppliedCount,rngDraws:planned.rngDraws});
 }
 function skillFailureMessage(move,result){
   const reasons={
