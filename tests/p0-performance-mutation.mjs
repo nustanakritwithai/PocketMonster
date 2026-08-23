@@ -325,8 +325,8 @@ const liveMutants=[
   ['floating-text-cap-disabled',mutate(activeSource,'floatingTexts.length>=VFX_LIMITS.maxFloatingTexts','floatingTexts.length>999','floating-text-cap-disabled')],
   ['owned-cooldowns-allocate-per-frame',mutate(
     activeSource,
-    'for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-dt);',
-    'a.skillCds=a.skillCds.map(x=>Math.max(0,x-dt));',
+    'for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-cooldownElapsed);',
+    'a.skillCds=a.skillCds.map(x=>Math.max(0,x-cooldownElapsed));',
     'owned-cooldowns-allocate-per-frame',
   )],
   ['owned-target-filter-allocates',mutate(

@@ -77,6 +77,8 @@ export function assertE2LiveWiring(source) {
     'ATK and Crit buffs affect owned Basic AI attacks');
   assert.match(updateOwned, /\*speedMultiplier\*dt/,
     'SPD buff affects owned movement');
+  assert.equal((source.match(/\*speedMultiplier\*dt/g) ?? []).length, 2,
+    'SPD applies to chase and forced-retreat movement');
   assert.match(wildDamage, /def:\(inst\.def\|\|10\)\*defenseMultiplier/,
     'DEF buff enters incoming damage defense');
   assert.match(updateWild, /resolveActiveSelfStatusModifiers\(activeSummon\.statusState,\{incomingType\}\)/);
@@ -84,6 +86,8 @@ export function assertE2LiveWiring(source) {
     'Evasion buff can avoid incoming wild attacks');
   assert.match(updateWild, /guard\.damageTakenMultiplier\*guard\.elementDamageTakenMultiplier/,
     'DamageReduce and elemental shield layers both affect incoming damage');
+  assert.equal((source.match(/guard\.damageTakenMultiplier\*guard\.elementDamageTakenMultiplier/g) ?? []).length, 2,
+    'elemental shield layers affect Basic and wild incoming damage paths');
 }
 
 const source = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');

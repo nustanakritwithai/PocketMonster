@@ -35,6 +35,7 @@ import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, resolveWorkbookDirectDamage, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
+import { combatStatusDescriptors, resolveCombatStatusRuntime } from './combat-status-runtime.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
@@ -1947,6 +1948,28 @@ function renderTargetTypesIfChanged(node,types){
   node.innerHTML=types.map(typeBadge).join('');
   node.dataset.typesKey=key;
 }
+function renderCombatStatusList(node,statusState,{limit=5}={}){
+  if(!node)return;
+  const descriptors=combatStatusDescriptors(statusState);
+  const visible=descriptors.slice(0,limit);
+  const key=visible.map(status=>`${status.statusId}:${status.stacks}:${status.remainingText}`).join('|')+`|+${Math.max(0,descriptors.length-limit)}`;
+  setClassTokenIfChanged(node,'hidden',descriptors.length===0);
+  if(node.dataset.statusKey===key)return;
+  node.replaceChildren();
+  for(const status of visible){
+    const chip=document.createElement('span');
+    chip.className=`combat-status-chip ${status.polarity==='Positive'?'positive':'negative'}`;
+    chip.title=`${status.nameTH} (${status.nameEN}) • ${status.remainingText} วินาที${status.stacks>1?` • ${status.stacks} ชั้น`:''}`;
+    chip.setAttribute('aria-label',chip.title);
+    const stack=status.stacks>1?`×${status.stacks}`:'';
+    chip.textContent=`${status.glyph}${stack} ${status.nameTH} ${status.remainingText}s`;
+    node.appendChild(chip);
+  }
+  if(descriptors.length>limit){
+    const overflow=document.createElement('span');overflow.className='combat-status-chip overflow';overflow.textContent=`+${descriptors.length-limit}`;node.appendChild(overflow);
+  }
+  node.dataset.statusKey=key;
+}
 const skillIconCache=new Map();
 function skillIconKind(skill){
   if(!skill||typeof skill==='string')return skill?'enemy':'empty';
@@ -2226,15 +2249,15 @@ function triggerCameraShake(mag=0.08,duration=0.14){
   cameraShake.duration=Math.max(cameraShake.duration,duration);
   cameraShake.mag=Math.max(cameraShake.mag,mag);
 }
-function spawnDamageNumber(amount,pos,{type='Normal',eff=1,healing=false,label=''}={}){
+function spawnDamageNumber(amount,pos,{type='Normal',eff=1,healing=false,label='',miss=false}={}){
   const layer=el('floatingTextLayer'); if(!layer)return;
   const d=document.createElement('div');
   const strong=eff>=2;
-  d.className='damage-pop'+(strong?' super':'')+(healing?' heal':'');
+  d.className='damage-pop'+(strong?' super':'')+(healing?' heal':'')+(miss?' miss':'');
   d.style.setProperty('--dmg-color',healing?'#86efac':(TYPE_COLOR[type]||'#fff'));
   const sign=healing?'+':'-';
   const effectLabelText=label||(eff>=4?'VERY EFFECTIVE':eff>1?'SUPER':eff===0?'IMMUNE':eff<1?'RESIST':'');
-  d.innerHTML=`<b>${sign}${Math.round(amount)}</b>${effectLabelText?`<small>${effectLabelText}</small>`:''}`;
+  d.innerHTML=miss?'<b>MISS</b>':`<b>${sign}${Math.round(amount)}</b>${effectLabelText?`<small>${effectLabelText}</small>`:''}`;
   layer.appendChild(d);
   addFloatingText({el:d,pos:safeVec3(pos),life:0.9,maxLife:0.9,rise:0,drift:(Math.random()-.5)*24});
 }
@@ -3398,11 +3421,13 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=t
   const skillRec=allowSkillMastery?(getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(' • ')[0])):null;
   const mastery=skillRec?masteryRawPower(skillRec.masteryRank):0;
   const derived=derivedStats(instanceCombatBuildSafe(attackerInst));
-  return liveClassedMoveDamage({
+  const guard=resolveActiveSelfStatusModifiers(defender?.statusState,{incomingType:move.type});
+  const defenseMultiplier=guard.ok?guard.defenseMultiplier:1;
+  const resolved=liveClassedMoveDamage({
     category:move.category||'Physical',
     movePower:move.power||0,
     attackerStats:{atk:attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10,spAtk:attackerInst.spAtk||attackerInst.atk||spById[attackerInst.speciesId]?.base.atk||10},
-    defenderStats:{def:defender.def||10,spDef:defender.spDef||defender.def||10},
+    defenderStats:{def:(defender.def||10)*defenseMultiplier,spDef:(defender.spDef||defender.def||10)*defenseMultiplier},
     attackerLevel:attackerInst.level||1,
     defenderLevel:defender.level||1,
     stab,
@@ -3414,12 +3439,14 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=t
     critDamage:derived.critDamage,
     critRoll:Math.random()
   });
+  const finalMultiplier=guard.ok?guard.damageTakenMultiplier*guard.elementDamageTakenMultiplier:1;
+  return {...resolved,damage:resolved.damage>0?Math.max(1,Math.round(resolved.damage*finalMultiplier)):0};
 }
 function instanceCombatBuildSafe(inst){
   const sp=spById[inst.speciesId];
   return computeCoreStats(inst,sp,getEvolutionPath(inst),getEquipmentFlat(inst)).build;
 }
-function wildDamage(w,inst,defenseMultiplier=1){
+function wildDamage(w,inst,defenseMultiplier=1,attackMultiplier=1){
   const sp=spById[w.speciesId],move={type:sp.types[0],category:'Physical',power:w.boss?24:18};
   const eff=typeEffectiveness(move.type,monsterTypes(inst));
   return liveClassedMoveDamage({
@@ -3431,7 +3458,7 @@ function wildDamage(w,inst,defenseMultiplier=1){
     defenderLevel:inst.level||1,
     stab:1.5,
     effectiveness:eff,
-    atkBuff:1
+    atkBuff:attackMultiplier
   });
 }
 function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04,priority:type==='capture'?'P0':'P1'});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
@@ -4128,6 +4155,7 @@ function skillFailureMessage(move,result){
     no_valid_target:`${move?.name||'สกิล'}: ไม่มีศัตรูในระยะ`,
     ground_point_required:`${move?.name||'สกิล'}: เล็งพื้นไม่สำเร็จ`,
     ground_point_out_of_range:`${move?.name||'สกิล'}: จุดเล็งอยู่นอกระยะ`,
+    status_controlled:`${move?.name||'สกิล'}: ใช้ไม่ได้ขณะติดสถานะควบคุม`,
     not_equipped:'ยังไม่มีสกิลช่องนี้',
     not_ready:'Targeting พร้อมแล้ว • เอฟเฟกต์สกิลนี้รอระบบขั้นถัดไป',
     duplicate_cast:'คำสั่งซ้ำถูกปฏิเสธ',
@@ -4148,10 +4176,20 @@ function announceCombatReason(text){
 function visibleCombatReason(fallback){
   return Date.now()<combatReasonHoldUntil&&combatReasonHoldText?combatReasonHoldText:fallback;
 }
+function statusDamageType(ticks,fallback='Normal'){
+  const statusId=Array.isArray(ticks)?ticks[0]?.statusId:null;
+  return ({ST_BURN:'Fire',ST_POISON:'Poison',ST_BLEED:'Normal',ST_SWARM:'Bug'})[statusId]||fallback;
+}
 function useSkill(index,intent={}){
   if(!activeSummon){announceCombatReason('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
   const a=activeSummon,slot=MANUAL_SKILL_SLOTS[index],move=canonicalCombatSkills(a.inst)[index];
   if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});announceCombatReason(skillFailureMessage(move,result));return result;}
+  const control=resolveCombatStatusRuntime(a.statusState);
+  if(control.ok&&!control.canUseSkill){
+    const result=Object.freeze({ok:false,reason:'status_controlled'});
+    announceCombatReason(skillFailureMessage(move,result));
+    return result;
+  }
   const result=executeEquippedSkillCommand(a.inst,{
     slot,
     commandId:intent.commandId,
@@ -4242,20 +4280,24 @@ function materializeOwnedBasicAiTarget(a,decision){
 function updateOwned(dt){
   const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];
   const statusAdvance=advanceEncounterEffects(a.statusState,{toSec:a.statusState.currentTimeSec+dt,targetHp:a.inst.hp,targetMaxHp:a.inst.maxHp});
-  if(statusAdvance.ok){a.statusState=statusAdvance.state;if(statusAdvance.damage>0){a.inst.hp=statusAdvance.targetHp;if(statusAdvance.fainted){faintActive();return;}}}
+  if(statusAdvance.ok){a.statusState=statusAdvance.state;if(statusAdvance.damage>0){const tickDamage=Math.max(1,Math.round(statusAdvance.damage));a.inst.hp=statusAdvance.targetHp;const tickType=statusDamageType(statusAdvance.ticks,monsterTypes(a.inst)[0]);ownedBasicAiImpactScratch.copy(a.mesh.position);ownedBasicAiImpactScratch.y+=1.25;spawnDamageNumber(tickDamage,ownedBasicAiImpactScratch,{type:tickType,label:'STATUS'});triggerMonsterAction(a.mesh,'hurt',0.16);renderParty();if(statusAdvance.fainted){faintActive();return;}}}
   const selfModifiers=resolveActiveSelfStatusModifiers(a.statusState);
+  const control=resolveCombatStatusRuntime(a.statusState);
   const attackMultiplier=selfModifiers.ok?selfModifiers.attackMultiplier:1;
   const speedMultiplier=selfModifiers.ok?selfModifiers.speedMultiplier:1;
   const critBonusPct=selfModifiers.ok?selfModifiers.critChancePct:0;
-  a.attackCd=tickCooldown(a.attackCd,dt);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-dt);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);
+  const cooldownElapsed=dt*(control.ok?control.cooldownRecoveryMultiplier:1);
+  a.attackCd=tickCooldown(a.attackCd,cooldownElapsed);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-cooldownElapsed);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);
   if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision))a.aiDecision=resolveOwnedBasicAiAction(fillOwnedBasicAiRequest(ownedBasicAiScratch,a,wilds));
   const decision=a.aiDecision;
   const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;if(!t&&decision?.targetId!==null)a.aiDecision=null;let moving=false;
-  if(t&&decision.action==='move'){
+  if(t&&control.ok&&control.forcedRetreat&&control.canMove){
+    moving=true;const dir=ownedBasicAiMoveScratch.copy(a.mesh.position).sub(t.mesh.position);dir.y=0;if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
+  }else if(t&&decision.action==='move'&&(!control.ok||control.canMove)){
     moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
-  }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0){
+  }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0&&(!control.ok||control.canAttack)){
     const liveTarget=materializeOwnedBasicAiTarget(a,decision);
-    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],category:'Physical',power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
+    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;if(control.ok&&Math.random()>=control.accuracyMultiplier){spawnDamageNumber(0,ownedBasicAiImpactScratch,{miss:true});msg(`${displayName(a.inst)} โจมตีพลาดเพราะสถานะ`);}else{spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],category:'Physical',power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}}
   }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
@@ -4293,8 +4335,11 @@ function updateWild(w,dt,canEngage=false){
   const statusRequest=wildUpdateScratch.statusRequest;
   statusRequest.toSec=w.statusState.currentTimeSec+dt;statusRequest.targetHp=w.hp;statusRequest.targetMaxHp=w.maxHp;
   const statusAdvance=advanceEncounterEffects(w.statusState,statusRequest);
-  if(statusAdvance.ok){w.statusState=statusAdvance.state;if(statusAdvance.damage>0){damageWild(w,Math.max(1,Math.round(statusAdvance.damage)),{type:wildTypes(w)[0],eff:1,statusDamage:true});if(w.dead)return;}}
-  w.attackCd=tickCooldown(w.attackCd,dt);
+  if(statusAdvance.ok){w.statusState=statusAdvance.state;if(statusAdvance.damage>0){damageWild(w,Math.max(1,Math.round(statusAdvance.damage)),{type:statusDamageType(statusAdvance.ticks,wildTypes(w)[0]),eff:1,statusDamage:true});if(w.dead)return;}}
+  const control=resolveCombatStatusRuntime(w.statusState);
+  const selfModifiers=resolveActiveSelfStatusModifiers(w.statusState);
+  const cooldownElapsed=dt*(control.ok?control.cooldownRecoveryMultiplier:1);
+  w.attackCd=tickCooldown(w.attackCd,cooldownElapsed);
   w.wanderT=(Number.isFinite(w.wanderT)?w.wanderT:0)-dt;
   w.dir=ensureDirection(w.dir||w.wanderDir);
   w.wanderDir=w.dir;
@@ -4320,7 +4365,7 @@ function updateWild(w,dt,canEngage=false){
       w.wanderDir=w.dir;
     }
     let moving=false;
-    if(w.state==='wander'){
+    if(w.state==='wander'&&(!control.ok||control.canMove)){
       const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(w.dir,dt*.9);
       if(w.home&&distXZ(next,w.home)>2.2){w.dir.multiplyScalar(-1);w.wanderDir=w.dir;}
       moving=moveWildWithFieldCollision(w,w.dir,dt*.9);
@@ -4336,23 +4381,30 @@ function updateWild(w,dt,canEngage=false){
   w.state='chase';
   let moving=false;
   const distance=distXZ(w.mesh.position,target.position);
-  if(distance>1.25){
+  if(control.ok&&control.forcedRetreat&&control.canMove){
+    const dir=wildUpdateScratch.direction.copy(w.mesh.position).sub(target.position);dir.y=0;
+    if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
+    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*(selfModifiers.ok?selfModifiers.speedMultiplier:1)*dt);
+    w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
+  }else if(distance>1.25&&(!control.ok||control.canMove)){
     moving=true;
     const dir=wildUpdateScratch.direction.copy(target.position).sub(w.mesh.position);dir.y=0;
     if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
-    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*dt);
+    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*(selfModifiers.ok?selfModifiers.speedMultiplier:1)*dt);
     w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
-  }else if(w.attackCd<=0){
+  }else if(w.attackCd<=0&&(!control.ok||control.canAttack)){
     w.attackCd=w.boss?.85:1.2;
     triggerMonsterAction(w.mesh,'attack',0.22);
     const impact=wildUpdateScratch.impact.copy(target.position);impact.y+=.55;
     spawnElementalFX(wildTypes(w)[0],impact,'impact',0.65);
     if(activeSummon&&activeSummon.mesh){
       const incomingType=wildTypes(w)[0],guard=resolveActiveSelfStatusModifiers(activeSummon.statusState,{incomingType});
+      const statusMissed=control.ok&&Math.random()>=control.accuracyMultiplier;
       const evaded=guard.ok&&guard.evasionChancePct>0&&Math.random()<guard.evasionChancePct/100;
-      if(evaded){msg(`${displayName(activeSummon.inst)} หลบการโจมตีได้`);}
+      if(statusMissed){spawnDamageNumber(0,impact,{miss:true});msg(`${spById[w.speciesId].name} โจมตีพลาดเพราะสถานะ`);}
+      else if(evaded){msg(`${displayName(activeSummon.inst)} หลบการโจมตีได้`);}
       else{
-        const res=wildDamage(w,activeSummon.inst,guard.ok?guard.defenseMultiplier:1);
+        const res=wildDamage(w,activeSummon.inst,guard.ok?guard.defenseMultiplier:1,selfModifiers.ok?selfModifiers.attackMultiplier:1);
         const finalMultiplier=guard.ok?guard.damageTakenMultiplier*guard.elementDamageTakenMultiplier:1;
         const dmg=Math.max(1,Math.round(res.damage*finalMultiplier));
         activeSummon.inst.hp-=dmg;
@@ -5373,6 +5425,8 @@ function applyActionPresentation(button,presentation,label){
 function renderCombatPresentation(){
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
   const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
+  const statusControl=activeSummon?resolveCombatStatusRuntime(activeSummon.statusState):null;
+  const skillStatusLocked=statusControl?.ok&&!statusControl.canUseSkill;
   MANUAL_SKILL_SLOTS.forEach((_,index)=>{
     const button=el(`skill${index+1}Btn`),skill=skillDefs[index],view=presentation.skills[index];
     const iconUrl=getSkillIcon(skill);
@@ -5382,6 +5436,7 @@ function renderCombatPresentation(){
     if(button.getAttribute('aria-label')!==skillName)button.setAttribute('aria-label',skillName);
     setActionStyle(button,skill?.type||activeType,`S${index+1}`,view.statusText);
     applyActionPresentation(button,view,`Skill ${index+1} ${skillName}`);
+    if(skillStatusLocked){button.dataset.state='disabled';button.dataset.sub='ติดสถานะ';setAttributeIfChanged(button,'aria-disabled','true');setAttributeIfChanged(button,'aria-label',`Skill ${index+1} ${skillName} • ใช้ไม่ได้ขณะติดสถานะควบคุม`);button.title='ใช้ไม่ได้ขณะติดสถานะควบคุม';}
   });
   const capture=el('captureBtn'),summon=el('summonBtn'),recallButton=el('recallBtn');
   setActionStyle(capture,'Water','CAP',presentation.actions.capture.statusText);
@@ -5394,7 +5449,7 @@ function renderCombatPresentation(){
   applyActionPresentation(summon,presentation.actions.summon,'ปาเรียก');
   applyActionPresentation(recallButton,presentation.actions.recall,'Recall คู่หู');
   capture.classList.toggle('aiming',presentation.actions.capture.state==='aiming');
-  setTextIfChanged(el('actionReason'),visibleCombatReason(presentation.actionReason));
+  setTextIfChanged(el('actionReason'),visibleCombatReason(skillStatusLocked?'คู่หูติดสถานะควบคุม • ใช้สกิลไม่ได้':presentation.actionReason));
   const activeLabel=el('activeMonsterStatus');
   setTextIfChanged(activeLabel,!activeSummon&&!pendingSummon&&hubCompanion?`${displayName(hubCompanion.inst)} • Ranch`:presentation.activeLabel);
 }
@@ -5409,6 +5464,7 @@ function renderHUD(){
   setTextIfChanged(el('zoneLabel'),ZONES[state.currentZone]?.label||state.currentZone);
   const wildCount=el('wildCount');
   setTextIfChanged(wildCount,state.currentZone==='hub'?'0':livingWilds().length);
+  renderCombatStatusList(el('ownedStatusStrip'),activeSummon?.statusState,{limit:4});
   renderCombatPresentation();
   renderCharacterAccess();
   renderStarterJourney();
@@ -5666,7 +5722,7 @@ function handleCharacterUiHardwareBack(event){
 function renderSkillButtons(){renderCombatPresentation();}
 function updateTarget(){
   const target=activeSummon?.target&&!activeSummon.target.dead?activeSummon.target:(aimedWild(10,1.8)||nearestWild(10)),card=el('targetCard');
-  if(!target){setClassTokenIfChanged(card,'hidden',true);return;}
+  if(!target){setClassTokenIfChanged(card,'hidden',true);renderCombatStatusList(el('targetStatusStrip'),null);return;}
   setClassTokenIfChanged(card,'hidden',false);
   const species=spById[target.speciesId],tag=target.boss?' ★ BOSS':target.elite?' ★ ELITE':'',hpPercent=hpPct(target.hp/target.maxHp)*100;
   setTextIfChanged(el('targetName'),species.name+tag);
@@ -5676,6 +5732,7 @@ function updateTarget(){
   setStyleIfChanged(hpBar,'width',`${hpPercent}%`);
   setAttributeIfChanged(hpBar,'aria-valuenow',String(Math.round(hpPercent)));
   renderTargetTypesIfChanged(el('targetTypes'),species.types);
+  renderCombatStatusList(el('targetStatusStrip'),target.statusState,{limit:5});
   const hint=el('typeHint');
   let hintText,hintClass;
   if(activeSummon){

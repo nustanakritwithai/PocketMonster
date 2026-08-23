@@ -61,6 +61,7 @@ function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) 
     'instanceCombatBuildSafe',
     'liveClassedMoveDamage',
     'spById',
+    'resolveActiveSelfStatusModifiers',
     `'use strict';${source};return monsterDamage;`,
   )(
     () => ['Normal'],
@@ -75,6 +76,7 @@ function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) 
     () => ({}),
     input => Object.freeze({ ...input }),
     Object.freeze({ normalooze: Object.freeze({ base: Object.freeze({ atk: 10 }) }) }),
+    () => Object.freeze({ ok: false }),
   );
 }
 
@@ -94,9 +96,9 @@ export function assertBasicAiLiveWiring(gameSource) {
   assert.match(updateOwned, /resolveOwnedBasicAiAction\(/);
   assert.match(updateOwned, /fillOwnedBasicAiRequest\(ownedBasicAiScratch,a,wilds\)/);
   assert.match(fillRequest, /request\.attackReady=a\?\.attackCd<=0/);
-  assert.equal((updateOwned.match(/tickCooldown\(a\.attackCd,dt\)/g) ?? []).length, 1,
+  assert.equal((updateOwned.match(/tickCooldown\(a\.attackCd,cooldownElapsed\)/g) ?? []).length, 1,
     'Basic attack cooldown ticks exactly once per frame');
-  assert.match(updateOwned, /a\.attackCd=tickCooldown\(a\.attackCd,dt\);/);
+  assert.match(updateOwned, /a\.attackCd=tickCooldown\(a\.attackCd,cooldownElapsed\);/);
   assert.doesNotMatch(updateOwned, /tickCooldown\(tickCooldown/);
   assert.doesNotMatch(updateOwned, /nearestWild\(/, 'owned AI no longer uses order-dependent legacy targeting');
 
@@ -123,7 +125,7 @@ export function assertBasicAiLiveWiring(gameSource) {
     'target is materialized once after resolve and again immediately before Basic damage');
   const cooldownCommit = updateOwned.indexOf('a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec');
   assert.ok(cooldownCommit >= 0, 'accepted Basic attack commits its cooldown');
-  assert.ok(cooldownCommit < updateOwned.indexOf('triggerMonsterAction('),
+  assert.ok(cooldownCommit < updateOwned.indexOf("triggerMonsterAction(a.mesh,'attack'"),
     'cooldown commits before the first Basic side effect');
   assert.ok(cooldownCommit < updateOwned.indexOf('monsterDamage('),
     'cooldown commits before Basic damage');

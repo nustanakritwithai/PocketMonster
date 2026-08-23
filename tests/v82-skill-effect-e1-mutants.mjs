@@ -152,7 +152,7 @@ const runtimeMutations = [
   ['drop second multi-status link', 'index < enemyStatuses.statusLinkIds.length; index += 1', 'index < 1; index += 1'],
   ['lose canonical status state', 'nextStatusState = lifecycle.state;', 'void lifecycle.state;'],
   ['reverse canonical target order', 'for (const target of targets) {\n    const targetNowSec = Number.isFinite(target.nowSec)', 'for (const target of [...targets].reverse()) {\n    const targetNowSec = Number.isFinite(target.nowSec)'],
-  ['bypass accuracy miss', 'if (accuracyRoll >= skill.accuracy / 100) {', 'if (false) {'],
+  ['bypass accuracy miss', 'if (accuracyRoll >= accuracyPct / 100) {', 'if (false) {'],
   ['double-count Poison stacks', "stacks: resolved.stackRule === 'AddStackAndRefresh'\n                ? resolved.potencyStacks\n                : resolved.proposedStatus.stacks,", 'stacks: resolved.proposedStatus.stacks,'],
 ];
 

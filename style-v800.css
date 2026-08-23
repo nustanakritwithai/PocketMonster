@@ -121,6 +121,7 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:rad
 .damage-pop small{font-size:8px;font-weight:1000;letter-spacing:.45px;color:#fff;background:rgba(8,12,20,.72);border:1px solid rgba(255,255,255,.14);padding:2px 5px;border-radius:999px}
 .damage-pop.super b{font-size:27px;transform:scale(1.05)}
 .damage-pop.heal b{color:#86efac!important;text-shadow:0 2px 6px rgba(0,0,0,.8),0 0 12px rgba(134,239,172,.6)}
+.damage-pop.miss b{color:#e2e8f0!important;font-size:18px;letter-spacing:1px}
 @media(max-height:560px){.damage-pop b{font-size:19px}.damage-pop.super b{font-size:23px}.damage-pop small{font-size:7px}}
 
 
@@ -143,6 +144,14 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:rad
 
 /* UX1 Combat HUD Foundation */
 :root{--touch-min:48px;--safe-top:max(10px,env(safe-area-inset-top));--safe-right:max(10px,env(safe-area-inset-right));--safe-bottom:max(8px,env(safe-area-inset-bottom));--safe-left:max(10px,env(safe-area-inset-left))}
+.combat-status-list{display:flex;align-items:center;gap:4px;flex-wrap:wrap;pointer-events:none}
+.combat-status-list.hidden{display:none!important}
+.target-status-list{margin:4px 0 5px}
+.combat-status-chip{display:inline-flex;align-items:center;justify-content:center;min-height:19px;padding:2px 5px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(15,23,42,.9);color:#fff;font-size:8px;font-weight:1000;line-height:1;white-space:nowrap;box-shadow:0 3px 9px #0005}
+.combat-status-chip.negative{border-color:#fb7185;color:#ffe4e6;background:rgba(76,5,25,.88)}
+.combat-status-chip.positive{border-color:#4ade80;color:#dcfce7;background:rgba(5,46,22,.88)}
+.combat-status-chip.overflow{border-color:#94a3b8;color:#e2e8f0}
+.owned-status-strip{position:absolute;z-index:9;left:50%;bottom:calc(var(--safe-bottom) + 66px);transform:translateX(-50%);max-width:44vw;justify-content:center;padding:4px 6px;border-radius:12px;background:rgba(7,14,25,.58);backdrop-filter:blur(8px)}
 button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .status-strip{top:var(--safe-top);left:var(--safe-left);max-width:calc(100vw - var(--safe-left) - var(--safe-right))}
 .compact-topbar .pill{min-height:var(--touch-min);display:flex;align-items:center;gap:5px}
@@ -170,6 +179,8 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .controls-right{right:var(--safe-right)}
 @media(max-width:900px){.compact-topbar .pill{min-height:44px}.action-reason{width:min(220px,31vw)}}
 @media(max-width:760px),(max-height:500px){
+  .combat-status-chip{min-height:17px;padding:2px 4px;font-size:7px}
+  .owned-status-strip{bottom:calc(var(--safe-bottom) + 58px);max-width:54vw}
   .compact-topbar{right:auto;left:var(--safe-left);width:max-content;max-width:calc(100vw - var(--safe-left) - var(--safe-right))}
   .compact-topbar .pill,.compact-topbar .small{min-height:var(--touch-min);padding:5px 7px}
   .compact-topbar .zone-pill{display:none}

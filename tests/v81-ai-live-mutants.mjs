@@ -91,8 +91,8 @@ const mutants = [
     'const skillRec=getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(\' • \')[0]);',
   )],
   ['double-tick Basic cooldown', mutate(
-    'a.attackCd=tickCooldown(a.attackCd,dt);',
-    'a.attackCd=tickCooldown(tickCooldown(a.attackCd,dt),dt);',
+    'a.attackCd=tickCooldown(a.attackCd,cooldownElapsed);',
+    'a.attackCd=tickCooldown(tickCooldown(a.attackCd,cooldownElapsed),cooldownElapsed);',
   )],
   ['change Basic power source', mutate(
     'power:OWNED_BASIC_AI_POLICY.basicAttackPower',

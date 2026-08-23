@@ -19,6 +19,7 @@ export const WORKBOOK_DAMAGE_RULES = Object.freeze({
   criticalMultiplier: 1.5,
   baseCritChancePct: 5,
   critChanceCapPct: 80,
+  accuracyMinimumPct: 5,
   varianceMin: 0.9,
   varianceMax: 1,
   variancePreview: 0.95,
@@ -43,6 +44,8 @@ export const DAMAGE_STATUS_MODIFIERS = Object.freeze([
   Object.freeze({ statusId: 'ST_DAMAGE_REDUCE', layer: 'DamageTaken', stat: 'FinalDamage', magnitudePct: -25 }),
   Object.freeze({ statusId: 'ST_FIRE_RESIST', layer: 'ElementResist', stat: 'Fire', magnitudePct: -25 }),
   Object.freeze({ statusId: 'ST_CRIT_UP', layer: 'CritChance', stat: 'CritChance', magnitudePct: 15 }),
+  Object.freeze({ statusId: 'ST_CONFUSE', layer: 'Accuracy', stat: 'Accuracy', magnitudePct: -35 }),
+  Object.freeze({ statusId: 'ST_BLIND', layer: 'Accuracy', stat: 'Accuracy', magnitudePct: -20 }),
 ]);
 
 const TOTAL_POWER_BUDGET_SKILLS = new Set([
@@ -321,21 +324,28 @@ export function resolveWorkbookDirectDamage({
   }
 
   const skill = skillCatalogEntry(skillId);
+  const attackerStatuses = activeStatusIds(attacker, attackerNowSec);
+  const defenderStatuses = activeStatusIds(defender, defenderNowSec);
+  const accuracyPct = clamp(
+    skill.accuracy + modifierPct(attackerStatuses, 'Accuracy', 'Accuracy'),
+    WORKBOOK_DAMAGE_RULES.accuracyMinimumPct,
+    100,
+  );
   let rngDraws = 0;
   let accuracyRoll = null;
-  if (skill.accuracy < 100) {
+  if (accuracyPct < 100) {
     const accuracy = readRoll(rng, 'accuracy');
     if (!accuracy.ok) return effectResult(false, accuracy.reason, { skillId, rngDraws: accuracy.rngDraws });
     rngDraws += accuracy.rngDraws;
     accuracyRoll = accuracy.roll;
-    if (accuracyRoll >= skill.accuracy / 100) {
+    if (accuracyRoll >= accuracyPct / 100) {
       return effectResult(true, 'attack_missed', {
         skillId,
         targetId: defender.id,
         hit: false,
         damage: 0,
         accuracyRoll,
-        accuracyPct: skill.accuracy,
+        accuracyPct,
         hitCount: profile.hitCount,
         powerBudgetRule: profile.powerBudgetRule,
         rngDraws,
@@ -343,8 +353,6 @@ export function resolveWorkbookDirectDamage({
     }
   }
 
-  const attackerStatuses = activeStatusIds(attacker, attackerNowSec);
-  const defenderStatuses = activeStatusIds(defender, defenderNowSec);
   const attackModifier = clamp(
     1 + modifierPct(attackerStatuses, 'AttackStat', profile.scalingStat) / 100,
     WORKBOOK_DAMAGE_RULES.statModifierMin,
@@ -376,7 +384,7 @@ export function resolveWorkbookDirectDamage({
       hit: true,
       damage: 0,
       accuracyRoll,
-      accuracyPct: skill.accuracy,
+      accuracyPct,
       baseDamage,
       stab,
       typeMultiplier,
@@ -437,7 +445,7 @@ export function resolveWorkbookDirectDamage({
     hit: true,
     damage,
     accuracyRoll,
-    accuracyPct: skill.accuracy,
+    accuracyPct,
     baseDamage,
     effectivePower,
     effectiveAttack,
@@ -551,7 +559,12 @@ export function resolveE1SkillEffects({ command, attacker, targets, nowSec = 0 }
             linkId,
             targetTypes: target.types,
             currentStacks: currentStacks(nextStatusState, statusId, targetNowSec),
-            extraResistancePct: finitePercent(target.statusResistancePct),
+            extraResistancePct: clamp(
+              finitePercent(target.statusResistancePct)
+                + (statusId === 'ST_POISON' && activeStatusIds(target, targetNowSec).includes('ST_POISON_RESIST') ? 50 : 0),
+              0,
+              100,
+            ),
           }, { rng });
           if (!resolved.ok) return effectResult(false, resolved.reason, { rngDraws: rngDraws + resolved.rngDraws });
           rngDraws += resolved.rngDraws;
