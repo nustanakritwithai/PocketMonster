@@ -32,6 +32,7 @@ assert.match(functionSource(js, 'isKeepAliveDeco'), /stageMarker/, 'stage marker
 assert.match(functionSource(js, 'clearDecorations'), /disposeObject3D\(decoAttachQueue/, 'zone clear must dispose queued props, not leak GPU objects');
 assert.match(functionSource(js, 'switchZone'), /player\.position\.set\(\.\.\.start\);\s*flushNearbyDecos\(player\.position,WORLD_STREAM\.zoneAttachBudget\)/, 'zone entry attaches the neighborhood after the player lands');
 assert.match(functionSource(js, 'loop'), /updateWorldStream\(\)/, 'the live loop streams the neighborhood each frame');
+assert.match(js, /window\.MLRPG_WORLD_STREAM=/, 'live diagnostics expose attached vs queued decoration counts');
 assert.match(functionSource(js, 'spawnZone'), /spawnRecords\(cfg\.spawn\)/, 'wild spawn stays immediate on zone load');
 assert.doesNotMatch(functionSource(js, 'updateWorldStream'), /disposeObject3D|removeAndDispose/, 'detach must keep shared geometries for reuse');
 

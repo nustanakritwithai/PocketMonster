@@ -1467,7 +1467,18 @@ const breedingNpc=breedingVisual.root; breedingNpc.position.set(7,0,10); scene.a
 const presentationScratch={throwOrigin:new THREE.Vector3(),hitText:new THREE.Vector3()};
 function playerThrowOrigin(){ return playerVisual.anchor('throwOrigin',presentationScratch.throwOrigin); }
 function playerHitText(){ return playerVisual.anchor('hitText',presentationScratch.hitText); }
-if(typeof window!=='undefined') window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
+if(typeof window!=='undefined'){
+  window.MLRPG_ASSETS={diagnostics:()=>assets.diagnostics()};
+  window.MLRPG_WORLD_STREAM=()=>({
+    attached:decorations.children.length,
+    queued:decoAttachQueue.length,
+    keepAlive:decorations.children.filter(child=>child.userData.warpRouteId||child.userData.stageMarker).length,
+    loadRadius:WORLD_STREAM.loadRadius,
+    unloadRadius:WORLD_STREAM.unloadRadius,
+    x:+player.position.x.toFixed(2),
+    z:+player.position.z.toFixed(2),
+  });
+}
 const VFX_LIMITS=Object.freeze({maxConcurrentEffects:80,maxParticles:200,maxGroundDecals:8,maxFloatingTexts:12});
 const VFX_PRIORITY_RANK=Object.freeze({P0:0,P1:1,P2:2,P3:3,P4:4});
 const effects=[];
