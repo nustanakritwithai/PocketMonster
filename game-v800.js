@@ -2893,6 +2893,7 @@ function switchZone(zone,silent=false){
   clearWilds();
   clearTransientEffects();
   clearSkillFields();
+  clearSkillSwarms();
   closeWarpPrompt();
   closeStageSelect();
   closeStageReward();
@@ -3308,6 +3309,7 @@ function spawnOwned(inst,pos){
 function recall(show=true,setCooldown=true){
   if(pendingSummon){pendingSummon=null;clearProjectiles();}
   if(!activeSummon){removeSceneRole('activeSummon');if(show)msg('ยังไม่มีมอนในสนาม');return;}
+  clearSkillSwarms();
   playerVisual.play('recall',{duration:.28});
   const name=displayName(activeSummon.inst);
   activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});
@@ -3322,7 +3324,7 @@ function recall(show=true,setCooldown=true){
   if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
   renderParty();renderSkillButtons();renderHUD();
 }
-function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
+function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}clearSkillSwarms();const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
 function spawnSkillTrail(type, fromPos, toPos) {
   const cfg = typeFx(type);
   const dist = fromPos.distanceTo(toPos);
@@ -3632,6 +3634,49 @@ function updateSkillFields(dt){
     if(field.ageSec+Number.EPSILON>=field.durationSec){if(field.mesh)removeAndDispose(scene,field.mesh);liveSkillFields.splice(index,1);}
   }
 }
+const liveSkillSwarms=[];
+function clearSkillSwarms(){liveSkillSwarms.length=0;}
+function activateSkillSwarm(a,move,summonResult){
+  if(!summonResult?.applied)return;
+  liveSkillSwarms.push({
+    ...summonResult,
+    ageSec:0,
+    nextTickSec:summonResult.tickIntervalSec,
+    attacker:canonicalSkillEffectAttacker(a,move),
+    attackerNowSec:a.statusState.currentTimeSec,
+    runtimeType:move.type,
+  });
+  const center=new THREE.Vector3(summonResult.center.x,.45,summonResult.center.z);
+  spawnBurst(center,typeFx(move.type).accent,{count:summonResult.summonCount*3,life:.5,size:.055,gravity:-.15,priority:'P0'});
+}
+function updateSkillSwarms(dt){
+  for(let index=liveSkillSwarms.length-1;index>=0;index--){
+    const swarm=liveSkillSwarms[index];swarm.ageSec+=dt;
+    while(swarm.nextTickSec<=Math.min(swarm.ageSec,swarm.durationSec)+Number.EPSILON){
+      let target=null,nearestDistance=Infinity;
+      for(let wildIndex=0;wildIndex<wilds.length;wildIndex++){
+        const candidate=wilds[wildIndex];
+        if(candidate.dead||candidate.capturing||!candidate.mesh?.position)continue;
+        const distance=distXZ(swarm.center,candidate.mesh.position);
+        if(distance>swarm.radiusM||distance>nearestDistance)continue;
+        if(distance===nearestDistance&&target&&candidate.id.localeCompare(target.id)>=0)continue;
+        target=candidate;nearestDistance=distance;
+      }
+      if(target){
+        const defense=Number.isFinite(target.def)?target.def:10,specialDefense=Number.isFinite(target.spDef)?target.spDef:(Number.isFinite(target.spdef)?target.spdef:defense);
+        const defender={id:target.id,level:target.level,types:[...wildTypes(target)],stats:{DEF:defense,SPDEF:specialDefense},hp:target.hp,maxHp:target.maxHp,statusState:target.statusState};
+        const resolved=resolveWorkbookDirectDamage({skillId:swarm.skillId,attacker:swarm.attacker,defender,attackerNowSec:swarm.attackerNowSec,defenderNowSec:target.statusState.currentTimeSec},{rng:Math.random});
+        if(resolved.ok&&resolved.hit&&resolved.damage>0){
+          const damage=Math.max(1,Math.round(resolved.damage*swarm.tickDamageRatio));
+          spawnElementalFX(swarm.runtimeType,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',.65);
+          damageWild(target,damage,{type:swarm.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true});
+        }
+      }
+      swarm.nextTickSec+=swarm.tickIntervalSec;
+    }
+    if(swarm.ageSec+Number.EPSILON>=swarm.durationSec)liveSkillSwarms.splice(index,1);
+  }
+}
 function canApplyLiveSkill(a,move,command,materialized){
   if(!canExecuteReviewedSkillEffect(command.skillId))return false;
   return validateReviewedSkillEffectRequest(canonicalSkillEffectRequest(a,move,command,materialized)).ok;
@@ -3698,6 +3743,17 @@ function applyPlannedMobilityEffects(a,move,movementResult,displacementResults,t
   }
   return appliedCount;
 }
+function applyPlannedClosureEffects(a,move,healModifierResult,summonResult){
+  let appliedCount=0;
+  if(healModifierResult?.applied){
+    a.inst.hp=healModifierResult.predictedHp;
+    spawnDamageNumber(healModifierResult.healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'DRAIN'});
+    spawnHealSkillEffect(a.mesh.position.clone(),move.type);logBattleEvent('spirit',healModifierResult.healing);
+    appliedCount++;
+  }
+  if(summonResult?.applied){activateSkillSwarm(a,move,summonResult);appliedCount++;}
+  return appliedCount;
+}
 function applyAcceptedSkillCommand(a,index,move,command,materialized){
   // Uses has already committed. Cooldown is the first live mutation here; all
   // presentation, damage, bond, mastery, and logs follow the acceptance guard.
@@ -3756,10 +3812,11 @@ function applyAcceptedSkillCommand(a,index,move,command,materialized){
   applyPlannedActorEffect(a,move,planned.actorResult);
   activateSkillField(a,move,planned.fieldResult);
   const mobilityAppliedCount=applyPlannedMobilityEffects(a,move,planned.movementResult,planned.displacementResults,targets);
+  const closureAppliedCount=applyPlannedClosureEffects(a,move,planned.healModifierResult,planned.summonResult);
   a.inst.bond=clamp(a.inst.bond+.3);
   awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
-  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,mobilityAppliedCount,rngDraws:planned.rngDraws});
+  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,mobilityAppliedCount,closureAppliedCount,rngDraws:planned.rngDraws});
 }
 function skillFailureMessage(move,result){
   const reasons={
@@ -5687,6 +5744,7 @@ function loop(now){
     updateEffects(dt);
     updateGroundDecals(dt);
     updateSkillFields(dt);
+    updateSkillSwarms(dt);
     updateCaptureAimVisual();
     updateOwned(dt);
     updateHubCompanion(dt);
