@@ -36,8 +36,13 @@ async function assertObjectiveContract(source,label='baseline'){
   assert.equal(requiresReconciliation(cleared),false);
 }
 
-function assertRuntimeContract(game,html){
+function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8')){
   assert.match(html,/id="stageObjective"[\s\S]*?STAGE OBJECTIVE/);
+  assert.match(html,/id="stageObjectiveList"/);
+  assert.match(html,/class="quest-tracker starter-journey/);
+  assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*left:10px/);
+  assert.doesNotMatch(css,/\.starter-journey\{[^}]*left:50%;transform:translateX\(-50%\)/);
+  assert.match(game,/stageObjectiveTracker\(objective,\{stageId:zoneId,stageName,monsterName\}\)/);
   assert.match(game,/objective=currentStageObjective\(zone\);\s*renderStarterJourney\(\);\s*if\(!cfg\|\|!objective\.encounter\)/);
   assert.match(game,/if\(objective\.encounter==='boss'\)\{ensureProgressionEncounter\(zone\);return;\}/);
   assert.match(game,/if\(objective\.encounter==='elite'\)ensureProgressionEncounter\(zone\)/);
@@ -77,6 +82,9 @@ for(const [name,mutant] of resolverMutants){
 
 const runtimeMutants=[
   ['remove objective HUD',gameSource,htmlSource.replace('id="stageObjective"','id="removedObjective"')],
+  ['restore centered objective banner',gameSource,htmlSource,fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8').replace('top:54px;left:10px;transform:none','top:132px;left:50%;transform:translateX(-50%)')],
+  ['drop MMO tracker list',gameSource,htmlSource.replace('id="stageObjectiveList"','id="removedObjectiveList"')],
+  ['stop using tracker view model',gameSource.replace('stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName})','({title:stageName,status:"",steps:[]})'),htmlSource],
   ['leave completed objective stale',gameSource.replace('renderStarterJourney();\n  if(!cfg||!objective.encounter)return null;','if(!cfg||!objective.encounter)return null;'),htmlSource],
   ['remove deterministic Boss spawn',gameSource.replace("if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}","if(objective.encounter==='boss')return;"),htmlSource],
   ['remove deterministic Elite spawn',gameSource.replace("if(objective.encounter==='elite')ensureProgressionEncounter(zone);","if(objective.encounter==='elite')return;"),htmlSource],
@@ -94,8 +102,8 @@ const runtimeMutants=[
   ['drop local saves during initial Cloud sync',gameSource.replace('  else if(remoteSaveSyncing)remoteSavePending=true;',''),htmlSource],
   ['leave reconciled Cloud document stale',gameSource.replace('    await flushRemoteSaveUntilSettled();','    void currentSaveEnvelope();'),htmlSource],
 ];
-for(const [name,game,html] of runtimeMutants){
-  assert.throws(()=>assertRuntimeContract(game,html),undefined,`${name} must be killed`);
+for(const [name,game,html,css] of runtimeMutants){
+  assert.throws(()=>assertRuntimeContract(game,html,css),undefined,`${name} must be killed`);
 }
 
 console.log(`V8 deterministic stage objective mutants: PASS (${resolverMutants.length+runtimeMutants.length}/${resolverMutants.length+runtimeMutants.length} killed)`);
