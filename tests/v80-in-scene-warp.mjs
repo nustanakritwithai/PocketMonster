@@ -26,6 +26,8 @@ assert.deepEqual(nextWarpPromptState({foundId:null,dismissedId:ember}),{nearbyId
 assert.deepEqual(nextWarpPromptState({foundId:ember,dismissedId:null}),{nearbyId:ember,dismissedId:null,open:true},'Walking back onto the same warp opens it again');
 assert.deepEqual(nextWarpPromptState({foundId:'ember-to-grass',dismissedId:ember}),{nearbyId:'ember-to-grass',dismissedId:null,open:true},'A different warp still opens after cancel');
 assert.match(css,/\.warp-prompt\{[^}]*pointer-events:none/,'Warp dim does not steal the joystick after cancel');
+assert.match(css,/\.warp-prompt\{[^}]*place-items:start start/,'Warp chip docks away from the party monster slots');
+assert.doesNotMatch(css,/\.warp-prompt\{[^}]*place-items:end center/,'Warp chip must not sit on the bottom-center party bar');
 assert.match(css,/\.warp-prompt-card\{[^}]*pointer-events:auto/,'Cancel and travel buttons stay tappable');
 assert.match(html,/id="warpPrompt"/,'Mobile warp prompt exists');
 assert.match(html,/id="warpPromptAction"/,'Warp confirmation action exists');
