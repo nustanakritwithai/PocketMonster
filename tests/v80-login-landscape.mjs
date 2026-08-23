@@ -17,7 +17,9 @@ assert.match(pass,/\.account-card\{[^}]*grid-template-columns:1fr 1fr/,'Login fi
 assert.match(pass,/\.account-logo\{display:none\}/,'Logo drops so the form fits without fullscreen');
 assert.match(pass,/\.account-card p\{display:none\}/,'Login tagline hides on short landscape');
 assert.match(pass,/\.account-card form\{[^}]*grid-template-columns:1fr 1fr/,'Email and password share one row');
-assert.match(pass,/\.auth-google,\.auth-guest\{[^}]*min-height:32px/,'Google and guest stay compact but tappable');
+assert.match(pass,/\.auth-google\{[^}]*grid-column:1\/-1/,'Google login stays a full-width row');
+assert.match(pass,/#guestLoginBtn,\.auth-guest\{[^}]*display:block/,'Guest login cannot be display:none');
+assert.match(pass,/#guestLoginBtn,\.auth-guest\{[^}]*grid-column:1\/-1/,'Guest login stays a full-width row on the login card');
 assert.doesNotMatch(pass,/\.action\.skill|\.skill1|\.capture\{/,'Landscape login pass must not shrink combat HUD buttons');
 
 console.log('V8.2 short landscape login: PASS');
