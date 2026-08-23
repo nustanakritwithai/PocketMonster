@@ -673,3 +673,91 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .stage-reward{position:fixed;inset:0;z-index:130;display:grid;place-items:center;padding:14px;background:rgba(2,6,23,.7);pointer-events:auto}.stage-reward-card{width:min(430px,94vw);padding:16px;border:1px solid #facc1566;border-radius:22px;background:linear-gradient(180deg,#33220b,#111827);box-shadow:0 20px 70px #000b}.stage-reward-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.stage-reward-head h2{margin:3px 0 0;font-size:21px;color:#fef3c7}.stage-reward-head button{min-width:var(--touch-min);min-height:var(--touch-min);border:1px solid #ffffff1f;border-radius:12px;background:#3f3f46;color:#fff;font-size:17px}.stage-reward-card p{color:#fde68a;font-size:11px;line-height:1.45}.stage-reward-list{display:grid;gap:7px;margin:12px 0}.stage-reward-item{padding:10px;border-radius:12px;background:#451a03;border:1px solid #f59e0b33;color:#fef3c7;font-weight:900;font-size:12px}.stage-reward-done{width:100%;min-height:var(--touch-min);border:0;border-radius:11px;background:#d97706;color:#fff;font-weight:1000}
 /* In-scene warp point confirmation */
 .warp-prompt{position:fixed;inset:0;z-index:140;display:grid;place-items:end center;padding:12px;background:rgba(2,6,23,.38);pointer-events:auto}.warp-prompt-card{width:min(460px,100%);padding:14px 16px calc(14px + env(safe-area-inset-bottom));border:1px solid #67e8f9aa;border-radius:20px 20px 0 0;background:linear-gradient(180deg,#12304a,#0b1220);box-shadow:0 -14px 55px #0009}.warp-prompt-card h2{margin:4px 0;font-size:20px;color:#e0f2fe}.warp-prompt-card p{margin:0 0 12px;color:#cbd5e1;font-size:11px}.warp-prompt-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}.warp-prompt-actions button{min-height:var(--touch-min);border:0;border-radius:11px;color:#fff;font-weight:1000;background:#334155}.warp-prompt-actions button:last-child{background:linear-gradient(180deg,#0ea5e9,#0369a1)}.warp-prompt-actions button:disabled{background:#475569;color:#94a3b8}
+
+/* Mobile menu density pass */
+:root{--menu-touch:36px}
+@media (max-width:900px),(pointer:coarse){
+  .manager{padding:6px max(6px,var(--safe-right)) 6px max(6px,var(--safe-left))}
+  .manager-card{width:min(980px,96vw);max-height:calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);padding:8px;border-radius:14px}
+  .manager-head{font-size:14px;gap:6px;align-items:center}
+  .manager-sub,.manager-note{display:none}
+  .cr-debug-panel{margin:0 0 6px;padding:6px 8px;font-size:10px;border-radius:8px}
+  .manager-head button,#closeManager{min-width:32px;min-height:32px;padding:4px 8px;border-radius:8px;font-size:12px}
+  .manager-toolbar{gap:5px;margin-bottom:6px}
+  .manager-toolbar .secondary-btn,.food-inventory b{padding:5px 7px;font-size:10px;min-height:var(--menu-touch);border-radius:8px}
+  .food-inventory{gap:4px;font-size:10px}
+  .manager-tabs{gap:4px;margin:2px 0 6px;padding:4px 0 3px}
+  .manager-tab{padding:5px 8px;font-size:10px;min-height:var(--menu-touch)}
+  .manager-section,.breeding-panel,.evolution-panel{padding:7px;border-radius:12px}
+  .manager-section h3,.breeding-panel h3,.character-section-head h3{font-size:12px;margin:0 0 6px}
+  .manager-item{padding:6px;margin-bottom:5px;border-radius:10px}
+  .monster-title b{font-size:11px}
+  .secondary-btn,.train-btn,.equip-btn,.breed-btn,.heal-btn{min-height:var(--menu-touch);padding:6px 8px;font-size:10px}
+  .character-manager-layout{gap:6px;min-height:0}
+  .character-preview{padding:6px;border-radius:12px}
+  .character-preview-art{width:min(92px,16vw);margin:4px 0}
+  .character-preview-name{font-size:14px}
+  .character-preview-meta,.character-preview-types,.character-preview-growth{font-size:9px;margin-top:2px}
+  .character-info-tabs{gap:3px;padding-bottom:4px}
+  .character-info-tab{padding:4px 6px;min-height:28px;font-size:9px}
+  .character-info-body{min-height:0;padding-top:5px;font-size:10px}
+  .character-skill-slot-card,.character-skill-system-card,.skill-card,.equip-slot-card,.training-line-card,.evo-card{padding:6px;margin-bottom:5px;border-radius:9px}
+  .character-quick-panel,.character-access-entry{padding:6px 7px;border-radius:12px;max-height:min(42vh,220px)}
+  .character-quick-actions button{min-height:var(--menu-touch);padding:4px 6px;font-size:10px}
+  .character-quick-portrait{width:30px;height:30px;flex-basis:30px;font-size:13px}
+  .character-access-name{font-size:11px}
+  .utility-menu{width:min(240px,68vw);padding:7px;border-radius:12px}
+  .utility-btn{padding:6px 8px;margin-top:4px;min-height:var(--menu-touch);font-size:11px}
+  .account-gate{padding:10px}
+  .account-card{padding:14px 14px;border-radius:16px}
+  .account-logo{font-size:28px}
+  .account-card h1{font-size:17px;margin:4px 0 0}
+  .account-card p{font-size:11px;margin:0 0 10px}
+  .account-card input{padding:8px;min-height:var(--menu-touch)}
+  .auth-primary,.auth-google,.auth-guest{margin-top:8px;padding:8px;font-size:13px;min-height:var(--menu-touch)}
+  .ranch-services,.ranch-storage-page{padding:0 max(6px,var(--safe-right)) max(6px,var(--safe-bottom))}
+  .ranch-services-card{padding:8px 10px;border-radius:16px 16px 12px 12px;max-height:min(62dvh,420px)}
+  .ranch-services-card h2,.ranch-storage-head h2{font-size:14px}
+  .ranch-services-card p{font-size:10px;margin:4px 0 6px}
+  .ranch-services-card>button,.ranch-services-card button,.storage-actions button{min-height:var(--menu-touch);padding:7px 10px;font-size:12px;margin-top:5px}
+  .ranch-storage-page{padding:8px;gap:6px}
+  .ranch-storage-head h2{font-size:14px}
+  .ranch-storage-preview .focused-name{font-size:14px}
+  .merchant-card,.trainer-card,.evolution-guide-card,.breeding-caretaker-card,.monster-picker-card{padding:8px 10px;border-radius:16px 16px 12px 12px;max-height:min(78dvh,560px)}
+  .merchant-head,.trainer-head,.evolution-guide-head,.breeding-caretaker-head,.picker-head{font-size:14px;gap:6px}
+  .merchant-head b,.trainer-head h2,.evolution-guide-head h2,.breeding-caretaker-head h2{font-size:14px;margin:0}
+  .merchant-card button,.trainer-card button,.evolution-guide-card button,.breeding-caretaker-card button{min-height:var(--menu-touch)}
+  .merchant-dialog,.trainer-dialog,.evolution-guide-dialog,.breeding-caretaker-dialog{margin:6px 0;padding:6px 8px;font-size:10px}
+  .merchant-item{padding:6px;gap:6px}
+  .merchant-icon{font-size:20px}
+  .merchant-item button{padding:6px 8px;font-size:11px}
+  .trainer-body .train-btn,.evolution-guide-body .evo-card button,.breeding-open-btn{min-height:var(--menu-touch);padding:6px 8px}
+  .breeding-preview-grid>div:not(.breeding-heart){min-height:64px;padding:8px}
+  .warp-prompt{padding:0}
+  .warp-prompt-card{padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0}
+  .warp-prompt-card h2{font-size:14px;margin:2px 0}
+  .warp-prompt-card p{margin:0 0 8px;font-size:10px}
+  .warp-prompt-actions{gap:6px}
+  .warp-prompt-actions button{min-height:var(--menu-touch);border-radius:9px;font-size:12px;padding:6px 10px}
+  .stage-select-card{padding:8px 10px;border-radius:16px 16px 0 0;max-height:min(78dvh,560px)}
+  .stage-select-head h2,.stage-reward-head h2{font-size:15px}
+  .stage-select-head button,.stage-reward-head button,.stage-enter,.stage-reward-done{min-width:var(--menu-touch);min-height:var(--menu-touch);font-size:12px}
+  .stage-card{padding:8px;gap:8px;border-radius:12px}
+  .stage-card h3{font-size:12px}
+  .stage-reward-card{padding:10px 12px;border-radius:16px}
+  .stage-reward-item{padding:7px;font-size:11px}
+  .event-card{padding:12px 14px;min-width:220px}
+  .event-popup .event-choices button{min-height:var(--menu-touch);padding:8px 12px}
+  .monster-picker{padding:8px}
+  .monster-picker-card{padding:8px 10px;max-height:78vh}
+  .picker-mon-card{padding:7px}
+}
+@media (pointer:coarse) and (orientation:landscape){
+  .manager-card{height:min(82dvh,460px);max-height:82dvh;padding:7px}
+  .manager-toolbar .secondary-btn{min-height:32px;padding:4px 6px}
+  .character-preview-art{width:min(72px,12vw)}
+  .character-preview-name{font-size:12px}
+  .ranch-services-card{max-height:min(58dvh,340px);padding:7px 9px}
+  .warp-prompt-card{width:min(420px,72vw);margin:0 auto}
+}
+/* Mobile menu density pass end */

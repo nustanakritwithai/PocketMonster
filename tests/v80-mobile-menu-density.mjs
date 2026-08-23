@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const css = readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
+const pass = css.match(/\/\* Mobile menu density pass \*\/([\s\S]*?)\/\* Mobile menu density pass end \*\//)?.[1] || '';
+assert.ok(pass, 'mobile menu density pass CSS block is required');
+assert.match(pass, /--menu-touch:36px/, 'menu buttons use a denser 36px tap target on mobile');
+assert.match(pass, /@media \(max-width:900px\),\(pointer:coarse\)/, 'density pass applies to narrow and coarse-pointer phones');
+for (const rule of [
+  '.manager-card',
+  '.manager-sub,.manager-note{display:none}',
+  '.character-info-tab',
+  '.ranch-services-card',
+  '.merchant-card,.trainer-card,.evolution-guide-card,.breeding-caretaker-card',
+  '.warp-prompt-card',
+  '.account-card',
+  '.stage-select-card',
+  '.utility-menu',
+]) {
+  assert.ok(pass.includes(rule), `density pass must compact ${rule}`);
+}
+assert.match(pass, /\.manager-head\{font-size:14px/, 'character manager title shrinks on mobile');
+assert.match(pass, /\.warp-prompt-card h2\{font-size:14px/, 'warp sheet title shrinks on mobile');
+assert.match(pass, /\.ranch-services-card h2,.ranch-storage-head h2\{font-size:14px/, 'ranch sheet title shrinks on mobile');
+assert.match(pass, /min-height:var\(--menu-touch\)/, 'sheet actions use the denser menu tap target');
+assert.match(pass, /@media \(pointer:coarse\) and \(orientation:landscape\)/, 'landscape phones get a tighter second pass');
+assert.doesNotMatch(pass, /\.action\.skill|\.skill1|\.capture\{/, 'density pass must not shrink combat HUD buttons');
+
+console.log('V8.2 mobile menu density pass: PASS');
