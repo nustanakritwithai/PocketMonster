@@ -163,7 +163,7 @@ function assertLiveContract(module) {
 }
 
 function assertGameContract(source) {
-  assert.match(source, /passiveCatalogEntry\(inst\.passiveId\)/);
+  assert.match(source, /typeof instanceContext\?\.passiveId==='string'[\s\S]*?passiveCatalogEntry\(instanceContext\.passiveId\)/);
   assert.doesNotMatch(source, /inst\.passive\|\|inst\.genes\?\.trait/);
   assert.match(source, /refreshCoreStats\(inst,sp,path,getEquipmentFlat\(inst\),\{heal\}\)/);
 }
@@ -207,8 +207,8 @@ for (const [sourceKey, name, before, after, contract] of mutants) {
 }
 
 const unsafeGame = SOURCES.game[1].replace(
-  "const passiveDefinition=passiveCatalogEntry(inst.passiveId);\n  const passive=passiveDefinition?`${passiveDefinition.nameTH} (${passiveDefinition.nameEN})`:'—';",
-  "const passive=inst.passive||inst.genes?.trait||'—';",
+  "const rawPassiveDefinition=typeof instanceContext?.passiveId==='string'\n    ?passiveCatalogEntry(instanceContext.passiveId)\n    :null;\n  const passiveDefinition=characterSkillsDataSnapshot(rawPassiveDefinition,['id','nameTH','nameEN']);\n  const passive=typeof passiveDefinition?.nameTH==='string'&&typeof passiveDefinition?.nameEN==='string'\n    ?`${passiveDefinition.nameTH} (${passiveDefinition.nameEN})`\n    :'—';",
+  "const passiveDefinition=null;\n  const passive=inst?.passive||inst?.genes?.trait||'—';",
 );
 assert.notEqual(unsafeGame, SOURCES.game[1]);
 assert.throws(() => assertGameContract(unsafeGame));

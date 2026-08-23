@@ -7,6 +7,7 @@ import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFl
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
+import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
 import {
   ACTIVE_SUMMON_READONLY_REASON,
   ACTIVE_SUMMON_SWITCH_REASON,
@@ -2196,10 +2197,31 @@ function liveFullCharacterTabPanel(tab){
 function characterSystemPanel(tab,fallbackId){
   return liveCharacterTabPanel(tab)||liveFullCharacterTabPanel(tab)||el(fallbackId);
 }
+function syncFullCharacterInfoTabA11y(tab){
+  const body=el('characterInfoBody');
+  let activeTabId='';
+  document.querySelectorAll('.character-info-tabs .character-info-tab').forEach(btn=>{
+    const key=btn.dataset.characterTab;
+    const selected=key===tab;
+    const tabId=`characterInfoTab-${key}`;
+    if(btn.id!==tabId)btn.id=tabId;
+    btn.setAttribute('role','tab');
+    btn.setAttribute('aria-controls','characterInfoBody');
+    btn.setAttribute('aria-selected',String(selected));
+    btn.tabIndex=selected?0:-1;
+    btn.classList.toggle('active',selected);
+    if(selected)activeTabId=tabId;
+  });
+  if(body){
+    body.setAttribute('role','tabpanel');
+    body.setAttribute('aria-labelledby',activeTabId);
+    body.tabIndex=0;
+  }
+}
 function setFullCharacterInfoTab(tab){
   if(!['info','skills','equipment','training','evolution'].includes(tab))return;
   characterUI?.setTab(tab);
-  document.querySelectorAll('.character-info-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.characterTab===tab));
+  syncFullCharacterInfoTabA11y(tab);
   if(tab==='info')renderFullCharacterStatus();
   if(tab==='skills')renderSkills(el('characterInfoBody'));
   if(tab==='equipment')renderEquipment(el('characterInfoBody'));
@@ -2260,31 +2282,176 @@ function renderTraining(targetPanel=null){
   bindMonsterSelect(panel,'trainingSelectedId',renderTraining);
   panel.querySelectorAll('[data-train-line]').forEach(b=>b.onclick=()=>setTraining(inst.instanceId,b.dataset.trainLine));
 }
-function renderFocusedSkillLoadoutV2(){
-  const presentation=focusedCharacterPresentation();
-  const inst=presentation.id?getInst(presentation.id):null;
-  if(!inst)return '<div class="manager-empty">เลือกมอนเพื่อดู Skill Loadout</div>';
-  const moves=getMonsterSkills(inst);
-  const learned=inst.skills||[];
-  const slotNames=['Basic AI','S1','S2','S3'];
-  const slots=slotNames.map((slot,index)=>{
-    const move=moves[index];
-    if(!move)return `<div class="skill-card skill-locked"><b>${slot}</b><div class="skill-detail">ยังไม่มีสกิลในสล็อตนี้</div></div>`;
-    const rec=learned.find(skill=>skill.skillId===move.name);
-    const rank=rec?.masteryRank||'novice';
-    const exp=rec?.masteryExp||0;
-    const mutations=rec&&rank==='master'?SKILL_MUTATIONS[rec.skillId]||[]:[];
-    return `<div class="skill-card"><div class="skill-card-header"><b>${slot} • ${move.name} ${typeBadge(move.type||'Normal')}</b><span class="skill-mastery-label ${rank}">${MASTERY_TH[rank]||rank}</span></div><div class="skill-detail">Power: ${move.power??'—'} • CD: ${move.cooldown??'—'}s • ${move.targetType||'enemy'}</div><div class="skill-detail">Mastery: ${rank} • Skill EXP: ${exp}${rec?.mutationId?` • Mutation: ${rec.mutationId}`:''}${mutations.length?' • Mutation พร้อมเลือกในระบบเดิม':''}</div></div>`;
-  }).join('');
-  const path=getEvolutionPath(inst);
-  const passiveDefinition=passiveCatalogEntry(inst.passiveId);
-  const passive=passiveDefinition?`${passiveDefinition.nameTH} (${passiveDefinition.nameEN})`:'—';
-  const evolutionTrait=path?.trait||path?.evolutionTrait||'—';
-  return `<section class="focused-skill-loadout"><div class="skills-section-title">Skill Loadout • ${presentation.name}</div><div class="skill-loadout-slots">${slots}</div><div class="skill-card skill-passive"><b>Passive</b><div class="skill-detail">${passive}</div></div><div class="skill-card skill-evolution-trait"><b>Evolution Trait</b><div class="skill-detail">${evolutionTrait}</div></div></section>`;
+const characterSkillsRightTabTrees=new WeakMap();
+function characterSkillsDataSnapshot(value,keys){
+  try{
+    if(value===null||typeof value!=='object'||Array.isArray(value))return null;
+    const prototype=Object.getPrototypeOf(value);
+    if(prototype!==Object.prototype&&prototype!==null)return null;
+    const snapshot=Object.create(null);
+    for(const key of keys){
+      const descriptor=Object.getOwnPropertyDescriptor(value,key);
+      if(!descriptor)continue;
+      if(!Object.prototype.hasOwnProperty.call(descriptor,'value'))return null;
+      snapshot[key]=descriptor.value;
+    }
+    return Object.freeze(snapshot);
+  }catch{return null;}
+}
+function characterSkillsElement(documentRef,tag,className,text=''){
+  const node=documentRef.createElement(tag);
+  if(className)node.className=className;
+  if(text)node.textContent=text;
+  return node;
+}
+function createCharacterSkillsManualCard(documentRef,slot){
+  const root=characterSkillsElement(documentRef,'article','character-skill-slot-card');
+  root.setAttribute('data-character-skill-slot',slot);
+  root.setAttribute('role','group');
+  const header=characterSkillsElement(documentRef,'div','character-skill-card-head');
+  const slotLabel=characterSkillsElement(documentRef,'span','character-skill-slot-label',slot.toUpperCase());
+  const name=characterSkillsElement(documentRef,'strong','character-skill-name','ยังไม่มีสกิล');
+  const state=characterSkillsElement(documentRef,'span','character-skill-state','Locked');
+  header.append(slotLabel,name,state);
+  const icons=characterSkillsElement(documentRef,'div','character-skill-icons');
+  icons.setAttribute('aria-hidden','true');
+  const mainIcon=characterSkillsElement(documentRef,'span','character-skill-main-icon','🔒');
+  const typeIcon=characterSkillsElement(documentRef,'span','character-skill-type-icon');
+  const categoryIcon=characterSkillsElement(documentRef,'span','character-skill-category-icon');
+  const effectIcon=characterSkillsElement(documentRef,'span','character-skill-effect-icon');
+  icons.append(mainIcon,typeIcon,categoryIcon,effectIcon);
+  const meta=characterSkillsElement(documentRef,'div','character-skill-meta','ยังไม่มีสกิลในสล็อตนี้');
+  const resources=characterSkillsElement(documentRef,'div','character-skill-resources','Uses — • CD —');
+  const mastery=characterSkillsElement(documentRef,'div','character-skill-mastery','Mastery —');
+  root.append(header,icons,meta,resources,mastery);
+  return Object.freeze({root,slotLabel,name,state,mainIcon,typeIcon,categoryIcon,effectIcon,meta,resources,mastery});
+}
+function createCharacterSkillsSystemCard(documentRef,key,label){
+  const root=characterSkillsElement(documentRef,'article','character-skill-system-card');
+  root.setAttribute('data-character-skill-system',key);
+  root.setAttribute('role','group');
+  const heading=characterSkillsElement(documentRef,'strong','character-skill-system-label',label);
+  const state=characterSkillsElement(documentRef,'span','character-skill-state');
+  const value=characterSkillsElement(documentRef,'div','character-skill-system-value');
+  const detail=characterSkillsElement(documentRef,'div','character-skill-system-detail');
+  root.append(heading,state,value,detail);
+  return Object.freeze({root,heading,state,value,detail});
+}
+function ensureCharacterSkillsRightTabTree(panel,documentRef=document){
+  const cached=characterSkillsRightTabTrees.get(panel);
+  if(cached?.root?.parentNode===panel)return cached;
+  const root=characterSkillsElement(documentRef,'section','character-skills-a37');
+  root.setAttribute('aria-live','polite');
+  const title=characterSkillsElement(documentRef,'h4','character-skills-title','Skill Loadout');
+  const notice=characterSkillsElement(documentRef,'p','character-skills-notice','ข้อมูลแบบอ่านอย่างเดียว • การใช้สกิลเกิดในสนามต่อสู้');
+  const empty=characterSkillsElement(documentRef,'div','character-info-empty','เลือกมอนสเตอร์จากรายการเพื่อดู Skill Loadout');
+  const manualHeading=characterSkillsElement(documentRef,'h5','character-skills-group-title','Manual Skills • S1–S4');
+  const manualGrid=characterSkillsElement(documentRef,'div','character-skills-manual-grid');
+  const manual=new Map();
+  for(const slot of ['s1','s2','s3','s4']){
+    const card=createCharacterSkillsManualCard(documentRef,slot);
+    manual.set(slot,card);
+    manualGrid.append(card.root);
+  }
+  const systemHeading=characterSkillsElement(documentRef,'h5','character-skills-group-title','System Skills');
+  const systemGrid=characterSkillsElement(documentRef,'div','character-skills-system-grid');
+  const system=new Map();
+  for(const [key,label] of [['basicAI','Basic AI'],['passive','Passive'],['evolutionTrait','Evolution Trait']]){
+    const card=createCharacterSkillsSystemCard(documentRef,key,label);
+    system.set(key,card);
+    systemGrid.append(card.root);
+  }
+  root.append(title,notice,empty,manualHeading,manualGrid,systemHeading,systemGrid);
+  panel.replaceChildren(root);
+  const tree=Object.freeze({root,title,notice,empty,manualHeading,manualGrid,systemHeading,systemGrid,manual,system});
+  characterSkillsRightTabTrees.set(panel,tree);
+  return tree;
+}
+function setCharacterSkillsText(node,value){
+  const text=value==null?'—':String(value);
+  if(node.textContent!==text)node.textContent=text;
+}
+function updateCharacterSkillsManualCard(card,row){
+  const stateClass={Ready:'ready','No Uses':'no-uses','Locked/Not Learned':'locked',Invalid:'invalid'}[row.state]||'invalid';
+  card.root.className=`character-skill-slot-card is-${stateClass}`;
+  card.root.dataset.skillState=stateClass;
+  card.root.setAttribute('aria-label',row.accessibilityLabelTH);
+  setCharacterSkillsText(card.slotLabel,row.label);
+  setCharacterSkillsText(card.name,row.nameEN?`${row.nameTH} (${row.nameEN})`:row.nameTH);
+  setCharacterSkillsText(card.state,row.state);
+  setCharacterSkillsText(card.mainIcon,row.documentedMainSymbol);
+  setCharacterSkillsText(card.typeIcon,row.typeSymbol);
+  setCharacterSkillsText(card.categoryIcon,row.categoryMarker);
+  setCharacterSkillsText(card.effectIcon,row.effectOverlay);
+  const typeText=row.sourceType?`${row.sourceType}${row.runtimeType&&row.runtimeType!==row.sourceType?` / runtime ${row.runtimeType}`:''}`:'—';
+  const coverage=row.documentedRuntimeCoverage==='CURRENT_GAP'?' • documented fallback / CURRENT_GAP':'';
+  setCharacterSkillsText(card.meta,row.equipped?`${typeText} • ${row.category} • ${row.targetType}${coverage}`:(row.reason||'ยังไม่มีสกิลในสล็อตนี้'));
+  setCharacterSkillsText(card.resources,`Uses ${row.usesText} • CD ${row.cooldownText}`);
+  const mutation=row.mutationId?` • Mutation ${row.mutationId}`:'';
+  setCharacterSkillsText(card.mastery,row.equipped?`Mastery ${row.masteryRank} • EXP ${row.masteryExp}${mutation}`:'Mastery —');
+}
+function updateCharacterSkillsSystemCard(card,row){
+  const stateClass=row.state==='Ready'?'ready':row.state==='Invalid'?'invalid':'locked';
+  card.root.className=`character-skill-system-card is-${stateClass}`;
+  card.root.dataset.skillState=stateClass;
+  card.root.setAttribute('aria-label',row.accessibilityLabelTH);
+  setCharacterSkillsText(card.heading,row.label);
+  setCharacterSkillsText(card.state,row.state);
+  setCharacterSkillsText(card.value,row.value);
+  if(row.key==='basicAI'){
+    setCharacterSkillsText(card.detail,`Power ${row.power} • CD ${row.cooldownSec}s • ${row.usesText}`);
+  }else{
+    setCharacterSkillsText(card.detail,'System slot • ไม่ใช่ manual command');
+  }
+}
+function renderFocusedSkillLoadoutV2(panel,inst,presentation,documentRef=document){
+  const instanceContext=characterSkillsDataSnapshot(inst,['speciesId','formId','evolutionPath','passiveId']);
+  const presentationContext=characterSkillsDataSnapshot(presentation,['id','name']);
+  const evolutionContext=typeof instanceContext?.speciesId==='string'
+    ?Object.freeze({
+      speciesId:instanceContext.speciesId,
+      formId:typeof instanceContext.formId==='string'?instanceContext.formId:null,
+      evolutionPath:typeof instanceContext.evolutionPath==='string'?instanceContext.evolutionPath:null,
+    })
+    :null;
+  const rawPath=evolutionContext?getEvolutionPath(evolutionContext):null;
+  const path=characterSkillsDataSnapshot(rawPath,['trait','evolutionTrait']);
+  const rawPassiveDefinition=typeof instanceContext?.passiveId==='string'
+    ?passiveCatalogEntry(instanceContext.passiveId)
+    :null;
+  const passiveDefinition=characterSkillsDataSnapshot(rawPassiveDefinition,['id','nameTH','nameEN']);
+  const passive=typeof passiveDefinition?.nameTH==='string'&&typeof passiveDefinition?.nameEN==='string'
+    ?`${passiveDefinition.nameTH} (${passiveDefinition.nameEN})`
+    :'—';
+  const model=createCharacterSkillsViewModel(inst,{
+    monsterId:typeof presentationContext?.id==='string'?presentationContext.id:null,
+    monsterName:typeof presentationContext?.name==='string'&&presentationContext.name.length>0?presentationContext.name:'มอนสเตอร์',
+    passiveId:typeof passiveDefinition?.id==='string'?passiveDefinition.id:(typeof instanceContext?.passiveId==='string'?instanceContext.passiveId:null),
+    passiveLabel:passive,
+    evolutionTrait:path?.trait||path?.evolutionTrait||'—',
+  });
+  const tree=ensureCharacterSkillsRightTabTree(panel,documentRef);
+  setCharacterSkillsText(tree.title,model.available?`Skill Loadout • ${model.monster.name}`:'Skill Loadout');
+  tree.empty.hidden=model.available;
+  tree.manualHeading.hidden=!model.available;
+  tree.manualGrid.hidden=!model.available;
+  tree.systemHeading.hidden=!model.available;
+  tree.systemGrid.hidden=!model.available;
+  setCharacterSkillsText(tree.empty,model.reason==='no_focused_monster'?'เลือกมอนสเตอร์จากรายการเพื่อดู Skill Loadout':'ข้อมูล Skill Loadout ไม่ถูกต้อง');
+  for(const row of model.manualSlots)updateCharacterSkillsManualCard(tree.manual.get(row.slot),row);
+  for(const row of model.systemRows)updateCharacterSkillsSystemCard(tree.system.get(row.key),row);
+  tree.root.dataset.modelState=model.ok?'ready':model.available?'invalid':'empty';
+  return model;
 }
 function renderSkills(targetPanel=null){
   const panel=targetPanel||characterSystemPanel('skills','skillsPanel');
   if(!panel)return;
+  if(targetPanel===el('characterInfoBody')){
+    const presentation=focusedCharacterPresentation();
+    const inst=presentation.id?getInst(presentation.id):null;
+    renderFocusedSkillLoadoutV2(panel,inst,presentation);
+    return;
+  }
   const allIds=ownedMonsterIds();
   if(!allIds.length){panel.innerHTML='<div class="manager-empty">ยังไม่มีมอน — ไปจับมอนก่อน</div>';return;}
   const selectedId=allIds.includes(state.skillsSelectedId)?state.skillsSelectedId:allIds[0];
@@ -2317,7 +2484,7 @@ function renderSkills(targetPanel=null){
   }).join('');
   const memoryEligibility=resolveInheritedSkillMemoryEligibility(inst);
   const memoryHTML=inst.inheritedSkillMemoryId?`<div class="skills-section-title">Skill Memory จากการผสมพันธุ์</div><div class="skill-card ${memoryEligibility.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${memoryEligibility.definition?.nameTH||inst.inheritedSkillMemoryId} • ${inst.inheritedSkillMemoryId}</b><span class="skill-mastery-label">${memoryEligibility.method||'Memory'}</span></div><div class="skill-detail">บันทึกจาก Partner • ไม่ติดตั้งสล็อตอัตโนมัติ</div>${memoryEligibility.eligible?`<button data-learn-memory="${inst.instanceId}">เรียนจาก Memory</button>`:`<div class="skill-req">${SKILL_MEMORY_REASON_TH[memoryEligibility.reason]||memoryEligibility.reason}</div>`}</div>`:'';
-  panel.innerHTML=`<div class="skills-panel">${renderFocusedSkillLoadoutV2()}<div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
   panel.querySelectorAll('[data-learn-memory]').forEach(b=>b.onclick=()=>learnSkillMemory(b.dataset.learnMemory));
@@ -4359,10 +4526,11 @@ function renderFullCharacterStatus(){
 function renderFullCharacterInfoTab(){
   const snap=characterUI?.snapshot?.();
   const tab=snap?.characterTab==='collection'||!snap?.characterTab?'info':snap.characterTab;
-  document.querySelectorAll('.character-info-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.characterTab===tab));
-  if(tab==='skills')return renderSkills();
-  if(tab==='equipment')return renderEquipment();
-  if(tab==='training')return renderTraining();
+  syncFullCharacterInfoTabA11y(tab);
+  if(tab==='skills')return renderSkills(el('characterInfoBody'));
+  if(tab==='equipment')return renderEquipment(el('characterInfoBody'));
+  if(tab==='training')return renderTraining(el('characterInfoBody'));
+  if(tab==='evolution')return renderEvolution(el('characterInfoBody'));
   return renderFullCharacterStatus();
 }
 let ranchStorageFocusId=null;
@@ -4977,17 +5145,125 @@ addEventListener('keydown',event=>{
   if(handleCharacterUiHardwareBack(event))event.preventDefault();
 });
 document.querySelectorAll('.manager-tab').forEach(b=>b.onclick=()=>{playSFX('sfx_ui_click');setManagerTab(b.dataset.managerTab);});
+const characterInfoTabActivationGuard=new WeakMap();
+const characterInfoTabSuppressedClicks=new WeakMap();
+function suppressFullCharacterInfoTabClick(button,now){
+  if(button===null||(typeof button!=='object'&&typeof button!=='function'))return false;
+  const pending=characterInfoTabSuppressedClicks.get(button);
+  const count=pending&&now-pending.at>=0&&now-pending.at<750?pending.count+1:1;
+  characterInfoTabSuppressedClicks.set(button,Object.freeze({at:now,count}));
+  return true;
+}
+function shouldActivateFullCharacterInfoTab(button,source,now,pointerGenerated=true){
+  if(button===null||(typeof button!=='object'&&typeof button!=='function'))return false;
+  if(source==='pointerup'){
+    const pending=characterInfoTabActivationGuard.get(button);
+    const count=pending&&now-pending.pointerAt>=0&&now-pending.pointerAt<750?pending.count+1:1;
+    characterInfoTabActivationGuard.set(button,Object.freeze({pointerAt:now,count}));
+    return true;
+  }
+  if(source==='click'&&pointerGenerated){
+    const suppressed=characterInfoTabSuppressedClicks.get(button);
+    const suppressedAge=suppressed?now-suppressed.at:Infinity;
+    if(suppressed&&suppressedAge>=0&&suppressedAge<750&&suppressed.count>0){
+      if(suppressed.count===1)characterInfoTabSuppressedClicks.delete(button);
+      else characterInfoTabSuppressedClicks.set(button,Object.freeze({at:suppressed.at,count:suppressed.count-1}));
+      return false;
+    }
+    if(suppressed)characterInfoTabSuppressedClicks.delete(button);
+    const pending=characterInfoTabActivationGuard.get(button);
+    const age=pending?now-pending.pointerAt:Infinity;
+    if(pending&&age>=0&&age<750&&pending.count>0){
+      if(pending.count===1)characterInfoTabActivationGuard.delete(button);
+      else characterInfoTabActivationGuard.set(button,Object.freeze({pointerAt:pending.pointerAt,count:pending.count-1}));
+      return false;
+    }
+    if(pending)characterInfoTabActivationGuard.delete(button);
+  }
+  return true;
+}
+const characterInfoTabPointerStarts=new Map();
+function beginFullCharacterInfoTabPointer(event,tab){
+  const pointerId=event?.pointerId;
+  if(!tab||!Number.isInteger(pointerId)||event?.isPrimary===false||event?.button!==0)return false;
+  const x=Number.isFinite(event.clientX)?event.clientX:0;
+  const y=Number.isFinite(event.clientY)?event.clientY:0;
+  characterInfoTabPointerStarts.set(pointerId,Object.freeze({tab,x,y,canceled:false}));
+  return true;
+}
+function moveFullCharacterInfoTabPointer(event,maxDistance=12){
+  const pointerId=event?.pointerId;
+  const start=characterInfoTabPointerStarts.get(pointerId);
+  if(!start)return false;
+  const x=Number.isFinite(event.clientX)?event.clientX:start.x;
+  const y=Number.isFinite(event.clientY)?event.clientY:start.y;
+  const limit=Number.isFinite(maxDistance)&&maxDistance>=0?maxDistance:12;
+  if((x-start.x)**2+(y-start.y)**2>limit**2){
+    characterInfoTabPointerStarts.set(pointerId,Object.freeze({...start,canceled:true}));
+    return false;
+  }
+  return true;
+}
+function cancelFullCharacterInfoTabPointer(event){
+  return characterInfoTabPointerStarts.delete(event?.pointerId);
+}
+function finishFullCharacterInfoTabPointer(event,tab,maxDistance=12){
+  const pointerId=event?.pointerId;
+  const start=characterInfoTabPointerStarts.get(pointerId);
+  characterInfoTabPointerStarts.delete(pointerId);
+  if(!start||!tab||start.tab!==tab||event?.isPrimary===false||event?.button!==0)return false;
+  const x=Number.isFinite(event.clientX)?event.clientX:start.x;
+  const y=Number.isFinite(event.clientY)?event.clientY:start.y;
+  const limit=Number.isFinite(maxDistance)&&maxDistance>=0?maxDistance:12;
+  if(start.canceled||(x-start.x)**2+(y-start.y)**2>limit**2){
+    suppressFullCharacterInfoTabClick(start.tab,Number.isFinite(event?.timeStamp)?event.timeStamp:0);
+    return false;
+  }
+  return true;
+}
+function resolveFullCharacterInfoTabKey(button,key,tabs){
+  if(!Array.isArray(tabs)||tabs.length===0)return null;
+  const current=tabs.indexOf(button);
+  if(current<0)return null;
+  if(key==='Home')return tabs[0];
+  if(key==='End')return tabs[tabs.length-1];
+  if(key==='ArrowRight'||key==='ArrowDown')return tabs[(current+1)%tabs.length];
+  if(key==='ArrowLeft'||key==='ArrowUp')return tabs[(current-1+tabs.length)%tabs.length];
+  return null;
+}
 document.querySelectorAll('.character-info-tab').forEach(btn=>{
-  btn.onclick=()=>{
+  btn.onclick=event=>{
+    if(!shouldActivateFullCharacterInfoTab(btn,'click',event.timeStamp,event.detail>0))return;
     playSFX('sfx_ui_click');
     setFullCharacterInfoTab(btn.dataset.characterTab);
   };
+  btn.onkeydown=event=>{
+    const tabs=[...document.querySelectorAll('.character-info-tabs .character-info-tab')];
+    const next=resolveFullCharacterInfoTabKey(btn,event.key,tabs);
+    if(!next)return;
+    event.preventDefault();
+    event.stopPropagation();
+    next.focus();
+    playSFX('sfx_ui_click');
+    setFullCharacterInfoTab(next.dataset.characterTab);
+  };
 });
+el('monsterManager')?.addEventListener('pointerdown',event=>{
+  const tab=event.target.closest?.('.character-info-tab');
+  beginFullCharacterInfoTabPointer(event,tab);
+},{capture:true});
+el('monsterManager')?.addEventListener('pointermove',event=>{
+  moveFullCharacterInfoTabPointer(event);
+},{capture:true});
+el('monsterManager')?.addEventListener('pointercancel',event=>{
+  cancelFullCharacterInfoTabPointer(event);
+},{capture:true});
 el('monsterManager')?.addEventListener('pointerup',event=>{
   const tab=event.target.closest?.('.character-info-tab');
-  if(!tab)return;
+  if(!finishFullCharacterInfoTabPointer(event,tab))return;
   event.preventDefault();
   event.stopPropagation();
+  if(!shouldActivateFullCharacterInfoTab(tab,'pointerup',event.timeStamp))return;
   playSFX('sfx_ui_click');
   setFullCharacterInfoTab(tab.dataset.characterTab);
 },{capture:true,passive:false});
