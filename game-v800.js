@@ -4877,8 +4877,9 @@ function renderBreedingSalon(){
     chip.textContent=compat.text;
     chip.className='breeding-salon-compat'+(a&&b?(compat.ok?' ok':' bad'):'');
   }
+  const start=el('breedingOpenManager');if(start)start.disabled=!compat.ok;
   const nest=el('breedingSalonIncubator');if(!nest)return;
-  if(!state.eggs.length){nest.innerHTML='<div class="breeding-salon-empty">Incubator ว่าง • สร้างไข่ในห้องผสมพันธุ์</div>';return;}
+  if(!state.eggs.length){nest.innerHTML='<div class="breeding-salon-empty">Incubator ว่าง • เลือกคู่แล้วกดเริ่มผสมพันธุ์</div>';return;}
   const now=Date.now();
   nest.innerHTML=state.eggs.slice(-3).map(egg=>{
     if(!egg||typeof egg!=='object')return '';
@@ -5971,7 +5972,7 @@ function bindMobileNpcSheet(panel,close,dragTarget=panel?.querySelector(':scope 
   };
   handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end);
 }
-el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else if(isNearTrainer())openTrainer();else if(isNearEvolution())openEvolutionGuide();else if(isNearBreeding())openBreedingCaretaker();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('trainerClose').onclick=()=>{playSFX('sfx_ui_click');closeTrainer();};el('evolutionClose').onclick=()=>{playSFX('sfx_ui_click');closeEvolutionGuide();};el('breedingClose').onclick=()=>{playSFX('sfx_ui_click');closeBreedingCaretaker();};el('breedingOpenManager').onclick=()=>{playSFX('sfx_ui_click');closeBreedingCaretaker();openManager({source:'npc'});setManagerTab('breeding');};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('trainerPanel').addEventListener('pointerdown',e=>{if(e.target===el('trainerPanel'))closeTrainer();});el('evolutionPanel').addEventListener('pointerdown',e=>{if(e.target===el('evolutionPanel'))closeEvolutionGuide();});el('breedingPanel').addEventListener('pointerdown',e=>{if(e.target===el('breedingPanel'))closeBreedingCaretaker();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
+el('npcBtn').onclick=()=>{playSFX('sfx_ui_click');if(isNearMerchant())openMerchant();else if(isNearTrainer())openTrainer();else if(isNearEvolution())openEvolutionGuide();else if(isNearBreeding())openBreedingCaretaker();else showRanchServices();};el('closeManager').onclick=()=>{playSFX('sfx_ui_click');closeManager();};el('merchantClose').onclick=()=>{playSFX('sfx_ui_click');closeMerchant();};el('trainerClose').onclick=()=>{playSFX('sfx_ui_click');closeTrainer();};el('evolutionClose').onclick=()=>{playSFX('sfx_ui_click');closeEvolutionGuide();};el('breedingClose').onclick=()=>{playSFX('sfx_ui_click');closeBreedingCaretaker();};el('breedingOpenManager').onclick=()=>{playSFX('sfx_ui_click');createEgg();};el('merchantShop').addEventListener('pointerdown',e=>{if(e.target===el('merchantShop'))closeMerchant();});el('trainerPanel').addEventListener('pointerdown',e=>{if(e.target===el('trainerPanel'))closeTrainer();});el('evolutionPanel').addEventListener('pointerdown',e=>{if(e.target===el('evolutionPanel'))closeEvolutionGuide();});el('breedingPanel').addEventListener('pointerdown',e=>{if(e.target===el('breedingPanel'))closeBreedingCaretaker();});el('monsterManager').addEventListener('pointerdown',e=>{if(e.target===el('monsterManager'))closeManager();});
 bindMobileNpcSheet(el('merchantShop'),closeMerchant);
 bindMobileNpcSheet(el('trainerPanel'),closeTrainer);
 bindMobileNpcSheet(el('evolutionPanel'),closeEvolutionGuide);
