@@ -7,7 +7,7 @@ assert.match(html,/id="stageObjective"/,'Stage objective / quest tracker HUD exi
 assert.match(html,/id="stageObjectiveStep"/,'Objective step label exists');
 assert.match(html,/id="stageObjectiveList"/,'Quest tracker lists stage steps');
 assert.match(css,/\.starter-journey/,'Starter Journey has compact mobile styling');
-assert.match(css,/\.quest-tracker\{[^}]*left:10px|\.starter-journey,\.quest-tracker\{[^}]*left:10px/,'Quest tracker stays on the left rail');
+assert.match(css,/\.starter-journey,\.quest-tracker\{[^}]*left:var\(--safe-left\)/,'Quest tracker stays on the left rail');
 assert.match(js,/starterJourney:\{version:1,grassMeadow:/,'Starter Journey is persisted in state');
 assert.match(js,/function markStarterJourney\(/,'Starter Journey progress handler exists');
 assert.match(js,/markStarterJourney\('battled'\)/,'Battle advances Starter Journey');
