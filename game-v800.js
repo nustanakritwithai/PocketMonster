@@ -2378,7 +2378,7 @@ function distXZ(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
 function hpPct(v){return Math.max(0,Math.min(1,v));}
 function msg(t){el('message').textContent=t;}
 function setManagerTab(tab='collection'){
-  if(tab==='breeding'&&!isNearNpc()){
+  if(tab==='breeding'&&!(isNearNpc()||isNearBreeding())){
     msg(FULL_MANAGER_NPC_REASON);
     return;
   }

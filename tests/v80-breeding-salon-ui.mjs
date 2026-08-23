@@ -39,6 +39,7 @@ assert.match(js, /openMonsterPicker\('parentA'\)/, 'Parent A still uses the cano
 assert.match(js, /el\('breedingSalonParentA'\)\?\.addEventListener\('click'/, 'salon Parent A opens the picker');
 assert.match(js, /el\('breedingSalonParentB'\)\?\.addEventListener\('click'/, 'salon Parent B opens the picker');
 assert.match(js, /openRanchBreeding\(\)/, 'farm-keeper breeding route remains');
+assert.match(js, /tab==='breeding'&&!\(isNearNpc\(\)\|\|isNearBreeding\(\)\)/, 'manager breeding tab accepts the breeding NPC');
 assert.match(js, /closeBreedingCaretaker\(\);openManager\(\{source:'npc'\}\);setManagerTab\('breeding'\)/, 'salon CTA still opens the manager lab');
 assert.doesNotMatch(js, /id="parentABtn"|id="breedBtn"|id="eggList"/, 'salon does not steal manager lab IDs');
 
