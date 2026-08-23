@@ -27,7 +27,7 @@ function functionSource(source, name) {
 }
 
 export function assertE1LiveWiring(source) {
-  assert.match(source, /import \{ canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, skillDamageProfile, validateReviewedSkillEffectRequest \} from '\.\/skill-effect-runtime\.mjs'/);
+  assert.match(source, /import \{ canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, resolveWorkbookDirectDamage, skillDamageProfile, validateReviewedSkillEffectRequest \} from '\.\/skill-effect-runtime\.mjs'/);
   const catalogSkills = functionSource(source, 'canonicalCombatSkills');
   const attacker = functionSource(source, 'canonicalSkillEffectAttacker');
   const targets = functionSource(source, 'canonicalSkillEffectTargets');

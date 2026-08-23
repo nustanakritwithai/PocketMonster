@@ -17,6 +17,16 @@ function mutate(field, before, after) {
   return { ...original, [field]: source.replace(before, after) };
 }
 
+function mutateNth(field, before, after, occurrence) {
+  const source = original[field];
+  let index = -1;
+  for (let count = 0; count < occurrence; count += 1) {
+    index = source.indexOf(before, index + 1);
+    assert.ok(index >= 0, `${field} mutation target occurrence ${occurrence} drifted: ${before}`);
+  }
+  return { ...original, [field]: `${source.slice(0, index)}${after}${source.slice(index + before.length)}` };
+}
+
 const mutants = [
   ['three HUD slots', mutate('hud', 'Array.from({ length: 4 }', 'Array.from({ length: 3 }')],
   ['remove fourth DOM slot', mutate('html', '<button id="skill4Btn"', '<button id="removedSkill4Btn"')],
@@ -28,7 +38,7 @@ const mutants = [
   ['mint command ID inside useSkill', mutate('js', 'commandId:intent.commandId,', 'commandId:`cast:${++skillCommandSequence}`,')],
   ['legacy cooldown', mutate('js', 'a.skillCds[index]=command.startCooldownSec;', 'a.skillCds[index]=move.cooldown;')],
   ['target substitution query', mutate('js', 'const wild=byId.get(targetId);', 'const wild=nearestWild(99,a.mesh.position);')],
-  ['area around actor', mutate('js', 'const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);', 'const anchor=a.mesh.position.clone();')],
+  ['area around actor', mutateNth('js', 'const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);', 'const anchor=a.mesh.position.clone();', 2)],
   ['legacy area range', mutate('js', 'spawnAreaWave(move.type,anchor,command.radiusM)', 'spawnAreaWave(move.type,anchor,move.range)')],
   ['immune becomes normal hit', mutate('js', 'res&&Number.isFinite(res.eff)?res.eff:1', 'res&&res.eff?res.eff:1')],
   ['remove slot four geometry', mutate('css', '.skill4{right:198px!important;', '.removed-skill4{right:198px!important;')],
