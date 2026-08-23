@@ -61,8 +61,8 @@ export function assertLiveTargetingWiring({ js, html, versionedHtml, css, hud })
   const damageAt = apply.indexOf('damageWild(');
   assert.ok(cooldownAt >= 0 && sfxAt > cooldownAt && damageAt > sfxAt,
     'catalog cooldown starts after Uses commit and before all presentation/damage effects');
-  assert.match(apply, /new THREE\.Vector3\(command\.targetPoint\.x,0,command\.targetPoint\.z\)/,
-    'area presentation uses the resolver anchor point unchanged');
+  assert.equal((apply.match(/new THREE\.Vector3\(command\.targetPoint\.x,0,command\.targetPoint\.z\)/g) || []).length, 2,
+    'GroundPoint and EnemyArea presentations each use the resolver anchor point unchanged');
   assert.match(apply, /command\.radiusM/, 'area presentation uses the resolver radius');
   assert.doesNotMatch(apply, /nearestWild\(|wilds\.filter|move\.range|move\.cooldown/,
     'accepted effect cannot resolve targets or geometry again');

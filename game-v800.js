@@ -31,7 +31,7 @@ import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getS
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
-import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
+import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, resolveWorkbookDirectDamage, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -2892,6 +2892,7 @@ function switchZone(zone,silent=false){
   summonCooldownUntil=0;
   clearWilds();
   clearTransientEffects();
+  clearSkillFields();
   closeWarpPrompt();
   closeStageSelect();
   closeStageReward();
@@ -3530,6 +3531,7 @@ function canonicalSkillEffectAttacker(a,move){
     id:a.inst.instanceId,
     level:a.inst.level,
     types:Object.freeze([...monsterTypes(a.inst)]),
+    position:Object.freeze({x:a.mesh.position.x,z:a.mesh.position.z}),
     stats:Object.freeze({ATK:attack,SPATK:specialAttack}),
     hp:a.inst.hp,
     maxHp:a.inst.maxHp,
@@ -3565,6 +3567,69 @@ function canonicalSkillEffectRequest(a,move,command,materialized){
     targets:command.targetKind==='Self'?Object.freeze([]):canonicalSkillEffectTargets(materialized),
     nowSec:a.statusState.currentTimeSec,
   });
+}
+const liveSkillFields=[];
+function clearSkillFields(){
+  for(const field of liveSkillFields)if(field.mesh)removeAndDispose(scene,field.mesh);
+  liveSkillFields.length=0;
+}
+function activateSkillField(a,move,fieldResult){
+  if(!fieldResult)return;
+  let mesh;
+  if(fieldResult.kind==='wall'){
+    mesh=new THREE.Mesh(new THREE.BoxGeometry(fieldResult.lengthM,1.8,fieldResult.thicknessM),new THREE.MeshStandardMaterial({color:0x93c5fd,emissive:0x2563eb,emissiveIntensity:.35,transparent:true,opacity:.78,roughness:.55,metalness:.05}));
+    mesh.position.set(fieldResult.center.x,.9,fieldResult.center.z);
+    mesh.rotation.y=Math.atan2(fieldResult.normal.x,fieldResult.normal.z);
+    mesh.castShadow=true;scene.add(mesh);
+  }else{
+    mesh=new THREE.Mesh(new THREE.RingGeometry(fieldResult.radiusM*.72,fieldResult.radiusM,32),new THREE.MeshBasicMaterial({color:0xf59e0b,transparent:true,opacity:.48,side:THREE.DoubleSide,depthWrite:false}));
+    mesh.position.set(fieldResult.center.x,.035,fieldResult.center.z);mesh.rotation.x=-Math.PI/2;scene.add(mesh);
+  }
+  liveSkillFields.push({
+    ...fieldResult,
+    mesh,
+    ageSec:0,
+    nextTickSec:fieldResult.tickIntervalSec??Infinity,
+    attacker:canonicalSkillEffectAttacker(a,move),
+    attackerNowSec:a.statusState.currentTimeSec,
+    runtimeType:move.type,
+  });
+}
+function fieldBlocksPosition(point){
+  for(const field of liveSkillFields){
+    if(field.kind!=='wall'||field.ageSec>=field.durationSec)continue;
+    const dx=point.x-field.center.x,dz=point.z-field.center.z;
+    const along=dx*field.tangent.x+dz*field.tangent.z;
+    const across=dx*field.normal.x+dz*field.normal.z;
+    if(Math.abs(along)<=field.lengthM/2+.35&&Math.abs(across)<=field.thicknessM/2+.35)return true;
+  }
+  return false;
+}
+function moveWildWithFieldCollision(w,direction,distance){
+  const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(direction,distance);
+  if(fieldBlocksPosition(next))return false;
+  w.mesh.position.copy(next);return true;
+}
+function updateSkillFields(dt){
+  for(let index=liveSkillFields.length-1;index>=0;index--){
+    const field=liveSkillFields[index];field.ageSec+=dt;
+    if(field.kind==='hazard'){
+      while(field.nextTickSec<=Math.min(field.ageSec,field.durationSec)+Number.EPSILON){
+        for(let wildIndex=wilds.length-1;wildIndex>=0;wildIndex--){
+          const w=wilds[wildIndex];
+          if(w.dead||w.capturing||distXZ(field.center,w.mesh.position)>field.radiusM)continue;
+          const defense=Number.isFinite(w.def)?w.def:10,specialDefense=Number.isFinite(w.spDef)?w.spDef:(Number.isFinite(w.spdef)?w.spdef:defense);
+          const target={id:w.id,level:w.level,types:[...wildTypes(w)],stats:{DEF:defense,SPDEF:specialDefense},hp:w.hp,maxHp:w.maxHp,statusState:w.statusState};
+          const resolved=resolveWorkbookDirectDamage({skillId:field.skillId,attacker:field.attacker,defender:target,attackerNowSec:field.attackerNowSec,defenderNowSec:w.statusState.currentTimeSec},{rng:Math.random});
+          if(!resolved.ok||!resolved.hit||resolved.damage<=0)continue;
+          const damage=Math.max(1,Math.round(resolved.damage*field.tickDamageRatio));
+          damageWild(w,damage,{type:field.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true});
+        }
+        field.nextTickSec+=field.tickIntervalSec;
+      }
+    }
+    if(field.ageSec+Number.EPSILON>=field.durationSec){if(field.mesh)removeAndDispose(scene,field.mesh);liveSkillFields.splice(index,1);}
+  }
 }
 function canApplyLiveSkill(a,move,command,materialized){
   if(!canExecuteReviewedSkillEffect(command.skillId))return false;
@@ -3634,6 +3699,12 @@ function applyAcceptedSkillCommand(a,index,move,command,materialized){
       msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${label}${res.stab>1?' • STAB':''}${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
       logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
     }else msg(`${displayName(a.inst)} ใช้ ${move.name} • MISS`);
+  }else if(command.targetKind==='GroundPoint'){
+    const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
+    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
+    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);
+    spawnGroundDecal(move.type,anchor,{radius:1.6,duration:1.45,intensity:1.15});
+    msg(`${displayName(a.inst)} ใช้ ${move.name} • สร้างกำแพงที่จุดเล็ง`);
   }else{
     const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
     playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
@@ -3653,6 +3724,7 @@ function applyAcceptedSkillCommand(a,index,move,command,materialized){
     msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${planned.hitCount}/${targets.length} ตัว • รวม ${total} Damage${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
   }
   applyPlannedActorEffect(a,move,planned.actorResult);
+  activateSkillField(a,move,planned.fieldResult);
   a.inst.bond=clamp(a.inst.bond+.3);
   awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
@@ -3840,9 +3912,8 @@ function updateWild(w,dt,canEngage=false){
     if(w.state==='wander'){
       const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(w.dir,dt*.9);
       if(w.home&&distXZ(next,w.home)>2.2){w.dir.multiplyScalar(-1);w.wanderDir=w.dir;}
-      w.mesh.position.addScaledVector(w.dir,dt*.9);
+      moving=moveWildWithFieldCollision(w,w.dir,dt*.9);
       w.mesh.rotation.y=monsterLookYaw(w.dir,w.mesh);
-      moving=true;
     }
     animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
     animateMonster(w.mesh,dt,moving);
@@ -3858,7 +3929,7 @@ function updateWild(w,dt,canEngage=false){
     moving=true;
     const dir=wildUpdateScratch.direction.copy(target.position).sub(w.mesh.position);dir.y=0;
     if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
-    w.mesh.position.addScaledVector(dir,(w.spd*.16+1.2)*dt);
+    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*dt);
     w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
   }else if(w.attackCd<=0){
     w.attackCd=w.boss?.85:1.2;
@@ -5584,6 +5655,7 @@ function loop(now){
     updateCaptureSequence(dt);
     updateEffects(dt);
     updateGroundDecals(dt);
+    updateSkillFields(dt);
     updateCaptureAimVisual();
     updateOwned(dt);
     updateHubCompanion(dt);

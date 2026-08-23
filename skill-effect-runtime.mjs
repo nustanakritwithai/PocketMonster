@@ -112,8 +112,14 @@ export const E2_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
 
 const E2_READY_SKILLS = new Set(E2_READY_SKILL_IDS);
 
+export const E3_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
+  .filter(row => row.components.some(component => component.slice === 'E3_GROUND_POINT_FIELD'))
+  .map(row => row.skillId));
+
+const E3_READY_SKILLS = new Set(E3_READY_SKILL_IDS);
+
 export const REVIEWED_SKILL_EFFECT_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
-  .filter(row => E1_READY_SKILLS.has(row.skillId) || E2_READY_SKILLS.has(row.skillId))
+  .filter(row => E1_READY_SKILLS.has(row.skillId) || E2_READY_SKILLS.has(row.skillId) || E3_READY_SKILLS.has(row.skillId))
   .map(row => row.skillId));
 
 const REVIEWED_SKILL_EFFECTS = new Set(REVIEWED_SKILL_EFFECT_IDS);
@@ -127,6 +133,22 @@ export const E2_SELF_EFFECT_POLICY = Object.freeze({
   healMagnitudeSource: 'runtime_fallback_workbook_percentage_unspecified',
   positiveStatusChance: 'guaranteed_by_status_resolver',
   encounterBoundary: 'clear_all',
+  sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
+  sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
+});
+
+export const E3_FIELD_EFFECT_POLICY = Object.freeze({
+  phase: 'E3_GROUND_POINT_FIELD',
+  activation: 'live',
+  wallDurationSec: 5,
+  wallLengthM: 3,
+  wallThicknessM: 0.6,
+  wallCollisionTargets: 'wild_enemies',
+  hazardDurationSec: 4,
+  hazardTickIntervalSec: 1,
+  hazardTickDamageRatio: 0.2,
+  magnitudeSource: 'runtime_fallback_workbook_mechanic_without_duration_or_tick_magnitude',
+  cleanupBoundary: 'zone_change',
   sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
 });
@@ -220,6 +242,10 @@ export function canExecuteE1SkillEffect(skillId) {
 
 export function canExecuteE2SkillEffect(skillId) {
   return E2_READY_SKILLS.has(skillId);
+}
+
+export function canExecuteE3SkillEffect(skillId) {
+  return E3_READY_SKILLS.has(skillId);
 }
 
 export function canExecuteReviewedSkillEffect(skillId) {
@@ -665,6 +691,75 @@ export function resolveActiveSelfStatusModifiers(statusState, { nowSec = statusS
   });
 }
 
+function validFieldPoint(point) {
+  return point && Number.isFinite(point.x) && Number.isFinite(point.z);
+}
+
+function validE3Request(command, actor) {
+  if (!command || command.ok !== true || typeof command.skillId !== 'string'
+    || !E3_READY_SKILLS.has(command.skillId)) return 'effect_not_ready';
+  const skill = skillCatalogEntry(command.skillId);
+  if (!skill || command.targetKind !== skill.targetType) return 'invalid_command';
+  if (typeof (command.castId ?? command.commandId) !== 'string'
+    || (command.castId ?? command.commandId).length === 0) return 'invalid_cast_id';
+  if (!actor || typeof actor.id !== 'string' || !validFieldPoint(actor.position)) return 'invalid_actor';
+  if (!validFieldPoint(command.targetPoint)) return 'invalid_target_point';
+  if (skill.effect === 'AreaHazard' && (!Number.isFinite(command.radiusM) || command.radiusM <= 0)) return 'invalid_radius';
+  return null;
+}
+
+export function validateE3SkillEffectRequest(request = {}) {
+  const reason = validE3Request(request.command, request.attacker);
+  return effectResult(reason === null, reason);
+}
+
+export function resolveE3SkillEffects({ command, attacker } = {}) {
+  const invalid = validE3Request(command, attacker);
+  if (invalid) return effectResult(false, invalid, { rngDraws: 0 });
+  const skill = skillCatalogEntry(command.skillId);
+  const center = Object.freeze({ x: command.targetPoint.x, z: command.targetPoint.z });
+  const fieldId = `field:${command.castId ?? command.commandId}`;
+  let fieldResult;
+  if (skill.effect === 'Wall') {
+    const dx = center.x - attacker.position.x;
+    const dz = center.z - attacker.position.z;
+    const length = Math.hypot(dx, dz);
+    const normal = length > Number.EPSILON
+      ? Object.freeze({ x: dx / length, z: dz / length })
+      : Object.freeze({ x: 0, z: -1 });
+    fieldResult = Object.freeze({
+      fieldId,
+      skillId: command.skillId,
+      kind: 'wall',
+      center,
+      normal,
+      tangent: Object.freeze({ x: -normal.z, z: normal.x }),
+      durationSec: E3_FIELD_EFFECT_POLICY.wallDurationSec,
+      lengthM: E3_FIELD_EFFECT_POLICY.wallLengthM,
+      thicknessM: E3_FIELD_EFFECT_POLICY.wallThicknessM,
+      collisionTargets: E3_FIELD_EFFECT_POLICY.wallCollisionTargets,
+    });
+  } else {
+    fieldResult = Object.freeze({
+      fieldId,
+      skillId: command.skillId,
+      kind: 'hazard',
+      center,
+      radiusM: command.radiusM,
+      durationSec: E3_FIELD_EFFECT_POLICY.hazardDurationSec,
+      tickIntervalSec: E3_FIELD_EFFECT_POLICY.hazardTickIntervalSec,
+      tickDamageRatio: E3_FIELD_EFFECT_POLICY.hazardTickDamageRatio,
+    });
+  }
+  return effectResult(true, null, {
+    effectMode: 'canonical_e3_ground_field',
+    skillId: command.skillId,
+    fieldResult,
+    activeComponentKinds: Object.freeze(['field']),
+    rngDraws: 0,
+  });
+}
+
 export function validateReviewedSkillEffectRequest(request = {}) {
   const skillId = request.command?.skillId;
   if (!REVIEWED_SKILL_EFFECTS.has(skillId)) return effectResult(false, 'effect_not_ready');
@@ -676,6 +771,10 @@ export function validateReviewedSkillEffectRequest(request = {}) {
     const e2 = validateE2SkillEffectRequest({ command: request.command, actor: request.attacker, nowSec: request.nowSec });
     if (!e2.ok) return e2;
   }
+  if (E3_READY_SKILLS.has(skillId)) {
+    const e3 = validateE3SkillEffectRequest(request);
+    if (!e3.ok) return e3;
+  }
   return effectResult(true, null);
 }
 
@@ -685,6 +784,7 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
   const skillId = request.command.skillId;
   let e1 = null;
   let e2 = null;
+  let e3 = null;
   let rngDraws = 0;
   if (E1_READY_SKILLS.has(skillId)) {
     e1 = resolveE1SkillEffects(request, { rng });
@@ -696,13 +796,20 @@ export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
     if (!e2.ok) return effectResult(false, e2.reason, { rngDraws: rngDraws + e2.rngDraws });
     rngDraws += e2.rngDraws;
   }
+  if (E3_READY_SKILLS.has(skillId)) {
+    e3 = resolveE3SkillEffects(request);
+    if (!e3.ok) return effectResult(false, e3.reason, { rngDraws });
+  }
   const coverage = skillEffectCoverageEntry(skillId);
-  const active = component => e1ComponentActive(component) || component.slice === E2_SELF_EFFECT_POLICY.phase;
+  const active = component => e1ComponentActive(component)
+    || component.slice === E2_SELF_EFFECT_POLICY.phase
+    || component.slice === E3_FIELD_EFFECT_POLICY.phase;
   return effectResult(true, null, {
     effectMode: 'canonical_reviewed_effects',
     skillId,
     targetResults: e1?.targetResults ?? Object.freeze([]),
     actorResult: e2?.actorResult ?? null,
+    fieldResult: e3?.fieldResult ?? null,
     hitCount: e1?.hitCount ?? 0,
     totalDamage: e1?.totalDamage ?? 0,
     healing: e2?.healing ?? 0,

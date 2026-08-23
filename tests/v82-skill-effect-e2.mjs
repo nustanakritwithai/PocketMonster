@@ -53,9 +53,9 @@ const e2Rows = SKILL_EFFECT_COVERAGE_CONTRACT.filter(row => row.components.some(
 assert.equal(e2Rows.length, 27);
 assert.equal(E2_READY_SKILL_IDS.length, 27);
 assert.equal(new Set(E2_READY_SKILL_IDS).size, 27);
-assert.equal(REVIEWED_SKILL_EFFECT_IDS.length, 107, 'E1 + E2 leaves only GroundPoint Ice Wall deferred');
+assert.equal(REVIEWED_SKILL_EFFECT_IDS.length, 108, 'cumulative reviewed coverage includes the E3 GroundPoint field');
 assert.equal(canExecuteReviewedSkillEffect('SK_GRASS_05'), true);
-assert.equal(canExecuteReviewedSkillEffect('SK_ICE_04'), false);
+assert.equal(canExecuteReviewedSkillEffect('SK_ICE_04'), true);
 assert.equal(canExecuteE2SkillEffect('SK_NORMAL_03'), true);
 assert.equal(E2_SELF_EFFECT_POLICY.healPercentMaxHp, 25);
 assert.equal(E2_SELF_EFFECT_POLICY.healMagnitudeSource, 'runtime_fallback_workbook_percentage_unspecified');
