@@ -106,6 +106,31 @@ export const E1_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
 
 const E1_READY_SKILLS = new Set(E1_READY_SKILL_IDS);
 
+export const E2_READY_SKILL_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
+  .filter(row => row.components.some(component => component.slice === 'E2_SELF_HEAL_BUFF_SHIELD'))
+  .map(row => row.skillId));
+
+const E2_READY_SKILLS = new Set(E2_READY_SKILL_IDS);
+
+export const REVIEWED_SKILL_EFFECT_IDS = Object.freeze(SKILL_EFFECT_COVERAGE_CONTRACT
+  .filter(row => E1_READY_SKILLS.has(row.skillId) || E2_READY_SKILLS.has(row.skillId))
+  .map(row => row.skillId));
+
+const REVIEWED_SKILL_EFFECTS = new Set(REVIEWED_SKILL_EFFECT_IDS);
+
+export const E2_SELF_EFFECT_POLICY = Object.freeze({
+  phase: 'E2_SELF_HEAL_BUFF_SHIELD',
+  activation: 'live',
+  statusSource: 'Status_Master + Skill_Status_Link',
+  healMode: 'percentage_max_hp',
+  healPercentMaxHp: 25,
+  healMagnitudeSource: 'runtime_fallback_workbook_percentage_unspecified',
+  positiveStatusChance: 'guaranteed_by_status_resolver',
+  encounterBoundary: 'clear_all',
+  sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
+  sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
+});
+
 export const SKILL_EFFECT_RUNTIME_POLICY = Object.freeze({
   phase: 'E1_DIRECT_DAMAGE_STATUS',
   activation: 'live',
@@ -143,7 +168,7 @@ function activeStatusIds(combatant, nowSec) {
   const statuses = combatant?.statusState?.statuses;
   if (!Array.isArray(statuses)) return [];
   return [...new Set(statuses
-    .filter(status => status && status.expiresAtSec > nowSec)
+    .filter(status => status && status.appliedAtSec <= nowSec && status.expiresAtSec > nowSec)
     .map(status => status.statusId))];
 }
 
@@ -193,12 +218,30 @@ export function canExecuteE1SkillEffect(skillId) {
   return E1_READY_SKILLS.has(skillId);
 }
 
-export function resolveWorkbookDirectDamage({ skillId, attacker, defender, nowSec = 0 } = {}, { rng } = {}) {
+export function canExecuteE2SkillEffect(skillId) {
+  return E2_READY_SKILLS.has(skillId);
+}
+
+export function canExecuteReviewedSkillEffect(skillId) {
+  return REVIEWED_SKILL_EFFECTS.has(skillId);
+}
+
+export function resolveWorkbookDirectDamage({
+  skillId,
+  attacker,
+  defender,
+  nowSec = 0,
+  attackerNowSec = nowSec,
+  defenderNowSec = nowSec,
+} = {}, { rng } = {}) {
   const profile = skillDamageProfile(skillId);
   if (!profile) return effectResult(false, 'unknown_skill', { skillId: skillId ?? null, rngDraws: 0 });
   const invalid = validateDamageInput(profile, attacker, defender);
   if (invalid) return effectResult(false, invalid, { skillId, rngDraws: 0 });
-  if (!Number.isFinite(nowSec) || nowSec < 0) return effectResult(false, 'invalid_time', { skillId, rngDraws: 0 });
+  if (!Number.isFinite(attackerNowSec) || attackerNowSec < 0
+    || !Number.isFinite(defenderNowSec) || defenderNowSec < 0) {
+    return effectResult(false, 'invalid_time', { skillId, rngDraws: 0 });
+  }
 
   const skill = skillCatalogEntry(skillId);
   let rngDraws = 0;
@@ -223,8 +266,8 @@ export function resolveWorkbookDirectDamage({ skillId, attacker, defender, nowSe
     }
   }
 
-  const attackerStatuses = activeStatusIds(attacker, nowSec);
-  const defenderStatuses = activeStatusIds(defender, nowSec);
+  const attackerStatuses = activeStatusIds(attacker, attackerNowSec);
+  const defenderStatuses = activeStatusIds(defender, defenderNowSec);
   const attackModifier = clamp(
     1 + modifierPct(attackerStatuses, 'AttackStat', profile.scalingStat) / 100,
     WORKBOOK_DAMAGE_RULES.statModifierMin,
@@ -403,7 +446,13 @@ export function resolveE1SkillEffects({ command, attacker, targets, nowSec = 0 }
 
   for (const target of targets) {
     const targetNowSec = Number.isFinite(target.nowSec) ? target.nowSec : nowSec;
-    const damage = resolveWorkbookDirectDamage({ skillId: command.skillId, attacker, defender: target, nowSec: targetNowSec }, { rng });
+    const damage = resolveWorkbookDirectDamage({
+      skillId: command.skillId,
+      attacker,
+      defender: target,
+      attackerNowSec: nowSec,
+      defenderNowSec: targetNowSec,
+    }, { rng });
     if (!damage.ok) return effectResult(false, damage.reason, { rngDraws: rngDraws + damage.rngDraws });
     rngDraws += damage.rngDraws;
     const predictedHp = Math.max(0, target.hp - damage.damage);
@@ -483,6 +532,183 @@ export function resolveE1SkillEffects({ command, attacker, targets, nowSec = 0 }
     statusAppliedCount,
     activeComponentKinds: Object.freeze(coverage.components.filter(e1ComponentActive).map(component => component.kind)),
     deferredComponentKinds: Object.freeze(coverage.components.filter(component => !e1ComponentActive(component)).map(component => component.kind)),
+    rngDraws,
+  });
+}
+
+function e2Components(row) {
+  return row.components.filter(component => component.slice === E2_SELF_EFFECT_POLICY.phase);
+}
+
+function validE2Request(command, actor, nowSec) {
+  if (!command || command.ok !== true || typeof command.skillId !== 'string'
+    || !Array.isArray(command.targetIds) || !E2_READY_SKILLS.has(command.skillId)) return 'effect_not_ready';
+  const skill = skillCatalogEntry(command.skillId);
+  if (!skill || command.targetKind !== skill.targetType) return 'invalid_command';
+  if (!actor || typeof actor.id !== 'string' || !validLevel(actor.level) || !validTypes(actor.types)
+    || !Number.isFinite(actor.hp) || !Number.isFinite(actor.maxHp) || actor.hp <= 0
+    || actor.maxHp <= 0 || actor.hp > actor.maxHp || !isEncounterStatusState(actor.statusState)
+    || actor.statusState.ended === true) return 'invalid_actor';
+  if (!Number.isFinite(nowSec) || nowSec < actor.statusState.currentTimeSec) return 'invalid_time';
+  if (command.targetKind === 'Self'
+    && (command.targetIds.length !== 1 || command.targetIds[0] !== actor.id)) return 'actor_mismatch';
+  return null;
+}
+
+export function validateE2SkillEffectRequest(request = {}) {
+  const reason = validE2Request(request.command, request.actor, request.nowSec);
+  return effectResult(reason === null, reason);
+}
+
+export function resolveE2SkillEffects({ command, actor, nowSec = 0 } = {}, { rng } = {}) {
+  const invalid = validE2Request(command, actor, nowSec);
+  if (invalid) return effectResult(false, invalid, { rngDraws: 0 });
+  const coverage = skillEffectCoverageEntry(command.skillId);
+  const components = e2Components(coverage);
+  let nextStatusState = actor.statusState;
+  const statusResults = [];
+  let statusAppliedCount = 0;
+  let rngDraws = 0;
+
+  if (components.some(component => component.kind === 'status')) {
+    for (let index = 0; index < coverage.statusLinkIds.length; index += 1) {
+      const linkId = coverage.statusLinkIds[index];
+      const statusId = coverage.statusIds[index];
+      const resolved = resolveStatusApplication({
+        linkId,
+        targetTypes: actor.types,
+        currentStacks: currentStacks(nextStatusState, statusId, nowSec),
+      }, { rng });
+      if (!resolved.ok) return effectResult(false, resolved.reason, { rngDraws: rngDraws + resolved.rngDraws });
+      rngDraws += resolved.rngDraws;
+      let applied = false;
+      let lifecycleReason = resolved.reason;
+      if (resolved.applied) {
+        const lifecycle = applyEncounterStatus(nextStatusState, {
+          ...resolved.proposedStatus,
+          stacks: resolved.stackRule === 'AddStackAndRefresh'
+            ? resolved.potencyStacks
+            : resolved.proposedStatus.stacks,
+          sourceInstanceId: actor.id,
+        }, { nowSec });
+        if (!lifecycle.ok) return effectResult(false, lifecycle.reason, { rngDraws });
+        nextStatusState = lifecycle.state;
+        applied = lifecycle.applied;
+        lifecycleReason = lifecycle.reason;
+        if (applied) statusAppliedCount += 1;
+      }
+      statusResults.push(Object.freeze({
+        linkId,
+        statusId,
+        applied,
+        reason: lifecycleReason,
+        finalChancePct: resolved.finalChancePct,
+        rngDraws: resolved.rngDraws,
+      }));
+    }
+  }
+
+  const hasHeal = components.some(component => component.kind === 'self_heal');
+  const requestedHealing = hasHeal
+    ? Math.max(1, Math.round(actor.maxHp * E2_SELF_EFFECT_POLICY.healPercentMaxHp / 100))
+    : 0;
+  const healing = Math.min(actor.maxHp - actor.hp, requestedHealing);
+  const predictedHp = actor.hp + healing;
+  return effectResult(true, null, {
+    effectMode: 'canonical_e2_self_support',
+    skillId: command.skillId,
+    actorResult: Object.freeze({
+      actorId: actor.id,
+      previousHp: actor.hp,
+      predictedHp,
+      requestedHealing,
+      healing,
+      statusResults: Object.freeze(statusResults),
+      nextStatusState,
+    }),
+    healing,
+    statusAppliedCount,
+    activeComponentKinds: Object.freeze(components.map(component => component.kind)),
+    rngDraws,
+  });
+}
+
+export function resolveActiveSelfStatusModifiers(statusState, { nowSec = statusState?.currentTimeSec, incomingType = null } = {}) {
+  if (!isEncounterStatusState(statusState) || statusState.ended === true
+    || !Number.isFinite(nowSec) || nowSec < statusState.currentTimeSec
+    || (incomingType !== null && !RUNTIME_TYPE_SET.has(incomingType))) {
+    return effectResult(false, 'invalid_status_context');
+  }
+  const definitions = activeStatusIds({ statusState }, nowSec)
+    .map(statusCatalogEntry)
+    .filter(Boolean);
+  const magnitudeFor = modifiedStat => definitions
+    .filter(definition => definition.modifiedStat === modifiedStat)
+    .reduce((total, definition) => total + definition.magnitude, 0);
+  const attackPct = magnitudeFor('ATK') + magnitudeFor('ATK_DEF');
+  const specialAttackPct = magnitudeFor('SPATK');
+  const defensePct = magnitudeFor('DEF') + magnitudeFor('ATK_DEF');
+  const speedPct = magnitudeFor('SPD');
+  const damageTakenPct = magnitudeFor('DamageTaken');
+  const elementDamageTakenPct = incomingType === 'Fire' ? magnitudeFor('FireDamageTaken') : 0;
+  return effectResult(true, null, {
+    attackMultiplier: clamp(1 + attackPct / 100, WORKBOOK_DAMAGE_RULES.statModifierMin, WORKBOOK_DAMAGE_RULES.statModifierMax),
+    specialAttackMultiplier: clamp(1 + specialAttackPct / 100, WORKBOOK_DAMAGE_RULES.statModifierMin, WORKBOOK_DAMAGE_RULES.statModifierMax),
+    defenseMultiplier: clamp(1 + defensePct / 100, WORKBOOK_DAMAGE_RULES.statModifierMin, WORKBOOK_DAMAGE_RULES.statModifierMax),
+    speedMultiplier: clamp(1 + speedPct / 100, WORKBOOK_DAMAGE_RULES.statModifierMin, WORKBOOK_DAMAGE_RULES.statModifierMax),
+    damageTakenMultiplier: clamp(1 + damageTakenPct / 100, WORKBOOK_DAMAGE_RULES.damageTakenMin, WORKBOOK_DAMAGE_RULES.damageTakenMax),
+    elementDamageTakenMultiplier: Math.max(0, 1 + elementDamageTakenPct / 100),
+    critChancePct: clamp(magnitudeFor('CritChance'), 0, WORKBOOK_DAMAGE_RULES.critChanceCapPct),
+    evasionChancePct: clamp(magnitudeFor('Evasion'), 0, 100),
+    poisonResistancePct: clamp(Math.abs(magnitudeFor('PoisonApplyChance')), 0, 100),
+    activeStatusIds: Object.freeze(definitions.map(definition => definition.id)),
+  });
+}
+
+export function validateReviewedSkillEffectRequest(request = {}) {
+  const skillId = request.command?.skillId;
+  if (!REVIEWED_SKILL_EFFECTS.has(skillId)) return effectResult(false, 'effect_not_ready');
+  if (E1_READY_SKILLS.has(skillId)) {
+    const e1 = validateE1SkillEffectRequest(request);
+    if (!e1.ok) return e1;
+  }
+  if (E2_READY_SKILLS.has(skillId)) {
+    const e2 = validateE2SkillEffectRequest({ command: request.command, actor: request.attacker, nowSec: request.nowSec });
+    if (!e2.ok) return e2;
+  }
+  return effectResult(true, null);
+}
+
+export function resolveReviewedSkillEffects(request = {}, { rng } = {}) {
+  const valid = validateReviewedSkillEffectRequest(request);
+  if (!valid.ok) return effectResult(false, valid.reason, { rngDraws: 0 });
+  const skillId = request.command.skillId;
+  let e1 = null;
+  let e2 = null;
+  let rngDraws = 0;
+  if (E1_READY_SKILLS.has(skillId)) {
+    e1 = resolveE1SkillEffects(request, { rng });
+    if (!e1.ok) return e1;
+    rngDraws += e1.rngDraws;
+  }
+  if (E2_READY_SKILLS.has(skillId)) {
+    e2 = resolveE2SkillEffects({ command: request.command, actor: request.attacker, nowSec: request.nowSec }, { rng });
+    if (!e2.ok) return effectResult(false, e2.reason, { rngDraws: rngDraws + e2.rngDraws });
+    rngDraws += e2.rngDraws;
+  }
+  const coverage = skillEffectCoverageEntry(skillId);
+  const active = component => e1ComponentActive(component) || component.slice === E2_SELF_EFFECT_POLICY.phase;
+  return effectResult(true, null, {
+    effectMode: 'canonical_reviewed_effects',
+    skillId,
+    targetResults: e1?.targetResults ?? Object.freeze([]),
+    actorResult: e2?.actorResult ?? null,
+    hitCount: e1?.hitCount ?? 0,
+    totalDamage: e1?.totalDamage ?? 0,
+    healing: e2?.healing ?? 0,
+    statusAppliedCount: (e1?.statusAppliedCount ?? 0) + (e2?.statusAppliedCount ?? 0),
+    activeComponentKinds: Object.freeze(coverage.components.filter(active).map(component => component.kind)),
+    deferredComponentKinds: Object.freeze(coverage.components.filter(component => !active(component)).map(component => component.kind)),
     rngDraws,
   });
 }

@@ -82,7 +82,10 @@ const mutants = [
     'a.aiDecision=resolveOwnedBasicAiAction(',
     'useSkill(0);a.aiDecision=resolveOwnedBasicAiAction(',
   )],
-  ['allow manual mastery in Basic call', mutate('{allowSkillMastery:false}', '{allowSkillMastery:true}')],
+  ['allow manual mastery in Basic call', mutate(
+    '{allowSkillMastery:false,critBonusPct}',
+    '{allowSkillMastery:true,critBonusPct}',
+  )],
   ['restore unconditional mastery lookup', mutate(
     'const skillRec=allowSkillMastery?(getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(\' • \')[0])):null;',
     'const skillRec=getSkill(attackerInst,move.skillId)||getSkill(attackerInst,move.name)||getSkill(attackerInst,move.name?.split(\' • \')[0]);',

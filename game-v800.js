@@ -31,7 +31,7 @@ import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getS
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
-import { canExecuteE1SkillEffect, resolveE1SkillEffects, skillDamageProfile, validateE1SkillEffectRequest } from './skill-effect-runtime.mjs';
+import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
 import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
@@ -685,7 +685,7 @@ function canonicalCombatSkills(inst){
       targetType:definition.targetType,
       effect:definition.effect,
       directDamage:definition.directDamage,
-      effectAvailable:canExecuteE1SkillEffect(definition.id),
+      effectAvailable:canExecuteReviewedSkillEffect(definition.id),
       unavailableReason:'Targeting พร้อมแล้ว • เอฟเฟกต์นี้รอระบบสกิลขั้นถัดไป',
       currentUses:entry.skill.currentUses,
       maxUses:definition.maxUses,
@@ -3095,7 +3095,7 @@ function defeatWild(w){
   retireWild(w);
   ensureProgressionEncounter(w.zone);
 }
-function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=true}={}){
+function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=true,critBonusPct=0}={}){
   const stab=monsterTypes(attackerInst).includes(move.type)?1.5:1;
   const defTypes=defender?.instanceId?monsterTypes(defender):wildTypes(defender);
   const eff=typeEffectiveness(move.type,defTypes);
@@ -3113,7 +3113,7 @@ function monsterDamage(attackerInst,move,defender,atkBuff=1,{allowSkillMastery=t
     atkBuff,
     masteryPower:mastery,
     traitBonus:attackerInst.genes?.trait==='Fierce'?1.08:1,
-    critRate:derived.critRate,
+    critRate:derived.critRate+critBonusPct/100,
     critDamage:derived.critDamage,
     critRoll:Math.random()
   });
@@ -3122,13 +3122,13 @@ function instanceCombatBuildSafe(inst){
   const sp=spById[inst.speciesId];
   return computeCoreStats(inst,sp,getEvolutionPath(inst),getEquipmentFlat(inst)).build;
 }
-function wildDamage(w,inst){
+function wildDamage(w,inst,defenseMultiplier=1){
   const sp=spById[w.speciesId],move={type:sp.types[0],power:w.boss?24:18};
   const eff=typeEffectiveness(move.type,monsterTypes(inst));
   return liveMoveDamage({
     movePower:move.power,
     atk:w.atk||sp.base.atk,
-    def:inst.def||10,
+    def:(inst.def||10)*defenseMultiplier,
     attackerLevel:w.level||1,
     defenderLevel:inst.level||1,
     stab:1.5,
@@ -3299,7 +3299,7 @@ function spawnOwned(inst,pos){
   mesh.userData.instanceId=inst.instanceId;
   mesh.position.copy(pos);mesh.position.y=0;scene.add(mesh);setupMonsterMotion(mesh,sp,inst);
   spawnElementalFX(monsterTypes(inst)[0],pos.clone().add(new THREE.Vector3(0,.45,0)),'summon',1.05);
-  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),skillUiElapsed:.1,aiDecision:null,aiDecisionElapsed:0,attackBuff:1,buffTimer:0,shieldReduction:0,shieldTimer:0};
+  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),skillUiElapsed:.1,aiDecision:null,aiDecisionElapsed:0,statusState:createEncounterStatusState({encounterId:`owned:${inst.instanceId}`,nowSec:0})};
   inst.bond=clamp(inst.bond+.4);
   msg(`${displayName(inst)} ลงสนาม • AI จะเลือกศัตรูใกล้ที่สุดและโจมตีพื้นฐานเอง`);
   renderParty();renderSkillButtons();renderHUD();
@@ -3309,6 +3309,7 @@ function recall(show=true,setCooldown=true){
   if(!activeSummon){removeSceneRole('activeSummon');if(show)msg('ยังไม่มีมอนในสนาม');return;}
   playerVisual.play('recall',{duration:.28});
   const name=displayName(activeSummon.inst);
+  activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});
   spawnRingPulse(activeSummon.mesh.position.clone(),0x60a5fa,{scale:.62,life:.26});
   spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.55,0)),0x60a5fa,{count:8,life:.24,size:.05});
   removeAndDispose(scene, activeSummon.mesh);
@@ -3320,7 +3321,7 @@ function recall(show=true,setCooldown=true){
   if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
   renderParty();renderSkillButtons();renderHUD();
 }
-function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
+function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
 function spawnSkillTrail(type, fromPos, toPos) {
   const cfg = typeFx(type);
   const dist = fromPos.distanceTo(toPos);
@@ -3530,7 +3531,9 @@ function canonicalSkillEffectAttacker(a,move){
     level:a.inst.level,
     types:Object.freeze([...monsterTypes(a.inst)]),
     stats:Object.freeze({ATK:attack,SPATK:specialAttack}),
-    statusState:a.statusState??null,
+    hp:a.inst.hp,
+    maxHp:a.inst.maxHp,
+    statusState:a.statusState,
     critChancePct:derived.critRate*100,
     powerBonusPct:skillRec?masteryRawPower(skillRec.masteryRank)*100:0,
     damageDealtPct:a.inst.genes?.trait==='Fierce'?8:0,
@@ -3555,17 +3558,17 @@ function canonicalSkillEffectTargets(materialized){
     });
   }));
 }
-function canonicalE1SkillEffectRequest(a,move,command,materialized){
+function canonicalSkillEffectRequest(a,move,command,materialized){
   return Object.freeze({
     command,
     attacker:canonicalSkillEffectAttacker(a,move),
-    targets:canonicalSkillEffectTargets(materialized),
-    nowSec:0,
+    targets:command.targetKind==='Self'?Object.freeze([]):canonicalSkillEffectTargets(materialized),
+    nowSec:a.statusState.currentTimeSec,
   });
 }
 function canApplyLiveSkill(a,move,command,materialized){
-  if(!canExecuteE1SkillEffect(command.skillId))return false;
-  return validateE1SkillEffectRequest(canonicalE1SkillEffectRequest(a,move,command,materialized)).ok;
+  if(!canExecuteReviewedSkillEffect(command.skillId))return false;
+  return validateReviewedSkillEffectRequest(canonicalSkillEffectRequest(a,move,command,materialized)).ok;
 }
 function awardAcceptedSkillMastery(a,move,res){
   const skillRec=getSkill(a.inst,move.skillId);
@@ -3578,16 +3581,43 @@ function awardAcceptedSkillMastery(a,move,res){
     if(sResult?.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}
   }
 }
+function applyPlannedActorEffect(a,move,actorResult){
+  if(!actorResult)return;
+  a.inst.hp=actorResult.predictedHp;
+  a.statusState=actorResult.nextStatusState;
+  const appliedStatusIds=actorResult.statusResults.filter(result=>result.applied).map(result=>result.statusId);
+  const activeStatuses=a.statusState.statuses.filter(status=>appliedStatusIds.includes(status.statusId));
+  const duration=Math.max(0,...activeStatuses.map(status=>status.expiresAtSec-a.statusState.currentTimeSec));
+  if(actorResult.healing>0){
+    spawnDamageNumber(actorResult.healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});
+    spawnHealSkillEffect(a.mesh.position.clone(),move.type);logBattleEvent('spirit',actorResult.healing);
+  }
+  if(appliedStatusIds.length){
+    const shieldStatus=appliedStatusIds.some(statusId=>['ST_DEF_UP','ST_DAMAGE_REDUCE','ST_FIRE_RESIST','ST_POISON_RESIST'].includes(statusId));
+    if(shieldStatus)spawnShieldSkillEffect(a.mesh.position.clone(),move.type,duration);
+    else spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,duration);
+    logBattleEvent(shieldStatus?'defense':'power',Math.max(1,duration*3));
+  }
+  const details=[];
+  if(actorResult.requestedHealing>0)details.push(`ฟื้น HP ${actorResult.healing}`);
+  if(appliedStatusIds.length)details.push(`Status ${appliedStatusIds.join(', ')} ${duration}s`);
+  if(details.length)msg(`${displayName(a.inst)} ใช้ ${move.name} • ${details.join(' • ')}`);
+}
 function applyAcceptedSkillCommand(a,index,move,command,materialized){
   // Uses has already committed. Cooldown is the first live mutation here; all
   // presentation, damage, bond, mastery, and logs follow the acceptance guard.
-  const planned=resolveE1SkillEffects(canonicalE1SkillEffectRequest(a,move,command,materialized),{rng:Math.random});
+  const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});
   if(!planned.ok)throw new Error(`canonical skill effect failed: ${planned.reason}`);
   a.skillCds[index]=command.startCooldownSec;
   const targets=materialized.map(target=>target.world);
   playSFX(`sfx_skill_${move.type.toLowerCase()}`);
   let res=null,total=0;
-  if(command.targetKind==='NearestEnemy'){
+  if(command.targetKind==='Self'){
+    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.22);
+    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);
+    spawnSkillSprite(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0.8,0.6);
+    spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
+  }else if(command.targetKind==='NearestEnemy'){
     const target=targets[0],effect=planned.targetResults[0],damageResult=effect.damageResult;
     res={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
     playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);
@@ -3622,6 +3652,7 @@ function applyAcceptedSkillCommand(a,index,move,command,materialized){
     }
     msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${planned.hitCount}/${targets.length} ตัว • รวม ${total} Damage${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
   }
+  applyPlannedActorEffect(a,move,planned.actorResult);
   a.inst.bond=clamp(a.inst.bond+.3);
   awardAcceptedSkillMastery(a,move,res);
   renderParty();renderSkillButtons();
@@ -3729,15 +3760,22 @@ function materializeOwnedBasicAiTarget(a,decision){
   return target;
 }
 function updateOwned(dt){
-  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];a.attackCd=tickCooldown(a.attackCd,dt);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-dt);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);if(a.buffTimer>0){a.buffTimer-=dt;if(a.buffTimer<=0)a.attackBuff=1;}if(a.shieldTimer>0){a.shieldTimer-=dt;if(a.shieldTimer<=0)a.shieldReduction=0;}
+  const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];
+  const statusAdvance=advanceEncounterEffects(a.statusState,{toSec:a.statusState.currentTimeSec+dt,targetHp:a.inst.hp,targetMaxHp:a.inst.maxHp});
+  if(statusAdvance.ok){a.statusState=statusAdvance.state;if(statusAdvance.damage>0){a.inst.hp=statusAdvance.targetHp;if(statusAdvance.fainted){faintActive();return;}}}
+  const selfModifiers=resolveActiveSelfStatusModifiers(a.statusState);
+  const attackMultiplier=selfModifiers.ok?selfModifiers.attackMultiplier:1;
+  const speedMultiplier=selfModifiers.ok?selfModifiers.speedMultiplier:1;
+  const critBonusPct=selfModifiers.ok?selfModifiers.critChancePct:0;
+  a.attackCd=tickCooldown(a.attackCd,dt);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-dt);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);
   if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision))a.aiDecision=resolveOwnedBasicAiAction(fillOwnedBasicAiRequest(ownedBasicAiScratch,a,wilds));
   const decision=a.aiDecision;
   const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;if(!t&&decision?.targetId!==null)a.aiDecision=null;let moving=false;
   if(t&&decision.action==='move'){
-    moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
+    moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
   }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0){
     const liveTarget=materializeOwnedBasicAiTarget(a,decision);
-    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,a.attackBuff,{allowSkillMastery:false});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
+    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}
   }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
@@ -3828,12 +3866,19 @@ function updateWild(w,dt,canEngage=false){
     const impact=wildUpdateScratch.impact.copy(target.position);impact.y+=.55;
     spawnElementalFX(wildTypes(w)[0],impact,'impact',0.65);
     if(activeSummon&&activeSummon.mesh){
-      const res=wildDamage(w,activeSummon.inst),reduction=activeSummon.shieldTimer>0?activeSummon.shieldReduction:0,dmg=Math.round(res.damage*(1-reduction));
-      activeSummon.inst.hp-=dmg;
-      impact.copy(activeSummon.mesh.position);impact.y+=1.25;
-      spawnDamageNumber(dmg,impact,{type:wildTypes(w)[0],eff:res.eff});
-      triggerCameraShake(w.boss?.15:.09,w.boss?.2:.14);
-      if(activeSummon.inst.hp<=0)faintActive();
+      const incomingType=wildTypes(w)[0],guard=resolveActiveSelfStatusModifiers(activeSummon.statusState,{incomingType});
+      const evaded=guard.ok&&guard.evasionChancePct>0&&Math.random()<guard.evasionChancePct/100;
+      if(evaded){msg(`${displayName(activeSummon.inst)} หลบการโจมตีได้`);}
+      else{
+        const res=wildDamage(w,activeSummon.inst,guard.ok?guard.defenseMultiplier:1);
+        const finalMultiplier=guard.ok?guard.damageTakenMultiplier*guard.elementDamageTakenMultiplier:1;
+        const dmg=Math.max(1,Math.round(res.damage*finalMultiplier));
+        activeSummon.inst.hp-=dmg;
+        impact.copy(activeSummon.mesh.position);impact.y+=1.25;
+        spawnDamageNumber(dmg,impact,{type:incomingType,eff:res.eff});
+        triggerCameraShake(w.boss?.15:.09,w.boss?.2:.14);
+        if(activeSummon.inst.hp<=0)faintActive();
+      }
       renderParty();
     }else if(playerData.invuln<=0){
       const playerDmg=Math.round(w.atk*(w.boss?.7:.48));

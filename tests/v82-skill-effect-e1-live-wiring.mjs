@@ -27,7 +27,7 @@ function functionSource(source, name) {
 }
 
 export function assertE1LiveWiring(source) {
-  assert.match(source, /import \{ canExecuteE1SkillEffect, resolveE1SkillEffects, skillDamageProfile, validateE1SkillEffectRequest \} from '\.\/skill-effect-runtime\.mjs'/);
+  assert.match(source, /import \{ canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, skillDamageProfile, validateReviewedSkillEffectRequest \} from '\.\/skill-effect-runtime\.mjs'/);
   const catalogSkills = functionSource(source, 'canonicalCombatSkills');
   const attacker = functionSource(source, 'canonicalSkillEffectAttacker');
   const targets = functionSource(source, 'canonicalSkillEffectTargets');
@@ -35,8 +35,8 @@ export function assertE1LiveWiring(source) {
   const apply = functionSource(source, 'applyAcceptedSkillCommand');
   const useSkill = functionSource(source, 'useSkill');
 
-  assert.match(catalogSkills, /effectAvailable:canExecuteE1SkillEffect\(definition\.id\)/,
-    'HUD availability comes from the reviewed E1 coverage');
+  assert.match(catalogSkills, /effectAvailable:canExecuteReviewedSkillEffect\(definition\.id\)/,
+    'HUD availability comes from cumulative reviewed coverage');
   assert.match(attacker, /skillDamageProfile\(move\.skillId\)/);
   assert.match(attacker, /stats:Object\.freeze\(\{ATK:attack,SPATK:specialAttack\}\)/,
     'live actor supplies both workbook scaling stats');
@@ -51,13 +51,13 @@ export function assertE1LiveWiring(source) {
   assert.match(targets, /statusState:w\.statusState/);
   assert.match(targets, /nowSec:w\.statusState\?\.currentTimeSec\?\?0/);
 
-  assert.match(readiness, /canExecuteE1SkillEffect\(command\.skillId\)/);
-  assert.match(readiness, /validateE1SkillEffectRequest\(canonicalE1SkillEffectRequest\(a,move,command,materialized\)\)\.ok/,
+  assert.match(readiness, /canExecuteReviewedSkillEffect\(command\.skillId\)/);
+  assert.match(readiness, /validateReviewedSkillEffectRequest\(canonicalSkillEffectRequest\(a,move,command,materialized\)\)\.ok/,
     'effect request is structurally validated before Uses commit');
   assert.match(useSkill, /canApply:\(command,targets\)=>canApplyLiveSkill\(a,move,command,targets\)/);
   assert.match(useSkill, /applyAccepted:\(command,targets\)=>applyAcceptedSkillCommand\(a,index,move,command,targets\)/);
 
-  const planAt = apply.indexOf('const planned=resolveE1SkillEffects(');
+  const planAt = apply.indexOf('const planned=resolveReviewedSkillEffects(');
   const cooldownAt = apply.indexOf('a.skillCds[index]=command.startCooldownSec;');
   const damageAt = apply.indexOf('damageWild(');
   assert.ok(planAt >= 0 && cooldownAt > planAt && damageAt > cooldownAt,

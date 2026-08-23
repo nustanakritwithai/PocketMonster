@@ -103,8 +103,8 @@ export function assertGoldenPathLiveWiring({ js, packageJson }) {
   assert.match(useSkill, /canApply:\(command,targets\)=>canApplyLiveSkill\(a,move,command,targets\)/, 'live readiness cannot be bypassed by the button adapter');
   assert.match(useSkill, /applyAccepted:\(command,targets\)=>applyAcceptedSkillCommand\(a,index,move,command,targets\)/, 'accepted commands reach the live effect boundary exactly once');
   assert.match(createSkillDispatchIntent, /move\?\.targetType==='GroundPoint'\?reticleGroundPoint\(\):null/, 'GroundPoint is sourced from the live reticle');
-  assert.match(canApplyLiveSkill, /canExecuteE1SkillEffect\(command\.skillId\)/, 'live effects are gated by the reviewed E1 coverage');
-  assert.match(canApplyLiveSkill, /validateE1SkillEffectRequest\(canonicalE1SkillEffectRequest/, 'live readiness validates the exact effect request before Uses commit');
+  assert.match(canApplyLiveSkill, /canExecuteReviewedSkillEffect\(command\.skillId\)/, 'live effects are gated by cumulative reviewed coverage');
+  assert.match(canApplyLiveSkill, /validateReviewedSkillEffectRequest\(canonicalSkillEffectRequest/, 'live readiness validates the exact effect request before Uses commit');
   for (let index = 1; index <= 4; index += 1) {
     assert.match(js, new RegExp(`bindActionPress\\(el\\('skill${index}Btn'\\),\\(\\)=>dispatchSkill\\(${index - 1}\\)\\)`), `combat hotbar slot ${index} is wired`);
   }
