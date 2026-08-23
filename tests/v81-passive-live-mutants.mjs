@@ -19,7 +19,7 @@ async function loadSource(source, filename, tag) {
 }
 
 function assertMonsterContract(module) {
-  assert.equal(module.INSTANCE_SAVE_VERSION, 12);
+  assert.equal(module.INSTANCE_SAVE_VERSION, 13);
   const normalized = module.normalizeInstance({
     instanceId: 'rock-mutant',
     speciesId: 'rockhorn',
@@ -49,12 +49,13 @@ function assertMonsterContract(module) {
 }
 
 function assertSaveContract(module) {
-  assert.equal(module.SAVE_SCHEMA_VERSION, 12);
+  assert.equal(module.SAVE_SCHEMA_VERSION, 13);
   assert.deepEqual(module.SAVE_MIGRATION_REGISTRY.map(entry => entry.id), [
     'monster-instance-v9-skill-runtime',
     'breeding-egg-v10',
     'passive-instance-v11',
     'canonical-monster-stats-v12',
+    'canonical-monster-exp-v13',
   ]);
   const sanitized = module.sanitizeStateForPersistence({
     collection: [],
@@ -189,10 +190,10 @@ assertLiveContract(await loadSource(SOURCES.live[1], SOURCES.live[0], 'passive-l
 assertGameContract(SOURCES.game[1]);
 
 const mutants = [
-  ['monster', 'retain old save version', 'export const INSTANCE_SAVE_VERSION = 12;', 'export const INSTANCE_SAVE_VERSION = 11;', assertMonsterContract],
+  ['monster', 'retain old save version', 'export const INSTANCE_SAVE_VERSION = 13;', 'export const INSTANCE_SAVE_VERSION = 11;', assertMonsterContract],
   ['monster', 'retain raw passive runtime fields', 'for (const field of TRANSIENT_PASSIVE_FIELDS) delete copy[field];', 'for (const field of []) delete copy[field];', assertMonsterContract],
   ['monster', 'trust forged passive ID', 'return isPassiveEligibleForSpecies(source.speciesId, source.passiveId)\n    ? source.passiveId\n    : defaultPassiveId;', 'return source.passiveId ?? defaultPassiveId;', assertMonsterContract],
-  ['save', 'retain old schema version', 'export const SAVE_SCHEMA_VERSION = 12;', 'export const SAVE_SCHEMA_VERSION = 11;', assertSaveContract],
+  ['save', 'retain old schema version', 'export const SAVE_SCHEMA_VERSION = 13;', 'export const SAVE_SCHEMA_VERSION = 11;', assertSaveContract],
   ['save', 'persist passive event ledger', 'for (const field of TRANSIENT_PASSIVE_FIELDS) delete state[field];', 'for (const field of []) delete state[field];', assertSaveContract],
   ['save', 'copy unsafe previous payload to backup', "storage.setItem(SAVE_BACKUP_KEY, JSON.stringify({\n      ...previous,\n      state: sanitizeStateForPersistence(previous.state),\n      appVersion: APP_VERSION,\n      saveSchemaVersion: SAVE_SCHEMA_VERSION,\n    }));", 'storage.setItem(SAVE_BACKUP_KEY, previousRaw);', assertSaveContract],
   ['save', 'drop passive migration registry entry', "  Object.freeze({\n    id: 'passive-instance-v11',\n    targetVersion: 11,\n    migrate: migrateState,\n  }),\n", '', assertSaveContract],

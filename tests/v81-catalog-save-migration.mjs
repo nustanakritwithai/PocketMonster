@@ -37,6 +37,7 @@ assert.deepEqual(
     ['breeding-egg-v10', 10],
     ['passive-instance-v11', 11],
     ['canonical-monster-stats-v12', 12],
+    ['canonical-monster-exp-v13', 13],
   ],
   'the supported instance migration is explicit and versioned',
 );

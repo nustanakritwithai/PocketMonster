@@ -9,12 +9,13 @@ import {
   workbookLevelDifferenceMultiplier,
 } from '../balance-formulas.mjs';
 
-assert.equal(WORKBOOK_EXP_ADAPTER.activation, 'calculator_only');
-assert.equal(WORKBOOK_EXP_ADAPTER.runtimeEligible, false);
+assert.equal(WORKBOOK_EXP_ADAPTER.activation, 'runtime_live');
+assert.equal(WORKBOOK_EXP_ADAPTER.runtimeEligible, true);
 assert.equal(Object.isFrozen(WORKBOOK_EXP_ADAPTER), true);
 assert.equal(Object.isFrozen(WORKBOOK_EXP_ADAPTER.curves), true);
-assert.equal(BALANCE_CONFIG.level.cap, 50, 'live level cap remains unchanged');
-assert.equal(expToNext(50), Infinity, 'Workbook source curves do not activate in the live game');
+assert.equal(BALANCE_CONFIG.level.cap, 60, 'Workbook Lv.60 cap is live');
+assert.ok(expToNext(50) > 0, 'live progression continues beyond Lv.50');
+assert.equal(expToNext(60), 0, 'live progression stops at Lv.60');
 
 const curveVectors = [
   ['Fast', 1, 0, 6],

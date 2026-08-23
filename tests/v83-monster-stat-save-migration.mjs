@@ -27,8 +27,8 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-assert.equal(INSTANCE_SAVE_VERSION, 12);
-assert.equal(SAVE_SCHEMA_VERSION, 12);
+assert.equal(INSTANCE_SAVE_VERSION, 13);
+assert.equal(SAVE_SCHEMA_VERSION, 13);
 assert.equal(INSTANCE_STAT_SCHEMA_VERSION, 'monster-instance-stats/v1');
 assert.deepEqual(INSTANCE_STAT_TRAINING_MAP, {
   hp: null, atk: 'power', def: 'defense', spAtk: 'technique', spDef: 'spirit', spd: 'speed',
@@ -39,6 +39,7 @@ assert.deepEqual(SAVE_MIGRATION_REGISTRY.map(entry => [entry.id, entry.targetVer
   ['breeding-egg-v10', 10],
   ['passive-instance-v11', 11],
   ['canonical-monster-stats-v12', 12],
+  ['canonical-monster-exp-v13', 13],
 ]);
 
 const legacy = {
@@ -51,7 +52,7 @@ const legacy = {
 const before = structuredClone(legacy);
 const migrated = normalizeInstance(legacy, { now: 1000 });
 assert.deepEqual(legacy, before, 'migration never mutates the source instance');
-assert.equal(migrated.saveVersion, 12);
+assert.equal(migrated.saveVersion, 13);
 assert.equal(migrated.statSchemaVersion, 'monster-instance-stats/v1');
 assert.equal(migrated.canonicalFormId, 'MON_002');
 assert.deepEqual(migrated.statTraining, { hp: 0, atk: 120, def: 80, spAtk: 40, spDef: 20, spd: 60 });
@@ -110,19 +111,19 @@ const state = normalizeSavedState({
   storage: ['evolved-stat'],
   ranchActive: ['evolved-stat'],
 }, { now: 1000 });
-assert.equal(state.saveVersion, 12);
+assert.equal(state.saveVersion, 13);
 assert.equal(state.collection[0].canonicalFormId, 'MON_002');
 assert.equal(state.collection[1].canonicalFormId, 'MON_020');
 assert.deepEqual(normalizeSavedState(state, { now: 1000 }), state, 'whole-save migration is twice-is-same');
 
 const sanitized = sanitizeStateForPersistence(state);
-assert.equal(sanitized.saveVersion, 12);
+assert.equal(sanitized.saveVersion, 13);
 assert.equal(sanitized.collection[0].statTraining.spatk, 40);
 const storage = new MemoryStorage();
 writeStoredSave(storage, { state, playerHp: 100 });
 const envelope = JSON.parse(storage.getItem(SAVE_KEY));
-assert.equal(envelope.saveSchemaVersion, 12);
-assert.equal(envelope.state.saveVersion, 12);
+assert.equal(envelope.saveSchemaVersion, 13);
+assert.equal(envelope.state.saveVersion, 13);
 const roundTrip = normalizeSavedState(envelope.state, { now: 1000 });
 assert.deepEqual(roundTrip.collection.map(monster => monster.statTraining), state.collection.map(monster => monster.statTraining));
 assert.deepEqual(roundTrip.collection.map(monster => monster.canonicalFormId), ['MON_002', 'MON_020']);

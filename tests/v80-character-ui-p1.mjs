@@ -54,7 +54,7 @@ function makeGame({ party = ['alpha', 'beta', null], selectedSlot = 1, zone = 'h
 }
 
 assert.equal(PARTY_SLOT_COUNT, 3, 'party stays 3 slots');
-assert.equal(SAVE_SCHEMA_VERSION, 12, 'Character UI uses the current monster-instance save schema');
+assert.equal(SAVE_SCHEMA_VERSION, 13, 'Character UI uses the current monster-instance save schema');
 
 const uiKeys = Object.keys(createCharacterUiState());
 assert.deepEqual(uiKeys.sort(), [

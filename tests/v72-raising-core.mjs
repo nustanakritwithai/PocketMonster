@@ -33,7 +33,8 @@ const legacy = {
 };
 const inst = normalizeInstance(legacy, { now: 1000 });
 assert.equal(inst.saveVersion, INSTANCE_SAVE_VERSION, 'instance is stamped with the current save version');
-assert.equal(inst.growthExp, 300, 'legacy exp migrates into growthExp');
+assert.equal(inst.growthExp, 124, 'legacy EXP migrates to the canonical Medium threshold without losing Lv.5');
+assert.equal(inst.level, 5, 'legacy EXP migration preserves the declared level');
 assert.deepEqual(inst.genes, { hp: 'B', atk: 'A', def: 'C', spd: 'B' }, 'genes normalize (case-insensitive, trait stripped out)');
 assert.deepEqual(inst.traitIds, ['Brave'], 'legacy genes.trait migrates into traitIds');
 assert.equal(inst.parents.a, 'mA', 'legacy parentAId migrates into parents.a');
@@ -58,7 +59,7 @@ assert.equal(step.toLevel, 5, 'adding the cumulative EXP for Lv.5 reaches Lv.5')
 assert.equal(step.leveledUp, true, 'level-up is reported');
 assert.equal(mon.level, 5, 'instance level updated');
 addGrowthExp(mon, 10 ** 9);
-assert.equal(mon.level, 50, 'growth never exceeds the Lv.50 cap');
+assert.equal(mon.level, 60, 'growth never exceeds the canonical Lv.60 cap');
 
 // --- Training pool (single shared capacity — R3) ---------------------------
 const trainee = normalizeInstance({ instanceId: 'm3', level: 20 });

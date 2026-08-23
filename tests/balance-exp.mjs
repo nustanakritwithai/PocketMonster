@@ -7,28 +7,29 @@ import {
   relativeLevelExpModifier,
 } from '../balance-formulas.mjs';
 
-// R2 reference table: EXP_to_next(L) = round(60 + 20L + 4L^2).
+// M7 reference table: live default uses the Workbook Medium cubic curve.
 const EXP_TO_NEXT = {
-  1: 84, 2: 116, 5: 260, 10: 660, 15: 1260, 20: 2060,
-  25: 3060, 30: 4260, 35: 5660, 40: 7260, 45: 9060, 49: 10644,
+  1: 7, 2: 19, 5: 91, 10: 331, 15: 721, 20: 1261,
+  25: 1951, 30: 2791, 35: 3781, 40: 4921, 45: 6211, 50: 7651, 59: 10621,
 };
 for (const [level, expected] of Object.entries(EXP_TO_NEXT)) {
   assert.equal(expToNext(Number(level)), expected, `expToNext(${level}) must equal ${expected}`);
 }
-assert.equal(expToNext(50), Infinity, 'Lv.50 is the cap: no more Growth EXP to next level');
-assert.equal(expToNext(999), Infinity, 'beyond cap stays capped');
+assert.ok(expToNext(50) > 0, 'Lv.50 continues on the Workbook curve');
+assert.equal(expToNext(60), 0, 'Lv.60 is the canonical cap');
+assert.equal(expToNext(999), 0, 'beyond cap stays capped');
 
 // R2 cumulative-EXP-to-reach-level reference values.
 const CUMULATIVE = {
-  1: 0, 2: 84, 5: 560, 10: 2580, 15: 7000, 20: 14820,
-  25: 27040, 30: 44660, 35: 68680, 40: 100100, 45: 139920, 49: 178496,
+  1: 0, 2: 7, 5: 124, 10: 999, 15: 3374, 20: 7999,
+  25: 15624, 30: 26999, 35: 42874, 40: 63999, 45: 91124, 50: 124999, 60: 215999,
 };
 for (const [level, expected] of Object.entries(CUMULATIVE)) {
   assert.equal(cumulativeExpToLevel(Number(level)), expected, `cumulativeExpToLevel(${level}) must equal ${expected}`);
 }
 
 // levelFromTotalExp must invert cumulativeExpToLevel and never exceed the cap.
-for (let level = 1; level <= 50; level++) {
+for (let level = 1; level <= 60; level++) {
   const total = cumulativeExpToLevel(level);
   const resolved = levelFromTotalExp(total);
   assert.equal(resolved.level, level, `total EXP for Lv.${level} must resolve back to Lv.${level}`);
@@ -40,9 +41,10 @@ assert.equal(mid.level, 10, 'partial progress stays in the current level');
 assert.equal(mid.expIntoLevel, 100, 'leftover EXP into the level is tracked');
 
 const capped = levelFromTotalExp(10 ** 9);
-assert.equal(capped.level, BALANCE_CONFIG.level.cap, 'huge EXP caps at Lv.50');
+assert.equal(capped.level, BALANCE_CONFIG.level.cap, 'huge EXP caps at Lv.60');
 assert.equal(capped.atCap, true, 'atCap flag set when capped');
-assert.equal(capped.expToNext, Infinity, 'no next-level EXP at cap');
+assert.equal(capped.expToNext, 0, 'no next-level EXP at cap');
+assert.ok(capped.overflowExp > 0, 'overflow EXP is preserved at cap');
 assert.equal(levelFromTotalExp(-5).level, 1, 'negative EXP resolves to Lv.1');
 
 // C4 / R2 relative-level Growth EXP modifier.

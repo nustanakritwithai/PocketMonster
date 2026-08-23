@@ -13,7 +13,7 @@ import {
 
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
@@ -44,6 +44,11 @@ export const SAVE_MIGRATION_REGISTRY = Object.freeze([
   Object.freeze({
     id: 'canonical-monster-stats-v12',
     targetVersion: 12,
+    migrate: migrateState,
+  }),
+  Object.freeze({
+    id: 'canonical-monster-exp-v13',
+    targetVersion: 13,
     migrate: migrateState,
   }),
 ]);

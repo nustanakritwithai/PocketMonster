@@ -713,12 +713,14 @@ function refreshStats(inst,heal=false){
 function makeInstance(sp,level=1,opts={}){
   const personality=opts.personality||rand(personalities);
   const genes=opts.genes||randomGenes(sp);
+  const mapping=monsterCatalogEntry(sp.id);
+  const spawnForm=monsterStatCatalogEntry(opts.canonicalFormId??(opts.evolutionPath?mapping?.workbookStage2MonsterId:mapping?.workbookBaseMonsterId));
   const inst=createInstance({
     instanceId:'m'+Date.now()+'-'+Math.floor(Math.random()*999999),
     speciesId:sp.id,
     formId:opts.formId??opts.evolutionPath??sp.id,
     level,
-    growthExp:opts.growthExp??growthExpForLevel(level),
+    growthExp:opts.growthExp??growthExpForLevel(level,spawnForm?.growthCurve),
     origin:opts.origin||'captured',
     personality,
     personalityId:personality,
@@ -757,7 +759,7 @@ function ensureInstanceShape(inst){
   const normalized=normalizeInstance({
     ...inst,
     formId:inst.formId||inst.evolutionPath||sp.id,
-    growthExp:Math.max(inst.growthExp||0,inst.exp||0,growthExpForLevel(inst.level||1)),
+    growthExp:Math.max(inst.growthExp||0,inst.exp||0,growthExpForLevel(inst.level||1,inst.growthCurve)),
     personalityId:inst.personalityId||inst.personality,
     parents:{a:inst.parents?.a??inst.parentAId??null,b:inst.parents?.b??inst.parentBId??null}
   });
@@ -772,7 +774,7 @@ function ensureInstanceShape(inst){
   inst.parentBId=inst.parentBId||inst.parents?.b||null;
   inst.secondaryType=inst.secondaryType??sp.types[1]??null;
   inst.evolutionPath=inst.evolutionPath||null;
-  if(inst.level>1&&(inst.growthExp||0)<growthExpForLevel(inst.level))inst.growthExp=growthExpForLevel(inst.level);
+  if(inst.level>1&&(inst.growthExp||0)<growthExpForLevel(inst.level,inst.growthCurve))inst.growthExp=growthExpForLevel(inst.level,inst.growthCurve);
   inst.exp=inst.growthExp;
   syncFromBodyMind(inst);
   refreshStats(inst,false);
@@ -3088,7 +3090,8 @@ function defeatWild(w){
   state.exp+=playerExp;
   // V7.3: Use resolveBattleGrowth + applyBattleGrowth instead of legacy grantMonsterExp
   const tier=getEnemyTier(w);
-  const enemy={level:w.level,tier};
+  const enemyForm=monsterStatCatalogEntry(w.canonicalFormId);
+  const enemy={level:w.level,tier,baseExpYield:enemyForm?.baseExpYield};
   const events=battleEventLog.splice(0); // consume events for this encounter
   let monGain=0,ups=0,trainSummary='',partyShareLine='';
   if(activeSummon){
@@ -4107,7 +4110,7 @@ function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=
 // ---------- V8.2.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){
-  const need=Math.max(1,growthExpForLevel((inst.level||1)+1)-(inst.growthExp||0));
+  const need=Math.max(1,growthExpForLevel((inst.level||1)+1,inst.growthCurve)-(inst.growthExp||0));
   addGrowthExp(inst,need);
   synchronizeStage1Learnset(inst);
   refreshStats(inst,true);
