@@ -2401,7 +2401,7 @@ function distXZ(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
 function hpPct(v){return Math.max(0,Math.min(1,v));}
 function msg(t){el('message').textContent=t;}
 function setManagerTab(tab='collection'){
-  if(tab==='breeding'&&!isNearNpc()){
+  if(tab==='breeding'&&!(isNearNpc()||isNearBreeding())){
     msg(FULL_MANAGER_NPC_REASON);
     return;
   }
@@ -4856,9 +4856,40 @@ function closeEvolutionGuide(){el('evolutionPanel').classList.add('hidden');play
 function openBreedingCaretaker(){
   if(!isNearBreeding()){msg('เข้าใกล้ผู้ดูแลเพาะพันธุ์ก่อน');return;}
   el('breedingPanel').classList.remove('hidden');
+  renderBreedingSalon();
   playSFX('sfx_ui_open');
 }
 function closeBreedingCaretaker(){el('breedingPanel').classList.add('hidden');playSFX('sfx_ui_close');}
+function salonParentPodHTML(label,inst){
+  if(!inst)return `<span>${label}</span><strong>แตะเพื่อเลือก</strong><small>มอน Stage 2 ในคลัง</small>`;
+  const sp=spById[inst.speciesId],profile=workbookBreedingProfile(inst.speciesId);
+  return `<span>${label}</span><span class="breeding-salon-orb" style="background:#${sp.color.toString(16).padStart(6,'0')}">${displayName(inst).slice(0,1)}</span><strong>${displayName(inst)}</strong><small>Lv.${inst.level} • ${GENDER_TH[inst.gender]||inst.gender} • Bond ${fmt(inst.mind?.bond??inst.bond)} • ${profile?.breedingGroup||'Unknown'}</small>`;
+}
+function renderBreedingSalon(){
+  const ids=breedingAdultIds();
+  const a=getInst(state.breeding.parentA),b=getInst(state.breeding.parentB),compat=breedingCompatibility(a,b);
+  const adults=el('breedingSalonAdults');if(adults)adults.textContent=`พร้อมผสม ${ids.length}`;
+  const eggsChip=el('breedingSalonEggs');if(eggsChip)eggsChip.textContent=`ไข่ ${state.eggs.length}`;
+  const podA=el('breedingSalonParentA');if(podA){podA.innerHTML=salonParentPodHTML('Parent A',a);podA.classList.toggle('filled',!!a);}
+  const podB=el('breedingSalonParentB');if(podB){podB.innerHTML=salonParentPodHTML('Parent B',b);podB.classList.toggle('filled',!!b);}
+  const chip=el('breedingSalonCompat');
+  if(chip){
+    chip.textContent=compat.text;
+    chip.className='breeding-salon-compat'+(a&&b?(compat.ok?' ok':' bad'):'');
+  }
+  const nest=el('breedingSalonIncubator');if(!nest)return;
+  if(!state.eggs.length){nest.innerHTML='<div class="breeding-salon-empty">Incubator ว่าง • สร้างไข่ในห้องผสมพันธุ์</div>';return;}
+  const now=Date.now();
+  nest.innerHTML=state.eggs.slice(-3).map(egg=>{
+    if(!egg||typeof egg!=='object')return '';
+    const holderId=egg.eggHolderOwnedMonsterId||egg.eggHolderId||egg.parentAId,partnerId=egg.partnerOwnedMonsterId||egg.parentBId;
+    const holder=getInst(holderId),partner=getInst(partnerId),readyAt=egg.hatchAt??egg.readyAt,hasDeadline=Number.isFinite(readyAt),hatched=!!egg.hatchedOwnedMonsterId;
+    const remain=hasDeadline?remainingCountdownSeconds(readyAt,now):Infinity;
+    const status=hatched?'ฟักแล้ว':(!hasDeadline?'ข้อมูลเวลาไม่ถูกต้อง':(remain>0?remain+'s':'พร้อมฟัก!'));
+    const canHatch=!hatched&&hasDeadline&&remain<=0;
+    return `<div class="breeding-salon-egg"><span class="breeding-salon-egg-icon">🥚</span><span><b>${status}</b><small>${holder?displayName(holder):'?'} × ${partner?displayName(partner):'?'}</small></span>${canHatch?`<button type="button" data-salon-hatch="${egg.eggId}">ฟักไข่</button>`:''}</div>`;
+  }).join('');
+}
 function renderEvolutionGuide(){
   const ids=[...state.party.filter(Boolean),...state.storage];
   const selected=ids.includes(state.evolutionCandidate)?state.evolutionCandidate:ids[0]||null;
@@ -5164,6 +5195,7 @@ function renderBreeding(){
     d.querySelector('[data-egg-hatch]').onclick=()=>hatchEgg(egg.eggId);
     list.appendChild(d);
   }
+  renderBreedingSalon();
 }
 function updateEggCountdowns(now=Date.now()){
   const list=el('eggList');
@@ -5944,6 +5976,14 @@ bindMobileNpcSheet(el('merchantShop'),closeMerchant);
 bindMobileNpcSheet(el('trainerPanel'),closeTrainer);
 bindMobileNpcSheet(el('evolutionPanel'),closeEvolutionGuide);
 bindMobileNpcSheet(el('breedingPanel'),closeBreedingCaretaker);
+el('breedingSalonParentA')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openMonsterPicker('parentA');});
+el('breedingSalonParentB')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openMonsterPicker('parentB');});
+el('breedingSalonIncubator')?.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-salon-hatch]');
+  if(!btn)return;
+  playSFX('sfx_ui_click');
+  hatchEgg(btn.dataset.salonHatch);
+});
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
 bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
