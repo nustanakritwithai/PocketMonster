@@ -15,7 +15,7 @@ export const WORKBOOK_GROWTH_ADAPTER = Object.freeze({
   deferredRuntimeStats: Object.freeze(['spAtk', 'spDef']),
   activation: 'calculator_only',
   statModelDecision: 'D3_SPATK_SPDEF_DEFERRED',
-  levelCapDecision: 'D7_RUNTIME_CAP_50_UNCHANGED',
+  levelCapDecision: 'M7_RUNTIME_CAP_60_LIVE',
 });
 
 export const WORKBOOK_EXP_ADAPTER = Object.freeze({
@@ -42,10 +42,10 @@ export const WORKBOOK_EXP_ADAPTER = Object.freeze({
   }),
   curveRounding: 'round',
   rewardRounding: 'floor',
-  activation: 'calculator_only',
-  runtimeEligible: false,
-  levelCapDecision: 'D7_RUNTIME_CAP_50_UNCHANGED',
-  curveDecision: 'D7_LIVE_CURVE_UNCHANGED',
+  activation: 'runtime_live',
+  runtimeEligible: true,
+  levelCapDecision: 'M7_RUNTIME_CAP_60_LIVE',
+  curveDecision: 'M7_WORKBOOK_CURVES_LIVE',
 });
 
 export const WORKBOOK_CAPTURE_ADAPTER = Object.freeze({
@@ -96,11 +96,12 @@ export const WORKBOOK_CAPTURE_ADAPTER = Object.freeze({
 export const BALANCE_CONFIG = Object.freeze({
   version: BALANCE_SCHEMA_VERSION,
 
-  // R2 — Growth EXP and level curve. EXP_to_next(L) = round(60 + 20L + 4L^2).
+  // M7 — Workbook Growth EXP curves are canonical through Lv.60.
   level: Object.freeze({
     min: 1,
-    cap: 50,
-    exp: Object.freeze({ base: 60, linear: 20, quadratic: 4 }),
+    cap: 60,
+    defaultCurve: 'Medium',
+    curves: WORKBOOK_EXP_ADAPTER.curves,
   }),
 
   // C4 / R2 — Relative-level Growth EXP modifier around |d| <= 5, floored/capped.
@@ -184,7 +185,7 @@ export const BALANCE_CONFIG = Object.freeze({
     noveltyDecay: 0.65,
     // Inactive/party members share only a fraction of Growth EXP and no training
     // (Anti Power-level rule — can't drag a Lv.1 into a boss and instantly grow).
-    partyGrowthShare: 0.35,
+    partyGrowthShare: 0.5,
     // A monster with no meaningful contribution earns reduced growth, no training.
     noContributionGrowthShare: 0.25,
   }),

@@ -7,18 +7,21 @@
 import { BALANCE_CONFIG } from './balance-config.mjs';
 import { monsterCatalogEntry } from './monster-catalog.mjs';
 import { MONSTER_STAT_KEYS, MONSTER_STAT_SOURCE_LIMITS } from './monster-stat-contract.mjs';
+import { monsterStatCatalogEntry } from './monster-stat-catalog.mjs';
 import { defaultPassiveIdForSpecies, isPassiveEligibleForSpecies } from './passive-catalog.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
 import { createRng } from './rng.mjs';
 import {
   levelFromTotalExp,
+  cumulativeExpToLevel,
   trainingCapacity,
   totalTrainingUsed,
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 12;
+export const INSTANCE_SAVE_VERSION = 13;
 export const INSTANCE_STAT_SCHEMA_VERSION = 'monster-instance-stats/v1';
+export const INSTANCE_EXP_SCHEMA_VERSION = 'workbook-exp/v1';
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);
 export const CORE_GENES = Object.freeze(['hp', 'atk', 'def', 'spd']);
 export const INSTANCE_POTENTIAL_STATS = MONSTER_STAT_KEYS;
@@ -79,6 +82,57 @@ function num(value, fallback) {
 
 function clamp100(value, fallback = 0) {
   return clamp(num(value, fallback), 0, 100);
+}
+
+function legacyCumulativeExpToLevel(level) {
+  const target = clamp(Math.floor(num(level, 1)), 1, 50);
+  let total = 0;
+  for (let current = 1; current < target; current += 1) {
+    total += Math.round(60 + (20 * current) + (4 * current * current));
+  }
+  return total;
+}
+
+function legacyLevelFromTotalExp(totalExp) {
+  const total = Math.max(0, num(totalExp, 0));
+  let level = 1;
+  while (level < 50 && legacyCumulativeExpToLevel(level + 1) <= total) level += 1;
+  return level;
+}
+
+function normalizeGrowthAwardIds(raw) {
+  return [...new Set((Array.isArray(raw) ? raw : [])
+    .filter(id => typeof id === 'string' && id.trim())
+    .map(id => id.trim()))];
+}
+
+export function canonicalGrowthProfile(source = {}) {
+  const formId = canonicalFormIdForInstance(source);
+  const form = monsterStatCatalogEntry(formId);
+  if (!form) return Object.freeze({ ok: false, reason: 'unknown_canonical_form', formId, growthCurve: null, baseExpYield: null });
+  return Object.freeze({
+    ok: true,
+    reason: null,
+    formId,
+    growthCurve: form.growthCurve,
+    baseExpYield: form.baseExpYield,
+    activation: 'runtime_live',
+  });
+}
+
+export function migrateLegacyGrowthExp({ level = 1, totalExp = 0, growthCurve = 'Medium' } = {}) {
+  const declaredLevel = clamp(Math.floor(num(level, 1)), 1, 50);
+  const rawTotal = Math.max(0, Math.floor(num(totalExp, 0)));
+  const effectiveLevel = Math.max(declaredLevel, legacyLevelFromTotalExp(rawTotal));
+  const legacyAtLevel = legacyCumulativeExpToLevel(effectiveLevel);
+  const canonicalAtLevel = cumulativeExpToLevel(effectiveLevel, BALANCE_CONFIG, growthCurve);
+  if (effectiveLevel >= 50) {
+    return canonicalAtLevel + Math.max(0, rawTotal - legacyAtLevel);
+  }
+  const legacyNext = legacyCumulativeExpToLevel(effectiveLevel + 1);
+  const canonicalNext = cumulativeExpToLevel(effectiveLevel + 1, BALANCE_CONFIG, growthCurve);
+  const progress = clamp((rawTotal - legacyAtLevel) / Math.max(1, legacyNext - legacyAtLevel), 0, 1);
+  return Math.round(canonicalAtLevel + (progress * (canonicalNext - canonicalAtLevel)));
 }
 
 function persistedPotentialValue(raw, stat) {
@@ -223,6 +277,10 @@ export function sanitizeMonsterInstanceForPersistence(raw) {
   instance.statTraining = statTrainingForPersistence(raw.statTraining, raw.training);
   instance.canonicalFormId = canonicalFormIdForInstance(raw);
   instance.statSchemaVersion = INSTANCE_STAT_SCHEMA_VERSION;
+  const growth = canonicalGrowthProfile(raw);
+  instance.growthCurve = growth.ok ? growth.growthCurve : BALANCE_CONFIG.level.defaultCurve;
+  instance.growthExpSchemaVersion = INSTANCE_EXP_SCHEMA_VERSION;
+  instance.growthAwardIds = normalizeGrowthAwardIds(raw.growthAwardIds);
   instance.passiveId = normalizedPassiveId(raw);
   return instance;
 }
@@ -258,10 +316,17 @@ export function normalizeTraining(raw = {}, config = BALANCE_CONFIG) {
 export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const persistentSource = withoutTransientCooldownFields(source);
-  const level = clamp(Math.floor(num(source.level, 1)), BALANCE_CONFIG.level.min, BALANCE_CONFIG.level.cap);
+  const declaredLevel = clamp(Math.floor(num(source.level, 1)), BALANCE_CONFIG.level.min, BALANCE_CONFIG.level.cap);
+  const growthProfile = canonicalGrowthProfile(source);
+  const growthCurve = growthProfile.ok ? growthProfile.growthCurve : BALANCE_CONFIG.level.defaultCurve;
+  const sourceGrowthExp = Math.max(0, Math.floor(num(source.growthExp, num(source.exp, 0))));
+  const migratedGrowthExp = source.growthExpSchemaVersion === INSTANCE_EXP_SCHEMA_VERSION
+    ? sourceGrowthExp
+    : migrateLegacyGrowthExp({ level: declaredLevel, totalExp: sourceGrowthExp, growthCurve });
+  const growthExp = Math.max(migratedGrowthExp, cumulativeExpToLevel(declaredLevel, BALANCE_CONFIG, growthCurve));
+  const level = levelFromTotalExp(growthExp, BALANCE_CONFIG, growthCurve).level;
 
   // Legacy shape used `exp`; the trait lived inside `genes.trait`.
-  const growthExp = Math.max(0, num(source.growthExp, num(source.exp, 0)));
   const legacyTrait = typeof source.genes?.trait === 'string' ? [source.genes.trait] : [];
   const traitIds = Array.isArray(source.traitIds) && source.traitIds.length ? source.traitIds.slice() : legacyTrait;
   const instanceId = typeof source.instanceId === 'string' && source.instanceId.trim().length > 0
@@ -290,6 +355,9 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
     formId: source.formId ?? null,
     level,
     growthExp,
+    growthCurve,
+    growthExpSchemaVersion: INSTANCE_EXP_SCHEMA_VERSION,
+    growthAwardIds: normalizeGrowthAwardIds(source.growthAwardIds),
     potential: normalizeInstancePotential(source.potential, instanceId),
     statTraining: normalizeInstanceStatTraining(source.statTraining, source.training),
     canonicalFormId: canonicalFormIdForInstance(source),
@@ -345,7 +413,7 @@ export function normalizeInstance(raw = {}, { now = Date.now() } = {}) {
 }
 
 export function createInstance(overrides = {}, options = {}) {
-  return normalizeInstance(overrides, options);
+  return normalizeInstance({ growthExpSchemaVersion: INSTANCE_EXP_SCHEMA_VERSION, ...overrides }, options);
 }
 
 export function instanceSpeciesIdentity(instance) {
@@ -406,13 +474,18 @@ export function migrateState(state = {}, { now = Date.now() } = {}) {
 // Growth EXP & level
 // ---------------------------------------------------------------------------
 
-// Add Growth EXP and recompute level from total EXP (R2). Never exceeds Lv.50.
+// Add Growth EXP and recompute level from total EXP on the monster's Workbook curve.
 export function addGrowthExp(instance, amount, config = BALANCE_CONFIG) {
   const gain = Math.max(0, num(amount, 0));
   const fromLevel = instance.level;
+  const profile = canonicalGrowthProfile(instance);
+  const growthCurve = profile.ok ? profile.growthCurve : (instance.growthCurve ?? config.level.defaultCurve);
   instance.growthExp = Math.max(0, num(instance.growthExp, 0) + gain);
-  const resolved = levelFromTotalExp(instance.growthExp, config);
+  const resolved = levelFromTotalExp(instance.growthExp, config, growthCurve);
   instance.level = resolved.level;
+  instance.exp = instance.growthExp;
+  instance.growthCurve = growthCurve;
+  instance.growthExpSchemaVersion = INSTANCE_EXP_SCHEMA_VERSION;
   return {
     gain,
     fromLevel,
@@ -421,6 +494,8 @@ export function addGrowthExp(instance, amount, config = BALANCE_CONFIG) {
     expIntoLevel: resolved.expIntoLevel,
     expToNext: resolved.expToNext,
     atCap: resolved.atCap,
+    overflowExp: resolved.overflowExp,
+    growthCurve,
   };
 }
 

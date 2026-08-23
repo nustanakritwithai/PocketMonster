@@ -25,40 +25,59 @@ function normalizeConditionKey(condition) {
 // R2 — Growth EXP and level curve
 // ---------------------------------------------------------------------------
 
+function growthCurveDefinition(curve, config = BALANCE_CONFIG) {
+  const curves = config.level?.curves ?? WORKBOOK_EXP_ADAPTER.curves;
+  return Object.hasOwn(curves, curve) ? curves[curve] : null;
+}
+
+function growthCurveName(curve, config = BALANCE_CONFIG) {
+  const candidate = typeof curve === 'string' ? curve : config.level?.defaultCurve;
+  return growthCurveDefinition(candidate, config) ? candidate : null;
+}
+
+function cumulativeForCurve(level, curve, config = BALANCE_CONFIG) {
+  const definition = growthCurveDefinition(curve, config);
+  if (!definition) return null;
+  return Math.round(((level ** definition.exponent) - 1) * definition.multiplier);
+}
+
 // EXP required to advance FROM the given level to the next one.
-export function expToNext(level, config = BALANCE_CONFIG) {
-  const { min, cap, exp } = config.level;
+export function expToNext(level, config = BALANCE_CONFIG, curve = config.level?.defaultCurve) {
+  const { min, cap } = config.level;
   const L = clamp(Math.floor(level), min, cap);
-  if (L >= cap) return Infinity; // Cap: further growth becomes Career/Mastery reward.
-  return Math.round(exp.base + exp.linear * L + exp.quadratic * L * L);
+  const canonicalCurve = growthCurveName(curve, config);
+  if (!canonicalCurve) return 0;
+  if (L >= cap) return 0;
+  return cumulativeForCurve(L + 1, canonicalCurve, config) - cumulativeForCurve(L, canonicalCurve, config);
 }
 
 // Total accumulated Growth EXP required to REACH the given level from level 1.
-export function cumulativeExpToLevel(level, config = BALANCE_CONFIG) {
+export function cumulativeExpToLevel(level, config = BALANCE_CONFIG, curve = config.level?.defaultCurve) {
   const { min, cap } = config.level;
   const target = clamp(Math.floor(level), min, cap);
-  let total = 0;
-  for (let L = min; L < target; L++) total += expToNext(L, config);
-  return total;
+  const canonicalCurve = growthCurveName(curve, config);
+  return canonicalCurve ? cumulativeForCurve(target, canonicalCurve, config) : 0;
 }
 
 // Resolve a level (and leftover EXP into the current level) from total Growth EXP.
-export function levelFromTotalExp(totalExp, config = BALANCE_CONFIG) {
+export function levelFromTotalExp(totalExp, config = BALANCE_CONFIG, curve = config.level?.defaultCurve) {
   const { min, cap } = config.level;
   const total = Number.isFinite(totalExp) && totalExp > 0 ? totalExp : 0;
-  let level = min;
-  let remaining = total;
-  while (level < cap) {
-    const need = expToNext(level, config);
-    if (remaining < need) break;
-    remaining -= need;
-    level += 1;
+  const canonicalCurve = growthCurveName(curve, config);
+  if (!canonicalCurve) {
+    return { level: min, expIntoLevel: 0, expToNext: 0, atCap: false, overflowExp: 0, curve: null };
   }
+  let level = min;
+  while (level < cap && cumulativeForCurve(level + 1, canonicalCurve, config) <= total) level += 1;
+  const threshold = cumulativeForCurve(level, canonicalCurve, config);
+  const atCap = level >= cap;
   return {
     level,
-    expIntoLevel: level >= cap ? 0 : Math.round(remaining),
-    expToNext: level >= cap ? Infinity : expToNext(level, config),
-    atCap: level >= cap,
+    expIntoLevel: atCap ? 0 : Math.round(total - threshold),
+    expToNext: atCap ? 0 : cumulativeForCurve(level + 1, canonicalCurve, config) - total,
+    atCap,
+    overflowExp: atCap ? Math.max(0, Math.round(total - threshold)) : 0,
+    curve: canonicalCurve,
   };
 }
 
@@ -71,8 +90,7 @@ export function relativeLevelExpModifier(enemyLevel, monsterLevel, config = BALA
   return clamp(1 + cfg.slopePerLevel * d, cfg.min, cfg.max);
 }
 
-// Workbook v2.1 EXP curve and reward formulas exposed as a calculator-only
-// compatibility seam. They do not replace the live Lv.50 curve above.
+// Workbook v2.1 EXP curve and reward formulas used by the live M7 runtime.
 export function calculateWorkbookExpCurvePreview({
   curve = 'Medium',
   level = WORKBOOK_EXP_ADAPTER.sourceLevel.min,

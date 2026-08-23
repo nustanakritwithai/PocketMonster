@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { BALANCE_CONFIG, WORKBOOK_GROWTH_ADAPTER } from '../balance-config.mjs';
 import { calculateWorkbookGrowthPreview } from '../balance-formulas.mjs';
 
-assert.equal(BALANCE_CONFIG.level.cap,50,'live level cap remains unchanged');
+assert.equal(BALANCE_CONFIG.level.cap,60,'Workbook Lv.60 cap is live');
 assert.equal(WORKBOOK_GROWTH_ADAPTER.sourceLevel.cap,60,'workbook cap is retained only in the preview adapter');
 assert.equal(WORKBOOK_GROWTH_ADAPTER.activation,'calculator_only');
 assert.deepEqual(WORKBOOK_GROWTH_ADAPTER.activeRuntimeStats,['hp','atk','def','spd']);

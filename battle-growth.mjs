@@ -4,7 +4,7 @@
 // caps and anti-grind rules (R4). Battle is NOT a separate stat layer (R1, C7).
 
 import { BALANCE_CONFIG } from './balance-config.mjs';
-import { relativeLevelExpModifier, clamp } from './balance-formulas.mjs';
+import { calculateWorkbookBattleExpPreview, clamp } from './balance-formulas.mjs';
 import { TRAINING_LINES, addGrowthExp, addTrainingExp, appendHistory } from './monster-instance.mjs';
 
 function num(value, fallback = 0) {
@@ -52,17 +52,28 @@ function resolveTrainingByCategory(events, enemy, config) {
 // Compute (but do not apply) battle growth for the ACTIVE monster.
 export function resolveBattleGrowth({ monster, enemy = {}, events = [], outcome = 'win' } = {}, config = BALANCE_CONFIG) {
   const monsterLevel = num(monster?.level, 1);
-  const relative = relativeLevelExpModifier(num(enemy.level, monsterLevel), monsterLevel, config);
   const tier = enemy.tier ?? 'normal';
-  const growthBase = config.battle.growthBaseByTier[tier] ?? config.battle.growthBaseByTier.normal;
   const won = outcome === 'win';
 
   const { trainingExp, cap } = resolveTrainingByCategory(events, enemy, config);
   const hasContribution = TRAINING_LINES.some(line => trainingExp[line] > 0);
 
-  let growthMultiplier = won ? 1 : config.battle.loseGrowthMultiplier;
-  if (!hasContribution) growthMultiplier *= config.battle.noContributionGrowthShare;
-  const growthExp = Math.round(growthBase * relative * growthMultiplier);
+  let extraMultiplier = won ? 1 : config.battle.loseGrowthMultiplier;
+  if (!hasContribution) extraMultiplier *= config.battle.noContributionGrowthShare;
+  const variant = tier === 'boss' ? 'Boss' : tier === 'elite' ? 'Elite' : 'Normal';
+  const baseExpYield = Math.max(0, num(
+    enemy.baseExpYield,
+    config.battle.growthBaseByTier[tier] ?? config.battle.growthBaseByTier.normal,
+  ));
+  const expPreview = calculateWorkbookBattleExpPreview({
+    baseExpYield,
+    enemyLevel: num(enemy.level, monsterLevel),
+    monsterLevel,
+    variant,
+    participation: 'Active',
+    extraMultiplier,
+  });
+  const growthExp = expPreview.ok ? expPreview.reward : 0;
 
   // Career + milestones only on victory (no farm on losses/repeats).
   const career = { battleWins: 0, eliteWins: 0, bossWins: 0, trials: 0 };
@@ -81,7 +92,10 @@ export function resolveBattleGrowth({ monster, enemy = {}, events = [], outcome 
   return {
     outcome,
     tier,
-    relativeModifier: relative,
+    relativeModifier: expPreview.levelDifferenceMultiplier ?? 0,
+    expPreview,
+    baseExpYield,
+    variant,
     trainingCap: cap,
     growthExp,
     trainingExp,

@@ -231,8 +231,8 @@ export function refreshCoreStats(inst, sp, path, equipmentFlat = null, { heal = 
   return computed;
 }
 
-export function growthExpForLevel(level) {
-  return cumulativeExpToLevel(level);
+export function growthExpForLevel(level, growthCurve = BALANCE_CONFIG.level.defaultCurve) {
+  return cumulativeExpToLevel(level, BALANCE_CONFIG, growthCurve);
 }
 
 export function liveCaptureChance({
