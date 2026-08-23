@@ -5,7 +5,7 @@ const css = readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
 const pass = css.match(/\/\* Mobile menu density pass \*\/([\s\S]*?)\/\* Mobile menu density pass end \*\//)?.[1] || '';
 assert.ok(pass, 'mobile menu density pass CSS block is required');
 assert.match(pass, /--menu-touch:36px/, 'menu buttons use a denser 36px tap target on mobile');
-assert.match(pass, /@media \(max-width:900px\),\(pointer:coarse\)/, 'density pass applies to narrow and coarse-pointer phones');
+assert.match(pass, /@media \(pointer:coarse\),\(hover:none\),\(max-width:1100px\)/, 'density pass applies to phones, hoverless devices, and typical mobile landscape widths');
 for (const rule of [
   '.manager-card',
   '.manager-sub,.manager-note{display:none}',
