@@ -35,7 +35,7 @@ assert.match(decal, /boxGeometry\(size,\.02,size\)/, 'decal floor is a thin box'
 assert.match(decal, /boxGeometry\(size\*\.78,\.02,size\*\.78\)/, 'outer frame is a box');
 assert.match(decal, /boxGeometry\(size\*\.24,\.02,size\*\.24\)/, 'inner frame is a box');
 assert.equal(count(decal, /wireframe:true/g), 2, 'outer and inner frames are wireframe');
-assert.match(decal, /groundDecals\.push\(\{group,disc,ring,inner,/, 'decal still records disc/ring/inner for the updater');
+assert.match(decal, /addGroundDecal\(\{group,disc,ring,inner,/, 'decal still records disc/ring/inner through the bounded updater gate');
 assert.match(decal, /group\.position\.set\(pos\.x,0,pos\.z\)/, 'decal still sits on the world XZ of the hit');
 
 assert.doesNotMatch(pulse, /torusGeometry/, 'ring pulse is no longer a torus');

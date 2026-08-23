@@ -27,7 +27,8 @@ const pool = js.slice(poolStart, poolEnd);
 const burst = extractFn('spawnBurst');
 const release = extractFn('releaseTransientEffect');
 
-assert.match(pool, /maxSize:200/, 'spark pool grows to 200 because boxes are cheaper than spheres');
+assert.match(js, /maxParticles:200/, 'the shared W15 particle budget remains exactly 200');
+assert.match(pool, /maxSize:VFX_LIMITS\.maxParticles/, 'spark pool consumes the shared particle budget');
 assert.match(pool, /boxGeometry\(1,1,1\)/, 'pooled sparks are unit boxes');
 assert.doesNotMatch(pool, /sphereGeometry/, 'spark pool no longer allocates spheres');
 assert.match(pool, /mesh\.rotation\.set\(0,0,0\)/, 'reset clears leftover box tumble');

@@ -31,7 +31,7 @@ assert.doesNotMatch(pulse, /torusGeometry/, 'mutant 3: ring pulses must not fall
 assert.match(decal, /wireframe:true/, 'mutant 4: decal frames must be wireframe boxes');
 assert.match(pulse, /wireframe:true/, 'mutant 5: ring pulse must be a wireframe box');
 assert.doesNotMatch(update, /d\.ring\.rotation\.z/, 'mutant 6: square decal frames must not spin on Z like a flat ring');
-assert.match(js, /groundDecals\.push\(\{group,disc,ring,inner,/, 'mutant 7: updater still receives disc/ring/inner');
+assert.match(js, /addGroundDecal\(\{group,disc,ring,inner,/, 'mutant 7: bounded updater still receives disc/ring/inner');
 assert.match(js, /spawnGroundDecal\(wildTypes\(w\)\[0\],w\.mesh\.position/, 'mutant 8: capture still stamps a ground decal');
 assert.match(js, /spawnRingPulse\(w\.mesh\.position\.clone\(\),0xffffff/, 'mutant 9: KO still fires a ring pulse');
 assert.match(js, /sphereGeometry\(\.16\*scale,12,10\)/, 'mutant 10: monster shine stays a sphere');

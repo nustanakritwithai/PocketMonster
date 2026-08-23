@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { selectQualityProfile } from '../performance-runtime.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const painterSrc = fs.readFileSync(new URL('../asset-presentation/blocky-ground.mjs', import.meta.url), 'utf8');
@@ -14,7 +15,8 @@ function extractFn(name) {
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
 assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: polish ASSET_REVISION stays 810');
-assert.match(js, /shadows:false/, 'mutant 3: medium quality must not force a shadow pass');
+assert.equal(selectQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, devicePixelRatio: 2 }).shadows, false,
+  'mutant 3: adaptive medium quality must not force a shadow pass');
 assert.match(extractFn('addDeco'), /obj\.isMesh/, 'mutant 4: group decorations must flag child meshes, not only the group');
 assert.match(extractFn('makeFlower'), /glowMat\(color,color,\.08/, 'mutant 5: flower glow must not fall back to a flat mat');
 assert.match(extractFn('makeTree'), /glowMat\(fruit,fruit,\.06/, 'mutant 6: fruit glow must stay on the berry boxes');

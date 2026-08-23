@@ -59,7 +59,8 @@ assert.match(extractFn('spawnBurst'), /Math\.min\(16,/, 'pooled bursts share the
 assert.match(extractFn('takeSpark'), /clampEmissive\(emissiveIntensity\)/, 'raising sparks clamp emissive');
 
 const pool = js.slice(js.indexOf('const sparkPool=createObjectPool({'), js.indexOf('function setHumanoidAction'));
-assert.match(pool, /maxSize:200/, 'spark pool cap stays 200');
+assert.match(js, /maxParticles:200/, 'shared particle cap stays 200');
+assert.match(pool, /maxSize:VFX_LIMITS\.maxParticles/, 'spark pool consumes the shared cap');
 assert.doesNotMatch(js, /maxSize:160/, 'pool cap does not fall back to 160');
 
 assert.equal((extractFn('fxGeom').match(/boxGeometry\(/g) || []).length, 18, 'P3 fxGeom still returns 18 boxes');

@@ -30,7 +30,7 @@ assert.match(colors, /spirit:0xa78bfa/, 'spirit training is purple');
 const train = extractFn('spawnTrainingEffect');
 assert.match(train, /takeSpark\(color\)/, 'training sparks come from the pool');
 assert.match(train, /for\(let i=0;i<8;i\+\+\)/, 'training fires 8 sparks');
-assert.match(train, /spawnRingPulse\(pos\.clone\(\),color,\{scale:0\.5,life:0\.3,y:0\.08\}\)/, 'training still stamps a ring pulse');
+assert.match(train, /spawnRingPulse\(pos\.clone\(\),color,\{scale:0\.5,life:0\.3,y:0\.08,priority:'P2'\}\)/, 'training still stamps a P2 ring pulse');
 assert.match(train, /gravity:0/, 'training sparks float');
 
 const evo = extractFn('spawnEvolutionEffect');
@@ -39,7 +39,7 @@ assert.match(evo, /wireframe:true/, 'evolution aura is wireframe');
 assert.match(evo, /kind:'evolution-aura'/, 'evolution aura uses its own updater');
 assert.match(evo, /for\(let i=0;i<20;i\+\+\)/, 'evolution fires 20 sparks');
 assert.match(evo, /triggerCameraShake\(0\.12,0\.2\)/, 'evolution shakes the camera');
-assert.match(evo, /effects\.push\(\{mesh:aura,life:1\.2,maxLife:1\.2,kind:'evolution-aura'/, 'aura mesh is unique and must be disposed');
+assert.match(evo, /addTransientEffect\(\{mesh:aura,life:1\.2,maxLife:1\.2,kind:'evolution-aura'/, 'unique aura must enter the bounded disposal path');
 
 const breed = extractFn('spawnBreedingEffect');
 assert.match(breed, /0xec4899/, 'breeding hearts are pink');
