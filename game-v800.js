@@ -2146,6 +2146,62 @@ function updateCharacterPreview(dt){
   if(characterPreviewMesh){animateMonster(characterPreviewMesh,dt,false); if(!characterPreviewDrag)characterPreviewMesh.rotation.y+=dt*.22;}
   try{characterPreviewRenderer.render(characterPreviewScene,characterPreviewCamera);}catch(error){console.warn('3D character preview render failed',error);characterPreviewRenderer=null;}
 }
+let ranchClubPreviewRenderer=null;
+let ranchClubPreviewScene=null;
+let ranchClubPreviewCamera=null;
+let ranchClubPreviewMesh=null;
+let ranchClubPreviewId=null;
+let ranchClubPreviewZoom=4.2;
+let ranchClubPreviewDrag=null;
+let ranchClubPreviewSize={width:0,height:0};
+function initRanchClubPreview3D(){
+  const canvas=el('ranchClubPreviewCanvas');
+  if(!canvas||typeof THREE==='undefined')return;
+  try{
+    ranchClubPreviewRenderer=new THREE.WebGLRenderer({canvas,antialias:qualityProfile.antialias,alpha:true,powerPreference:'low-power'});
+    ranchClubPreviewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,qualityProfile.maxDpr));
+    ranchClubPreviewRenderer.setClearColor(0x000000,0);
+    ranchClubPreviewScene=new THREE.Scene();
+    ranchClubPreviewCamera=new THREE.PerspectiveCamera(28,1,.1,30);
+    ranchClubPreviewCamera.position.set(0,1.05,ranchClubPreviewZoom);
+    const hemi=new THREE.HemisphereLight(0xffffff,0x14532d,1.8);
+    const key=new THREE.DirectionalLight(0xfff7ed,2.2); key.position.set(2,4,3);
+    ranchClubPreviewScene.add(hemi,key);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.72,.018,6,32),new THREE.MeshBasicMaterial({color:0xfacc15,transparent:true,opacity:.85}));
+    ring.rotation.x=Math.PI/2; ring.position.y=.04; ring.name='ranchClubPreviewRing';
+    ranchClubPreviewScene.add(ring);
+    canvas.parentElement?.classList.add('has-3d');
+    canvas.addEventListener('pointerdown',event=>{
+      ranchClubPreviewDrag={x:event.clientX,rotation:ranchClubPreviewMesh?.rotation.y||0};
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('pointermove',event=>{
+      if(!ranchClubPreviewDrag||!ranchClubPreviewMesh)return;
+      ranchClubPreviewMesh.rotation.y=ranchClubPreviewDrag.rotation+(event.clientX-ranchClubPreviewDrag.x)*.012;
+    });
+    const stopDrag=()=>{ranchClubPreviewDrag=null;};
+    canvas.addEventListener('pointerup',stopDrag); canvas.addEventListener('pointercancel',stopDrag);
+    canvas.addEventListener('wheel',event=>{
+      event.preventDefault();
+      ranchClubPreviewZoom=THREE.MathUtils.clamp(ranchClubPreviewZoom+event.deltaY*.002,2.8,6);
+    },{passive:false});
+  }catch(error){
+    ranchClubPreviewRenderer=null; ranchClubPreviewScene=null; ranchClubPreviewCamera=null;
+    console.warn('3D ranch club preview unavailable; using portrait fallback',error);
+  }
+}
+function updateRanchClubPreview(dt){
+  if(!ranchClubPreviewRenderer||!ranchClubPreviewScene||!ranchClubPreviewCamera)return;
+  const page=el('ranchStoragePage'),canvas=el('ranchClubPreviewCanvas');
+  if(!page||!canvas||page.classList.contains('hidden'))return;
+  const rect=canvas.getBoundingClientRect(),width=Math.floor(rect.width),height=Math.floor(rect.height);
+  if(width<2||height<2)return;
+  if(ranchClubPreviewSize.width!==width||ranchClubPreviewSize.height!==height){ranchClubPreviewRenderer.setSize(Math.max(2,width),Math.max(2,height),false);ranchClubPreviewSize={width,height};}
+  ranchClubPreviewCamera.aspect=rect.width/Math.max(1,rect.height); ranchClubPreviewCamera.position.z+=(ranchClubPreviewZoom-ranchClubPreviewCamera.position.z)*Math.min(1,dt*8); ranchClubPreviewCamera.lookAt(0,.78,0);
+  const ring=ranchClubPreviewScene.getObjectByName('ranchClubPreviewRing'); if(ring)ring.rotation.z+=dt*.35;
+  if(ranchClubPreviewMesh){animateMonster(ranchClubPreviewMesh,dt,false); if(!ranchClubPreviewDrag)ranchClubPreviewMesh.rotation.y+=dt*.22;}
+  try{ranchClubPreviewRenderer.render(ranchClubPreviewScene,ranchClubPreviewCamera);}catch(error){console.warn('3D ranch club preview render failed',error);ranchClubPreviewRenderer=null;}
+}
 function monsterLookYaw(dir,mesh){ return Math.atan2(dir.x,dir.z) + (mesh?.userData?.faceOffset??Math.PI); }
 
 // ---------- V7.0 Combat feedback: floating damage, camera shake, elemental ground decals ----------
@@ -5157,7 +5213,102 @@ function renderFullCharacterInfoTab(){
   return renderFullCharacterStatus();
 }
 let ranchStorageFocusId=null;
-function renderRanchStoragePage(){const roster=el('ranchStorageRoster'),preview=el('ranchStoragePreview'),details=el('ranchStorageDetails');if(!roster||!preview||!details)return;const ids=state.storage.filter(Boolean);const partyIds=state.party.filter(Boolean);const selectableIds=[...partyIds,...ids];el('ranchStorageCount').textContent=`Storage ${ids.length}`;el('ranchActiveCount').textContent=`Ranch Active ${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;roster.innerHTML='';if(!selectableIds.length){roster.innerHTML='<div class="manager-empty">ยังไม่มีมอนสเตอร์</div>';preview.innerHTML='';details.innerHTML='';return;}if(!selectableIds.includes(ranchStorageFocusId))ranchStorageFocusId=ids[0]||partyIds[0];const addGroup=(title,group,kind)=>{if(!group.length)return;const head=document.createElement('div');head.className='manager-empty';head.textContent=title;roster.appendChild(head);group.forEach(id=>{const i=getInst(id);if(!i)return;const card=document.createElement('button');card.type='button';card.className='manager-item';card.dataset.storageId=id;card.textContent=`${displayName(i)} • Lv.${i.level}`;card.classList.toggle('focused-monster',id===ranchStorageFocusId);card.onclick=()=>{ranchStorageFocusId=id;renderRanchStoragePage();};roster.appendChild(card);});};addGroup('Party',partyIds,'party');if(!ids.length){const empty=document.createElement('div');empty.className='manager-empty';empty.textContent='Storage ว่าง';roster.appendChild(empty);}else addGroup('Storage',ids,'storage');const focused=getInst(ranchStorageFocusId),inParty=focused&&state.party.includes(focused.instanceId);preview.innerHTML=focused?`<div class="focused-name">${displayName(focused)}</div><div>Lv.${focused.level} • HP ${fmt(focused.hp)}/${fmt(focused.maxHp)}</div>`:'';details.innerHTML=focused?`<div class="manager-empty">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="storage-actions">${inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (state.ranchActive.includes(focused.instanceId)?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>'}</div>`:'';details.querySelector('[data-storage-deposit]')?.addEventListener('click',()=>depositMonster(focused.instanceId));details.querySelector('[data-storage-withdraw]')?.addEventListener('click',()=>withdrawMonster(focused.instanceId));details.querySelector('[data-storage-ranch]')?.addEventListener('click',()=>toggleRanchActive(focused.instanceId));}
+function syncRanchClubPreview(inst){
+  if(!ranchClubPreviewScene&&!ranchClubPreviewRenderer)initRanchClubPreview3D();
+  const species=inst?spById[inst.speciesId]:null;
+  const previewId=inst?.instanceId||null;
+  if(previewId!==ranchClubPreviewId){
+    if(ranchClubPreviewMesh&&ranchClubPreviewScene)removeAndDispose(ranchClubPreviewScene,ranchClubPreviewMesh);
+    ranchClubPreviewMesh=null; ranchClubPreviewId=previewId;
+    if(inst&&species&&ranchClubPreviewScene){
+      ranchClubPreviewMesh=monsterMesh(species,true,inst);
+      ranchClubPreviewMesh.scale.multiplyScalar(.9);
+      ranchClubPreviewMesh.position.y=.02;
+      setupMonsterMotion(ranchClubPreviewMesh,species,inst);
+      ranchClubPreviewScene.add(ranchClubPreviewMesh);
+    }
+  }
+  const portrait=el('ranchClubPreviewPortrait');
+  const portraitColor=species?`#${species.color.toString(16).padStart(6,'0')}`:'#14532d';
+  setTextIfChanged(portrait,inst?displayName(inst).slice(0,1):'♣');
+  if(portrait&&portrait.dataset.color!==portraitColor){portrait.dataset.color=portraitColor;portrait.style.backgroundColor=portraitColor;}
+  el('ranchClubStage')?.classList.toggle('ranch-club-empty-stage',!inst);
+  el('ranchClubStageArt')?.classList.toggle('has-3d',Boolean(ranchClubPreviewMesh));
+  setTextIfChanged(el('ranchClubPreviewName'),inst?displayName(inst):'Monster Club');
+  setTextIfChanged(el('ranchClubPreviewMeta'),inst?`Lv.${inst.level} • HP ${fmt(inst.hp)}/${fmt(inst.maxHp)}`:'ฝากมอนจาก Party เพื่อเข้าคลับ');
+  const hpPct=inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
+  const hpBar=el('ranchClubPreviewHp'),hpFill=el('ranchClubPreviewHpFill');
+  hpBar?.classList.toggle('hidden',!inst);
+  if(hpFill)hpFill.style.width=`${hpPct}%`;
+  const typesBox=el('ranchClubPreviewTypes');
+  if(typesBox)typesBox.innerHTML=inst?monsterTypes(inst).map(typeBadge).join(''):'';
+}
+function renderRanchStoragePage(){
+  const roster=el('ranchStorageRoster'),vault=el('ranchClubVault'),preview=el('ranchStoragePreview'),details=el('ranchStorageDetails');
+  if(!roster||!preview||!details)return;
+  const ids=state.storage.filter(Boolean);
+  const partyIds=state.party.filter(Boolean);
+  const selectableIds=[...partyIds,...ids];
+  el('ranchStorageCount').textContent=`Storage ${ids.length}`;
+  el('ranchActiveCount').textContent=`Ranch Active ${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;
+  const clubTint=(inst)=>{const sp=inst&&spById[inst.speciesId];return sp?`#${sp.color.toString(16).padStart(6,'0')}`:'#166534';};
+  const clubCardHTML=(inst,kind)=>{
+    const ranch=state.ranchActive.includes(inst.instanceId);
+    const faint=inst.fainted||inst.hp<=0;
+    const chip=kind==='party'?'พกอยู่':ranch?'Ranch':'คลัง';
+    return `<span class="ranch-club-avatar" style="background:${clubTint(inst)}">${displayName(inst).slice(0,1)}</span><span class="ranch-club-card-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="ranch-club-chip">${chip}</span>`;
+  };
+  const fillColumn=(mount,title,group,kind,emptyText)=>{
+    if(!mount)return;
+    mount.innerHTML='';
+    const head=document.createElement('div');
+    head.className='manager-empty ranch-club-group';
+    head.textContent=title;
+    mount.appendChild(head);
+    if(!group.length){
+      const empty=document.createElement('div');
+      empty.className='manager-empty ranch-club-empty';
+      empty.textContent=emptyText;
+      mount.appendChild(empty);
+      return;
+    }
+    group.forEach(id=>{
+      const i=getInst(id);
+      if(!i)return;
+      const card=document.createElement('button');
+      card.type='button';
+      card.className='manager-item ranch-club-card';
+      card.dataset.storageId=id;
+      card.innerHTML=clubCardHTML(i,kind);
+      card.classList.toggle('focused-monster',id===ranchStorageFocusId);
+      card.classList.toggle('is-party',kind==='party');
+      card.classList.toggle('is-ranch',state.ranchActive.includes(id));
+      card.onclick=()=>{ranchStorageFocusId=id;renderRanchStoragePage();};
+      mount.appendChild(card);
+    });
+  };
+  if(!selectableIds.includes(ranchStorageFocusId))ranchStorageFocusId=ids[0]||partyIds[0]||null;
+  fillColumn(roster,'พกอยู่',partyIds,'party','ยังไม่มีมอนที่พก');
+  fillColumn(vault,'ในคลัง',ids,'storage','Storage ว่าง');
+  if(!selectableIds.length){
+    syncRanchClubPreview(null);
+    details.innerHTML='';
+    return;
+  }
+  const focused=getInst(ranchStorageFocusId),inParty=focused&&state.party.includes(focused.instanceId);
+  if(!focused){
+    syncRanchClubPreview(null);
+    details.innerHTML='';
+    return;
+  }
+  syncRanchClubPreview(focused);
+  const ranchOn=state.ranchActive.includes(focused.instanceId);
+  details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'}</b>Ranch</span></div><div class="storage-actions">${inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>'}</div>`;
+  details.querySelector('[data-storage-deposit]')?.addEventListener('click',()=>depositMonster(focused.instanceId));
+  details.querySelector('[data-storage-withdraw]')?.addEventListener('click',()=>withdrawMonster(focused.instanceId));
+  details.querySelector('[data-storage-ranch]')?.addEventListener('click',()=>toggleRanchActive(focused.instanceId));
+}
+
 function renderManager(){applyLifeSimulation(Date.now());const partyBox=el('managerParty');partyBox.innerHTML='';const partyIds=state.party.filter(Boolean);el('partyCountLabel').textContent=`${partyIds.length}/3`;if(!partyIds.length)partyBox.innerHTML='<div class="manager-empty">Party ว่าง</div>';partyIds.forEach(id=>{const i=getInst(id);if(i)partyBox.appendChild(monsterCard(i,'party'));});renderFullCharacterPreview();renderFullCharacterInfoTab();el('foodProtein').textContent=state.inventory.protein||0;el('foodHealthy').textContent=state.inventory.healthy||0;el('foodFavorite').textContent=state.inventory.favorite||0;if(el('foodTraining'))el('foodTraining').textContent=state.inventory.trainingChow||0;if(el('foodMineral'))el('foodMineral').textContent=state.inventory.mineralBite||0;if(el('foodEmber'))el('foodEmber').textContent=state.inventory.emberFruit||0;if(el('foodMoon'))el('foodMoon').textContent=state.inventory.moonFruit||0;el('managerBallCount').textContent=state.inventory.captureBalls||0;renderRaisingEventBanner();renderEvolution();renderBreeding();renderCrDebug();el('monsterManager')?.querySelector('.manager-item.focused-monster')?.scrollIntoView({block:'nearest'});renderParty();renderHUD();}
 function renderCrDebug(){
   const box=el('crDebugPanel');if(!box)return;
@@ -6069,6 +6220,7 @@ function loop(now){
       if(!el('monsterManager').classList.contains('hidden')&&managerDirty.consume(now))renderManager();
     }
     updateCharacterPreview(dt);
+    updateRanchClubPreview(dt);
     renderer.render(scene,camera);
     if(firstFrame){
       firstFrame=false;
