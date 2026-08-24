@@ -12,13 +12,20 @@
 | Realtime | ไม่มี VPS adapter ใน Goal 1 | Firebase/client เดิม | ยังไม่เปลี่ยน transport |
 | Economy | game runtime และ local save | client เดิม | mutation flag ถูกบังคับปิด |
 
-## Server confirmation gaps
+## Server contract ที่ยืนยันแล้ว (PR #288 review)
 
-ก่อนเปิด Goal ถัดไป Server ต้องยืนยันจาก source/config จริง: health path และ response schema,
-version path และ response schema, API version policy, minimum client version policy,
-save schema compatibility, maintenance semantics, correlation/request-id convention,
-และ deployment release identifier. จนกว่าจะยืนยัน ช่องว่างเหล่านี้ถือเป็น `pending`;
-client จะไม่เดา endpoint เพิ่มและจะไม่เขียนข้อมูลผู้เล่น
+- `GET /api/health`: `200` พร้อม `status: ready` หรือ `503` พร้อม `status: not_ready`
+- `GET /api/version`: `apiVersion: 1.1`, `minimumClientVersion: 8.3.0`, `saveSchemaVersion: 1`
+- `deployedRelease` ต้องมี `version`, `commitSha`, `builtAtUtc`
+- request ใช้ `X-Request-Id`; response ใช้ `X-API-Version`
+- maintenance ใช้ boolean จาก `MONSTERLIFE_MAINTENANCE`
+
+## Remaining Server confirmation gaps
+
+`Test-ServerRelease.ps1` ยังอ้าง `status=healthy` และ field `database` ซึ่งไม่ตรงกับ
+implementation ที่ยืนยันว่าใช้ `ready/not_ready`; Server owner ต้องเลือก contract เดียวกัน
+ก่อน approve. หาก `commitSha` เป็น `unavailable` client จะถือ release เป็น unverified
+และไม่ผ่าน compatibility gate. ยังไม่มีการเปิด player-data writes หรือ migration
 
 ## Rollback / security
 

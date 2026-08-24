@@ -7,27 +7,51 @@ function joinUrl(base, path) {
   return new URL(path, `${base.replace(/\/$/, '')}/`).toString();
 }
 
+function parseVersion(value) {
+  const match = typeof value === 'string' && value.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+  return match ? match.slice(1, 4).map(Number) : null;
+}
+
+export function compareSemanticVersions(left, right) {
+  const a = parseVersion(left); const b = parseVersion(right);
+  if (!a || !b) return null;
+  for (let index = 0; index < 3; index += 1) if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1;
+  return 0;
+}
+
 function normalizePayload(payload) {
-  if (!payload || typeof payload !== 'object') return null;
-  const health = payload.health ?? payload.status;
-  const maintenance = payload.maintenance === true || health === 'maintenance';
-  const status = typeof health === 'string' ? health.toLowerCase() : '';
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const status = typeof payload.status === 'string' ? payload.status.toLowerCase() : '';
+  const release = payload.deployedRelease ?? payload.deployed_release ?? payload.release ?? payload.version?.deployedRelease;
   return {
-    health: status || (maintenance ? 'maintenance' : ''),
-    maintenance,
+    status,
+    maintenance: payload.maintenance === true,
     apiVersion: payload.apiVersion ?? payload.api_version ?? payload.version?.apiVersion ?? '',
     minimumClientVersion: payload.minimumClientVersion ?? payload.minimum_client_version ?? '',
-    saveSchemaVersion: payload.saveSchemaVersion ?? payload.save_schema_version ?? payload.version?.saveSchemaVersion,
-    deployedRelease: payload.deployedRelease ?? payload.deployed_release ?? payload.release ?? payload.version?.deployedRelease ?? '',
+    saveSchemaVersion: payload.saveSchemaVersion ?? payload.save_schema_version,
+    deployedRelease: release,
   };
 }
 
+function validRelease(release) {
+  return Boolean(release && typeof release === 'object' && !Array.isArray(release)
+    && typeof release.version === 'string' && release.version
+    && typeof release.commitSha === 'string' && release.commitSha && release.commitSha !== 'unavailable'
+    && typeof release.builtAtUtc === 'string' && release.builtAtUtc);
+}
+
 function compatible(server, config) {
-  if (!server) return false;
-  if (server.minimumClientVersion && config.minimumClientVersion && server.minimumClientVersion > config.minimumClientVersion) return false;
-  if (server.apiVersion && config.apiVersion && server.apiVersion !== config.apiVersion) return false;
-  if (server.saveSchemaVersion !== undefined && Number(server.saveSchemaVersion) !== Number(config.saveSchemaVersion)) return false;
-  return true;
+  if (!server || server.status !== 'ready' || server.maintenance) return false;
+  if (!server.apiVersion || (config.apiVersion && server.apiVersion !== config.apiVersion)) return false;
+  const versionResult = compareSemanticVersions(config.minimumClientVersion, server.minimumClientVersion);
+  if (server.minimumClientVersion && versionResult === null) return false;
+  if (versionResult !== null && versionResult < 0) return false;
+  if (server.saveSchemaVersion === undefined || Number(server.saveSchemaVersion) !== Number(config.saveSchemaVersion)) return false;
+  return validRelease(server.deployedRelease);
+}
+
+async function readJson(response) {
+  try { return await response.json(); } catch { return null; }
 }
 
 export async function requestServerContract(config, { fetchImpl = globalThis.fetch, signal, timeoutMs = 5000, correlationId = `pm-${Date.now().toString(36)}` } = {}) {
@@ -36,8 +60,8 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
+  const headers = { Accept: 'application/json', 'X-Request-Id': correlationId };
   try {
-    const headers = { Accept: 'application/json', 'X-Correlation-Id': correlationId };
     const requests = Promise.all([
       fetchImpl(joinUrl(config.apiBaseUrl, config.healthPath), { method: 'GET', headers, signal: controller.signal, cache: 'no-store' }),
       fetchImpl(joinUrl(config.apiBaseUrl, config.versionPath), { method: 'GET', headers, signal: controller.signal, cache: 'no-store' }),
@@ -46,13 +70,16 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
       requests,
       new Promise((_, reject) => setTimeout(() => { const error = new Error('request timeout'); error.name = 'AbortError'; reject(error); }, timeoutMs)),
     ]);
-    if (!healthResponse.ok || !versionResponse.ok) return { state: healthResponse.status === 503 || versionResponse.status === 503 ? 'maintenance' : 'offline', reason: `http-${Math.max(healthResponse.status, versionResponse.status)}`, correlationId };
-    const health = normalizePayload(await healthResponse.json());
-    const version = normalizePayload(await versionResponse.json());
-    const server = { ...health, ...version, maintenance: health.maintenance || version.maintenance };
+    const [healthPayload, versionPayload] = await Promise.all([readJson(healthResponse), readJson(versionResponse)]);
+    const health = normalizePayload(healthPayload);
+    const version = normalizePayload(versionPayload);
     if (!health || !version) return { state: 'invalid', reason: 'malformed-payload', correlationId };
+    const server = { ...health, ...version, status: health.status, maintenance: health.maintenance || version.maintenance, apiResponseVersion: healthResponse.headers?.get?.('X-API-Version') || versionResponse.headers?.get?.('X-API-Version') || '' };
+    if (config.apiVersion && server.apiResponseVersion !== config.apiVersion) return { state: 'invalid', reason: 'api-version-header-mismatch', server, correlationId };
     if (server.maintenance) return { state: 'maintenance', server, correlationId };
-    if (!compatible(server, config)) return { state: 'incompatible', server, correlationId };
+    if (healthResponse.status === 503 || versionResponse.status === 503 || health.status !== 'ready') return { state: 'offline', reason: health.status === 'not_ready' ? 'server-not-ready' : `http-${Math.max(healthResponse.status, versionResponse.status)}`, server, correlationId };
+    if (!healthResponse.ok || !versionResponse.ok) return { state: 'offline', reason: `http-${Math.max(healthResponse.status, versionResponse.status)}`, server, correlationId };
+    if (!compatible(server, config)) return { state: 'incompatible', reason: validRelease(server.deployedRelease) ? 'version-incompatible' : 'release-unverified', server, correlationId };
     return { state: 'healthy', server, correlationId };
   } catch (error) {
     return { state: error?.name === 'AbortError' ? 'offline' : 'invalid', reason: error?.name === 'AbortError' ? 'timeout' : 'request-failed', correlationId };
