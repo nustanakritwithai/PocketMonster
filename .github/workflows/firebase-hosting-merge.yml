@@ -16,6 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Generate read-only MonsterLife runtime config
+        env:
+          MONSTERLIFE_READONLY_ORIGIN: '${{ vars.MONSTERLIFE_READONLY_ORIGIN }}'
+        shell: bash
+        run: |
+          test -n "$MONSTERLIFE_READONLY_ORIGIN"
+          node scripts/write-deployment-runtime-config.mjs
+          node tests/deployment-runtime-config.mjs
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
