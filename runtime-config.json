@@ -1,20 +1,31 @@
 {
   "configVersion": 1,
-  "environment": "firebase-only",
-  "apiBaseUrl": "",
-  "webSocketUrl": "",
+  "environment": "hybrid",
+  "apiBaseUrl": "https://157.85.96.139",
+  "webSocketUrl": "wss://157.85.96.139/ws/chat",
   "apiVersion": "1.1",
   "minimumClientVersion": "8.3.0",
   "saveSchemaVersion": 1,
   "deployedRelease": "",
   "featureFlags": {
-    "vpsEnabled": false,
-    "vpsReads": false,
+    "vpsEnabled": true,
+    "vpsReads": true,
     "vpsWrites": false,
     "playerDataWrites": false,
     "accountMigration": false,
     "saveMigration": false,
-    "economyMutation": false,
-    "firebaseFallback": true
+    "economyMutation": true,
+    "firebaseFallback": true,
+    "firebaseAuthBridge": true,
+    "accountLinking": true,
+    "profileReads": true
+  },
+  "firebase": {
+    "apiKey": "AIzaSyBNKirSYZ0Yz-yGFIb0HRvgainkXY4bqsE",
+    "authDomain": "studio-9398155272-b7220.firebaseapp.com",
+    "projectId": "studio-9398155272-b7220",
+    "storageBucket": "studio-9398155272-b7220.firebasestorage.app",
+    "messagingSenderId": "618025038190",
+    "appId": "1:618025038190:web:c67b18708371bb254fd17f"
   }
 }

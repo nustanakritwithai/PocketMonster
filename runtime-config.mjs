@@ -58,12 +58,11 @@ function normalizeManifest(manifest = {}) {
   if (source.featureFlags && typeof source.featureFlags === 'object') {
     for (const key of FLAG_KEYS) if (typeof source.featureFlags[key] === 'boolean') config.featureFlags[key] = source.featureFlags[key];
   }
-  // Goal 1 is read-only.  A future goal must explicitly change this contract.
+  // Player save writes remain locked. Economy has its own explicit server-authoritative gate.
   config.featureFlags.vpsWrites = false;
   config.featureFlags.playerDataWrites = false;
   config.featureFlags.accountMigration = false;
   config.featureFlags.saveMigration = false;
-  config.featureFlags.economyMutation = false;
   config.featureFlags.firebaseFallback = true;
   if (!config.featureFlags.vpsEnabled || !config.featureFlags.vpsReads) {
     config.featureFlags.firebaseAuthBridge = false;
