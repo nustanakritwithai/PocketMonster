@@ -4,7 +4,7 @@ import { STAGE_BY_ID } from '../stage-catalog.mjs';
 
 const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const routes=fs.readFileSync(new URL('../warp-routes.mjs',import.meta.url),'utf8');
-const block=()=>js.match(/['"]steel-factory['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const block=()=>js.match(/['"]steel-factory['"]\s*:\s*\{[\s\S]*?(?=\n  ['"][^'"]+['"]\s*:\s*\{)/)?.[0]||'';
 const expectGuard=(label,pattern,replace)=>{
   const mutated=block().replace(pattern,replace);
   assert.notEqual(mutated,block(),`${label}: mutation applied`);

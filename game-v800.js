@@ -5,7 +5,7 @@ import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
+ import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, nextWarpPromptState, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
@@ -616,6 +616,40 @@ function populateWorld(zone='hub'){
       tile.position.set(0,.025,z); addDeco(tile);
     }
     for(const [x,z] of [[-10,8],[-6,8],[-2,8],[2,8],[6,8],[10,8],[-10,-2],[-6,-2],[-2,-2],[2,-2],[6,-2],[10,-2]]) makeStageBeacon(x,z,0xfbbf24);
+  }else if(zone==='dragon-crater'){
+    [[-19,10,1.35],[19,10,1.25],[-19,-10,1.2],[19,-10,1.3]].forEach(([x,z,s])=>makeCanyonWall(x,z,s,0x7f1d1d));
+    [[-15,5,1.15],[15,5,1.2],[-15,-14,1.3],[15,-14,1.2],[-8,14,1.05],[8,-12,1.1]].forEach(([x,z,s])=>makeRock(x,z,s,0x991b1b));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xf97316,transparent:true,opacity:.26}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-5,8],[5,8],[10,8],[-10,-2],[-5,-2],[5,-2],[10,-2]]) makeStageBeacon(x,z,0xfb923c);
+  }else if(zone==='fairy-garden'){
+    [[-18,10,1.1],[18,10,1.05],[-18,-10,1.15],[18,-10,1.1],[-8,16,1],[8,-16,1.05]].forEach(([x,z,s])=>makeTree(x,z,s,{leaf:0xa855f7,fruit:0xf9a8d4}));
+    [[-15,5,1],[15,5,1.05],[-15,-14,1.05],[15,-14,1]].forEach(([x,z,s])=>makeShrineLantern(x,z,s));
+    for(const [x,z,color] of [[-10,12,0xf9a8d4],[-5,12,0xc4b5fd],[5,12,0xf0abfc],[10,12,0xfde68a],[-10,-7,0xc4b5fd],[-5,-7,0xf9a8d4],[5,-7,0xfde68a],[10,-7,0xf0abfc]]) makeFlower(x,z,color);
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xf5d0fe,transparent:true,opacity:.3}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-5,8],[5,8],[10,8],[-10,-2],[-5,-2],[5,-2],[10,-2]]) makeStageBeacon(x,z,0xf0abfc);
+  }else if(zone==='combat-colosseum'){
+    [[-19,11,1.3],[19,11,1.3],[-19,-11,1.3],[19,-11,1.3],[-12,17,1.1],[12,17,1.1],[-12,-17,1.1],[12,-17,1.1]].forEach(([x,z,s])=>makeRuinPillar(x,z,s,0x92400e));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(3.4,.018,2.2),new THREE.MeshBasicMaterial({color:0xfbbf24,transparent:true,opacity:.28}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-5,8],[5,8],[10,8],[-10,-2],[-5,-2],[5,-2],[10,-2]]) makeStageBeacon(x,z,0xfacc15);
+  }else if(zone==='normal-wildlands'){
+    [[-18,10,1.15],[18,-10,1.25],[-18,-10,1.05],[18,10,1.15],[-8,16,1.2],[8,-16,1.1]].forEach(([x,z,s])=>makeRock(x,z,s,0x4d7c0f));
+    [[-15,5,1.05,{leaf:0x65a30d}],[15,5,1.1,{leaf:0x16a34a,fruit:0xfacc15}],[-15,-14,1.05,{leaf:0x22c55e}],[15,-14,1.15,{leaf:0x4d7c0f,fruit:0xfb7185}]].forEach(([x,z,s,opt])=>makeTree(x,z,s,opt));
+    for(const [x,z] of [[-10,11],[-5,11],[5,11],[10,11],[-10,-6],[-5,-6],[5,-6],[10,-6]]) makeGrassTuft(x,z,.9+((x+z)&1)*.12);
+    [[-8,14,0xfacc15],[0,14,0xfb7185],[8,14,0x67e8f9],[-8,-10,0xa78bfa],[8,-10,0xfde047]].forEach(v=>makeFlower(...v));
+    for(const z of [14,10,6,2,-2,-6,-10,-14]){
+      const tile=new THREE.Mesh(boxGeometry(2.8,.018,2.2),new THREE.MeshBasicMaterial({color:0xd9f99d,transparent:true,opacity:.24}));
+      tile.position.set(0,.025,z); addDeco(tile);
+    }
+    for(const [x,z] of [[-10,8],[-5,8],[5,8],[10,8],[-10,-2],[-5,-2],[5,-2],[10,-2]]) makeStageBeacon(x,z,0x86efac);
   }else if(zone==='frozen-pass'){
     [[-17,10,1.2],[17,-10,1.35],[18,12,1.05],[-18,-12,1.15],[7,17,1.25],[-8,-17,1.15]].forEach(([x,z,s])=>makeRock(x,z,s,0x94a3b8));
     [[-15,5,1.2],[15,5,1.1],[15,-14,1.35],[-15,-14,1.2],[5,15,1.15],[-5,-15,1.2],[-4,-5,1],[8,-8,1.1]].forEach(([x,z,s])=>makeIceCrystal(x,z,s));
@@ -2986,40 +3020,52 @@ const ZONES={
   hub:{label:'Ranch Hub',bg:0x72c7ef,ground:0x62c96b,spawn:[],bounds:{minX:-32,maxX:32,minZ:-32,maxZ:32},playerStart:[0,0,5]},
   'grass-meadow':{label:'Grass Meadow • Normal + Rare + Elite + Boss',stageId:'grass-meadow',biomeId:'grass-meadow',bg:0x7bcf9a,ground:0x62b96b,spawn:[
     ['mossbun',-11,2,1,{}],['mossbun',11,2,1,{}],['buglet',-11,-8,1,{}],['buglet',11,-8,1,{}],['normalooze',-6,-14,1,{}],['normalooze',6,-14,1,{}],['mossbun',-16,14,2,{}],['buglet',16,14,2,{}]
-  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,eliteSpawn:[['mossbun',0,-18,3,{elite:true}]],eliteChance:.18,bossSpawn:[['mossbun',0,-18,BALANCE.grassMeadowBoss.level,{boss:true}]],progressionBossSpeciesId:'mossbun',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',eliteEncounterTableId:'grass-meadow-elite-v1',bossEncounterTableId:'grass-meadow-boss-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:{min:1,max:5},sceneStatus:'normal-encounters'},
+  ],rareSpawn:[['mossbun',0,-2,BALANCE.grassMeadowRare.level,{rare:true}]],rareChance:BALANCE.grassMeadowRare.chance,eliteSpawn:[['mossbun',0,-18,3,{elite:true}]],eliteChance:.18,bossSpawn:[['mossbun',0,-18,BALANCE.grassMeadowBoss.level,{boss:true}]],progressionBossSpeciesId:'mossbun',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Grass'],secondaryTypes:['Bug','Normal'],encounterTableId:'grass-meadow-normal-v1',rareEncounterTableId:'grass-meadow-rare-v1',eliteEncounterTableId:'grass-meadow-elite-v1',bossEncounterTableId:'grass-meadow-boss-v1',balanceProfileId:'grass-meadow-normal-v1',recommendedLevel:stageLevelRange('grass-meadow'),sceneStatus:'normal-encounters'},
   'ember-valley':{label:'Ember Valley • Fire + Rock + Ground',stageId:'ember-valley',biomeId:'volcanic-valley',bg:0xc2410c,ground:0x7c2d12,spawn:[
     ['flameling',-11,2,4,{}],['flameling',11,2,4,{}],['rockhorn',-11,-8,4,{}],['rockhorn',11,-8,4,{}],['sandmole',-7,-14,5,{}],['sandmole',7,-14,5,{}]
-  ],eliteSpawn:[['flameling',0,-16,6,{elite:true,evolutionPath:'flame_wolf'}]],eliteChance:.16,bossSpawn:[['flameling',0,-18,8,{boss:true,evolutionPath:'magma_bear'}]],progressionBossSpeciesId:'flameling',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Fire'],secondaryTypes:['Rock','Ground'],encounterTableId:'encounter-ember-valley-v1',eliteEncounterTableId:'elite-ember-valley-v1',bossEncounterTableId:'boss-ember-valley-v1',balanceProfileId:'stage-ember-valley-v1',recommendedLevel:{min:4,max:8},sceneStatus:'stage-ready'},
+  ],eliteSpawn:[['flameling',0,-16,6,{elite:true,evolutionPath:'flame_wolf'}]],eliteChance:.16,bossSpawn:[['flameling',0,-18,7,{boss:true,evolutionPath:'magma_bear'}]],progressionBossSpeciesId:'flameling',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Fire'],secondaryTypes:['Rock','Ground'],encounterTableId:'encounter-ember-valley-v1',eliteEncounterTableId:'elite-ember-valley-v1',bossEncounterTableId:'boss-ember-valley-v1',balanceProfileId:'stage-ember-valley-v1',recommendedLevel:stageLevelRange('ember-valley'),sceneStatus:'stage-ready'},
   'misty-lake':{label:'Misty Lake • Water + Grass + Flying',stageId:'misty-lake',biomeId:'misty-lake',bg:0x38bdf8,ground:0x0e7490,spawn:[
-    ['aquapuff',-11,2,7,{}],['aquapuff',11,2,7,{}],['mossbun',-11,-8,7,{}],['mossbun',11,-8,7,{}],['galebird',-7,-14,8,{}],['galebird',7,-14,8,{}]
-  ],eliteSpawn:[['aquapuff',0,-16,10,{elite:true}]],eliteChance:.16,bossSpawn:[['aquapuff',0,-18,12,{boss:true}]],progressionBossSpeciesId:'aquapuff',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Water'],secondaryTypes:['Grass','Flying'],encounterTableId:'encounter-misty-lake-v1',eliteEncounterTableId:'elite-misty-lake-v1',bossEncounterTableId:'boss-misty-lake-v1',balanceProfileId:'stage-misty-lake-v1',recommendedLevel:{min:7,max:12},sceneStatus:'stage-ready'},
+    ['aquapuff',-11,2,5,{}],['aquapuff',11,2,5,{}],['mossbun',-11,-8,5,{}],['mossbun',11,-8,5,{}],['galebird',-7,-14,6,{}],['galebird',7,-14,6,{}]
+  ],eliteSpawn:[['aquapuff',0,-16,7,{elite:true}]],eliteChance:.16,bossSpawn:[['aquapuff',0,-18,8,{boss:true}]],progressionBossSpeciesId:'aquapuff',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Water'],secondaryTypes:['Grass','Flying'],encounterTableId:'encounter-misty-lake-v1',eliteEncounterTableId:'elite-misty-lake-v1',bossEncounterTableId:'boss-misty-lake-v1',balanceProfileId:'stage-misty-lake-v1',recommendedLevel:stageLevelRange('misty-lake'),sceneStatus:'stage-ready'},
   'storm-field':{label:'Storm Field • Electric + Flying + Steel',stageId:'storm-field',biomeId:'storm-field',bg:0x1e40af,ground:0x1e3a8a,spawn:[
-    ['voltkit',-11,2,12,{}],['voltkit',11,2,12,{}],['galebird',-11,-8,12,{}],['galebird',11,-8,12,{}],['ironbug',-7,-14,13,{}],['ironbug',7,-14,13,{}]
-  ],eliteSpawn:[['voltkit',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,18,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:{min:12,max:18},sceneStatus:'stage-ready'},
+    ['voltkit',-11,2,6,{}],['voltkit',11,2,6,{}],['galebird',-11,-8,6,{}],['galebird',11,-8,6,{}],['ironbug',-7,-14,7,{}],['ironbug',7,-14,7,{}]
+  ],eliteSpawn:[['voltkit',0,-16,9,{elite:true}]],eliteChance:.16,bossSpawn:[['voltkit',0,-18,10,{boss:true}]],progressionBossSpeciesId:'voltkit',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Electric'],secondaryTypes:['Flying','Steel'],encounterTableId:'encounter-storm-field-v1',eliteEncounterTableId:'elite-storm-field-v1',bossEncounterTableId:'boss-storm-field-v1',balanceProfileId:'stage-storm-field-v1',recommendedLevel:stageLevelRange('storm-field'),sceneStatus:'stage-ready'},
   'poison-marsh':{label:'Poison Marsh • Poison + Grass + Bug',stageId:'poison-marsh',biomeId:'poison-marsh',bg:0x6b7f4a,ground:0x365314,spawn:[
-    ['toxitoad',-11,2,31,{}],['toxitoad',11,2,31,{}],['mossbun',-11,-8,31,{}],['mossbun',11,-8,31,{}],['buglet',-7,-14,32,{}],['toxitoad',7,-14,32,{}]
-  ],eliteSpawn:[['toxitoad',0,-16,35,{elite:true}]],eliteChance:.16,bossSpawn:[['toxitoad',0,-18,38,{boss:true}]],progressionBossSpeciesId:'toxitoad',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Poison'],secondaryTypes:['Grass','Bug'],encounterTableId:'encounter-poison-marsh-v1',eliteEncounterTableId:'elite-poison-marsh-v1',bossEncounterTableId:'boss-poison-marsh-v1',balanceProfileId:'stage-poison-marsh-v1',recommendedLevel:{min:30,max:38},sceneStatus:'stage-ready'},
+    ['toxitoad',-11,2,16,{}],['toxitoad',11,2,16,{}],['mossbun',-11,-8,16,{}],['mossbun',11,-8,16,{}],['buglet',-7,-14,17,{}],['toxitoad',7,-14,17,{}]
+  ],eliteSpawn:[['toxitoad',0,-16,19,{elite:true}]],eliteChance:.16,bossSpawn:[['toxitoad',0,-18,20,{boss:true}]],progressionBossSpeciesId:'toxitoad',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Poison'],secondaryTypes:['Grass','Bug'],encounterTableId:'encounter-poison-marsh-v1',eliteEncounterTableId:'elite-poison-marsh-v1',bossEncounterTableId:'boss-poison-marsh-v1',balanceProfileId:'stage-poison-marsh-v1',recommendedLevel:stageLevelRange('poison-marsh'),sceneStatus:'stage-ready'},
   'dream-shrine':{label:'Dream Shrine • Psychic + Fairy + Normal',stageId:'dream-shrine',biomeId:'dream-shrine',bg:0x312e81,ground:0x6d28d9,spawn:[
     ['mindcoon',-11,2,20,{}],['mindcoon',11,2,20,{}],['fairimp',-11,-8,20,{}],['fairimp',11,-8,20,{}],['normalooze',-7,-14,21,{}],['mindcoon',7,-14,21,{}]
-  ],eliteSpawn:[['mindcoon',0,-16,23,{elite:true}]],eliteChance:.16,bossSpawn:[['mindcoon',0,-18,24,{boss:true}]],progressionBossSpeciesId:'mindcoon',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Psychic'],secondaryTypes:['Fairy','Normal'],encounterTableId:'encounter-dream-shrine-v1',eliteEncounterTableId:'elite-dream-shrine-v1',bossEncounterTableId:'boss-dream-shrine-v1',balanceProfileId:'stage-dream-shrine-v1',recommendedLevel:{min:20,max:24},sceneStatus:'stage-ready'},
+  ],eliteSpawn:[['mindcoon',0,-16,23,{elite:true}]],eliteChance:.16,bossSpawn:[['mindcoon',0,-18,24,{boss:true}]],progressionBossSpeciesId:'mindcoon',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Psychic'],secondaryTypes:['Fairy','Normal'],encounterTableId:'encounter-dream-shrine-v1',eliteEncounterTableId:'elite-dream-shrine-v1',bossEncounterTableId:'boss-dream-shrine-v1',balanceProfileId:'stage-dream-shrine-v1',recommendedLevel:stageLevelRange('dream-shrine'),sceneStatus:'stage-ready'},
   'haunted-woods':{label:'Haunted Woods • Ghost + Dark + Poison',stageId:'haunted-woods',biomeId:'haunted-woods',bg:0x1e293b,ground:0x334155,spawn:[
     ['ghostpurr',-11,2,22,{}],['ghostpurr',11,2,22,{}],['toxitoad',-11,-8,22,{}],['toxitoad',11,-8,22,{}],['voidhorn',-7,-14,23,{}],['ghostpurr',7,-14,23,{}]
-  ],eliteSpawn:[['ghostpurr',0,-16,25,{elite:true}]],eliteChance:.16,bossSpawn:[['ghostpurr',0,-18,26,{boss:true}]],progressionBossSpeciesId:'ghostpurr',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ghost'],secondaryTypes:['Dark','Poison'],encounterTableId:'encounter-haunted-woods-v1',eliteEncounterTableId:'elite-haunted-woods-v1',bossEncounterTableId:'boss-haunted-woods-v1',balanceProfileId:'stage-haunted-woods-v1',recommendedLevel:{min:22,max:26},sceneStatus:'stage-ready'},
+  ],eliteSpawn:[['ghostpurr',0,-16,25,{elite:true}]],eliteChance:.16,bossSpawn:[['ghostpurr',0,-18,26,{boss:true}]],progressionBossSpeciesId:'ghostpurr',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ghost'],secondaryTypes:['Dark','Poison'],encounterTableId:'encounter-haunted-woods-v1',eliteEncounterTableId:'elite-haunted-woods-v1',bossEncounterTableId:'boss-haunted-woods-v1',balanceProfileId:'stage-haunted-woods-v1',recommendedLevel:stageLevelRange('haunted-woods'),sceneStatus:'stage-ready'},
   'shadow-city':{label:'Shadow City • Dark + Poison + Fighting',stageId:'shadow-city',biomeId:'shadow-city',bg:0x111827,ground:0x312e81,spawn:[
     ['voidhorn',-11,2,24,{}],['voidhorn',11,2,24,{}],['toxitoad',-11,-8,24,{}],['toxitoad',11,-8,24,{}],['punchcub',-7,-14,25,{}],['voidhorn',7,-14,25,{}]
-  ],eliteSpawn:[['voidhorn',0,-16,27,{elite:true}]],eliteChance:.16,bossSpawn:[['voidhorn',0,-18,28,{boss:true}]],progressionBossSpeciesId:'voidhorn',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Dark'],secondaryTypes:['Poison','Fighting'],encounterTableId:'encounter-shadow-city-v1',eliteEncounterTableId:'elite-shadow-city-v1',bossEncounterTableId:'boss-shadow-city-v1',balanceProfileId:'stage-shadow-city-v1',recommendedLevel:{min:24,max:28},sceneStatus:'stage-ready'},
+  ],eliteSpawn:[['voidhorn',0,-16,27,{elite:true}]],eliteChance:.16,bossSpawn:[['voidhorn',0,-18,28,{boss:true}]],progressionBossSpeciesId:'voidhorn',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Dark'],secondaryTypes:['Poison','Fighting'],encounterTableId:'encounter-shadow-city-v1',eliteEncounterTableId:'elite-shadow-city-v1',bossEncounterTableId:'boss-shadow-city-v1',balanceProfileId:'stage-shadow-city-v1',recommendedLevel:stageLevelRange('shadow-city'),sceneStatus:'stage-ready'},
   'steel-factory':{label:'Steel Factory • Steel + Electric + Rock',stageId:'steel-factory',biomeId:'steel-factory',bg:0x64748b,ground:0x475569,spawn:[
     ['ironbug',-11,2,26,{}],['ironbug',11,2,26,{}],['voltkit',-11,-8,26,{}],['voltkit',11,-8,26,{}],['rockhorn',-7,-14,27,{}],['ironbug',7,-14,27,{}]
-  ],eliteSpawn:[['ironbug',0,-16,29,{elite:true}]],eliteChance:.16,bossSpawn:[['ironbug',0,-18,30,{boss:true}]],progressionBossSpeciesId:'ironbug',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Steel'],secondaryTypes:['Electric','Rock'],encounterTableId:'encounter-steel-factory-v1',eliteEncounterTableId:'elite-steel-factory-v1',bossEncounterTableId:'boss-steel-factory-v1',balanceProfileId:'stage-steel-factory-v1',recommendedLevel:{min:26,max:30},sceneStatus:'stage-ready'},
+  ],eliteSpawn:[['ironbug',0,-16,29,{elite:true}]],eliteChance:.16,bossSpawn:[['ironbug',0,-18,30,{boss:true}]],progressionBossSpeciesId:'ironbug',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Steel'],secondaryTypes:['Electric','Rock'],encounterTableId:'encounter-steel-factory-v1',eliteEncounterTableId:'elite-steel-factory-v1',bossEncounterTableId:'boss-steel-factory-v1',balanceProfileId:'stage-steel-factory-v1',recommendedLevel:stageLevelRange('steel-factory'),sceneStatus:'stage-ready'},
+  'dragon-crater':{label:'Dragon Crater • Dragon + Fire + Rock',stageId:'dragon-crater',biomeId:'dragon-crater',bg:0x7f1d1d,ground:0x431407,spawn:[
+    ['emberdrake',-11,2,30,{}],['emberdrake',11,2,30,{}],['flameling',-11,-8,30,{}],['flameling',11,-8,30,{}],['rockhorn',-7,-14,31,{}],['emberdrake',7,-14,31,{}]
+  ],eliteSpawn:[['emberdrake',0,-16,34,{elite:true}]],eliteChance:.16,bossSpawn:[['emberdrake',0,-18,35,{boss:true}]],progressionBossSpeciesId:'emberdrake',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Dragon'],secondaryTypes:['Fire','Rock'],encounterTableId:'encounter-dragon-crater-v1',eliteEncounterTableId:'elite-dragon-crater-v1',bossEncounterTableId:'boss-dragon-crater-v1',balanceProfileId:'stage-dragon-crater-v1',recommendedLevel:stageLevelRange('dragon-crater'),sceneStatus:'stage-ready'},
+  'fairy-garden':{label:'Fairy Garden • Fairy + Grass + Psychic',stageId:'fairy-garden',biomeId:'fairy-garden',bg:0xc084fc,ground:0x4d7c0f,spawn:[
+    ['fairimp',-11,2,32,{}],['fairimp',11,2,32,{}],['mossbun',-11,-8,32,{}],['mossbun',11,-8,32,{}],['mindcoon',-7,-14,33,{}],['fairimp',7,-14,33,{}]
+  ],eliteSpawn:[['fairimp',0,-16,35,{elite:true}]],eliteChance:.16,bossSpawn:[['fairimp',0,-18,36,{boss:true}]],progressionBossSpeciesId:'fairimp',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Fairy'],secondaryTypes:['Grass','Psychic'],encounterTableId:'encounter-fairy-garden-v1',eliteEncounterTableId:'elite-fairy-garden-v1',bossEncounterTableId:'boss-fairy-garden-v1',balanceProfileId:'stage-fairy-garden-v1',recommendedLevel:stageLevelRange('fairy-garden'),sceneStatus:'stage-ready'},
+  'combat-colosseum':{label:'Combat Colosseum • Fighting + Normal + Steel',stageId:'combat-colosseum',biomeId:'combat-colosseum',bg:0xf59e0b,ground:0x92400e,spawn:[
+    ['punchcub',-11,2,34,{}],['punchcub',11,2,34,{}],['normalooze',-11,-8,34,{}],['normalooze',11,-8,34,{}],['ironbug',-7,-14,35,{}],['punchcub',7,-14,35,{}]
+  ],eliteSpawn:[['punchcub',0,-16,37,{elite:true}]],eliteChance:.16,bossSpawn:[['punchcub',0,-18,38,{boss:true}]],progressionBossSpeciesId:'punchcub',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Fighting'],secondaryTypes:['Normal','Steel'],encounterTableId:'encounter-combat-colosseum-v1',eliteEncounterTableId:'elite-combat-colosseum-v1',bossEncounterTableId:'boss-combat-colosseum-v1',balanceProfileId:'stage-combat-colosseum-v1',recommendedLevel:stageLevelRange('combat-colosseum'),sceneStatus:'stage-ready'},
+  'normal-wildlands':{label:'Normal Wildlands • Normal + All Types',stageId:'normal-wildlands',biomeId:'normal-wildlands',bg:0x60a5fa,ground:0x65a30d,spawn:[
+    ['normalooze',-11,2,38,{}],['normalooze',11,2,38,{}],['emberdrake',-11,-8,38,{}],['fairimp',11,-8,38,{}],['ironbug',-7,-14,39,{}],['normalooze',7,-14,39,{}]
+  ],eliteSpawn:[['normalooze',0,-16,41,{elite:true}]],eliteChance:.16,bossSpawn:[['normalooze',0,-18,42,{boss:true}]],progressionBossSpeciesId:'normalooze',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Normal'],secondaryTypes:['Grass','Bug','Fire','Water','Electric','Ice','Rock','Ground','Flying','Poison','Psychic','Ghost','Dark','Steel','Dragon','Fairy','Fighting'],bossEncounterTableId:'boss-normal-wildlands-v1',eliteEncounterTableId:'elite-normal-wildlands-v1',encounterTableId:'encounter-normal-wildlands-v1',balanceProfileId:'stage-normal-wildlands-v1',recommendedLevel:stageLevelRange('normal-wildlands'),sceneStatus:'stage-ready'},
   'sky-ruins':{label:'Sky Ruins • Flying + Electric + Psychic',stageId:'sky-ruins',biomeId:'sky-ruins',bg:0x8da4c7,ground:0x64748b,spawn:[
-    ['galebird',-11,2,24,{}],['galebird',11,2,24,{}],['voltkit',-11,-8,24,{}],['voltkit',11,-8,24,{}],['mindcoon',-7,-14,25,{}],['galebird',7,-14,25,{}]
-  ],eliteSpawn:[['galebird',0,-16,27,{elite:true}]],eliteChance:.16,bossSpawn:[['galebird',0,-18,30,{boss:true}]],progressionBossSpeciesId:'galebird',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Flying'],secondaryTypes:['Electric','Psychic'],encounterTableId:'encounter-sky-ruins-v1',eliteEncounterTableId:'elite-sky-ruins-v1',bossEncounterTableId:'boss-sky-ruins-v1',balanceProfileId:'stage-sky-ruins-v1',recommendedLevel:{min:24,max:30},sceneStatus:'stage-ready'},
+    ['galebird',-11,2,14,{}],['galebird',11,2,14,{}],['voltkit',-11,-8,14,{}],['voltkit',11,-8,14,{}],['mindcoon',-7,-14,15,{}],['galebird',7,-14,15,{}]
+  ],eliteSpawn:[['galebird',0,-16,17,{elite:true}]],eliteChance:.16,bossSpawn:[['galebird',0,-18,18,{boss:true}]],progressionBossSpeciesId:'galebird',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Flying'],secondaryTypes:['Electric','Psychic'],encounterTableId:'encounter-sky-ruins-v1',eliteEncounterTableId:'elite-sky-ruins-v1',bossEncounterTableId:'boss-sky-ruins-v1',balanceProfileId:'stage-sky-ruins-v1',recommendedLevel:stageLevelRange('sky-ruins'),sceneStatus:'stage-ready'},
   'rocky-canyon':{label:'Rocky Canyon • Rock + Ground + Fighting',stageId:'rocky-canyon',biomeId:'rocky-canyon',bg:0xd6a66b,ground:0x9a6b3f,spawn:[
-    ['rockhorn',-11,2,20,{}],['rockhorn',11,2,20,{}],['sandmole',-11,-8,20,{}],['sandmole',11,-8,20,{}],['punchcub',-7,-14,21,{}],['rockhorn',7,-14,21,{}]
-  ],eliteSpawn:[['rockhorn',0,-16,23,{elite:true}]],eliteChance:.16,bossSpawn:[['rockhorn',0,-18,26,{boss:true}]],progressionBossSpeciesId:'rockhorn',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Rock'],secondaryTypes:['Ground','Fighting'],encounterTableId:'encounter-rocky-canyon-v1',eliteEncounterTableId:'elite-rocky-canyon-v1',bossEncounterTableId:'boss-rocky-canyon-v1',balanceProfileId:'stage-rocky-canyon-v1',recommendedLevel:{min:20,max:26},sceneStatus:'stage-ready'},
+    ['rockhorn',-11,2,12,{}],['rockhorn',11,2,12,{}],['sandmole',-11,-8,12,{}],['sandmole',11,-8,12,{}],['punchcub',-7,-14,13,{}],['rockhorn',7,-14,13,{}]
+  ],eliteSpawn:[['rockhorn',0,-16,15,{elite:true}]],eliteChance:.16,bossSpawn:[['rockhorn',0,-18,16,{boss:true}]],progressionBossSpeciesId:'rockhorn',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Rock'],secondaryTypes:['Ground','Fighting'],encounterTableId:'encounter-rocky-canyon-v1',eliteEncounterTableId:'elite-rocky-canyon-v1',bossEncounterTableId:'boss-rocky-canyon-v1',balanceProfileId:'stage-rocky-canyon-v1',recommendedLevel:stageLevelRange('rocky-canyon'),sceneStatus:'stage-ready'},
   'frozen-pass':{label:'Frozen Pass • Ice + Flying + Water',stageId:'frozen-pass',biomeId:'frozen-pass',bg:0xbfe8ff,ground:0xdbeafe,spawn:[
-    ['frostowl',-11,2,16,{}],['frostowl',11,2,16,{}],['aquapuff',-11,-8,16,{}],['aquapuff',11,-8,16,{}],['frostowl',-7,-14,17,{}],['aquapuff',7,-14,17,{}]
-  ],eliteSpawn:[['frostowl',0,-16,19,{elite:true}]],eliteChance:.16,bossSpawn:[['frostowl',0,-18,22,{boss:true}]],progressionBossSpeciesId:'frostowl',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ice'],secondaryTypes:['Flying','Water'],encounterTableId:'encounter-frozen-pass-v1',eliteEncounterTableId:'elite-frozen-pass-v1',bossEncounterTableId:'boss-frozen-pass-v1',balanceProfileId:'stage-frozen-pass-v1',recommendedLevel:{min:16,max:22},sceneStatus:'stage-ready'},
+    ['frostowl',-11,2,10,{}],['frostowl',11,2,10,{}],['aquapuff',-11,-8,10,{}],['aquapuff',11,-8,10,{}],['frostowl',-7,-14,11,{}],['aquapuff',7,-14,11,{}]
+  ],eliteSpawn:[['frostowl',0,-16,13,{elite:true}]],eliteChance:.16,bossSpawn:[['frostowl',0,-18,14,{boss:true}]],progressionBossSpeciesId:'frostowl',bounds:{minX:-22,maxX:22,minZ:-20,maxZ:20},playerStart:[0,0,17],primaryTypes:['Ice'],secondaryTypes:['Flying','Water'],encounterTableId:'encounter-frozen-pass-v1',eliteEncounterTableId:'elite-frozen-pass-v1',bossEncounterTableId:'boss-frozen-pass-v1',balanceProfileId:'stage-frozen-pass-v1',recommendedLevel:stageLevelRange('frozen-pass'),sceneStatus:'stage-ready'},
   grassland:{label:'Green Meadow',bg:0x68d2f5,ground:0x56d364,spawn:[
     ['normalooze',-4,-2,1,{}],['normalooze',18,16,1,{}],['flameling',8,-10,1,{}],['flameling',-18,14,1,{}],['aquapuff',16,-4,1,{}],['aquapuff',-16,-16,1,{}],['voltkit',-12,6,1,{}],['voltkit',10,18,1,{}],['mossbun',4,-18,1,{}],['mossbun',-20,4,1,{}],['fairimp',-6,-20,1,{}],['fairimp',18,-16,1,{}],
     ['galebird',14,-20,2,{}],['toxitoad',-20,-10,2,{}],['punchcub',20,10,2,{}],['punchcub',-10,20,2,{}]
@@ -3031,9 +3077,10 @@ const ZONES={
   ]}
 };
 const zoneContentValidation=validateZoneEncounterConfig(ZONES);
+const stageLevelValidation=validateStageLevelProgression(ZONES);
 const warpContentValidation=validateWarpRoutes();
-if(!zoneContentValidation.ok||!warpContentValidation.ok){
-  throw new Error(`World content validation failed: ${JSON.stringify([...zoneContentValidation.issues,...warpContentValidation.issues])}`);
+if(!zoneContentValidation.ok||!stageLevelValidation.ok||!warpContentValidation.ok){
+  throw new Error(`World content validation failed: ${JSON.stringify([...zoneContentValidation.issues,...stageLevelValidation.issues,...warpContentValidation.issues])}`);
 }
 function setZoneLighting(zone){
   if(zone==='cave'){
@@ -3088,6 +3135,22 @@ function setZoneLighting(zone){
     hemi.intensity=1.15;
     sun.intensity=1.55;
     sun.color.setHex(0xfde68a);
+  }else if(zone==='dragon-crater'){
+    hemi.intensity=0.9;
+    sun.intensity=1.45;
+    sun.color.setHex(0xfdba74);
+  }else if(zone==='fairy-garden'){
+    hemi.intensity=1.5;
+    sun.intensity=1.75;
+    sun.color.setHex(0xf5d0fe);
+  }else if(zone==='combat-colosseum'){
+    hemi.intensity=1.3;
+    sun.intensity=1.85;
+    sun.color.setHex(0xfef3c7);
+  }else if(zone==='normal-wildlands'){
+    hemi.intensity=1.55;
+    sun.intensity=2;
+    sun.color.setHex(0xe0f2fe);
   }else{
     hemi.intensity=1.55;
     sun.intensity=2.15;
@@ -3097,7 +3160,7 @@ function setZoneLighting(zone){
 function setZoneGround(zone){
   const z=ZONES[zone];
   if(!z)return;
-  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='poison-marsh'?'marsh':zone==='dream-shrine'?'shrine':zone==='haunted-woods'?'woods':zone==='shadow-city'?'city':zone==='steel-factory'?'factory':zone==='rocky-canyon'?'rocky':'grass';
+  const type=zone==='cave'?'cave':zone==='ember-valley'?'ember':zone==='misty-lake'?'lake':zone==='storm-field'?'storm':zone==='frozen-pass'?'frozen':zone==='sky-ruins'?'ruins':zone==='poison-marsh'?'marsh':zone==='dream-shrine'?'shrine':zone==='haunted-woods'?'woods':zone==='shadow-city'?'city':zone==='steel-factory'?'factory':zone==='dragon-crater'?'dragon':zone==='fairy-garden'?'fairy':zone==='combat-colosseum'?'arena':zone==='normal-wildlands'?'wildlands':zone==='rocky-canyon'?'rocky':'grass';
   ground.material.map=makeGroundTexture(z.ground,type);
   ground.material.color.setHex(0xffffff);
   ground.material.needsUpdate=true;

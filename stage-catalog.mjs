@@ -26,13 +26,18 @@ export const STAGE_CATALOG=Object.freeze([
   stage('haunted-woods','Haunted Woods','haunted-woods',['Ghost'],['Dark','Poison'],{min:22,max:26},{type:'clearStage',stageId:'dream-shrine'}),
   stage('shadow-city','Shadow City','shadow-city',['Dark'],['Poison','Fighting'],{min:24,max:28},{type:'clearStage',stageId:'haunted-woods'}),
   stage('steel-factory','Steel Factory','steel-factory',['Steel'],['Electric','Rock'],{min:26,max:30},{type:'clearStage',stageId:'shadow-city'}),
-  stage('dragon-crater','Dragon Crater','dragon-crater',['Dragon'],['Fire','Rock'],{min:30,max:35},{type:'clearSet',setId:'set-3'}),
-  stage('fairy-garden','Fairy Garden','fairy-garden',['Fairy'],['Grass','Psychic'],{min:32,max:36},{type:'clearStage',stageId:'dragon-crater'}),
-  stage('combat-colosseum','Combat Colosseum','combat-colosseum',['Fighting'],['Normal','Steel'],{min:34,max:38},{type:'clearStage',stageId:'fairy-garden'}),
-  stage('normal-wildlands','Normal Wildlands','normal-wildlands',['Normal'],STAGE_TYPES.filter(type=>type!=='Normal'),{min:38,max:42},{type:'clearStage',stageId:'combat-colosseum'}),
+  stage('dragon-crater','Dragon Crater','dragon-crater',['Dragon'],['Fire','Rock'],{min:30,max:35},{type:'clearSet',setId:'set-3'},'active'),
+  stage('fairy-garden','Fairy Garden','fairy-garden',['Fairy'],['Grass','Psychic'],{min:32,max:36},{type:'clearStage',stageId:'dragon-crater'},'active'),
+  stage('combat-colosseum','Combat Colosseum','combat-colosseum',['Fighting'],['Normal','Steel'],{min:34,max:38},{type:'clearStage',stageId:'fairy-garden'},'active'),
+  stage('normal-wildlands','Normal Wildlands','normal-wildlands',['Normal'],STAGE_TYPES.filter(type=>type!=='Normal'),{min:38,max:42},{type:'clearStage',stageId:'combat-colosseum'},'active'),
 ]);
 
 export const STAGE_BY_ID=Object.freeze(Object.fromEntries(STAGE_CATALOG.map(definition=>[definition.id,definition])));
+
+export function stageLevelRange(stageId){
+  const range=STAGE_BY_ID[stageId]?.recommendedLevel;
+  return range?{min:range.min,max:range.max}:null;
+}
 
 export const ENCOUNTER_VARIANTS=Object.freeze(['normal','rare','elite','boss']);
 export const CAPTURE_POLICIES=Object.freeze(['normal','elite','disabled']);
@@ -156,6 +161,50 @@ export function validateZoneEncounterConfig(zones){
   return Object.freeze({ok:issues.length===0,issues:Object.freeze(issues)});
 }
 
+export function validateStageLevelProgression(zones,{stages=STAGE_CATALOG,requireRuntime=true}={}){
+  const issues=[];
+  if(!zones||typeof zones!=='object'||Array.isArray(zones)){
+    return Object.freeze({ok:false,issues:Object.freeze([encounterIssue('invalid_zone_catalog','zones')])});
+  }
+  const supplied=Array.isArray(stages)?stages:[];
+  const byId=new Map(supplied.map(definition=>[definition?.id,definition]));
+  const canonicalIds=new Set(STAGE_CATALOG.map(definition=>definition.id));
+  const ordered=[...STAGE_CATALOG.map(definition=>byId.get(definition.id)).filter(Boolean),...supplied.filter(definition=>!canonicalIds.has(definition?.id))];
+  let previous=null;
+  for(const definition of ordered){
+    const range=definition?.recommendedLevel;
+    if(!definition?.id||!Number.isInteger(range?.min)||!Number.isInteger(range?.max)||range.min<1||range.max<range.min){
+      issues.push(encounterIssue('invalid_stage_level_range','recommendedLevel',{stageId:definition?.id??null}));
+      continue;
+    }
+    if(previous&&(range.min<previous.min||range.max<previous.max)){
+      issues.push(encounterIssue('stage_level_inversion','recommendedLevel',{stageId:definition.id,previousStageId:previous.id}));
+    }
+    previous={id:definition.id,min:range.min,max:range.max};
+    const zone=zones[definition.id];
+    if(!zone){
+      if(requireRuntime)issues.push(encounterIssue('missing_stage_runtime','zone',{stageId:definition.id}));
+      continue;
+    }
+    const runtime=zone.recommendedLevel;
+    if(runtime?.min!==range.min||runtime?.max!==range.max){
+      issues.push(encounterIssue('stage_level_range_mismatch','recommendedLevel',{stageId:definition.id,runtimeMin:runtime?.min??null,runtimeMax:runtime?.max??null,catalogMin:range.min,catalogMax:range.max}));
+    }
+    for(const listName of ['spawn','rareSpawn','eliteSpawn','bossSpawn']){
+      for(const [index,record] of (Array.isArray(zone[listName])?zone[listName]:[]).entries()){
+        const level=record?.[3];
+        if(!Number.isInteger(level)||level<range.min||level>range.max){
+          issues.push(encounterIssue('spawn_level_outside_stage','level',{stageId:definition.id,listName,index,level:level??null,min:range.min,max:range.max}));
+        }
+      }
+    }
+    for(const [index,record] of (Array.isArray(zone.bossSpawn)?zone.bossSpawn:[]).entries()){
+      if(record?.[3]!==range.max)issues.push(encounterIssue('boss_level_not_stage_max','bossSpawn',{stageId:definition.id,index,level:record?.[3]??null,expected:range.max}));
+    }
+  }
+  return Object.freeze({ok:issues.length===0,issues:Object.freeze(issues)});
+}
+
 export const STAGE_SET_MEMBERS=Object.freeze({
   'set-1':Object.freeze(['grass-meadow','ember-valley','misty-lake','storm-field']),
   'set-2':Object.freeze(['frozen-pass','rocky-canyon','sky-ruins','poison-marsh']),
@@ -180,6 +229,10 @@ export const STAGE_REWARD_PROFILES=Object.freeze({
   'stage-haunted-woods-v1':Object.freeze({captureBalls:5,healthy:2,shadowBerry:1}),
   'stage-shadow-city-v1':Object.freeze({captureBalls:5,protein:2,mineralBite:1}),
   'stage-steel-factory-v1':Object.freeze({captureBalls:5,mineralBite:2,trainingChow:1}),
+  'stage-dragon-crater-v1':Object.freeze({captureBalls:6,protein:2,emberFruit:1}),
+  'stage-fairy-garden-v1':Object.freeze({captureBalls:6,healthy:2,moonFruit:1}),
+  'stage-combat-colosseum-v1':Object.freeze({captureBalls:7,trainingChow:3,protein:1}),
+  'stage-normal-wildlands-v1':Object.freeze({captureBalls:8,mineralBite:2,moonFruit:1}),
 });
 
 export const STAGE_CURRENCY_REWARD_PROFILES=Object.freeze(Object.fromEntries(

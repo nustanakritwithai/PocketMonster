@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { MONSTER_CATALOG } from '../monster-catalog.mjs';
-import { STAGE_CATALOG } from '../stage-catalog.mjs';
+import { STAGE_CATALOG, stageLevelRange } from '../stage-catalog.mjs';
 import { WARP_ROUTES } from '../warp-routes.mjs';
 
 const moduleUrl = new URL('../world-content-superset.mjs', import.meta.url);
@@ -21,10 +21,10 @@ function liveZones() {
   const marker = 'const ZONES=';
   const start = game.indexOf(marker) + marker.length;
   const end = game.indexOf('\n};\nconst zoneContentValidation', start) + 2;
-  return Function('BALANCE', `"use strict";return (${game.slice(start, end)});`)({
+  return Function('BALANCE', 'stageLevelRange', `"use strict";return (${game.slice(start, end)});`)({
     grassMeadowRare: { level: 2, chance: .24 },
     grassMeadowBoss: { level: 5 },
-  });
+  }, stageLevelRange);
 }
 
 function inputs() {
@@ -55,29 +55,33 @@ function assertContract(module) {
   assert.equal(module.CANONICAL_MAIN_WORLD_ADDITIONS.routes.digest, 'becea50e803e45ca6e3d39dab5dead86c33313303b3890100b8b2f76512fba96');
   assert.equal(module.WORKBOOK_WORLD_BASELINE.stages.digest, 'add440d4971b34fddb714b7f70dc43f72e2c8d00d7952698ec9d1df60d193a93');
   assert.equal(module.CANONICAL_MAIN_WORLD_ADDITIONS.stages.digest, '5768654e398c121c45721ae113407a755207007d09736de3bf86501aba95b9e4');
+  assert.equal(module.CANONICAL_LEVEL_RESOLUTION.spawnPlacements.digest, 'ffaef02fa95bdcd6d17bf258aa34b1bc9576595c20688908ed617e98a0d7a3ac');
+  assert.equal(module.CANONICAL_LEVEL_RESOLUTION.stages.digest, '7c16946b377095907fe8bd4d376ed9767c2534757f855a3e22cf7e93e172b2f6');
+  assert.equal(module.CANONICAL_FINAL_WORLD_ADDITIONS.spawnPlacements.digest, '315af5a853a4ddd04b765828479d71e4b6cd244929be9fed65c5b076e531e656');
+  assert.equal(module.CANONICAL_FINAL_WORLD_ADDITIONS.routes.digest, '5a7aa79073481145c44b99469fcdfb50001f64aaa64f0b40c7e5ab36176ed6e4');
+  assert.equal(module.CANONICAL_FINAL_WORLD_ADDITIONS.stages.digest, 'ff5ac7f28d89a8304e9bd4c3141a5ae4a4b622c895ec564b0da3a2f85f9b7f9a');
   assert.equal(module.WORKBOOK_WORLD_BASELINE.plannedStages.digest, '78f2703a5f49c444162196d150d533b5021276d54b695fcf8cff34088ce66f40');
   assert.equal(module.WORKBOOK_WORLD_BASELINE.landmarkDigest, 'ed13b6688c013d159aeed926a0905dd1b5028fdcc9ac41e2ded83666b8a9436a');
   assert.deepEqual(module.CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds, ['haunted-woods', 'shadow-city', 'steel-factory']);
+  assert.deepEqual(module.CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds, ['dragon-crater', 'fairy-garden', 'combat-colosseum', 'normal-wildlands']);
+  assert.equal(module.WORKBOOK_WORLD_WARNING_SNAPSHOT.length, 9);
+  assert.equal(module.WORLD_RESOLUTION_BASELINE.length, 8);
   assert.deepEqual(module.WORLD_WARNING_BASELINE.map(row => [row.id, row.severity, row.sourceCell]), [
-    ['MAP-A01:ember-valley', 'HIGH', 'Map_Audit!A18:D18'],
-    ['MAP-A01:misty-lake', 'HIGH', 'Map_Audit!A19:D19'],
-    ['MAP-A01:storm-field', 'HIGH', 'Map_Audit!A20:D20'],
-    ['MAP-A01:frozen-pass', 'HIGH', 'Map_Audit!A21:D21'],
-    ['MAP-A01:rocky-canyon', 'HIGH', 'Map_Audit!A22:D22'],
-    ['MAP-A01:sky-ruins', 'HIGH', 'Map_Audit!A23:D23'],
-    ['MAP-A01:poison-marsh', 'HIGH', 'Map_Audit!A24:D24'],
     ['MAP-A03', 'HIGH', 'Map_Audit!F6'],
-    ['MAP-A06', 'HIGH', 'Map_Audit!F9'],
   ]);
   assertDeepFrozen(module.WORKBOOK_WORLD_BASELINE);
   assertDeepFrozen(module.CANONICAL_MAIN_WORLD_ADDITIONS);
+  assertDeepFrozen(module.CANONICAL_LEVEL_RESOLUTION);
+  assertDeepFrozen(module.CANONICAL_FINAL_WORLD_ADDITIONS);
+  assertDeepFrozen(module.WORKBOOK_WORLD_WARNING_SNAPSHOT);
+  assertDeepFrozen(module.WORLD_RESOLUTION_BASELINE);
   assertDeepFrozen(module.WORLD_WARNING_BASELINE);
 
   const current = module.validateWorldContentSuperset(inputs());
   assert.equal(current.ok, true, JSON.stringify(current.issues));
-  assert.equal(current.counts.actualSpawnPlacements, 133);
-  assert.equal(current.counts.actualRoutes, 28);
-  assert.equal(current.counts.actualImplementedStages, 12);
+  assert.equal(current.counts.actualSpawnPlacements, 165);
+  assert.equal(current.counts.actualRoutes, 37);
+  assert.equal(current.counts.actualImplementedStages, 16);
   assertDeepFrozen(current);
 
   const invalidRoot = module.validateWorldContentSuperset(null);
@@ -104,6 +108,10 @@ function assertContract(module) {
   shiftedExtraSpawn.zones['haunted-woods'].spawn[0][1] = -10;
   assert.equal(hasIssue(module.validateWorldContentSuperset(shiftedExtraSpawn), 'missing_canonical_spawn'), true);
 
+  const shiftedFinalSpawn = inputs();
+  shiftedFinalSpawn.zones['dragon-crater'].spawn[0][1] = -10;
+  assert.equal(hasIssue(module.validateWorldContentSuperset(shiftedFinalSpawn), 'missing_final_spawn'), true);
+
   const duplicate = inputs();
   duplicate.zones['grass-meadow'].spawn[0] = structuredClone(duplicate.zones['grass-meadow'].spawn[1]);
   assert.equal(hasIssue(module.validateWorldContentSuperset(duplicate), 'duplicate_spawn_signature'), true);
@@ -123,6 +131,10 @@ function assertContract(module) {
   const shiftedExtraRoute = inputs();
   shiftedExtraRoute.routes.find(route => route.id === 'dream-to-haunted').position[0] = 19;
   assert.equal(hasIssue(module.validateWorldContentSuperset(shiftedExtraRoute), 'missing_canonical_route'), true);
+
+  const shiftedFinalRoute = inputs();
+  shiftedFinalRoute.routes.find(route => route.id === 'dragon-to-fairy').position[0] = 19;
+  assert.equal(hasIssue(module.validateWorldContentSuperset(shiftedFinalRoute), 'missing_final_route'), true);
 
   const rogueZone = inputs();
   rogueZone.zones['rogue-zone'] = rogueZone.zones['haunted-woods'];
@@ -150,13 +162,17 @@ function assertContract(module) {
   changedHubStatus.zones.hub.sceneStatus = 'danger';
   assert.equal(hasIssue(module.validateWorldContentSuperset(changedHubStatus), 'workbook_zone_mismatch'), true);
 
-  const plannedRoute = inputs();
-  plannedRoute.routes.push({ id: 'rogue-to-planned', from: 'hub', to: 'dragon-crater', label: 'Rogue', position: [1, 1], spawn: [0, 0, 0], kind: 'forward' });
-  assert.equal(hasIssue(module.validateWorldContentSuperset(plannedRoute), 'unknown_route_destination'), true);
+  const unknownRoute = inputs();
+  unknownRoute.routes.push({ id: 'rogue-to-missing', from: 'hub', to: 'missing-stage', label: 'Rogue', position: [1, 1], spawn: [0, 0, 0], kind: 'forward' });
+  assert.equal(hasIssue(module.validateWorldContentSuperset(unknownRoute), 'unknown_route_destination'), true);
 
   const missingExtraStage = inputs();
   delete missingExtraStage.zones['haunted-woods'];
   assert.equal(hasIssue(module.validateWorldContentSuperset(missingExtraStage), 'missing_canonical_stage'), true);
+
+  const missingFinalStage = inputs();
+  delete missingFinalStage.zones['dragon-crater'];
+  assert.equal(hasIssue(module.validateWorldContentSuperset(missingFinalStage), 'missing_final_stage'), true);
 
   const badCatalog = inputs();
   badCatalog.stages.find(stage => stage.id === 'grass-meadow').recommendedLevel.max = 6;
@@ -171,9 +187,9 @@ function assertContract(module) {
   assert.doesNotThrow(() => module.validateWorldContentSuperset(hostileStage));
   assert.equal(module.validateWorldContentSuperset(hostileStage).ok, false);
 
-  const badPlannedCatalog = inputs();
-  badPlannedCatalog.stages.find(stage => stage.id === 'dragon-crater').recommendedLevel.max = 36;
-  assert.equal(hasIssue(module.validateWorldContentSuperset(badPlannedCatalog), 'stage_catalog_mismatch'), true);
+  const badFinalCatalog = inputs();
+  badFinalCatalog.stages.find(stage => stage.id === 'dragon-crater').recommendedLevel.max = 36;
+  assert.equal(hasIssue(module.validateWorldContentSuperset(badFinalCatalog), 'stage_catalog_mismatch'), true);
 
   const renamedMapping = inputs();
   renamedMapping.speciesMappings.find(mapping => mapping.runtimeSpeciesId === 'mossbun').runtimeName = 'Mutant Moss';
@@ -197,8 +213,8 @@ function assertContract(module) {
   assert.equal(hasIssue(module.validateWorldContentSuperset(missingMapping), 'missing_spawn_species_mapping'), true);
 
   const warningRewrite = inputs();
-  warningRewrite.zones['ember-valley'].recommendedLevel.max = 7;
-  assert.equal(hasIssue(module.validateWorldContentSuperset(warningRewrite), 'known_warning_mismatch'), true);
+  warningRewrite.zones['ember-valley'].recommendedLevel.max = 8;
+  assert.equal(hasIssue(module.validateWorldContentSuperset(warningRewrite), 'stage_level_range_mismatch'), true);
 
   const fairyRewrite = inputs();
   fairyRewrite.speciesMappings.find(mapping => mapping.runtimeSpeciesId === 'fairimp').workbookTypeCandidate = 'FAIRY';
@@ -206,13 +222,13 @@ function assertContract(module) {
 
   const inversionRewrite = inputs();
   inversionRewrite.zones['dream-shrine'].recommendedLevel.min = 39;
-  assert.equal(hasIssue(module.validateWorldContentSuperset(inversionRewrite), 'known_warning_mismatch'), true);
+  assert.equal(hasIssue(module.validateWorldContentSuperset(inversionRewrite), 'stage_level_range_mismatch'), true);
 
-  const plannedRuntime = inputs();
-  plannedRuntime.zones['dragon-crater'] = {
+  const malformedFinalRuntime = inputs();
+  malformedFinalRuntime.zones['dragon-crater'] = {
     stageId: 'dragon-crater', spawn: [], bounds: { minX: -22, maxX: 22, minZ: -20, maxZ: 20 },
   };
-  assert.equal(module.validateWorldContentSuperset(plannedRuntime).ok, false);
+  assert.equal(module.validateWorldContentSuperset(malformedFinalRuntime).ok, false);
 }
 
 assertContract(await loadSource(originalSource, 'world-superset-current'));
@@ -232,9 +248,15 @@ const mutants = [
   ['corrupt canonical route oracle', replaceOnce('becea50e803e45ca6e3d39dab5dead86c33313303b3890100b8b2f76512fba96', '0ecea50e803e45ca6e3d39dab5dead86c33313303b3890100b8b2f76512fba96')],
   ['corrupt workbook stage oracle', replaceOnce('add440d4971b34fddb714b7f70dc43f72e2c8d00d7952698ec9d1df60d193a93', '0dd440d4971b34fddb714b7f70dc43f72e2c8d00d7952698ec9d1df60d193a93')],
   ['corrupt canonical stage oracle', replaceOnce('5768654e398c121c45721ae113407a755207007d09736de3bf86501aba95b9e4', '0768654e398c121c45721ae113407a755207007d09736de3bf86501aba95b9e4')],
+  ['corrupt resolved spawn oracle', replaceOnce('ffaef02fa95bdcd6d17bf258aa34b1bc9576595c20688908ed617e98a0d7a3ac', '0faef02fa95bdcd6d17bf258aa34b1bc9576595c20688908ed617e98a0d7a3ac')],
+  ['corrupt resolved stage oracle', replaceOnce('7c16946b377095907fe8bd4d376ed9767c2534757f855a3e22cf7e93e172b2f6', '0c16946b377095907fe8bd4d376ed9767c2534757f855a3e22cf7e93e172b2f6')],
+  ['corrupt final spawn oracle', replaceOnce('315af5a853a4ddd04b765828479d71e4b6cd244929be9fed65c5b076e531e656', '015af5a853a4ddd04b765828479d71e4b6cd244929be9fed65c5b076e531e656')],
+  ['corrupt final route oracle', replaceOnce('5a7aa79073481145c44b99469fcdfb50001f64aaa64f0b40c7e5ab36176ed6e4', '0a7aa79073481145c44b99469fcdfb50001f64aaa64f0b40c7e5ab36176ed6e4')],
+  ['corrupt final stage oracle', replaceOnce('ff5ac7f28d89a8304e9bd4c3141a5ae4a4b622c895ec564b0da3a2f85f9b7f9a', '0f5ac7f28d89a8304e9bd4c3141a5ae4a4b622c895ec564b0da3a2f85f9b7f9a')],
   ['corrupt planned stage oracle', replaceOnce('78f2703a5f49c444162196d150d533b5021276d54b695fcf8cff34088ce66f40', '08f2703a5f49c444162196d150d533b5021276d54b695fcf8cff34088ce66f40')],
   ['corrupt landmark oracle', replaceOnce('ed13b6688c013d159aeed926a0905dd1b5028fdcc9ac41e2ded83666b8a9436a', '0d13b6688c013d159aeed926a0905dd1b5028fdcc9ac41e2ded83666b8a9436a')],
   ['drop canonical stage policy', replaceOnce("const CANONICAL_ADDED_STAGE_IDS = ['haunted-woods', 'shadow-city', 'steel-factory'];", "const CANONICAL_ADDED_STAGE_IDS = ['shadow-city', 'steel-factory'];")],
+  ['drop final stage policy', replaceOnce("const CANONICAL_FINAL_STAGE_IDS = ['dragon-crater', 'fairy-garden', 'combat-colosseum', 'normal-wildlands'];", "const CANONICAL_FINAL_STAGE_IDS = ['fairy-garden', 'combat-colosseum', 'normal-wildlands'];")],
   ['skip digest enforcement', replaceOnce('if (digest !== policy.digest) {', 'if (false) {')],
   ['skip duplicate detection', replaceOnce('if (duplicateCount > 0) issues.push({ code: codes.duplicate, count: duplicateCount });', 'if (false) issues.push({ code: codes.duplicate, count: duplicateCount });')],
   ['make digest order-dependent', replaceOnce('.map(row => JSON.stringify(row)).sort();', '.map(row => JSON.stringify(row));')],
@@ -242,32 +264,21 @@ const mutants = [
   ['erase evolution paths', replaceOnce("typeof options.evolutionPath === 'string' && options.evolutionPath ? options.evolutionPath : null,", 'null,')],
   ['make elite normally capturable', replaceOnce("variant === 'Boss' ? 'disabled' : variant === 'Elite' ? 'elite' : 'normal',", "variant === 'Boss' ? 'disabled' : 'normal',")],
   ['erase gate chance', replaceOnce('return Number.isFinite(chance) ? finiteNumberOrNull(chance * 100) : null;', 'return null;')],
-  ['erase legacy class prefix', replaceOnce("`${zone.stageId ? '' : 'Legacy'}${variant}`", '`${variant}`')],
   ['accept unexpected zone IDs', replaceOnce("for (const id of actual) if (!expected.has(id)) issues.push({ code: unexpectedCode, [field]: id });", 'for (const id of actual) if (false) issues.push({ code: unexpectedCode, [field]: id });')],
   ['accept mapping metadata drift', replaceOnce("else if (JSON.stringify(mappingProjection(actual)) !== JSON.stringify(mappingProjection(expected))) {", 'else if (false) {')],
   ['erase missing mapping diagnostic', replaceOnce("if (!actual) issues.push({ code: 'missing_spawn_species_mapping', runtimeSpeciesId: expected.runtimeSpeciesId });", 'if (!actual) {}')],
-  ['erase level warning guard', replaceOnce("if (runtimeLevel !== warning.runtimeLevel || catalogLevel !== warning.catalogLevel) {", 'if (false) {')],
   ['erase Fairy LIGHT warning guard', replaceOnce("if (fairimp?.runtimeType !== 'Fairy' || fairimp?.workbookTypeCandidate !== 'LIGHT' || fairimp?.typeActivation !== 'deferred') {", 'if (false) {')],
-  ['erase inversion warning guard', replaceOnce("if (poisonLevel !== '30-38' || dreamLevel !== '20-24') {", 'if (false) {')],
+  ['skip stage level validation', replaceOnce('for (const issue of validateStageLevelProgression(zones,{stages:safeStages}).issues) issues.push(safeCopy(issue));', '')],
   ['make snapshots shallow-mutable', replaceOnce('return Object.freeze(value);', 'return value;')],
   ['always claim ok', replaceOnce('return deepFreeze({ ok: frozenIssues.length === 0, issues: frozenIssues, warnings: WORLD_WARNING_BASELINE, counts });', 'return deepFreeze({ ok: true, issues: frozenIssues, warnings: WORLD_WARNING_BASELINE, counts });')],
-  ['skip workbook stage digest', replaceOnce("if (worldContentDigest(workbookStageRows) !== WORKBOOK_WORLD_BASELINE.stages.digest) {", 'if (false) {')],
-  ['skip planned stage digest', replaceOnce("if (worldContentDigest(plannedStageRows) !== WORKBOOK_WORLD_BASELINE.plannedStages.digest) {", 'if (false) {')],
-  ['treat planned catalog as live for route validation', replaceOnce('knownZoneIds: Object.keys(safeZones)', 'knownZoneIds: [...Object.keys(safeZones), ...PLANNED_NO_RUNTIME_STAGE_IDS]')],
-  ['change frozen warning severity', replaceOnce("severity: 'HIGH', code: 'fairy_light_deferred'", "severity: 'MEDIUM', code: 'fairy_light_deferred'")],
-  ['corrupt workbook provenance', replaceOnce('fdda777b1cbb0eeaacb7e02ced3c1c9df1a3af2853bfdf8d1fe902370789e39c', '0dda777b1cbb0eeaacb7e02ced3c1c9df1a3af2853bfdf8d1fe902370789e39c')],
-  ['accept planned runtime zone', source => {
-    let mutated = source.replace(
-      "for (const id of actual) if (!expected.has(id)) issues.push({ code: unexpectedCode, [field]: id });",
-      'for (const id of actual) if (false) issues.push({ code: unexpectedCode, [field]: id });',
-    );
-    mutated = mutated.replace(
-      "if (!WORKBOOK_WORLD_BASELINE.implementedStageIds.includes(id) && !CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds.includes(id)) {",
-      'if (false) {',
-    );
-    assert.notEqual(mutated, source);
+  ['skip resolved workbook stage digest', replaceOnce("if (worldContentDigest(workbookStageRows) !== CANONICAL_LEVEL_RESOLUTION.stages.digest) {", 'if (false) {')],
+  ['skip final stage digest', replaceOnce("if (worldContentDigest(finalStageRows) !== CANONICAL_FINAL_WORLD_ADDITIONS.stages.digest) {", 'if (false) {')],
+  ['change frozen warning severity', source => {
+    const mutated=source.replaceAll("severity: 'HIGH', code: 'fairy_light_deferred'", "severity: 'MEDIUM', code: 'fairy_light_deferred'");
+    assert.notEqual(mutated,source);
     return mutated;
   }],
+  ['corrupt workbook provenance', replaceOnce('fdda777b1cbb0eeaacb7e02ced3c1c9df1a3af2853bfdf8d1fe902370789e39c', '0dda777b1cbb0eeaacb7e02ced3c1c9df1a3af2853bfdf8d1fe902370789e39c')],
   ['accept malformed stage entries', replaceOnce(
     "if (!stage || typeof stage !== 'object' || Array.isArray(stage) || typeof stage.id !== 'string' || !stage.id) {",
     'if (false) {',
