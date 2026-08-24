@@ -163,7 +163,7 @@ assert.equal(resolveBattleGrowth({
 }).growthExp, 0, 'loss never grants victory EXP');
 
 const game = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-const defeatWild = game.match(/function defeatWild\(w\)\{[\s\S]*?\n\}/)?.[0] ?? '';
+const defeatWild = game.match(/function defeatWild\(w,rewardOwnerInstanceId=null\)\{[\s\S]*?\n\}/)?.[0] ?? '';
 const makeInstance = game.match(/function makeInstance\(sp,level=1,opts=\{\}\)\{[\s\S]*?\n\}/)?.[0] ?? '';
 assert.match(defeatWild, /monsterStatCatalogEntry\(w\.canonicalFormId\)/);
 assert.match(defeatWild, /baseExpYield:enemyForm\?\.baseExpYield/);

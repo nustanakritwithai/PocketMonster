@@ -42,8 +42,11 @@ assert.match(update, /lerpVectors\(p\.start,p\.end,t\)/, 'arc lerp is unchanged'
 assert.match(update, /Math\.sin\(t\*Math\.PI\)\*2\.2/, 'throw arc height is unchanged');
 assert.match(update, /spawnElementalFX\(monsterTypes\(inst\)\[0\],p\.mesh\.position\.clone\(\),'trail',0\.55\)/, 'summon trail is unchanged');
 assert.match(update, /priority:p\.type==='capture'\?'P0':'P1'/, 'capture projectile trail remains P0');
-assert.match(update, /removeAndDispose\(scene, p\.mesh\)/, 'impact still disposes the projectile');
+assert.match(update, /try\{removeAndDispose\(scene,mesh\);\}catch\{\}/,
+  'summon impact disposes its committed projectile mesh even if cleanup itself fails');
 assert.match(update, /p\.onHit\?\.\(\)/, 'impact still fires onHit');
+assert.ok(update.lastIndexOf('try{removeAndDispose(scene,mesh);}catch{}') < update.indexOf('try{p.onHit?.();}catch{}'),
+  'summon projectile cleanup precedes its gameplay arrival callback');
 
 assert.match(pulse, /boxGeometry\(size,\.02,size\)/, 'map ring pulses stay thin boxes');
 assert.match(pulse, /wireframe:true/, 'map ring pulses stay wireframe');

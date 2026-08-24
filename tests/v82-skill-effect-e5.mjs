@@ -213,7 +213,8 @@ export function assertSkillEffectClosure(runtime, { gameSource, packageJson } = 
     assert.ok(applyStart >= 0 && applyEnd > applyStart);
     assert.equal((applySource.match(/a\.skillCds\[index\]=command\.startCooldownSec/g) ?? []).length, 1,
       'live accepted adapter owns exactly one cooldown commit');
-    assert.match(applySource, /applyPlannedClosureEffects\(a,move,planned\.healModifierResult,planned\.summonResult\)/);
+    assert.match(applySource, /applyPlannedClosureEffects\(a,move,planned\.healModifierResult,planned\.summonResult,actualTotalDamage,effectRequest\.attacker,effectRequest\.nowSec,contributionEvents\)/);
+    assert.match(applySource, /hitCount:actualHitCount,totalDamage:actualTotalDamage,statusAppliedCount:actualStatusAppliedCount/);
     assert.doesNotMatch(gameSource.slice(gameSource.indexOf('function updateSkillSwarms('), gameSource.indexOf('\nfunction canApplyLiveSkill(')),
       /executeEquippedSkillCommand|consumeSkillUse|skillCds|currentUses/,
       'summon ticks cannot recommit command resources');

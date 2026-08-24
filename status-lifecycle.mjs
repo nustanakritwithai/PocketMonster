@@ -8,6 +8,7 @@ assertContentProvenance(CONTENT_PROVENANCE);
 export const STATUS_LIFECYCLE_POLICY = Object.freeze({
   tickAtApply: false,
   dotCanFaint: true,
+  applyRequiresSettledTickCursor: true,
   encounterBoundary: 'clear_all',
   sourceWorkbookVersion: CONTENT_PROVENANCE.workbookVersion,
   sourceWorkbookSha256: CONTENT_PROVENANCE.sha256,
@@ -40,20 +41,26 @@ export const STATUS_INTERACTIONS = Object.freeze(RAW_INTERACTIONS.map(([
   priority, incomingStatusId, existingStatusId, interaction,
 ]) => Object.freeze({ priority, incomingStatusId, existingStatusId, interaction })));
 
+const EMPTY_STATUS_LIST = Object.freeze([]);
+const EMPTY_CONTROL_HISTORY = Object.freeze([]);
+const EMPTY_CONTROL_DR = Object.freeze({
+  windowStartedAtSec: null,
+  lastAppliedAtSec: null,
+  count: 0,
+  history: EMPTY_CONTROL_HISTORY,
+});
+const EMPTY_TICKS = Object.freeze([]);
+
 function frozenStatuses(statuses) {
-  return Object.freeze(statuses.map(status => Object.freeze({ ...status })));
+  return statuses.length === 0 ? EMPTY_STATUS_LIST : Object.freeze(statuses.map(status => Object.freeze({ ...status })));
 }
 
 function emptyControlDr() {
-  return Object.freeze({
-    windowStartedAtSec: null,
-    lastAppliedAtSec: null,
-    count: 0,
-    history: Object.freeze([]),
-  });
+  return EMPTY_CONTROL_DR;
 }
 
 function frozenControlDr(controlDr = emptyControlDr()) {
+  if (!Array.isArray(controlDr?.history) || controlDr.history.length === 0) return EMPTY_CONTROL_DR;
   const history = Array.isArray(controlDr?.history)
     ? controlDr.history.map(entry => Object.freeze({ statusId: entry.statusId, atSec: entry.atSec }))
     : [];
@@ -66,7 +73,9 @@ function frozenControlDr(controlDr = emptyControlDr()) {
 }
 
 function activeControlDr(controlDr, nowSec) {
-  const history = frozenControlDr(controlDr).history.filter(
+  const canonical = frozenControlDr(controlDr);
+  if (canonical.history.length === 0) return EMPTY_CONTROL_DR;
+  const history = canonical.history.filter(
     entry => nowSec - entry.atSec < HARD_CC_DR_POLICY.windowSec,
   );
   return frozenControlDr({ history });
@@ -82,14 +91,44 @@ function statusState({ encounterId, currentTimeSec, ended, statuses, controlDr }
   });
 }
 
+function validRuntimeStatusTiming(status, definition, currentTimeSec) {
+  return Number.isFinite(status.appliedAtSec) && status.appliedAtSec >= 0 && status.appliedAtSec <= currentTimeSec
+    && Number.isFinite(status.expiresAtSec) && status.expiresAtSec > currentTimeSec
+    && (definition.tickIntervalSec > 0
+      ? Number.isFinite(status.nextTickAtSec) && status.nextTickAtSec > currentTimeSec
+      : status.nextTickAtSec === null);
+}
+
+function validRuntimeStatus(status, currentTimeSec) {
+  if (!status || typeof status !== 'object' || Array.isArray(status)) return false;
+  const definition = statusCatalogEntry(status.statusId);
+  if (!definition
+    || ![status.sourceSkillId, status.sourceLinkId, status.sourceInstanceId]
+      .every(value => value === null || typeof value === 'string')
+    || !Number.isInteger(status.stacks) || status.stacks < 1 || status.stacks > definition.maxStacks
+    || !validRuntimeStatusTiming(status, definition, currentTimeSec)
+    || status.stackRule !== definition.stackRule
+    || status.category !== definition.category) return false;
+  return true;
+}
+
 function result(ok, reason, detail = {}) {
   return Object.freeze({ ok, reason, ...detail });
 }
 
 function validState(state) {
   if (!state || typeof state.encounterId !== 'string' || state.encounterId.length === 0
-    || !Number.isFinite(state.currentTimeSec) || typeof state.ended !== 'boolean' || !Array.isArray(state.statuses)) {
+    || !Number.isFinite(state.currentTimeSec) || state.currentTimeSec < 0
+    || typeof state.ended !== 'boolean' || !Array.isArray(state.statuses)
+    || state.ended && state.statuses.length > 0) {
     return false;
+  }
+  for (let index = 0; index < state.statuses.length; index += 1) {
+    const status = state.statuses[index];
+    if (!validRuntimeStatus(status, state.currentTimeSec)) return false;
+    for (let prior = 0; prior < index; prior += 1) {
+      if (state.statuses[prior].statusId === status.statusId) return false;
+    }
   }
   if (state.controlDr == null) return true;
   if (!Array.isArray(state.controlDr.history)
@@ -169,6 +208,12 @@ export function applyEncounterStatus(state, proposed, { nowSec } = {}) {
   if (!validState(state)) return result(false, 'invalid_state', { state });
   if (state.ended) return result(false, 'encounter_ended', { state });
   if (!Number.isFinite(nowSec) || nowSec < state.currentTimeSec) return result(false, 'invalid_time', { state });
+  const pendingTick = state.statuses.some(status => {
+    const existingDefinition = statusCatalogEntry(status.statusId);
+    return existingDefinition?.tickIntervalSec > 0
+      && status.nextTickAtSec <= Math.min(nowSec, status.expiresAtSec);
+  });
+  if (pendingTick) return result(false, 'advance_required', { state });
   if (!proposed || typeof proposed !== 'object') return result(false, 'invalid_proposed_status', { state });
   const definition = statusCatalogEntry(proposed.statusId);
   if (!definition) return result(false, 'unknown_status', { state, statusId: proposed.statusId ?? null });
@@ -176,11 +221,19 @@ export function applyEncounterStatus(state, proposed, { nowSec } = {}) {
     || !Number.isFinite(proposed.durationSec) || proposed.durationSec <= 0) {
     return result(false, 'invalid_proposed_status', { state, statusId: definition.id });
   }
+  const proposedSources = [proposed.sourceSkillId, proposed.sourceLinkId, proposed.sourceInstanceId];
+  if (!proposedSources.every(value => value === undefined || value === null || typeof value === 'string')) {
+    return result(false, 'invalid_proposed_status', { state, statusId: definition.id });
+  }
 
   const liveStatuses = state.statuses.filter(status => status.expiresAtSec > nowSec);
   const hardCc = hardCcDuration(state.controlDr, definition, proposed.durationSec, nowSec);
   const retainedControlDr = activeControlDr(state.controlDr, nowSec);
   const incoming = runtimeStatus({ ...proposed, durationSec: hardCc.durationSec }, definition, nowSec);
+  if (!Number.isFinite(hardCc.durationSec) || !(hardCc.durationSec > 0)
+    || !validRuntimeStatusTiming(incoming, definition, nowSec)) {
+    return result(false, 'invalid_proposed_status', { state, statusId: definition.id });
+  }
   const sameIndex = liveStatuses.findIndex(status => status.statusId === definition.id);
   if (sameIndex >= 0) {
     const existing = liveStatuses[sameIndex];
@@ -264,6 +317,16 @@ export function advanceEncounterEffects(state, { toSec, targetHp, targetMaxHp } 
     return result(false, 'invalid_advance', { state, damage: 0, ticks: Object.freeze([]) });
   }
 
+  if (state.statuses.length === 0 && (state.controlDr == null || state.controlDr.history.length === 0)) {
+    return result(true, null, {
+      state: statusState({ ...state, currentTimeSec: toSec, statuses: EMPTY_STATUS_LIST, controlDr: EMPTY_CONTROL_DR }),
+      damage: 0,
+      targetHp,
+      fainted: targetHp <= 0,
+      ticks: EMPTY_TICKS,
+    });
+  }
+
   const statuses = [];
   const ticks = [];
   let damage = 0;
@@ -276,7 +339,7 @@ export function advanceEncounterEffects(state, { toSec, targetHp, targetMaxHp } 
       while (nextTickAtSec <= activeUntil + Number.EPSILON) {
         const tickDamage = damagePerTick(definition, status, targetMaxHp);
         damage += tickDamage;
-        ticks.push(Object.freeze({ statusId: status.statusId, atSec: nextTickAtSec, stacks: status.stacks, damage: tickDamage }));
+        ticks.push(Object.freeze({ statusId: status.statusId, atSec: nextTickAtSec, stacks: status.stacks, damage: tickDamage, sourceInstanceId: status.sourceInstanceId }));
         nextTickAtSec += definition.tickIntervalSec;
       }
     }

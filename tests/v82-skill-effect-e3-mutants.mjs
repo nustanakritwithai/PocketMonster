@@ -108,11 +108,28 @@ for (const [name, from, to] of runtimeMutations) {
 }
 
 assertE3LiveWiring(gameSource);
+const activateFieldStart = gameSource.indexOf('function activateSkillField(');
+const activateFieldEnd = gameSource.indexOf('\nfunction fieldBlocksPosition(', activateFieldStart);
+assert.ok(activateFieldStart >= 0 && activateFieldEnd > activateFieldStart,
+  'activateSkillField mutation target must exist');
+const activateFieldSource = gameSource.slice(activateFieldStart, activateFieldEnd);
+const delayedFieldRegistrationSource = activateFieldSource
+  .replace('  liveSkillFields.push(field);\n', '')
+  .replace('    field.mesh=mesh;\n', '    field.mesh=mesh;\n    liveSkillFields.push(field);\n');
+assert.notEqual(delayedFieldRegistrationSource, activateFieldSource,
+  'field registration ordering mutation must apply');
 const liveMutations = [
-  ['drop field activation', 'activateSkillField(a,move,planned.fieldResult);', 'void planned.fieldResult;'],
+  ['let the first field visual failure escape',
+    'function runBestEffortCombatPresentation(callback){try{callback();return true;}catch{return false;}}',
+    'function runBestEffortCombatPresentation(callback){callback();return true;}'],
+  ['register field only after visual construction', activateFieldSource, delayedFieldRegistrationSource],
+  ['drop field activation', 'activateSkillField(a,move,planned.fieldResult,effectRequest.attacker,effectRequest.nowSec);', 'void planned.fieldResult;'],
+  ['recapture field attacker after live damage',
+    'activateSkillField(a,move,planned.fieldResult,effectRequest.attacker,effectRequest.nowSec);',
+    'activateSkillField(a,move,planned.fieldResult);'],
   ['route GroundPoint through enemy area', "else if(command.targetKind==='GroundPoint')", 'else if(false)'],
   ['reuse shared wall geometry', 'new THREE.BoxGeometry(fieldResult.lengthM,1.8,fieldResult.thicknessM)', 'boxGeometry(fieldResult.lengthM,1.8,fieldResult.thicknessM)'],
-  ['drop cast-time attacker snapshot', 'attacker:canonicalSkillEffectAttacker(a,move),\n    attackerNowSec', 'attacker:null,\n    attackerNowSec'],
+  ['drop cast-time attacker snapshot', 'attacker:attackerSnapshot,\n    attackerNowSec', 'attacker:null,\n    attackerNowSec'],
   ['bypass wall collision', 'if(fieldBlocksPosition(next))return false;', 'if(false)return false;'],
   ['remove one wild collision path', 'moving=moveWildWithFieldCollision(w,w.dir,dt*.9);', 'w.mesh.position.addScaledVector(w.dir,dt*.9);'],
   ['tick targets outside hazard', 'distXZ(field.center,w.mesh.position)>field.radiusM', 'false'],

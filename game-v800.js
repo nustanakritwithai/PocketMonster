@@ -1,6 +1,7 @@
-import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, fillEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
+import { ENCOUNTER_POLICY, OWNED_BASIC_AI_POLICY, WILD_BASIC_AI_POLICY, WILD_BOSS_BASIC_AI_POLICY, fillEngagedWildIds, shouldResetEncounter, tickCooldown } from './runtime-policies.mjs';
 import { acceptBossChallenge, bossCombatAuthorized, bossPromptAvailable, bossTargetable, createBossChallengeSession, declineBossChallenge, rearmBossChallenge, retreatBossChallenge } from './boss-challenge.mjs';
 import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
+import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState, resetMonsterAIState, resolveWildMonsterAI, settleWildAIIntent } from './wild-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
@@ -36,7 +37,7 @@ import { passiveCatalogEntry } from './passive-catalog.mjs';
 import { executeEquippedSkillCommand } from './skill-command-runtime.mjs';
 import { canExecuteReviewedSkillEffect, resolveActiveSelfStatusModifiers, resolveReviewedSkillEffects, resolveWorkbookDirectDamage, skillDamageProfile, validateReviewedSkillEffectRequest } from './skill-effect-runtime.mjs';
 import { recoverSkillUses } from './skill-recovery.mjs';
-import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects } from './status-lifecycle.mjs';
+import { advanceEncounterEffects, createEncounterStatusState, endEncounterEffects, isEncounterStatusState } from './status-lifecycle.mjs';
 import { combatStatusDescriptors, resolveCombatStatusRuntime } from './combat-status-runtime.mjs';
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
@@ -1698,7 +1699,8 @@ function spawnBurst(pos,color=0x8b5cf6,{count=8,life=.4,size=.06,gravity=0,prior
 function spawnRingPulse(pos,color=0x60a5fa,{scale=.6,life=.35,y=.08,priority='P1'}={}){
   const size=scale*1.2;
   const mesh=new THREE.Mesh(boxGeometry(size,.02,size),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,wireframe:true}));
-  mesh.position.copy(pos); mesh.position.y+=y; scene.add(mesh); addTransientEffect({mesh,life,maxLife:life,kind:'ring'},priority);
+  const effect={mesh,life,maxLife:life,kind:'ring'};
+  mesh.position.copy(pos);mesh.position.y+=y;scene.add(mesh);return addTransientEffect(effect,priority)?effect:null;
 }
 const TRAIN_FX_COLOR={power:0xef6c32,defense:0x4f87e8,speed:0xe8bd22,technique:0x63b34b,spirit:0xa78bfa};
 const FOOD_FX_COLOR={protein:0xf97316,healthy:0x22c55e,favorite:0xec4899,trainingChow:0xe8bd22,mineralBite:0xaab0c8,emberFruit:0xef6c32,moonFruit:0xc4b5fd};
@@ -2105,14 +2107,15 @@ function setupMonsterMotion(mesh,sp,inst=null){
   mesh.userData.monPhase=Math.random()*6.28;
   mesh.userData.monAction='idle';
   mesh.userData.monActionTimer=0;
+  mesh.userData.monActionDuration=0.22;
 }
-function triggerMonsterAction(mesh,action='attack',duration=0.22){ if(!mesh?.userData) return; mesh.userData.monAction=action; mesh.userData.monActionTimer=duration; }
+function triggerMonsterAction(mesh,action='attack',duration=0.22){ if(!mesh?.userData) return; const safeDuration=Number.isFinite(duration)&&duration>0?duration:0.22;mesh.userData.monAction=action;mesh.userData.monActionTimer=safeDuration;mesh.userData.monActionDuration=safeDuration; }
 function animateMonster(mesh,dt,moving=false){
   if(!mesh?.userData?.baseScale) return;
   const u=mesh.userData,pType=typeFx(u.monsterType||'Normal'),p=(u.monPhase=(u.monPhase||0)+dt*(moving?5.2:2.2)*pType.speed),s=u.baseScale;
   if(u.monActionTimer>0) u.monActionTimer=Math.max(0,u.monActionTimer-dt); else u.monAction='idle';
   let sx=1,sy=1,sz=1,rx=0,rz=0;
-  const pulse=Math.sin(p), pulse2=Math.cos(p*0.7), actionBoost=u.monActionTimer>0?Math.sin((1-u.monActionTimer/0.22)*Math.PI):0;
+  const pulse=Math.sin(p), pulse2=Math.cos(p*0.7), actionDuration=Number.isFinite(u.monActionDuration)&&u.monActionDuration>0?u.monActionDuration:0.22,actionBoost=u.monActionTimer>0?Math.sin((1-u.monActionTimer/actionDuration)*Math.PI):0;
   if(!u.monsterEvolved){ sx=1+pulse*0.04; sy=1+Math.abs(pulse)*0.08; sz=1+pulse2*0.03; }
   switch(u.monsterType){
     case 'Fire': sy+=Math.abs(Math.sin(p*1.4))*0.03; sx-=0.02*Math.sin(p*1.2); rz+=Math.sin(p*1.6)*0.02; break;
@@ -2339,7 +2342,7 @@ function markRareDiscovery(w,kind='found'){
   const key=`${w.zone}:${w.speciesId}`;
   if(bucket[key])return;
   bucket[key]={count:1,firstAt:Date.now()};
-  saveGame(false);
+  try{saveGame(false);}catch{}
 }
 function markEliteProgress(w,kind='found'){
   if(!w?.elite)return;
@@ -2348,7 +2351,7 @@ function markEliteProgress(w,kind='found'){
   const key=`${w.zone}:${w.speciesId}`;
   if(bucket[key])return;
   bucket[key]={count:1,firstAt:Date.now()};
-  saveGame(false);
+  try{saveGame(false);}catch{}
 }
 function markBossProgress(w,kind='found',persist=true){
   if(!w?.boss)return;
@@ -2357,13 +2360,13 @@ function markBossProgress(w,kind='found',persist=true){
   const key=`${w.zone}:${w.speciesId}`;
   if(bucket[key])return;
   bucket[key]={count:1,firstAt:Date.now()};
-  if(persist)saveGame(false);
+  if(persist)try{saveGame(false);}catch{}
 }
 function markStarterJourney(step){
   if(state.currentZone!=='grass-meadow')return;
   const journey=state.starterJourney||starterJourneyDefaults();
   journey.grassMeadow=journey.grassMeadow||starterJourneyDefaults().grassMeadow;
-  if(step in journey.grassMeadow&&!journey.grassMeadow[step]){journey.grassMeadow[step]=true;state.starterJourney=journey;renderStarterJourney();saveGame(false);}
+  if(step in journey.grassMeadow&&!journey.grassMeadow[step]){journey.grassMeadow[step]=true;state.starterJourney=journey;runBestEffortCombatPresentation(()=>renderStarterJourney());try{saveGame(false);}catch{}}
 }
 function currentStageObjective(zoneId=state.currentZone){
   return resolveStageObjective({
@@ -2878,7 +2881,7 @@ function ensureStarter(){
 }
 
 // ---------- World zones / wild encounters ----------
-let nextId=1,zoneGeneration=0;const wilds=[],projectiles=[];let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
+let nextId=1,zoneGeneration=0,summonRuntimeEpoch=0,wildPopulationRecoveryPending=false;const wilds=[],projectiles=[],wildRespawnTimers=new Set();let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
 let bossChallengeSession=createBossChallengeSession(),nearbyBossChallengeId=null;
 let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null,dismissedWarpId=null;
 characterUI=createCharacterUIController({
@@ -3019,6 +3022,243 @@ function setZoneGround(zone){
   scene.fog.far=zone==='cave'?50:zone==='frozen-pass'?62:zone==='rocky-canyon'?68:zone==='sky-ruins'?80:zone==='poison-marsh'?58:zone==='dream-shrine'?64:zone==='haunted-woods'?48:zone==='shadow-city'?60:zone==='steel-factory'?66:76;
   setZoneLighting(zone);
 }
+const MONSTER_AI_DEBUG=new URLSearchParams(location.search).get('debugAI')==='1';
+const MONSTER_AI_TRACE_LIMIT=48;
+const MONSTER_AI_SESSION_TRACE_LIMIT=160;
+const MONSTER_AI_SESSION_ACTOR_LIMIT=32;
+const monsterAiDebugSession=MONSTER_AI_DEBUG?{version:'v8.10',events:[],actors:[]}:null;
+if(monsterAiDebugSession)globalThis.__MONSTER_AI_DEBUG__=monsterAiDebugSession;
+function wildAiEncounterId(zone=state.currentZone,generation=zoneGeneration){return`zone:${generation}:${zone}`;}
+function ownedWildAiTargetId(summon=activeSummon){return summon?.inst?.instanceId&&Number.isSafeInteger(summon.runtimeEpoch)?`owned:${summon.inst.instanceId}:${summon.runtimeEpoch}`:null;}
+function playerWildAiTargetId(generation=zoneGeneration){return`player:${generation}`;}
+function wildAiPolicy(w){return w?.boss===true?WILD_BOSS_BASIC_AI_POLICY:WILD_BASIC_AI_POLICY;}
+function appendMonsterAiSessionTrace(event){
+  if(!monsterAiDebugSession||!event)return;
+  monsterAiDebugSession.events.push(event);
+  if(monsterAiDebugSession.events.length>MONSTER_AI_SESSION_TRACE_LIMIT)monsterAiDebugSession.events.shift();
+}
+function publishMonsterAiMetrics(actorId,kind,metrics){
+  if(!monsterAiDebugSession||typeof actorId!=='string'||!actorId||!metrics)return;
+  const actors=monsterAiDebugSession.actors;
+  let index=actors.findIndex(entry=>entry.actorId===actorId),entry=index>=0?actors.splice(index,1)[0]:null;
+  if(!entry)entry={actorId,kind};
+  entry.kind=kind;
+  entry.decisionCount=metrics.decisionCount;
+  entry.transitionCount=metrics.transitionCount;
+  entry.targetSwitchCount=metrics.targetSwitchCount;
+  entry.rejectedIntentCount=metrics.rejectedIntentCount;
+  entry.resetCount=metrics.resetCount;
+  entry.avgDecisionMs=metrics.avgDecisionMs;
+  entry.maxDecisionMs=metrics.maxDecisionMs;
+  if(Number.isFinite(metrics.attackCount))entry.attackCount=metrics.attackCount;
+  actors.push(entry);
+  if(actors.length>MONSTER_AI_SESSION_ACTOR_LIMIT)actors.shift();
+}
+function runBestEffortCombatPresentation(callback){try{callback();return true;}catch{return false;}}
+function recordWildAiTrace(w,options={}){
+  if(!MONSTER_AI_DEBUG||!w)return;
+  try{
+  const {fromState=w?.state??null,toState=w?.state??null,targetId=w?.aiState?.targetId??null,action='idle',reason='unknown',timeSec=w?.statusState?.currentTimeSec??0,durationMs=0,rejected=false,decision=false,reset=false}=options??{};
+  if(!w.aiDebug)w.aiDebug={eventCount:0,decisionCount:0,transitionCount:0,targetSwitchCount:0,rejectedIntentCount:0,resetCount:0,avgDecisionMs:0,maxDecisionMs:0,trace:[]};
+  const metrics=w.aiDebug;
+  metrics.eventCount++;
+  if(decision){metrics.decisionCount++;metrics.avgDecisionMs+=((Number.isFinite(durationMs)?durationMs:0)-metrics.avgDecisionMs)/metrics.decisionCount;metrics.maxDecisionMs=Math.max(metrics.maxDecisionMs,Number.isFinite(durationMs)?durationMs:0);}
+  if(fromState!==toState)metrics.transitionCount++;
+  if(rejected)metrics.rejectedIntentCount++;
+  if(reset)metrics.resetCount++;
+  const previous=metrics.trace[metrics.trace.length-1];
+  if(previous?.targetId!==undefined&&previous.targetId!==targetId)metrics.targetSwitchCount++;
+  const event={actorId:w.id,fromState,toState,targetId,action,reason,time:timeSec};
+  metrics.trace.push(event);
+  if(metrics.trace.length>MONSTER_AI_TRACE_LIMIT)metrics.trace.shift();
+  appendMonsterAiSessionTrace(event);
+  publishMonsterAiMetrics(w.id,'wild',metrics);
+  }catch{}
+}
+function recordOwnedAiTrace(a,options={}){
+  if(!MONSTER_AI_DEBUG||!a)return;
+  try{
+  const {fromState=a?.aiDecision?.action??'idle',toState=a?.aiDecision?.action??'idle',targetId=a?.aiDecision?.targetId??null,action=toState,reason='unknown',timeSec=a?.statusState?.currentTimeSec??0,durationMs=0,rejected=false,decision=false}=options??{};
+  if(!a.aiDebug)a.aiDebug={decisionCount:0,transitionCount:0,targetSwitchCount:0,rejectedIntentCount:0,resetCount:0,attackCount:0,avgDecisionMs:0,maxDecisionMs:0,trace:[]};
+  const metrics=a.aiDebug;
+  if(decision){metrics.decisionCount++;metrics.avgDecisionMs+=((Number.isFinite(durationMs)?durationMs:0)-metrics.avgDecisionMs)/metrics.decisionCount;metrics.maxDecisionMs=Math.max(metrics.maxDecisionMs,Number.isFinite(durationMs)?durationMs:0);}
+  if(fromState!==toState)metrics.transitionCount++;
+  if(rejected)metrics.rejectedIntentCount++;
+  if(action==='basic_attack'&&reason==='runtime_commit'&&!rejected)metrics.attackCount++;
+  const previous=metrics.trace[metrics.trace.length-1];
+  if(previous?.targetId!==undefined&&previous.targetId!==targetId)metrics.targetSwitchCount++;
+  const actorId=ownedWildAiTargetId(a),event={actorId,fromState,toState,targetId,action,reason,time:timeSec};
+  metrics.trace.push(event);
+  if(metrics.trace.length>MONSTER_AI_TRACE_LIMIT)metrics.trace.shift();
+  appendMonsterAiSessionTrace(event);
+  publishMonsterAiMetrics(actorId,'owned',metrics);
+  }catch{}
+}
+function cancelOwnedAIAction(a,reason){
+  if(!a)return false;
+  const previous=a.aiDecision;
+  a.target=null;a.aiDecision=null;a.aiDecisionElapsed=0;
+  recordOwnedAiTrace(a,{fromState:previous?.action??'idle',toState:'idle',targetId:previous?.targetId??null,action:'idle',reason,timeSec:a.statusState?.currentTimeSec??0,rejected:previous?.targetId!==null&&previous?.targetId!==undefined});
+  return true;
+}
+function cancelOwnedAITarget(targetId,reason){
+  if(!targetId||activeSummon?.aiDecision?.targetId!==targetId)return false;
+  return cancelOwnedAIAction(activeSummon,reason);
+}
+function clearWildAiTelegraph(w){
+  if(!w)return false;
+  const effect=w?.aiTelegraphEffect;
+  const index=effect?effects.indexOf(effect):-1;
+  if(index>=0){effect.life=0;if(effect.mesh)effect.mesh.visible=false;}
+  w.aiTelegraphEffect=null;
+  w.aiTelegraphTargetId=null;
+  w.aiTelegraphYOffset=0;
+  if(w.mesh?.userData){w.mesh.userData.monAction='idle';w.mesh.userData.monActionTimer=0;}
+  return !!effect;
+}
+function setWildAiTelegraph(w,effect,target=null){
+  clearWildAiTelegraph(w);
+  if(!w||!effect)return false;
+  w.aiTelegraphEffect=effect;
+  w.aiTelegraphTargetId=target?.id??null;
+  w.aiTelegraphYOffset=target&&Number.isFinite(effect.mesh?.position?.y)&&Number.isFinite(target.position?.y)?effect.mesh.position.y-target.position.y:0;
+  return true;
+}
+function createWildAiTelegraph(w,position,color,options,target=null){
+  try{
+    const effect=spawnRingPulse(position,color,options);
+    if(!effect?.mesh||!effects.includes(effect))return false;
+    return setWildAiTelegraph(w,effect,target);
+  }catch{return false;}
+}
+function syncWildAiTelegraphs(target){
+  for(const w of wilds){
+    const effect=w?.aiTelegraphEffect;
+    if(!effect)continue;
+    if(!effects.includes(effect)){w.aiTelegraphEffect=null;w.aiTelegraphTargetId=null;w.aiTelegraphYOffset=0;continue;}
+    if(!w.aiTelegraphTargetId)continue;
+    if(!wildAiTargetAvailable(target)||target.id!==w.aiTelegraphTargetId||!effect.mesh?.position)continue;
+    effect.mesh.position.x=target.position.x;
+    effect.mesh.position.y=(Number.isFinite(target.position.y)?target.position.y:0)+w.aiTelegraphYOffset;
+    effect.mesh.position.z=target.position.z;
+  }
+}
+function commitWildAIState(w,nextState){
+  const floor=w?.aiActionSequenceFloor,canonical=validateMonsterAIState(nextState);
+  if(!w||!canonical||canonical.actorId!==w.id||canonical.encounterId!==w.aiEncounterId
+    ||!Number.isSafeInteger(floor)||floor<1||canonical.nextActionSequence<floor)return false;
+  w.aiState=canonical;
+  w.aiActionSequenceFloor=canonical.nextActionSequence;
+  w.state=canonical.state;
+  return true;
+}
+function finiteWildVector(value){return Number.isFinite(value?.x)&&Number.isFinite(value?.y)&&Number.isFinite(value?.z);}
+function finiteNonNegativeWildValue(value){return Number.isFinite(value)&&value>=0;}
+function knownWildMonsterAction(value){return value==='idle'||value==='attack'||value==='hurt';}
+function knownWildMotionAction(value){return value==='idle'||value==='wander'||value==='move';}
+let wildRuntimeFrameToken=0;
+const wildRuntimeActorIdsScratch=new Set();
+const wildFrameRuntimeCache=new WeakMap();
+function ensureWildFrameRuntime(w){
+  let runtime=wildFrameRuntimeCache.get(w);
+  if(!runtime){runtime={actor:w,validationToken:0,statusState:null,control:null,selfModifiers:null};wildFrameRuntimeCache.set(w,runtime);}
+  return runtime;
+}
+function markWildRuntimeValidated(w){
+  const runtime=ensureWildFrameRuntime(w);
+  runtime.validationToken=wildRuntimeFrameToken;runtime.statusState=w.statusState;runtime.control=null;runtime.selfModifiers=null;
+  return runtime;
+}
+function wildFrameRuntimeUsable(w,runtime){
+  return !!w&&runtime?.actor===w&&runtime.validationToken===wildRuntimeFrameToken&&runtime.statusState===w.statusState
+    &&w.dead===false&&w.retired===false&&w.runtimeGeneration===zoneGeneration&&Number.isFinite(w.hp)&&w.hp>0&&!!w.mesh;
+}
+function validateWildRuntimeActor(w){
+  const aiState=w?.aiState;
+  const motion=w?.aiMotion;
+  return !!w&&typeof w.id==='string'&&w.id.length>0&&!!spById[w.speciesId]
+    &&w.dead===false&&w.retired===false&&typeof w.capturing==='boolean'&&typeof w.engaged==='boolean'
+    &&typeof w.combatEnabled==='boolean'&&typeof w.boss==='boolean'&&typeof w.elite==='boolean'&&typeof w.rare==='boolean'
+    &&Number.isInteger(w.level)&&w.level>=1&&Number.isFinite(w.maxHp)&&w.maxHp>0
+    &&Number.isFinite(w.hp)&&w.hp>0&&w.hp<=w.maxHp
+    &&finiteNonNegativeWildValue(w.atk)&&finiteNonNegativeWildValue(w.def)&&finiteNonNegativeWildValue(w.spAtk)&&finiteNonNegativeWildValue(w.spDef)&&finiteNonNegativeWildValue(w.spd)
+    &&Number.isFinite(w.attackCd)&&w.attackCd>=0&&Number.isFinite(w.wanderT)
+    &&finiteWildVector(w.mesh?.position)&&typeof w.mesh.position.copy==='function'&&typeof w.mesh.position.clone==='function'&&typeof w.mesh.position.add==='function'
+    &&finiteWildVector(w.mesh.rotation)&&finiteWildVector(w.mesh.scale)&&typeof w.mesh.scale.set==='function'&&typeof w.mesh.scale.multiplyScalar==='function'
+    &&!!w.mesh.userData&&typeof w.mesh.userData==='object'&&finiteWildVector(w.mesh.userData.baseScale)
+    &&(w.mesh.userData.animPhase===undefined||Number.isFinite(w.mesh.userData.animPhase))
+    &&Number.isFinite(w.mesh.userData.monPhase)&&knownWildMonsterAction(w.mesh.userData.monAction)
+    &&Number.isFinite(w.mesh.userData.monActionTimer)&&w.mesh.userData.monActionTimer>=0
+    &&Number.isFinite(w.mesh.userData.monActionDuration)&&w.mesh.userData.monActionDuration>0
+    &&w.mesh.userData.monActionTimer<=w.mesh.userData.monActionDuration&&finiteWildVector(w.home)
+    &&finiteWildVector(w.dir)&&typeof w.dir.clone==='function'&&typeof w.dir.lengthSq==='function'&&typeof w.dir.multiplyScalar==='function'
+    &&finiteWildVector(w.wanderDir)&&typeof w.wanderDir.clone==='function'&&typeof w.wanderDir.lengthSq==='function'
+    &&!!motion&&knownWildMotionAction(motion.action)
+    &&(motion.targetId===null||typeof motion.targetId==='string')&&finiteWildVector(motion.direction)&&typeof motion.direction.set==='function'
+    &&w.runtimeGeneration===zoneGeneration&&w.aiEncounterId===wildAiEncounterId()
+    &&isCanonicalMonsterAIState(aiState)&&aiState.actorId===w.id&&aiState.encounterId===w.aiEncounterId&&aiState.state===w.state
+    &&Number.isSafeInteger(w.aiActionSequenceFloor)&&w.aiActionSequenceFloor===aiState.nextActionSequence
+    &&isEncounterStatusState(w.statusState)&&w.statusState.ended===false&&w.statusState.encounterId===w.id;
+}
+function quarantineWildAIActor(w){
+  if(!w)return false;
+  const id=typeof w.id==='string'?w.id:null,mesh=w.mesh??null,label=w.labelEl??null;
+  try{abortCaptureSequence(w);}catch{}
+  try{cancelOwnedAITarget(id,'actor_quarantined');}catch{}
+  try{discardBattleEventsForTarget(id);}catch{}
+  try{clearWildAiTelegraph(w);}catch{}
+  if(id!==null){try{distanceTickScheduler.clear(id);}catch{}try{labelTickScheduler.clear(`label:${id}`);}catch{}}
+  if(mesh){try{mesh.visible=false;}catch{}try{removeAndDispose(scene,mesh);}catch{}}
+  try{removeWildLabel(w);}catch{try{label?.remove?.();}catch{}}
+  const index=wilds.indexOf(w);if(index>=0)wilds.splice(index,1);
+  try{w.dead=true;w.retired=true;w.engaged=false;w.capturing=false;}catch{}
+  try{w.mesh=null;}catch{}
+  wildPopulationRecoveryPending=true;
+  return true;
+}
+function quarantineInvalidWildActors(){
+  wildRuntimeActorIdsScratch.clear();
+  let quarantined=0;
+  for(let index=0;index<wilds.length;){
+    const w=wilds[index];
+    if(!w||(typeof w!=='object'&&typeof w!=='function')){
+      wilds.splice(index,1);wildPopulationRecoveryPending=true;quarantined++;continue;
+    }
+    const duplicateId=typeof w?.id==='string'&&wildRuntimeActorIdsScratch.has(w.id);
+    if(!duplicateId&&validateWildRuntimeActor(w)){
+      wildRuntimeActorIdsScratch.add(w.id);markWildRuntimeValidated(w);index++;continue;
+    }
+    try{
+      try{recordWildAiTrace(w,{fromState:w?.state??null,toState:'fainted',targetId:null,action:'idle',reason:duplicateId?'duplicate_runtime_actor_id':'invalid_runtime_actor',timeSec:w?.statusState?.currentTimeSec??0,rejected:true});}catch{}
+      try{quarantineWildAIActor(w);}catch{}
+    }finally{
+      let staleIndex=wilds.indexOf(w);while(staleIndex>=0){wilds.splice(staleIndex,1);staleIndex=wilds.indexOf(w);}
+      wildPopulationRecoveryPending=true;quarantined++;
+    }
+  }
+  return quarantined;
+}
+function cancelWildAIAction(w,reason,{retire=false,clearEngagement=false,encounterReset=false}={}){
+  if(!w)return false;
+  const previousState=w.aiState?.state??w.state??'wander';
+  clearWildAiTelegraph(w);
+  const floor=Number.isSafeInteger(w.aiActionSequenceFloor)&&w.aiActionSequenceFloor>=1?w.aiActionSequenceFloor:null;
+  let reset=resetMonsterAIState(w.aiState);
+  if(reset&&floor!==null&&reset.nextActionSequence<floor)reset=null;
+  reset=reset??(floor===null?null:createMonsterAIState({actorId:w.id,encounterId:w.aiEncounterId,nextActionSequence:floor}));
+  if(!reset||!commitWildAIState(w,reset)){w.aiState=null;w.state='fainted';quarantineWildAIActor(w);recordWildAiTrace(w,{fromState:previousState,toState:'fainted',targetId:null,reason:`${reason}:invalid_state`,timeSec:w.statusState?.currentTimeSec??0,rejected:true});return false;}
+  if(clearEngagement)w.engaged=false;
+  if(retire)w.retired=true;
+  if(w.aiMotion){w.aiMotion.action='idle';w.aiMotion.targetId=null;}
+  recordWildAiTrace(w,{fromState:previousState,toState:w.state,targetId:null,reason,timeSec:w.statusState?.currentTimeSec??0,reset:encounterReset});
+  return true;
+}
+function cancelWildAITarget(targetId,reason){
+  if(!targetId)return 0;
+  let cancelled=0;
+  for(let index=wilds.length-1;index>=0;index--){const w=wilds[index];if(w?.aiState?.targetId===targetId){cancelWildAIAction(w,reason);cancelled++;}}
+  return cancelled;
+}
 function createWild(sp,x,z,level=1,opts={}){
   const boss=!!opts.boss,elite=!!opts.elite||!!sp?.elite,rare=!!opts.rare;
   const encounterProfile=resolveEncounterProfile({stageId:STAGE_BY_ID[state.currentZone]?state.currentZone:null,runtimeSpeciesId:sp?.id,variant:encounterVariantFromFlags({boss,elite,rare}),level});
@@ -3035,39 +3275,45 @@ function createWild(sp,x,z,level=1,opts={}){
   marker.position.set(0,boss?2.45:(rare?2.2:2.05),0);marker.name='wildMarker';mesh.add(marker);
   scene.add(mesh);setupMonsterMotion(mesh,sp,renderInst);const genes=randomGenes(sp),{hp:maxHp,atk,def,spAtk,spDef,spd}=canonicalStats.stats;
   const capturePolicy=encounterProfile.capturePolicy;
-  const wildId='w'+nextId++;
-  const w={id:wildId,speciesId:sp.id,canonicalFormId:canonicalStats.formId,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk,def,spAtk,spDef,spd,potential,genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:'wander',wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),attackCd:0,dead:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,combatEnabled:!boss,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
+  const wildId='w'+nextId++,aiEncounterId=wildAiEncounterId(),aiState=createMonsterAIState({actorId:wildId,encounterId:aiEncounterId});
+  if(!aiState){removeAndDispose(scene,mesh);return null;}
+  const w={id:wildId,speciesId:sp.id,canonicalFormId:canonicalStats.formId,level,maxHp,hp:maxHp,capturePolicy,captureReferenceLevel:null,atk,def,spAtk,spDef,spd,potential,genes,gender:rollGender(sp),mesh,home:new THREE.Vector3(x,0,z),state:aiState.state,aiState,aiEncounterId,aiActionSequenceFloor:aiState.nextActionSequence,aiTelegraphEffect:null,aiTelegraphTargetId:null,aiTelegraphYOffset:0,runtimeGeneration:zoneGeneration,retired:false,lastCommittedAiActionToken:null,wanderT:0,wanderDir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),aiMotion:{action:'wander',targetId:null,direction:new THREE.Vector3(0,0,-1)},attackCd:0,dead:false,capturing:false,captureEngagementResumePending:false,phase:Math.random()*6.28,engaged:false,resetTimer:0,combatEnabled:!boss,boss,elite,rare,zone:state.currentZone,evolutionPath,renderInst,statusState:createEncounterStatusState({encounterId:wildId,nowSec:0})};
   if(rare)markRareDiscovery(w,'found');
   if(elite)markEliteProgress(w,'found');
   if(boss)markBossProgress(w,'found');
   w.labelEl=createWildLabel(w);wilds.push(w);return w;
 }
 function clearWilds(){
+  clearWildRespawnTimers();
   abortCaptureSequence();
   clearCaptureAttemptLedger(captureAttemptLedger);
-  for(const w of wilds){w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});removeAndDispose(scene,w.mesh);removeWildLabel(w);}
+  for(let index=wilds.length-1;index>=0;index--){const w=wilds[index];cancelOwnedAITarget(w?.id,'zone_clear');cancelWildAIAction(w,'zone_clear',{retire:true,clearEngagement:true});w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});removeAndDispose(scene,w.mesh);removeWildLabel(w);}
   wilds.length=0;
+  battleEventLog.length=0;
   distanceTickScheduler.clearAll();
   labelTickScheduler.clearAll();
 }
 function retireWild(w){
+  cancelOwnedAITarget(w?.id,'actor_retired');
+  discardBattleEventsForTarget(w?.id);
+  cancelWildAIAction(w,'actor_retired',{retire:true,clearEngagement:true});
   distanceTickScheduler.clear(w.id);
   labelTickScheduler.clear(`label:${w.id}`);
   const index=wilds.indexOf(w);
   if(index>=0)wilds.splice(index,1);
 }
-function livingWilds(){return wilds.filter(w=>!w.dead);}
+function livingWilds(){return wilds.filter(w=>!w.dead&&!w.retired);}
 function spawnRecords(records=[]){for(const [id,x,z,l,opts] of records)createWild(spById[id],x,z,l,opts);}
 function ensureProgressionEncounter(zone=state.currentZone){
   if(zone!==state.currentZone)return null;
   const cfg=ZONES[zone],objective=currentStageObjective(zone);
-  renderStarterJourney();
+  runBestEffortCombatPresentation(()=>renderStarterJourney());
   if(!cfg||!objective.encounter)return null;
   if(livingWilds().some(w=>w[objective.encounter]))return objective.encounter;
   const records=objective.encounter==='boss'?cfg.bossSpawn:cfg.eliteSpawn;
   if(!records?.length)return null;
   spawnRecords(records);
-  renderStarterJourney();
+  runBestEffortCombatPresentation(()=>renderStarterJourney());
   return objective.encounter;
 }
 function reconcilePendingStageClear(zone,objective){
@@ -3084,49 +3330,67 @@ function spawnZone(zone){
   if(objective.encounter==='elite')ensureProgressionEncounter(zone);
   else if(objective.complete&&cfg.eliteSpawn?.length&&!livingWilds().some(w=>w.rare||w.elite)&&Math.random()<cfg.eliteChance)spawnRecords(cfg.eliteSpawn);
 }
-function resetWild(w){if(w.dead)return;w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});w.captureReferenceLevel=null;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;if(w.boss)w.combatEnabled=false;w.mesh.position.copy(w.home);}
+function resetWild(w,cause='unspecified'){
+  if(w.dead||w.retired)return false;
+  const resetReason=`encounter_reset:${typeof cause==='string'&&cause?cause:'unspecified'}`;
+  cancelOwnedAITarget(w.id,resetReason);
+  if(!cancelWildAIAction(w,resetReason,{clearEngagement:true,encounterReset:true}))return false;
+  discardBattleEventsForTarget(w.id);
+  w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
+  w.statusState=createEncounterStatusState({encounterId:w.id,nowSec:0});
+  w.captureReferenceLevel=null;w.captureEngagementResumePending=false;w.hp=w.maxHp;w.state='wander';w.engaged=false;w.resetTimer=0;w.attackCd=0;
+  if(w.aiMotion){w.aiMotion.action='wander';w.aiMotion.targetId=null;}
+  if(w.boss)w.combatEnabled=false;
+  w.mesh.position.copy(w.home);
+  return true;
+}
 function canCombatTargetWild(w){return bossTargetable(w,bossChallengeSession);}
-function bossChallengeWild(id=bossChallengeSession.activeBossId){return id?wilds.find(w=>w?.id===id&&w.boss&&!w.dead)||null:null;}
+function bossChallengeWild(id=bossChallengeSession.activeBossId){return id?wilds.find(w=>w?.id===id&&w.boss&&!w.dead&&!w.retired)||null:null;}
 function closeBossChallengeUi({clearSession=false}={}){
-  nearbyBossChallengeId=null;
-  el('bossChallenge')?.classList.add('hidden');
-  el('bossRetreatBtn')?.classList.add('hidden');
   if(clearSession)bossChallengeSession=createBossChallengeSession();
+  nearbyBossChallengeId=null;
+  runBestEffortCombatPresentation(()=>{el('bossChallenge')?.classList.add('hidden');el('bossRetreatBtn')?.classList.add('hidden');});
 }
 function updateBossChallengePrompt(){
   const active=bossChallengeWild();
   if(bossChallengeSession.activeBossId){
     if(!active){closeBossChallengeUi({clearSession:true});return;}
     nearbyBossChallengeId=null;
-    el('bossChallenge')?.classList.add('hidden');
-    el('bossRetreatBtn')?.classList.remove('hidden');
+    runBestEffortCombatPresentation(()=>{el('bossChallenge')?.classList.add('hidden');el('bossRetreatBtn')?.classList.remove('hidden');});
     return;
   }
-  el('bossRetreatBtn')?.classList.add('hidden');
-  const boss=wilds.find(w=>w?.boss&&!w.dead&&w.mesh?.position)||null;
-  if(!boss){nearbyBossChallengeId=null;el('bossChallenge')?.classList.add('hidden');return;}
+  runBestEffortCombatPresentation(()=>el('bossRetreatBtn')?.classList.add('hidden'));
+  const boss=wilds.find(w=>w?.boss&&!w.dead&&!w.retired&&w.mesh?.position)||null;
+  if(!boss){nearbyBossChallengeId=null;runBestEffortCombatPresentation(()=>el('bossChallenge')?.classList.add('hidden'));return;}
   const distanceM=distXZ(player.position,boss.mesh.position);
   bossChallengeSession=rearmBossChallenge(bossChallengeSession,boss.id,distanceM);
   if(!bossPromptAvailable({session:bossChallengeSession,bossId:boss.id,alive:!boss.dead,distanceM})){
-    nearbyBossChallengeId=null;el('bossChallenge')?.classList.add('hidden');return;
+    nearbyBossChallengeId=null;runBestEffortCombatPresentation(()=>el('bossChallenge')?.classList.add('hidden'));return;
   }
   nearbyBossChallengeId=boss.id;
-  setTextIfChanged(el('bossChallengeTitle'),`ท้าสู้ BOSS ${wildDisplayName(boss)}?`);
-  setTextIfChanged(el('bossChallengeDetail'),`Lv.${boss.level} • จะยังไม่โจมตีจนกว่าจะกดเข้าสู้`);
-  el('bossChallenge')?.classList.remove('hidden');
+  runBestEffortCombatPresentation(()=>{setTextIfChanged(el('bossChallengeTitle'),`ท้าสู้ BOSS ${wildDisplayName(boss)}?`);setTextIfChanged(el('bossChallengeDetail'),`Lv.${boss.level} • จะยังไม่โจมตีจนกว่าจะกดเข้าสู้`);el('bossChallenge')?.classList.remove('hidden');});
 }
 function startBossChallenge(){
   const boss=bossChallengeWild(nearbyBossChallengeId);
   if(!boss||!bossPromptAvailable({session:bossChallengeSession,bossId:boss.id,alive:!boss.dead,distanceM:distXZ(player.position,boss.mesh.position)}))return false;
+  const combatTarget=resolveWildAiTarget();
+  const combatTargetDistance=wildAiTargetAvailable(combatTarget)?distXZ(boss.mesh.position,combatTarget.position):Infinity;
+  if(!Number.isFinite(combatTargetDistance)||combatTargetDistance>ENCOUNTER_POLICY.disengageRadius){
+    msg(activeSummon&&activeSummon.mesh?'เริ่มการต่อสู้ BOSS ไม่ได้ • พามอนที่ Summon เข้าใกล้ BOSS ก่อน':'เริ่มการต่อสู้ BOSS ไม่ได้ • เป้าหมายต่อสู้ไม่พร้อม');
+    return false;
+  }
+  if(!cancelWildAIAction(boss,'boss_challenge_start',{clearEngagement:true})){
+    nearbyBossChallengeId=null;
+    el('bossChallenge')?.classList.add('hidden');
+    msg('เริ่มการต่อสู้ BOSS ไม่ได้ • Wild AI state ไม่สมบูรณ์');
+    return false;
+  }
   bossChallengeSession=acceptBossChallenge(bossChallengeSession,boss.id);
   nearbyBossChallengeId=null;
   ensureCaptureReferenceLevel(boss);
-  boss.combatEnabled=true;boss.engaged=true;boss.state='chase';
-  if(activeSummon){activeSummon.target=null;activeSummon.aiDecision=null;}
-  el('bossChallenge')?.classList.add('hidden');
-  el('bossRetreatBtn')?.classList.remove('hidden');
-  playBGM('boss');
-  msg(`เริ่มการต่อสู้ BOSS ${wildDisplayName(boss)} • กด “ออกจากไฟต์” ได้ทุกเมื่อ`);
+  boss.combatEnabled=true;boss.engaged=true;boss.state=boss.aiState.state;
+  if(activeSummon)cancelOwnedAIAction(activeSummon,'boss_challenge_start');
+  runBestEffortCombatPresentation(()=>{el('bossChallenge')?.classList.add('hidden');el('bossRetreatBtn')?.classList.remove('hidden');playBGM('boss');msg(`เริ่มการต่อสู้ BOSS ${wildDisplayName(boss)} • กด “ออกจากไฟต์” ได้ทุกเมื่อ`);});
   return true;
 }
 function declineNearbyBossChallenge(){
@@ -3134,29 +3398,28 @@ function declineNearbyBossChallenge(){
   if(!boss)return false;
   bossChallengeSession=declineBossChallenge(bossChallengeSession,boss.id);
   nearbyBossChallengeId=null;
-  el('bossChallenge')?.classList.add('hidden');
-  msg(`ยังไม่เข้าสู้ BOSS ${wildDisplayName(boss)} • เดินออกแล้วกลับมาใหม่เมื่อพร้อม`);
+  runBestEffortCombatPresentation(()=>{el('bossChallenge')?.classList.add('hidden');msg(`ยังไม่เข้าสู้ BOSS ${wildDisplayName(boss)} • เดินออกแล้วกลับมาใหม่เมื่อพร้อม`);});
   return true;
 }
 function exitBossChallenge(reason='player'){
   const boss=bossChallengeWild();
   if(!boss)return false;
+  const resetCause=reason==='player'?'boss_challenge_exit':typeof reason==='string'&&reason?reason:'boss_challenge_exit';
+  abortCaptureSequence(boss);
   bossChallengeSession=retreatBossChallenge(bossChallengeSession,boss.id);
-  resetWild(boss);
-  clearBossChallengeCombatEffects();battleEventLog.length=0;
+  resetWild(boss,resetCause);
+  clearBossChallengeCombatEffects();discardBattleEventsForTarget(boss.id);
   if(activeSummon){
-    activeSummon.target=null;activeSummon.aiDecision=null;
+    cancelOwnedAIAction(activeSummon,'boss_challenge_exit');
     resetActiveBossChallengeStatus();
   }
-  el('bossRetreatBtn')?.classList.add('hidden');
-  playBGM(state.currentZone);
-  msg(reason==='leash'?'ออกห่างจากสนามบอส • ยุติการต่อสู้โดยไม่มีโทษ':`ออกจากไฟต์ BOSS ${wildDisplayName(boss)} • ไม่มีโทษและยังกลับมาท้าใหม่ได้`);
+  runBestEffortCombatPresentation(()=>{el('bossRetreatBtn')?.classList.add('hidden');playBGM(state.currentZone);msg(reason!=='player'?'ออกนอกเงื่อนไขสนามบอส • ยุติการต่อสู้โดยไม่มีโทษ':`ออกจากไฟต์ BOSS ${wildDisplayName(boss)} • ไม่มีโทษและยังกลับมาท้าใหม่ได้`);});
   return true;
 }
 function finishBossChallenge(w){
   if(!w?.boss||!bossCombatAuthorized(bossChallengeSession,w.id))return;
   closeBossChallengeUi({clearSession:true});
-  playBGM(state.currentZone);
+  runBestEffortCombatPresentation(()=>playBGM(state.currentZone));
 }
 function nearestWild(max=12,from=player.position){let best=null,bd=max;for(const w of wilds){if(w.dead||!canCombatTargetWild(w))continue;const d=distXZ(from,w.mesh.position);if(d<bd){best=w;bd=d;}}return best;}
 function aimedWild(maxRange=10,radius=1.35){
@@ -3164,12 +3427,17 @@ function aimedWild(maxRange=10,radius=1.35){
 }
 function respawnWild(w,delay=6000){
   const generation=zoneGeneration,zone=w.zone,id=w.speciesId,level=w.level,boss=w.boss,elite=w.elite,rare=w.rare,x=w.home.x,z=w.home.z,evolutionPath=w.evolutionPath;
-  setTimeout(()=>{
+  let timer=null;
+  timer=setTimeout(()=>{
+    wildRespawnTimers.delete(timer);
     if(zoneGeneration!==generation||state.currentZone!==zone||!ZONES[zone])return;
     createWild(spById[id],x,z,level,{boss,elite,rare,evolutionPath});
   },delay);
+  wildRespawnTimers.add(timer);
+  return timer;
 }
-function clearProjectiles(){ abortCaptureSequence();while(projectiles.length){const p=projectiles.pop();removeAndDispose(scene,p.mesh);}pendingSummon=null; }
+function clearWildRespawnTimers(){for(const timer of wildRespawnTimers)try{clearTimeout(timer);}catch{}wildRespawnTimers.clear();}
+function clearProjectiles(){try{abortCaptureSequence();}catch{}while(projectiles.length){const p=projectiles.pop();if(p?.mesh)try{removeAndDispose(scene,p.mesh);}catch{}}pendingSummon=null;}
 function removeSceneRole(role,instanceId=null){
   for(let i=scene.children.length-1;i>=0;i--){
     const obj=scene.children[i];
@@ -3368,12 +3636,126 @@ function captureWorkbookVariant(w){return encounterVariantFromFlags({boss:!!w?.b
 function validCapturePolicyForWild(w){const variant=captureWorkbookVariant(w),expected=variant==='elite'?'elite':variant==='boss'?'disabled':'normal';return w?.capturePolicy===expected;}
 function captureActiveStatusIds(w){const status=w?.statusState;if(!status||status.ended||!Array.isArray(status.statuses)||!Number.isFinite(status.currentTimeSec))return null;return status.statuses.filter(entry=>entry&&typeof entry.statusId==='string'&&Number.isFinite(entry.expiresAtSec)&&entry.expiresAtSec>status.currentTimeSec).map(entry=>entry.statusId);}
 function captureCalculatorInput(w,{referenceLevel=w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit=true}={}){const identity=captureIdentityForWild(w),activeStatusIds=captureActiveStatusIds(w);if(!identity||!activeStatusIds||!validCapturePolicyForWild(w))return null;return{targetId:w.id,monsterId:captureWorkbookMonsterId(w),currentHp:w.hp,maxHp:w.maxHp,activeStatusIds,ballClass:'Basic',ballTargetType:null,targetSecondaryType:identity.targetSecondaryType,targetLevel:w.level,referenceLevel,variant:captureWorkbookVariant(w),ownedMonsterActive:!!(activeSummon||pendingSummon),ballQuantity:state.inventory.captureBalls,projectileHit,targetAlive:!w.dead&&w.hp>0};}
-function damageWild(w,dmg,meta={}){if(w.dead)return;ensureCaptureReferenceLevel(w);w.engaged=true;if(!canCombatTargetWild(w)){w.engaged=false;return false;}w.hp-=dmg;const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;triggerMonsterAction(w.mesh,'hurt',0.22);spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead)w.mesh.scale.multiplyScalar(1/.94);},90);if(w.hp<=0){w.hp=0;spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});defeatWild(w);}return true;}
+function isWildDamageReady(w){
+  if(!validateWildRuntimeActor(w)||w.capturing||!canCombatTargetWild(w))return false;
+  const distanceFromHome=distXZ(w.mesh.position,w.home);
+  return Number.isFinite(distanceFromHome)&&distanceFromHome<=ENCOUNTER_POLICY.leashRadius;
+}
+function wildDamageTargetAvailable(w){
+  if(!w||w.dead||w.retired||w.capturing)return false;
+  if(!validateWildRuntimeActor(w)){quarantineWildAIActor(w);return false;}
+  if(distXZ(w.mesh.position,w.home)>ENCOUNTER_POLICY.leashRadius){
+    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id))exitBossChallenge('outside_leash');
+    else resetWild(w,'outside_leash');
+    return false;
+  }
+  return canCombatTargetWild(w);
+}
+function stableCombatIdCompare(left,right){const a=String(left),b=String(right);return a<b?-1:a>b?1:0;}
+function damageWild(w,dmg,meta={}){
+  if(!Number.isFinite(dmg)||dmg<=0||!wildDamageTargetAvailable(w))return false;
+  const commitReceipt=meta.commitReceipt&&typeof meta.commitReceipt==='object'?meta.commitReceipt:null;
+  if(commitReceipt){commitReceipt.committed=false;commitReceipt.damage=0;}
+  ensureCaptureReferenceLevel(w);w.engaged=true;
+  const hpBefore=w.hp;w.hp=Math.max(0,w.hp-dmg);
+  if(commitReceipt){commitReceipt.committed=true;commitReceipt.damage=Math.max(0,hpBefore-w.hp);}
+  const hitType=meta.type||wildTypes(w)[0],hitEff=meta.eff??1;
+  runBestEffortCombatPresentation(()=>{
+    triggerMonsterAction(w.mesh,'hurt',0.22);
+    spawnElementalFX(hitType,w.mesh.position.clone().add(new THREE.Vector3(0,.8,0)),'impact',0.75);
+    spawnDamageNumber(dmg,w.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)),{type:hitType,eff:hitEff});
+    hitFlashGroup(w.mesh);triggerCameraShake(hitEff>1?0.11:0.065,hitEff>1?0.16:0.11);
+    if(hitEff>1)playSFX('sfx_hit_effective');else if(hitEff<1)playSFX('sfx_hit_weak');else playSFX('sfx_hit_normal');
+    w.mesh.scale.multiplyScalar(.94);setTimeout(()=>{if(!w.dead&&w.mesh)w.mesh.scale.multiplyScalar(1/.94);},90);
+    if(w.hp<=0)spawnRingPulse(w.mesh.position.clone(),0xffffff,{scale:.68,life:.28});
+  });
+  if(w.hp<=0&&meta.deferDefeat!==true)finalizePendingWildDefeat(w,meta.rewardOwnerInstanceId??null);
+  return true;
+}
+function commitAttributedWildDamage(w,dmg,meta,sourceInstanceId){
+  const commitReceipt={committed:false,damage:0};
+  const ownerId=typeof sourceInstanceId==='string'&&sourceInstanceId?sourceInstanceId:null;
+  try{return damageWild(w,dmg,{...meta,deferDefeat:true,commitReceipt});}
+  finally{if(commitReceipt.committed){try{logBattleEvent('power',commitReceipt.damage,true,w.id,ownerId);}finally{finalizePendingWildDefeat(w,ownerId);}}}
+}
+function commitAttributedStatusDamage(w,dmg,meta,ticks){
+  const commitReceipt={committed:false,damage:0};
+  try{return damageWild(w,dmg,{...meta,deferDefeat:true,commitReceipt});}
+  finally{if(commitReceipt.committed){
+    const ordered=[...(Array.isArray(ticks)?ticks:[])].sort((left,right)=>(left.atSec??0)-(right.atSec??0)||stableCombatIdCompare(left.sourceInstanceId,right.sourceInstanceId)||stableCombatIdCompare(left.statusId,right.statusId));
+    const bySource=new Map();let remaining=commitReceipt.damage,lethalOwnerInstanceId=null,lastSourceInstanceId=null;
+    for(const tick of ordered){
+      if(!(remaining>0))break;
+      const sourceInstanceId=typeof tick?.sourceInstanceId==='string'&&tick.sourceInstanceId?tick.sourceInstanceId:null;
+      const applied=Math.min(remaining,Math.max(0,tick?.damage??0));
+      if(applied>0&&sourceInstanceId){bySource.set(sourceInstanceId,(bySource.get(sourceInstanceId)||0)+applied);lastSourceInstanceId=sourceInstanceId;}
+      remaining-=applied;
+      if(!(remaining>0))lethalOwnerInstanceId=sourceInstanceId;
+    }
+    if(remaining>0&&lastSourceInstanceId){bySource.set(lastSourceInstanceId,(bySource.get(lastSourceInstanceId)||0)+remaining);lethalOwnerInstanceId=lastSourceInstanceId;}
+    try{for(const [sourceInstanceId,amount] of [...bySource].sort(([left],[right])=>stableCombatIdCompare(left,right)))logBattleEvent('power',amount,true,w.id,sourceInstanceId);}
+    finally{finalizePendingWildDefeat(w,lethalOwnerInstanceId);}
+  }}
+}
+function finalizePendingWildDefeat(w,rewardOwnerInstanceId=null){if(!w||w.dead||!(w.hp<=0))return false;defeatWild(w,rewardOwnerInstanceId);return true;}
+function finalizeCommittedWildDefeats(targets,targetDamageCommitted,rewardOwnerInstanceId=null){
+  const pending=[];
+  for(let index=0;index<targets.length;index++){
+    const target=targets[index];
+    if(targetDamageCommitted[index]===true&&target&&!target.dead&&target.hp<=0)pending.push({target,index});
+  }
+  pending.sort((left,right)=>stableCombatIdCompare(left.target.id,right.target.id)||left.index-right.index);
+  let firstFailure=null,hasFailure=false;
+  for(const {target} of pending){try{finalizePendingWildDefeat(target,rewardOwnerInstanceId);}catch(error){if(!hasFailure){firstFailure=error;hasFailure=true;}}}
+  if(hasFailure)throw firstFailure;
+}
 function monsterExpNeed(level){return 24+level*18;}
 function grantMonsterExp(inst,amount){if(!inst)return 0;inst.exp=(inst.exp||0)+amount;let ups=0;while(inst.exp>=monsterExpNeed(inst.level)){inst.exp-=monsterExpNeed(inst.level);levelUpInstance(inst);ups++;}inst.bond=clamp(inst.bond+Math.min(2,amount*.04));return ups;}
 // V7.3: Battle event tracking for growth/training (per-encounter, cleared on defeat)
 let battleEventLog=[];
-function logBattleEvent(category,amount,meaningful=true){if(TRAINING_LINES.includes(category)&&amount>0)battleEventLog.push({category,amount,meaningful});}
+function battleEventTargetId(event){return typeof event?.targetId==='string'&&event.targetId?event.targetId:null;}
+function battleEventSourceInstanceId(event){return typeof event?.sourceInstanceId==='string'&&event.sourceInstanceId?event.sourceInstanceId:null;}
+function logBattleEvent(category,amount,meaningful=true,targetId=null,sourceInstanceId=null){if(TRAINING_LINES.includes(category)&&amount>0&&typeof targetId==='string'&&targetId&&typeof sourceInstanceId==='string'&&sourceInstanceId)battleEventLog.push({category,amount,meaningful,targetId,sourceInstanceId});}
+function consumeBattleEventsForTarget(targetId,sourceInstanceId=null){
+  if(typeof targetId!=='string'||!targetId)return[];
+  const sourceId=typeof sourceInstanceId==='string'&&sourceInstanceId?sourceInstanceId:null;
+  const consumed=[],retained=[];
+  for(const event of battleEventLog){if(battleEventTargetId(event)===targetId&&battleEventSourceInstanceId(event)===sourceId)consumed.push(event);else retained.push(event);}
+  battleEventLog.splice(0,battleEventLog.length,...retained);
+  return consumed;
+}
+function discardBattleEventsForTarget(targetId){
+  if(typeof targetId!=='string'||!targetId)return 0;
+  const retained=[];let discarded=0;
+  for(const event of battleEventLog){if(battleEventTargetId(event)===targetId)discarded++;else retained.push(event);}
+  battleEventLog.splice(0,battleEventLog.length,...retained);return discarded;
+}
+function discardBattleEventsForSource(sourceInstanceId){
+  if(typeof sourceInstanceId!=='string'||!sourceInstanceId)return 0;
+  const retained=[];let discarded=0;
+  for(const event of battleEventLog){if(battleEventSourceInstanceId(event)===sourceInstanceId)discarded++;else retained.push(event);}
+  battleEventLog.splice(0,battleEventLog.length,...retained);return discarded;
+}
+function logCommittedSkillTargetEvents(targets,targetDamageCommitted,targetCommittedDamage,techniqueBudget,sourceInstanceId,additionalEvents=[]){
+  let committedCount=0;
+  for(let index=0;index<targets.length;index++){if(targetDamageCommitted[index]===true&&targetCommittedDamage[index]>0)committedCount++;}
+  if(committedCount===0)return 0;
+  const techniqueShare=Math.max(0,techniqueBudget)/committedCount;
+  for(let index=0;index<targets.length;index++){
+    const target=targets[index],damage=targetCommittedDamage[index];
+    if(targetDamageCommitted[index]!==true||!(damage>0)||!target)continue;
+    logBattleEvent('power',damage,true,target.id,sourceInstanceId);
+    if(techniqueShare>0)logBattleEvent('technique',techniqueShare,true,target.id,sourceInstanceId);
+    for(const event of additionalEvents){if(event?.amount>0)logBattleEvent(event.category,event.amount/committedCount,event.meaningful!==false,target.id,sourceInstanceId);}
+  }
+  return committedCount;
+}
+function settleCommittedSkillBattleTransaction(targets,targetDamageCommitted,targetCommittedDamage,techniqueBudget,sourceInstanceId,additionalEvents){
+  let firstFailure=null,hasFailure=false;
+  try{logCommittedSkillTargetEvents(targets,targetDamageCommitted,targetCommittedDamage,techniqueBudget,sourceInstanceId,additionalEvents);}catch(error){firstFailure=error;hasFailure=true;}
+  try{finalizeCommittedWildDefeats(targets,targetDamageCommitted,sourceInstanceId);}catch(error){if(!hasFailure){firstFailure=error;hasFailure=true;}}
+  if(hasFailure)throw firstFailure;
+}
 function getEnemyTier(w){if(w.boss)return'boss';if(w.elite)return'elite';if(w.trial)return'trial';if(w.strong)return'strong';return'normal';}
 function completeStageClear(stageId,{recovered=false}={}){
   const definition=STAGE_BY_ID[stageId];
@@ -3387,32 +3769,35 @@ function completeStageClear(stageId,{recovered=false}={}){
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
   }
   state.stageProgress=next;
-  saveGame(false);
-  renderStageSelect();
-  renderWarpPrompt();
-  renderStageReward({definition,first,rewards,elapsed});
+  try{saveGame(false);}catch{}
+  runBestEffortCombatPresentation(()=>{renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});});
   return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}`:' • เคลียร์ด่านแล้ว';
 }
-function defeatWild(w){
+function defeatWild(w,rewardOwnerInstanceId=null){
   if(w.dead)return;
   finishBossChallenge(w);
   w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
   w.dead=true;
-  if(state.currentZone==='grass-meadow')markStarterJourney('battled');
-  if(w.elite)markEliteProgress(w,'defeated');
-  if(w.boss)markBossProgress(w,'defeated',false);
-  removeAndDispose(scene,w.mesh);
-  removeWildLabel(w);
+  try{if(state.currentZone==='grass-meadow')markStarterJourney('battled');}catch{}
+  try{if(w.elite)markEliteProgress(w,'defeated');}catch{}
+  try{if(w.boss)markBossProgress(w,'defeated',false);}catch{}
+  try{removeAndDispose(scene,w.mesh);}catch{}
+  try{removeWildLabel(w);}catch{}
   const playerExp=playerExpReward('battle',w);
   state.exp+=playerExp;
   // V7.3: Use resolveBattleGrowth + applyBattleGrowth instead of legacy grantMonsterExp
   const tier=getEnemyTier(w);
   const enemyForm=monsterStatCatalogEntry(w.canonicalFormId);
   const enemy={level:w.level,tier,baseExpYield:enemyForm?.baseExpYield};
-  const events=battleEventLog.splice(0); // consume events for this encounter
+  const requestedOwnerId=typeof rewardOwnerInstanceId==='string'&&rewardOwnerInstanceId?rewardOwnerInstanceId:null;
+  const rewardOwnerId=requestedOwnerId;
+  const rewardInst=rewardOwnerId?getInst(rewardOwnerId):null;
+  const rewardSummon=rewardInst&&activeSummon?.inst?.instanceId===rewardInst.instanceId?activeSummon:null;
+  const events=consumeBattleEventsForTarget(w.id,rewardOwnerId);
+  discardBattleEventsForTarget(w.id);
   let monGain=0,ups=0,trainSummary='',partyShareLine='';
-  if(activeSummon){
-    const inst=activeSummon.inst;
+  if(rewardInst){
+    const inst=rewardInst;
     // Ensure inst has V7.2 schema fields for applyBattleGrowth
     if(!inst.career)inst.career={battleWins:0,eliteWins:0,bossWins:0,trials:0,milestones:[]};
     if(!inst.training)inst.training={power:0,defense:0,speed:0,technique:0,spirit:0};
@@ -3421,29 +3806,30 @@ function defeatWild(w){
     monGain=result.growthExp;ups=applied.growth.leveledUp?applied.growth.toLevel-applied.growth.fromLevel:0;
     synchronizeStage1Learnset(inst);
     refreshStats(inst,false);
-    if(ups>0)spawnLevelUpEffect(activeSummon.mesh.position.clone());
+    if(ups>0&&rewardSummon)runBestEffortCombatPresentation(()=>spawnLevelUpEffect(rewardSummon.mesh.position.clone()));
     const trainLines=TRAINING_LINES.filter(l=>result.trainingExp[l]>0);
     if(trainLines.length)trainSummary=' • Training: '+trainLines.map(l=>`${l[0].toUpperCase()+l.slice(1)} +${result.trainingExp[l]}`).join(' ');
     // Party share growth (non-active members get 35% of active's growth EXP)
     const share=resolvePartyShareGrowth({enemy,activeGrowthExp:monGain});
-    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);synchronizeStage1Learnset(pm);if(grown.leveledUp)spawnLevelUpEffect(fxWorldPos(pm.instanceId));}}}
+    for(const pid of state.party){if(pid&&pid!==inst.instanceId){const pm=getInst(pid);if(pm){if(!pm.growthExp)pm.growthExp=pm.exp||0;const grown=addGrowthExp(pm,share);synchronizeStage1Learnset(pm);if(grown.leveledUp)runBestEffortCombatPresentation(()=>spawnLevelUpEffect(fxWorldPos(pm.instanceId)));}}}
     const partyMembers=state.party.filter(id=>id&&id!==inst.instanceId);
     if(share>0&&partyMembers.length)partyShareLine=`\n  Party Share: +${share} EXP ละ/ตัว (${partyMembers.length} ตัว)`;
   }
   const clearSummary=w.boss&&STAGE_BY_ID[w.zone]?completeStageClear(w.zone):'';
   const tag=w.boss?'BOSS ':w.elite?'ELITE ':w.rare?'RARE ':'';
   let battleMsg=`${tag}${wildDisplayName(w)} ถูกปราบ\n  +${playerExp} Player EXP`;
-  if(activeSummon){
-    battleMsg+=`\n  ${displayName(activeSummon.inst)}: +${monGain} Growth EXP`;
+  if(rewardInst){
+    battleMsg+=`\n  ${displayName(rewardInst)}: +${monGain} Growth EXP`;
     if(ups)battleMsg+=` • Lv.Up +${ups}!`;
     if(trainSummary)battleMsg+=trainSummary;
     if(partyShareLine)battleMsg+=partyShareLine;
   }
-  msg(battleMsg+clearSummary);
-  renderAll();
-  saveGame(false);
-  const stageEliteCleared=w.elite&&ZONES[w.zone]?.progressionBossSpeciesId&&!state.bossProgress?.defeated?.[`${w.zone}:${ZONES[w.zone].progressionBossSpeciesId}`];
-  if(!stageEliteCleared)respawnWild(w,wildRespawnDelay(w));
+  runBestEffortCombatPresentation(()=>{msg(battleMsg+clearSummary);renderAll();});
+  try{saveGame(false);}catch{}
+  const progressionBossSpeciesId=ZONES[w.zone]?.progressionBossSpeciesId,progressionKey=progressionBossSpeciesId?`${w.zone}:${progressionBossSpeciesId}`:null;
+  const stageEliteCleared=Boolean(w.elite&&progressionBossSpeciesId&&!state.bossProgress?.defeated?.[progressionKey]);
+  const progressionBossCleared=Boolean(w.boss&&w.speciesId===progressionBossSpeciesId&&state.bossProgress?.defeated?.[progressionKey]);
+  if(!stageEliteCleared&&!progressionBossCleared)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
   ensureProgressionEncounter(w.zone);
 }
@@ -3494,7 +3880,7 @@ function wildDamage(w,inst,defenseMultiplier=1,attackMultiplier=1){
     atkBuff:attackMultiplier
   });
 }
-function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6,mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04,priority:type==='capture'?'P0':'P1'});projectiles.push({mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0});}
+function throwProjectile(type,targetPos,onHit){const color=type==='capture'?0x3b82f6:0x8b5cf6;let mesh=null,projectile=null;try{mesh=new THREE.Mesh(boxGeometry(.14,.14,.14),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45,transparent:true,opacity:.96}));mesh.userData.spin=true;mesh.position.copy(playerThrowOrigin());mesh.castShadow=true;scene.add(mesh);projectile={mesh,type,color,start:mesh.position.clone(),end:targetPos.clone(),t:0,duration:.55,onHit,lastTrail:0};projectiles.push(projectile);runBestEffortCombatPresentation(()=>spawnBurst(mesh.position.clone(),color,{count:5,life:.18,size:.04,priority:type==='capture'?'P0':'P1'}));return true;}catch{const index=projectile?projectiles.indexOf(projectile):-1;if(index>=0)projectiles.splice(index,1);if(mesh)try{removeAndDispose(scene,mesh);}catch{}return false;}}
 function captureChance(w){
   const input=captureCalculatorInput(w,{referenceLevel:w?.captureReferenceLevel??currentCaptureReferenceLevel(),projectileHit:true});
   if(!input)return 0;
@@ -3509,7 +3895,7 @@ function capturePrerequisite(){if(state.currentZone==='hub'){msg('ต้อง�
 function beginCaptureAim(){if(!capturePrerequisite())return false;captureAimActive=true;captureAimLine.visible=true;el('captureBtn').classList.add('aiming');renderSkillButtons();msg('Capture Aim • ลากด้านขวาหมุนกล้อง แล้วปล่อยปุ่มเพื่อขว้าง');return true;}
 function cancelCaptureAim(){captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');renderSkillButtons();}
 function updateCaptureAimVisual(){if(!captureAimActive)return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),start=playerThrowOrigin().clone(),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0)),pts=[];for(let i=0;i<=18;i++){const u=i/18,p=start.clone().lerp(end,u);p.y+=Math.sin(u*Math.PI)*2.2;pts.push(p);}captureAimGeom.setFromPoints(pts);}
-function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');if(!capturePrerequisite())return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),referenceLevel=t?ensureCaptureReferenceLevel(t):null,targetMonsterId=t?captureWorkbookMonsterId(t):null,attemptId=nextCaptureAttemptId();const begun=beginCaptureAttempt(captureAttemptLedger,{attemptId:attemptId,inventory:state.inventory,targetId:t?.id??null,targetMonsterId,ballClass:'Basic',ballTargetType:null,referenceLevel,ownedMonsterActive:!!(activeSummon||pendingSummon)});if(!begun.ok){msg(begun.reason==='no_capture_ball'?'Capture Ball หมด':'เริ่มการจับไม่ได้ • ข้อมูล encounter ไม่สมบูรณ์');renderHUD();return;}playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');if(t)t.capturing=true;activeCaptureAttempt={attemptId,wild:t};const end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));throwProjectile('capture',end,ballMesh=>resolveCapture(t,ballMesh,attemptId,end));if(t){msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);}else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();saveGame(false);}
+function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;runBestEffortCombatPresentation(()=>el('captureBtn').classList.remove('aiming'));if(!capturePrerequisite())return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),referenceLevel=t?ensureCaptureReferenceLevel(t):null,targetMonsterId=t?captureWorkbookMonsterId(t):null,attemptId=nextCaptureAttemptId();const begun=beginCaptureAttempt(captureAttemptLedger,{attemptId:attemptId,inventory:state.inventory,targetId:t?.id??null,targetMonsterId,ballClass:'Basic',ballTargetType:null,referenceLevel,ownedMonsterActive:!!(activeSummon||pendingSummon)});if(!begun.ok){runBestEffortCombatPresentation(()=>{msg(begun.reason==='no_capture_ball'?'Capture Ball หมด':'เริ่มการจับไม่ได้ • ข้อมูล encounter ไม่สมบูรณ์');renderHUD();});return;}activeCaptureAttempt={attemptId,wild:t};let targetReady=true;if(t){try{cancelOwnedAITarget(t.id,'capture_started');if(!cancelWildAIAction(t,'capture_started'))targetReady=false;else{t.captureEngagementResumePending=t.engaged===true;t.capturing=true;}}catch{targetReady=false;}}if(!targetReady){abortCaptureSequence(t);runBestEffortCombatPresentation(()=>{msg('ยกเลิกการจับ • Wild AI state ไม่สมบูรณ์');renderHUD();});try{saveGame(false);}catch{}return;}runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');});let end=null,projectileStarted=false;try{end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));projectileStarted=throwProjectile('capture',end,ballMesh=>resolveCapture(t,ballMesh,attemptId,end));}catch{}if(!projectileStarted){abortCaptureSequence(t);runBestEffortCombatPresentation(()=>{msg('ยกเลิกการจับ • สร้าง Capture Ball ไม่สำเร็จ');renderHUD();});try{saveGame(false);}catch{}return;}runBestEffortCombatPresentation(()=>{if(t)msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();});try{saveGame(false);}catch{}}
 function captureThrow(){if(beginCaptureAim())executeCaptureThrow();}
 let captureSequence=null;
 function spawnCaptureResultEffect(pos,success){
@@ -3523,170 +3909,178 @@ function spawnCaptureResultEffect(pos,success){
     spawnRingPulse(pos.clone(),0xef4444,{scale:.5,life:.22,y:.1,priority:'P0'});
   }
 }
-function abortCaptureSequence(){
+function abortCaptureSequence(targetWild=null){
   const cs=captureSequence,active=activeCaptureAttempt;
-  if(!cs&&!active)return;
+  const w=cs?.wild??active?.wild??targetWild;
+  if(targetWild&&w!==targetWild)return false;
+  if(!cs&&!active&&!targetWild?.capturing)return false;
   captureSequence=null;
   activeCaptureAttempt=null;
   const attemptId=cs?.attemptId??active?.attemptId;
-  if(attemptId)cancelCaptureAttempt(captureAttemptLedger,attemptId);
-  if(cs?.ballMesh)removeAndDispose(scene,cs.ballMesh);
-  const w=cs?.wild??active?.wild;
+  if(attemptId)try{cancelCaptureAttempt(captureAttemptLedger,attemptId);}catch{}
+  if(cs?.ballMesh)try{removeAndDispose(scene,cs.ballMesh);}catch{}
+  for(let index=projectiles.length-1;index>=0;index--){const projectile=projectiles[index];if(projectile?.type!=='capture')continue;if(projectile.mesh)try{removeAndDispose(scene,projectile.mesh);}catch{}projectiles.splice(index,1);}
   if(w?.mesh){
-    w.capturing=false;
-    if(!w.dead)w.mesh.visible=true;
+    try{w.capturing=false;}catch{}
+    if(!w.dead)try{w.mesh.visible=true;}catch{}
   }
+  return true;
 }
 function startCaptureSequence(w,ballMesh,attemptId,resolution){
-  if(!w||w.dead||!resolution){if(w)w.capturing=false;if(ballMesh)removeAndDispose(scene,ballMesh);cancelCaptureAttempt(captureAttemptLedger,attemptId);activeCaptureAttempt=null;msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();saveGame(false);return;}
+  if(!w||w.dead||!resolution){if(ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}try{cancelCaptureAttempt(captureAttemptLedger,attemptId);}catch{}if(w)try{w.capturing=false;}catch{}activeCaptureAttempt=null;runBestEffortCombatPresentation(()=>{msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');renderHUD();});try{saveGame(false);}catch{}return false;}
   const sp=spById[w.speciesId],name=wildDisplayName(w);
-  const pos=w.mesh.position.clone();
-  w.capturing=true;
-  w.mesh.visible=false;
-  if(!ballMesh){
-    ballMesh=new THREE.Mesh(boxGeometry(.28,.28,.28),new THREE.MeshStandardMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:clampEmissive(.35),roughness:.2,metalness:.6,transparent:true,opacity:.96}));
-    scene.add(ballMesh);
-    ballMesh.scale.setScalar(1.85);
-  }else{
-    ballMesh.scale.setScalar(3.6);
-  }
-  ballMesh.position.copy(pos);
-  ballMesh.position.y=.7;
-  playSFX('sfx_capture_tension');
-  spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05,priority:'P0'});
-  spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1,priority:'P0'});
+  let pos=null;
+  try{pos=w.mesh.position.clone();}catch{abortCaptureSequence(w);if(ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}return false;}
   const chance=resolution.finalChancePct/100;
-  captureSequence={attemptId,wild:w,ballMesh,pos,sp,name,chance,resolution,success:resolution.captureSucceeded,phaseTime:0,phase:'tension'};
+  const cs={attemptId,wild:w,ballMesh:null,pos,sp,name,chance,resolution,success:resolution.captureSucceeded,phaseTime:0,phase:'tension'};
+  captureSequence=cs;
+  try{
+    w.capturing=true;w.mesh.visible=false;
+    if(!ballMesh){ballMesh=new THREE.Mesh(boxGeometry(.28,.28,.28),new THREE.MeshStandardMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:clampEmissive(.35),roughness:.2,metalness:.6,transparent:true,opacity:.96}));scene.add(ballMesh);ballMesh.scale.setScalar(1.85);}
+    else ballMesh.scale.setScalar(3.6);
+    cs.ballMesh=ballMesh;ballMesh.position.copy(pos);ballMesh.position.y=.7;
+  }catch{abortCaptureSequence(w);if(ballMesh&&cs.ballMesh!==ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}return false;}
+  runBestEffortCombatPresentation(()=>{playSFX('sfx_capture_tension');spawnBurst(pos.clone().add(new THREE.Vector3(0,.7,0)),0xffffff,{count:10,life:.3,size:.05,priority:'P0'});spawnRingPulse(pos.clone(),0x3b82f6,{scale:.55,life:.25,y:.1,priority:'P0'});});
+  return true;
 }
 function finishCaptureSuccess(cs){
   const w=cs.wild,captureProfile=cs.resolution?.captureProfile,identity=captureIdentityForWild(w);
   if(!captureProfile||!identity||captureProfile.monsterId!==identity.monsterId||captureProfile.stage!==identity.stage)throw new Error('capture identity drift');
-  playSFX('sfx_capture_success');
-  w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
-  if(w.rare)markRareDiscovery(w,'captured');
-  if(w.elite)markEliteProgress(w,'captured');
-  spawnCaptureResultEffect(cs.pos,true);
-  spawnGroundDecal(wildTypes(w)[0],w.mesh.position.clone(),{radius:1.2,duration:.8,intensity:.85});
-  triggerCameraShake(.1,.2);
-  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
   const inst=makeInstance(cs.sp,w.level,{origin:'captured',genes:w.genes,potential:w.potential,gender:w.gender,bond:captureProfile.baseBond,formId:captureProfile.stage===2?captureProfile.monsterId:undefined,evolutionPath:w.evolutionPath,secondaryType:identity.runtimeSecondary});
-  if(state.currentZone==='grass-meadow')markStarterJourney('captured');
+  w.statusState=endEncounterEffects(w.statusState,{nowSec:w.statusState.currentTimeSec});
+  try{if(w.rare)markRareDiscovery(w,'captured');}catch{}
+  try{if(w.elite)markEliteProgress(w,'captured');}catch{}
+  try{if(state.currentZone==='grass-meadow')markStarterJourney('captured');}catch{}
   state.collection.push(inst);
   const empty=state.party.findIndex(x=>x===null);
   if(empty>=0)state.party[empty]=inst.instanceId;
   else state.storage.push(inst.instanceId);
   w.dead=true;
   w.capturing=false;
-  if(w.mesh)removeAndDispose(scene,w.mesh);
-  removeWildLabel(w);
   const playerExp=playerExpReward('capture',w);
   state.exp+=playerExp;
-  msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':w.rare?' • RARE':''} • +${playerExp} Player EXP (${Math.round(cs.chance*100)}%)`);
-  renderAll();
-  saveGame(false);
   const progressionSpeciesId=ZONES[w.zone]?.progressionBossSpeciesId;
   const progressionKey=progressionSpeciesId?`${w.zone}:${progressionSpeciesId}`:null;
   const replacesProgressionElite=Boolean(w.elite&&w.speciesId===progressionSpeciesId&&progressionKey&&!state.eliteProgress?.defeated?.[progressionKey]);
   if(!replacesProgressionElite)respawnWild(w,wildRespawnDelay(w));
   retireWild(w);
   ensureProgressionEncounter(state.currentZone);
+  if(cs.ballMesh)try{removeAndDispose(scene,cs.ballMesh);}catch{}
+  if(w.mesh)try{removeAndDispose(scene,w.mesh);}catch{}
+  try{removeWildLabel(w);}catch{}
+  runBestEffortCombatPresentation(()=>{playSFX('sfx_capture_success');spawnCaptureResultEffect(cs.pos,true);spawnGroundDecal(wildTypes(w)[0],cs.pos.clone(),{radius:1.2,duration:.8,intensity:.85});triggerCameraShake(.1,.2);msg(`จับ ${cs.name} สำเร็จ! ${empty>=0?'เข้า Party ช่อง '+(empty+1):'ส่งเข้า Storage'}${w.elite?' • ELITE':w.rare?' • RARE':''} • +${playerExp} Player EXP (${Math.round(cs.chance*100)}%)`);renderAll();});
+  try{saveGame(false);}catch{}
   return{ownedMonsterId:inst.instanceId,destination:empty>=0?'party':'storage',playerExp};
 }
 function finishCaptureFail(cs){
-  playSFX('sfx_capture_fail');
-  spawnCaptureResultEffect(cs.pos,false);
-  if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
-  if(cs.wild)cs.wild.capturing=false;
-  if(cs.wild?.mesh&&!cs.wild.dead){
-    cs.wild.mesh.visible=true;
-    cs.wild.mesh.position.copy(cs.pos);
-    cs.wild.mesh.rotation.z=0;
-    cs.wild.engaged=true;
-    cs.wild.state='chase';
+  if(cs.ballMesh)try{removeAndDispose(scene,cs.ballMesh);}catch{}
+  const w=cs.wild;if(w)try{w.capturing=false;}catch{}
+  if(w?.mesh&&!w.dead){
+    let resumed=false;try{resumed=cancelWildAIAction(w,'capture_failed_resume');}catch{}
+    if(resumed){try{w.mesh.visible=true;}catch{}try{w.mesh.position.copy(cs.pos);}catch{}try{w.mesh.rotation.z=0;}catch{}try{w.engaged=true;w.state=w.aiState.state;}catch{}}
   }
   const reason=cs.resolution?.reason;
-  if(reason==='projectile_miss')msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');
-  else if(reason==='capture_disabled')msg(`Boss ${cs.name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);
-  else if(reason==='invalid_roll')msg('ผลสุ่มจับไม่ถูกต้อง • การจับล้มเหลวแบบปลอดภัย');
-  else msg(`จับ ${cs.name} ไม่สำเร็จ (${Math.round(cs.chance*100)}%) • บอลแตก!`);
-  renderHUD();
-  saveGame(false);
+  runBestEffortCombatPresentation(()=>{playSFX('sfx_capture_fail');spawnCaptureResultEffect(cs.pos,false);if(reason==='projectile_miss')msg('ปาพลาด/ลูกตกพื้น • เสีย Capture Ball 1 ลูก');else if(reason==='capture_disabled')msg(`Boss ${cs.name} จับไม่ได้ในเวอร์ชันนี้ • บอลถูกใช้ไปแล้ว`);else if(reason==='invalid_roll')msg('ผลสุ่มจับไม่ถูกต้อง • การจับล้มเหลวแบบปลอดภัย');else msg(`จับ ${cs.name} ไม่สำเร็จ (${Math.round(cs.chance*100)}%) • บอลแตก!`);renderHUD();});
+  try{saveGame(false);}catch{}
   return{ownedMonsterId:null,destination:null,playerExp:0};
 }
 function updateCaptureSequence(dt){
   if(!captureSequence)return;
   const cs=captureSequence;
   if(!cs.wild||cs.wild.dead||!cs.ballMesh){
-    if(cs.wild?.dead)msg(`${cs.name} หนีไปแล้ว • เสีย Capture Ball 1 ลูก`);
     abortCaptureSequence();
+    if(cs.wild?.dead)runBestEffortCombatPresentation(()=>msg(`${cs.name} หนีไปแล้ว • เสีย Capture Ball 1 ลูก`));
     return;
   }
   cs.phaseTime+=dt;
   const t=Math.min(1,cs.phaseTime/1.7);
-  const drop=Math.min(1,cs.phaseTime/.25);
-  const shake=.01+t*.04;
-  cs.ballMesh.position.x=cs.pos.x+(Math.random()-.5)*shake;
-  cs.ballMesh.position.z=cs.pos.z+(Math.random()-.5)*shake;
-  cs.ballMesh.position.y=.7-drop*.52;
-  cs.ballMesh.rotation.y+=dt*10;
-  cs.ballMesh.rotation.z=(Math.random()-.5)*.18;
-  const flashColor=t<.5?0x3b82f6:(t<.8?0xfacc15:0xef4444);
-  const flashRate=.12+t*.12;
-  if(Math.floor(cs.phaseTime/flashRate)!==Math.floor((cs.phaseTime-dt)/flashRate)){
-    cs.ballMesh.material.color.setHex(flashColor);
-    cs.ballMesh.material.emissive.setHex(flashColor);
-    cs.ballMesh.material.emissiveIntensity=clampEmissive(.35+Math.random()*.25);
-  }
+  runBestEffortCombatPresentation(()=>{const drop=Math.min(1,cs.phaseTime/.25),shake=.01+t*.04;cs.ballMesh.position.x=cs.pos.x+(Math.random()-.5)*shake;cs.ballMesh.position.z=cs.pos.z+(Math.random()-.5)*shake;cs.ballMesh.position.y=.7-drop*.52;cs.ballMesh.rotation.y+=dt*10;cs.ballMesh.rotation.z=(Math.random()-.5)*.18;const flashColor=t<.5?0x3b82f6:(t<.8?0xfacc15:0xef4444),flashRate=.12+t*.12;if(Math.floor(cs.phaseTime/flashRate)!==Math.floor((cs.phaseTime-dt)/flashRate)){cs.ballMesh.material.color.setHex(flashColor);cs.ballMesh.material.emissive.setHex(flashColor);cs.ballMesh.material.emissiveIntensity=clampEmissive(.35+Math.random()*.25);}});
   if(cs.phaseTime>=1.7){
     captureSequence=null;
     const committed=commitCaptureAttempt(captureAttemptLedger,{attemptId:cs.attemptId,onSuccess:()=>finishCaptureSuccess(cs),onFailure:()=>finishCaptureFail(cs)});
     if(activeCaptureAttempt?.attemptId===cs.attemptId)activeCaptureAttempt=null;
     if(!committed.ok){
       console.warn('Capture commit failed closed',committed.reason);
-      if(cs.ballMesh)removeAndDispose(scene,cs.ballMesh);
-      if(cs.wild?.mesh&&!cs.wild.dead){cs.wild.capturing=false;cs.wild.mesh.visible=true;}
+      if(cs.ballMesh)try{removeAndDispose(scene,cs.ballMesh);}catch{}
+      if(cs.wild?.mesh&&!cs.wild.dead){try{cs.wild.capturing=false;}catch{}try{cs.wild.mesh.visible=true;}catch{}}
     }
   }
 }
-function resolveCapture(w,ballMesh,attemptId,end){const projectileHit=!!w&&!w.dead,calculatorInput=projectileHit?captureCalculatorInput(w,{referenceLevel:w.captureReferenceLevel,projectileHit:true}):null;if(projectileHit&&!calculatorInput){cancelCaptureAttempt(captureAttemptLedger,attemptId);if(ballMesh)removeAndDispose(scene,ballMesh);w.capturing=false;w.mesh.visible=true;if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;msg('ข้อมูลมอนหรือ encounter ไม่ตรง Workbook • ยกเลิกผลจับแบบปลอดภัย');renderHUD();saveGame(false);return;}const resolved=resolveCaptureAttempt(captureAttemptLedger,{attemptId,projectileHit,calculatorInput,rng:Math.random});if(!resolved.ok){if(ballMesh)removeAndDispose(scene,ballMesh);if(w?.mesh&&!w.dead){w.capturing=false;w.mesh.visible=true;}if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;if(resolved.reason!=='attempt_cancelled')msg('ผลจับถูกปฏิเสธ • '+resolved.reason);return;}if(resolved.replay)return;const resolution=resolved.attempt.resolution,cs={attemptId,wild:w,ballMesh,pos:w?.mesh?.position?.clone?.()??safeVec3(end),sp:w?spById[w.speciesId]:null,name:w?wildDisplayName(w):'เป้าหมาย',chance:resolution.finalChancePct/100,resolution,success:resolution.captureSucceeded};if(!projectileHit||!resolution.shouldRoll){const committed=commitCaptureAttempt(captureAttemptLedger,{attemptId,onSuccess:()=>finishCaptureSuccess(cs),onFailure:()=>finishCaptureFail(cs)});if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;if(!committed.ok)console.warn('Capture rejection commit failed closed',committed.reason);return;}startCaptureSequence(w,ballMesh,attemptId,resolution);}
-function summonThrow(){const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;playerVisual.play('throw',{duration:.34});pendingSummon={instanceId:inst.instanceId};clearHubCompanion();throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return;pendingSummon=null;spawnOwned(inst,end);});msg(`ปาเรียก ${displayName(inst)}`);}
+function resolveCapture(w,ballMesh,attemptId,end){
+  const projectileHit=!!w&&!w.dead;
+  let calculatorInput=null;
+  try{calculatorInput=projectileHit?captureCalculatorInput(w,{referenceLevel:w.captureReferenceLevel,projectileHit:true}):null;}catch{}
+  if(projectileHit&&!calculatorInput){abortCaptureSequence(w);if(ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}runBestEffortCombatPresentation(()=>{msg('ข้อมูลมอนหรือ encounter ไม่ตรง Workbook • ยกเลิกผลจับแบบปลอดภัย');renderHUD();});try{saveGame(false);}catch{}return;}
+  let resolved=null;
+  try{resolved=resolveCaptureAttempt(captureAttemptLedger,{attemptId,projectileHit,calculatorInput,rng:Math.random});}catch{}
+  if(!resolved?.ok){abortCaptureSequence(w);if(ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}if(resolved?.reason!=='attempt_cancelled')runBestEffortCombatPresentation(()=>msg('ผลจับถูกปฏิเสธ • '+(resolved?.reason??'invalid_state')));return;}
+  if(resolved.replay)return;
+  const resolution=resolved.attempt.resolution;
+  let pos=safeVec3(end),name='เป้าหมาย';
+  try{pos=w?.mesh?.position?.clone?.()??pos;}catch{}
+  try{if(w)name=wildDisplayName(w);}catch{}
+  const cs={attemptId,wild:w,ballMesh,pos,sp:w?spById[w.speciesId]:null,name,chance:resolution.finalChancePct/100,resolution,success:resolution.captureSucceeded};
+  if(!projectileHit||!resolution.shouldRoll){
+    const committed=commitCaptureAttempt(captureAttemptLedger,{attemptId,onSuccess:()=>finishCaptureSuccess(cs),onFailure:()=>finishCaptureFail(cs)});
+    if(activeCaptureAttempt?.attemptId===attemptId)activeCaptureAttempt=null;
+    if(!committed.ok){if(ballMesh)try{removeAndDispose(scene,ballMesh);}catch{}if(w?.mesh&&!w.dead){try{w.capturing=false;}catch{}try{w.mesh.visible=true;}catch{}}console.warn('Capture rejection commit failed closed',committed.reason);}
+    return;
+  }
+  startCaptureSequence(w,ballMesh,attemptId,resolution);
+}
+function summonThrow(){const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;pendingSummon={instanceId:inst.instanceId};runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});clearHubCompanion();});const started=throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return false;let spawned=false;try{spawned=spawnOwned(inst,end);}finally{pendingSummon=null;}if(!spawned)runBestEffortCombatPresentation(()=>msg(`เรียก ${displayName(inst)} ไม่สำเร็จ`));return spawned;});if(!started){pendingSummon=null;runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)} ไม่สำเร็จ`));return;}runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)}`));}
 function spawnOwned(inst,pos){
-  clearHubCompanion();
-  removeSceneRole('activeSummon');
-  const sp=spById[inst.speciesId],mesh=monsterMesh(sp,true,inst);
-  mesh.userData.worldRole='activeSummon';
-  mesh.userData.instanceId=inst.instanceId;
-  mesh.position.copy(pos);mesh.position.y=0;scene.add(mesh);setupMonsterMotion(mesh,sp,inst);
-  spawnElementalFX(monsterTypes(inst)[0],pos.clone().add(new THREE.Vector3(0,.45,0)),'summon',1.05);
-  activeSummon={inst,mesh,target:null,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),skillUiElapsed:.1,aiDecision:null,aiDecisionElapsed:0,statusState:createEncounterStatusState({encounterId:`owned:${inst.instanceId}`,nowSec:0})};
-  inst.bond=clamp(inst.bond+.4);
-  msg(`${displayName(inst)} ลงสนาม • AI จะเลือกศัตรูใกล้ที่สุดและโจมตีพื้นฐานเอง`);
-  renderParty();renderSkillButtons();renderHUD();
+  try{clearHubCompanion();}catch{}
+  try{removeSceneRole('activeSummon');}catch{}
+  const sp=spById[inst.speciesId];let mesh=null,summon=null;
+  try{
+    mesh=monsterMesh(sp,true,inst);
+    mesh.userData.worldRole='activeSummon';mesh.userData.instanceId=inst.instanceId;
+    mesh.position.copy(pos);mesh.position.y=0;scene.add(mesh);setupMonsterMotion(mesh,sp,inst);
+    summon={inst,mesh,target:null,runtimeEpoch:++summonRuntimeEpoch,attackCd:.3,skillCds:MANUAL_SKILL_SLOTS.map(()=>0),skillUiElapsed:.1,aiDecision:null,aiDecisionElapsed:0,statusState:createEncounterStatusState({encounterId:`owned:${inst.instanceId}`,nowSec:0})};
+  }catch{if(mesh)try{removeAndDispose(scene,mesh);}catch{}return false;}
+  activeSummon=summon;
+  try{inst.bond=clamp(inst.bond+.4);}catch{}
+  runBestEffortCombatPresentation(()=>{spawnElementalFX(monsterTypes(inst)[0],pos.clone().add(new THREE.Vector3(0,.45,0)),'summon',1.05);msg(`${displayName(inst)} ลงสนาม • AI จะเลือกศัตรูใกล้ที่สุดและโจมตีพื้นฐานเอง`);renderParty();renderSkillButtons();renderHUD();});
+  return true;
 }
 function recall(show=true,setCooldown=true){
   if(pendingSummon){pendingSummon=null;clearProjectiles();}
   if(!activeSummon){removeSceneRole('activeSummon');if(show)msg('ยังไม่มีมอนในสนาม');return;}
+  const summon=activeSummon,inst=summon.inst,mesh=summon.mesh,name=displayName(inst);
   clearSkillSwarms();
-  playerVisual.play('recall',{duration:.28});
-  const name=displayName(activeSummon.inst);
-  activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});
-  spawnRingPulse(activeSummon.mesh.position.clone(),0x60a5fa,{scale:.62,life:.26});
-  spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.55,0)),0x60a5fa,{count:8,life:.24,size:.05});
-  removeAndDispose(scene, activeSummon.mesh);
+  discardBattleEventsForSource(inst.instanceId);
+  try{cancelOwnedAIAction(summon,'owned_recall');}catch{}
+  try{cancelWildAITarget(ownedWildAiTargetId(summon),'owned_recall');}catch{}
+  summon.statusState=endEncounterEffects(summon.statusState,{nowSec:summon.statusState.currentTimeSec});
+  try{removeAndDispose(scene,mesh);}catch{}
   activeSummon=null;
-  removeSceneRole('activeSummon');
+  try{removeSceneRole('activeSummon');}catch{}
   if(state.currentZone==='grass-meadow')markStarterJourney('recalled');
-  syncHubCompanion();
+  runBestEffortCombatPresentation(()=>syncHubCompanion());
   if(setCooldown)summonCooldownUntil=Date.now()+1000;
-  if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);
-  renderParty();renderSkillButtons();renderHUD();
+  runBestEffortCombatPresentation(()=>{playerVisual.play('recall',{duration:.28});spawnRingPulse(mesh.position.clone(),0x60a5fa,{scale:.62,life:.26});spawnBurst(mesh.position.clone().add(new THREE.Vector3(0,.55,0)),0x60a5fa,{count:8,life:.24,size:.05});if(show)msg(`Recall ${name} แล้ว • Switch cooldown 1s`);renderParty();renderSkillButtons();renderHUD();});
 }
 function resetActiveBossChallengeStatus(){
   if(!activeSummon)return;
   activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});
   activeSummon.statusState=createEncounterStatusState({encounterId:activeSummon.inst.instanceId,nowSec:0});
 }
-function faintActive(){if(!activeSummon){removeSceneRole('activeSummon');return;}clearSkillSwarms();const inst=activeSummon.inst;inst.hp=0;inst.fainted=true;const name=displayName(inst);activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});playSFX('sfx_faint');spawnBurst(activeSummon.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});removeAndDispose(scene, activeSummon.mesh);activeSummon=null;pendingSummon=null;removeSceneRole('activeSummon');syncHubCompanion();summonCooldownUntil=Date.now()+800;msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();saveGame(false);}
+function faintActive(){
+  if(!activeSummon){removeSceneRole('activeSummon');return;}
+  const summon=activeSummon,inst=summon.inst,mesh=summon.mesh,name=displayName(inst);
+  clearSkillSwarms();discardBattleEventsForSource(inst.instanceId);
+  inst.hp=0;inst.fainted=true;
+  try{cancelOwnedAIAction(summon,'owned_fainted');}catch{}
+  try{cancelWildAITarget(ownedWildAiTargetId(summon),'owned_fainted');}catch{}
+  summon.statusState=endEncounterEffects(summon.statusState,{nowSec:summon.statusState.currentTimeSec});
+  try{removeAndDispose(scene,mesh);}catch{}
+  activeSummon=null;pendingSummon=null;summonCooldownUntil=Date.now()+800;
+  try{removeSceneRole('activeSummon');}catch{}
+  try{syncHubCompanion();}catch{}
+  try{saveGame(false);}catch{}
+  runBestEffortCombatPresentation(()=>{playSFX('sfx_faint');spawnBurst(mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0xef4444,{count:12,life:.32,size:.06,gravity:1.2});msg(`${name} Fainted • Auto Recall • ต้อง Heal ที่ Ranch/NPC หรือ Item`);renderParty();renderSkillButtons();renderHUD();});
+}
 function spawnSkillTrail(type, fromPos, toPos) {
   const cfg = typeFx(type);
   const dist = fromPos.distanceTo(toPos);
@@ -3861,8 +4255,8 @@ function skillEnemySnapshots(){
     if(typeof wild?.id!=='string'||!wild.mesh?.position)continue;
     snapshots.push(Object.freeze({
       id:wild.id,
-      alive:!wild.dead,
-      targetable:!wild.capturing&&canCombatTargetWild(wild),
+      alive:wild.dead===false&&Number.isFinite(wild.hp)&&wild.hp>0,
+      targetable:isWildDamageReady(wild),
       position:Object.freeze({x:wild.mesh.position.x,z:wild.mesh.position.z}),
     }));
   }
@@ -3881,7 +4275,7 @@ function materializeSkillTargets(a,command){
   for(const targetId of command.targetIds){
     const wild=byId.get(targetId);
     if(!wild||wild.dead||wild.capturing||!wild.mesh?.position)return [];
-    if(!canCombatTargetWild(wild))return [];
+    if(!isWildDamageReady(wild))return [];
     targets.push(Object.freeze({id:targetId,alive:true,targetable:true,world:wild}));
   }
   return targets;
@@ -3939,26 +4333,30 @@ function clearSkillFields(){
   for(const field of liveSkillFields)if(field.mesh)removeAndDispose(scene,field.mesh);
   liveSkillFields.length=0;
 }
-function activateSkillField(a,move,fieldResult){
+function activateSkillField(a,move,fieldResult,attackerSnapshot=canonicalSkillEffectAttacker(a,move),attackerNowSec=a.statusState.currentTimeSec){
   if(!fieldResult)return;
-  let mesh;
-  if(fieldResult.kind==='wall'){
-    mesh=new THREE.Mesh(new THREE.BoxGeometry(fieldResult.lengthM,1.8,fieldResult.thicknessM),new THREE.MeshStandardMaterial({color:0x93c5fd,emissive:0x2563eb,emissiveIntensity:.35,transparent:true,opacity:.78,roughness:.55,metalness:.05}));
-    mesh.position.set(fieldResult.center.x,.9,fieldResult.center.z);
-    mesh.rotation.y=Math.atan2(fieldResult.normal.x,fieldResult.normal.z);
-    mesh.castShadow=true;scene.add(mesh);
-  }else{
-    mesh=new THREE.Mesh(new THREE.RingGeometry(fieldResult.radiusM*.72,fieldResult.radiusM,32),new THREE.MeshBasicMaterial({color:0xf59e0b,transparent:true,opacity:.48,side:THREE.DoubleSide,depthWrite:false}));
-    mesh.position.set(fieldResult.center.x,.035,fieldResult.center.z);mesh.rotation.x=-Math.PI/2;scene.add(mesh);
-  }
-  liveSkillFields.push({
+  const field={
     ...fieldResult,
-    mesh,
+    mesh:null,
     ageSec:0,
     nextTickSec:fieldResult.tickIntervalSec??Infinity,
-    attacker:canonicalSkillEffectAttacker(a,move),
-    attackerNowSec:a.statusState.currentTimeSec,
+    attacker:attackerSnapshot,
+    attackerNowSec,
     runtimeType:move.type,
+  };
+  liveSkillFields.push(field);
+  runBestEffortCombatPresentation(()=>{
+    let mesh;
+    if(fieldResult.kind==='wall'){
+      mesh=new THREE.Mesh(new THREE.BoxGeometry(fieldResult.lengthM,1.8,fieldResult.thicknessM),new THREE.MeshStandardMaterial({color:0x93c5fd,emissive:0x2563eb,emissiveIntensity:.35,transparent:true,opacity:.78,roughness:.55,metalness:.05}));
+      mesh.position.set(fieldResult.center.x,.9,fieldResult.center.z);
+      mesh.rotation.y=Math.atan2(fieldResult.normal.x,fieldResult.normal.z);
+      mesh.castShadow=true;scene.add(mesh);
+    }else{
+      mesh=new THREE.Mesh(new THREE.RingGeometry(fieldResult.radiusM*.72,fieldResult.radiusM,32),new THREE.MeshBasicMaterial({color:0xf59e0b,transparent:true,opacity:.48,side:THREE.DoubleSide,depthWrite:false}));
+      mesh.position.set(fieldResult.center.x,.035,fieldResult.center.z);mesh.rotation.x=-Math.PI/2;scene.add(mesh);
+    }
+    field.mesh=mesh;
   });
 }
 function fieldBlocksPosition(point){
@@ -3989,7 +4387,7 @@ function updateSkillFields(dt){
           const resolved=resolveWorkbookDirectDamage({skillId:field.skillId,attacker:field.attacker,defender:target,attackerNowSec:field.attackerNowSec,defenderNowSec:w.statusState.currentTimeSec},{rng:Math.random});
           if(!resolved.ok||!resolved.hit||resolved.damage<=0)continue;
           const damage=Math.max(1,Math.round(resolved.damage*field.tickDamageRatio));
-          damageWild(w,damage,{type:field.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true});
+          commitAttributedWildDamage(w,damage,{type:field.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true},field.attacker?.id??null);
         }
         field.nextTickSec+=field.tickIntervalSec;
       }
@@ -3999,18 +4397,18 @@ function updateSkillFields(dt){
 }
 const liveSkillSwarms=[];
 function clearSkillSwarms(){liveSkillSwarms.length=0;}
-function activateSkillSwarm(a,move,summonResult){
+function activateSkillSwarm(a,move,summonResult,attackerSnapshot=canonicalSkillEffectAttacker(a,move),attackerNowSec=a.statusState.currentTimeSec){
   if(!summonResult?.applied)return;
   liveSkillSwarms.push({
     ...summonResult,
     ageSec:0,
     nextTickSec:summonResult.tickIntervalSec,
-    attacker:canonicalSkillEffectAttacker(a,move),
-    attackerNowSec:a.statusState.currentTimeSec,
+    attacker:attackerSnapshot,
+    attackerNowSec,
     runtimeType:move.type,
   });
   const center=new THREE.Vector3(summonResult.center.x,.45,summonResult.center.z);
-  spawnBurst(center,typeFx(move.type).accent,{count:summonResult.summonCount*3,life:.5,size:.055,gravity:-.15,priority:'P0'});
+  runBestEffortCombatPresentation(()=>spawnBurst(center,typeFx(move.type).accent,{count:summonResult.summonCount*3,life:.5,size:.055,gravity:-.15,priority:'P0'}));
 }
 function updateSkillSwarms(dt){
   for(let index=liveSkillSwarms.length-1;index>=0;index--){
@@ -4022,7 +4420,7 @@ function updateSkillSwarms(dt){
         if(candidate.dead||candidate.capturing||!canCombatTargetWild(candidate)||!candidate.mesh?.position)continue;
         const distance=distXZ(swarm.center,candidate.mesh.position);
         if(distance>swarm.radiusM||distance>nearestDistance)continue;
-        if(distance===nearestDistance&&target&&candidate.id.localeCompare(target.id)>=0)continue;
+        if(distance===nearestDistance&&target&&stableCombatIdCompare(candidate.id,target.id)>=0)continue;
         target=candidate;nearestDistance=distance;
       }
       if(target){
@@ -4031,8 +4429,8 @@ function updateSkillSwarms(dt){
         const resolved=resolveWorkbookDirectDamage({skillId:swarm.skillId,attacker:swarm.attacker,defender,attackerNowSec:swarm.attackerNowSec,defenderNowSec:target.statusState.currentTimeSec},{rng:Math.random});
         if(resolved.ok&&resolved.hit&&resolved.damage>0){
           const damage=Math.max(1,Math.round(resolved.damage*swarm.tickDamageRatio));
-          spawnElementalFX(swarm.runtimeType,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',.65);
-          damageWild(target,damage,{type:swarm.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true});
+          const committed=commitAttributedWildDamage(target,damage,{type:swarm.runtimeType,eff:resolved.typeMultiplier??1,statusDamage:true},swarm.attacker?.id??null);
+          if(committed)runBestEffortCombatPresentation(()=>spawnElementalFX(swarm.runtimeType,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',.65));
         }
       }
       swarm.nextTickSec+=swarm.tickIntervalSec;
@@ -4042,6 +4440,7 @@ function updateSkillSwarms(dt){
 }
 function canApplyLiveSkill(a,move,command,materialized){
   if(!canExecuteReviewedSkillEffect(command.skillId))return false;
+  if(command.targetKind!=='Self'&&materialized.some(target=>!isWildDamageReady(target.world)))return false;
   return validateReviewedSkillEffectRequest(canonicalSkillEffectRequest(a,move,command,materialized)).ok;
 }
 function awardAcceptedSkillMastery(a,move,res){
@@ -4052,134 +4451,156 @@ function awardAcceptedSkillMastery(a,move,res){
   const sExp=computeSkillExp({base:move.power||10,hitQuality,targetTier:1,spamCount,contribution:1});
   if(sExp>0&&skillRec){
     const sResult=addSkillExp(a.inst,move.skillId,sExp);
-    if(sResult?.rankedUp){showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());}
+    if(sResult?.rankedUp)runBestEffortCombatPresentation(()=>{showMasteryPopup(displayName(a.inst),move.name,sResult.toRank);spawnMasteryUpEffect(a.mesh.position.clone());});
   }
 }
-function applyPlannedActorEffect(a,move,actorResult){
-  if(!actorResult)return;
+function applyPlannedActorEffect(a,move,actorResult,contributionEvents=[]){
+  if(!actorResult)return 0;
   a.inst.hp=actorResult.predictedHp;
   a.statusState=actorResult.nextStatusState;
   const appliedStatusIds=actorResult.statusResults.filter(result=>result.applied).map(result=>result.statusId);
   const activeStatuses=a.statusState.statuses.filter(status=>appliedStatusIds.includes(status.statusId));
   const duration=Math.max(0,...activeStatuses.map(status=>status.expiresAtSec-a.statusState.currentTimeSec));
   if(actorResult.healing>0){
-    spawnDamageNumber(actorResult.healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});
-    spawnHealSkillEffect(a.mesh.position.clone(),move.type);logBattleEvent('spirit',actorResult.healing);
+    contributionEvents.push({category:'spirit',amount:actorResult.healing,meaningful:true});
+    runBestEffortCombatPresentation(()=>{spawnDamageNumber(actorResult.healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'HEAL'});spawnHealSkillEffect(a.mesh.position.clone(),move.type);});
   }
   if(appliedStatusIds.length){
     const shieldStatus=appliedStatusIds.some(statusId=>['ST_DEF_UP','ST_DAMAGE_REDUCE','ST_FIRE_RESIST','ST_POISON_RESIST'].includes(statusId));
-    if(shieldStatus)spawnShieldSkillEffect(a.mesh.position.clone(),move.type,duration);
-    else spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,duration);
-    logBattleEvent(shieldStatus?'defense':'power',Math.max(1,duration*3));
+    contributionEvents.push({category:shieldStatus?'defense':'power',amount:Math.max(1,duration*3),meaningful:true});
+    runBestEffortCombatPresentation(()=>{if(shieldStatus)spawnShieldSkillEffect(a.mesh.position.clone(),move.type,duration);else spawnBuffAtkSkillEffect(a.mesh.position.clone(),move.type,duration);});
   }
   const details=[];
   if(actorResult.requestedHealing>0)details.push(`ฟื้น HP ${actorResult.healing}`);
   if(appliedStatusIds.length)details.push(`Status ${appliedStatusIds.join(', ')} ${duration}s`);
-  if(details.length)msg(`${displayName(a.inst)} ใช้ ${move.name} • ${details.join(' • ')}`);
+  if(details.length)runBestEffortCombatPresentation(()=>msg(`${displayName(a.inst)} ใช้ ${move.name} • ${details.join(' • ')}`));
+  return appliedStatusIds.length;
 }
 function clampSkillEffectDestination(destination){
   const bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};
   return{x:THREE.MathUtils.clamp(destination.x,bounds.minX,bounds.maxX),z:THREE.MathUtils.clamp(destination.z,bounds.minZ,bounds.maxZ)};
 }
-function applyPlannedMobilityEffects(a,move,movementResult,displacementResults,targets){
+function applyPlannedMobilityEffects(a,move,movementResult,displacementResults,targets,targetDamageCommitted,actualHitCount){
   let appliedCount=0;
-  if(movementResult?.applied){
+  if(movementResult?.applied&&actualHitCount>0){
     const destination=clampSkillEffectDestination(movementResult.destination);
     const from=a.mesh.position.clone(),dx=destination.x-from.x,dz=destination.z-from.z;
     a.mesh.position.x=destination.x;a.mesh.position.z=destination.z;
     if(Math.hypot(dx,dz)>Number.EPSILON)a.mesh.rotation.y=Math.atan2(dx,dz)+Math.PI;
     a.aiDecision=null;
-    spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.5,0)),a.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));
-    spawnBurst(a.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),typeFx(move.type).core,{count:8,life:.22,size:.045,priority:'P0'});
     appliedCount++;
+    runBestEffortCombatPresentation(()=>{spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.5,0)),a.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));spawnBurst(a.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),typeFx(move.type).core,{count:8,life:.22,size:.045,priority:'P0'});});
   }
   for(let index=0;index<displacementResults.length;index++){
     const result=displacementResults[index],target=targets[index];
-    if(!result?.applied||!target||target.dead||!target.mesh?.position)continue;
+    if(targetDamageCommitted[index]!==true||!result?.applied||!target||target.dead||!(target.hp>0)||!target.mesh?.position)continue;
     const destination=clampSkillEffectDestination(result.destination);
     if(fieldBlocksPosition(destination))continue;
     const from=target.mesh.position.clone();
     target.mesh.position.x=destination.x;target.mesh.position.z=destination.z;
-    spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.45,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)));
-    spawnBurst(target.mesh.position.clone().add(new THREE.Vector3(0,.4,0)),typeFx(move.type).accent,{count:6,life:.2,size:.04,priority:'P0'});
     appliedCount++;
+    runBestEffortCombatPresentation(()=>{spawnSkillTrail(move.type,from.clone().add(new THREE.Vector3(0,.45,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)));spawnBurst(target.mesh.position.clone().add(new THREE.Vector3(0,.4,0)),typeFx(move.type).accent,{count:6,life:.2,size:.04,priority:'P0'});});
   }
   return appliedCount;
 }
-function applyPlannedClosureEffects(a,move,healModifierResult,summonResult){
+function applyPlannedClosureEffects(a,move,healModifierResult,summonResult,committedDamage,attackerSnapshot,attackerNowSec,contributionEvents=[]){
   let appliedCount=0;
+  if(!(committedDamage>0))return appliedCount;
   if(healModifierResult?.applied){
-    a.inst.hp=healModifierResult.predictedHp;
-    spawnDamageNumber(healModifierResult.healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'DRAIN'});
-    spawnHealSkillEffect(a.mesh.position.clone(),move.type);logBattleEvent('spirit',healModifierResult.healing);
-    appliedCount++;
+    const requestedHealing=Math.max(1,Math.round(committedDamage*healModifierResult.healRatio));
+    const healing=Math.max(0,Math.min(a.inst.maxHp-a.inst.hp,requestedHealing));
+    if(healing>0){
+      a.inst.hp+=healing;
+      contributionEvents.push({category:'spirit',amount:healing,meaningful:true});
+      appliedCount++;
+      runBestEffortCombatPresentation(()=>{spawnDamageNumber(healing,a.mesh.position.clone().add(new THREE.Vector3(0,1.25,0)),{type:move.type,healing:true,label:'DRAIN'});spawnHealSkillEffect(a.mesh.position.clone(),move.type);});
+    }
   }
-  if(summonResult?.applied){activateSkillSwarm(a,move,summonResult);appliedCount++;}
+  if(summonResult?.applied){activateSkillSwarm(a,move,summonResult,attackerSnapshot,attackerNowSec);appliedCount++;}
   return appliedCount;
 }
 function applyAcceptedSkillCommand(a,index,move,command,materialized){
   // Uses has already committed. Cooldown is the first live mutation here; all
   // presentation, damage, bond, mastery, and logs follow the acceptance guard.
-  const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});
+  const effectRequest=canonicalSkillEffectRequest(a,move,command,materialized);
+  const planned=resolveReviewedSkillEffects(effectRequest,{rng:Math.random});
   if(!planned.ok)throw new Error(`canonical skill effect failed: ${planned.reason}`);
   a.skillCds[index]=command.startCooldownSec;
   const targets=materialized.map(target=>target.world);
-  playSFX(`sfx_skill_${move.type.toLowerCase()}`);
-  let res=null,total=0;
+  const targetDamageCommitted=new Array(targets.length).fill(false);
+  const targetCommittedDamage=new Array(targets.length).fill(0);
+  const targetDamageReceipts=targets.map(()=>({committed:false,damage:0}));
+  const contributionEvents=[];
+  let res=null,actualHitCount=0,actualTotalDamage=0,actualStatusAppliedCount=0;
+  let receipt;
+  try{
+    runBestEffortCombatPresentation(()=>playSFX(`sfx_skill_${move.type.toLowerCase()}`));
   if(command.targetKind==='Self'){
-    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.22);
-    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);
-    spawnSkillSprite(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0.8,0.6);
-    spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});
+    runBestEffortCombatPresentation(()=>{playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.22);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'summon',0.8);spawnSkillSprite(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),0.8,0.6);spawnGroundDecal(move.type,a.mesh.position.clone(),{radius:1.2,duration:1.2,intensity:.95});});
   }else if(command.targetKind==='NearestEnemy'){
     const target=targets[0],effect=planned.targetResults[0],damageResult=effect.damageResult;
-    res={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
-    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);
-    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);
-    spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));
+    const plannedRes={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
+    runBestEffortCombatPresentation(()=>{playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.24);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),'burst',1);spawnSkillTrail(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.6,0)),target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)));});
     if(effect.hit){
-      spawnSkillSprite(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);
-      spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);
-      spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:res.eff>1?1.2:1});
-      damageWild(target,res.damage,{type:move.type,eff:res.eff});
-      if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;
-      triggerCameraShake(res.eff>1?0.14:0.09,0.16);
-      const [label]=effectLabel(res.eff);
-      msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${res.damage} • ${label}${res.stab>1?' • STAB':''}${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
-      logBattleEvent('power',res.damage);logBattleEvent('technique',move.power||10);
-    }else msg(`${displayName(a.inst)} ใช้ ${move.name} • MISS`);
+      const damageReceipt=targetDamageReceipts[0];
+      damageWild(target,plannedRes.damage,{type:move.type,eff:plannedRes.eff,deferDefeat:true,commitReceipt:damageReceipt});
+      if(damageReceipt.committed){
+        targetDamageCommitted[0]=true;
+        const committedDamage=damageReceipt.damage;
+        targetCommittedDamage[0]=committedDamage;
+        res={...plannedRes,damage:committedDamage};actualHitCount++;actualTotalDamage+=committedDamage;
+        if(!target.dead&&target.hp>0&&effect.nextStatusState){
+          target.statusState=effect.nextStatusState;
+          actualStatusAppliedCount+=(effect.statusResults||[]).filter(result=>result.applied).length;
+        }
+        const [label]=effectLabel(res.eff);
+        runBestEffortCombatPresentation(()=>{spawnSkillSprite(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),0.7,0.45);spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.5,0)),'impact',0.9);spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:1.05,duration:1.15,intensity:plannedRes.eff>1?1.2:1});triggerCameraShake(res.eff>1?0.14:0.09,0.16);msg(`${displayName(a.inst)} ใช้ ${move.name} [${TYPE_TH[move.type]}] -${committedDamage} • ${label}${res.stab>1?' • STAB':''}${actualStatusAppliedCount?` • Status ${actualStatusAppliedCount}`:''}`);});
+      }else runBestEffortCombatPresentation(()=>msg(`${displayName(a.inst)} ใช้ ${move.name} • โดน 0/1 ตัว • รวม 0 Damage`));
+    }else runBestEffortCombatPresentation(()=>msg(`${displayName(a.inst)} ใช้ ${move.name} • MISS`));
   }else if(command.targetKind==='GroundPoint'){
     const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
-    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
-    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);
-    spawnGroundDecal(move.type,anchor,{radius:1.6,duration:1.45,intensity:1.15});
-    msg(`${displayName(a.inst)} ใช้ ${move.name} • สร้างกำแพงที่จุดเล็ง`);
+    runBestEffortCombatPresentation(()=>{playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,anchor,{radius:1.6,duration:1.45,intensity:1.15});msg(`${displayName(a.inst)} ใช้ ${move.name} • สร้างกำแพงที่จุดเล็ง`);});
   }else{
     const anchor=new THREE.Vector3(command.targetPoint.x,0,command.targetPoint.z);
-    playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);
-    spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);
-    spawnGroundDecal(move.type,anchor,{radius:Math.min(2.8,command.radiusM),duration:1.45,intensity:1.15});
-    spawnAreaWave(move.type,anchor,command.radiusM);triggerCameraShake(.11,.17);
+    runBestEffortCombatPresentation(()=>{playerVisual.play('skill',{duration:.28});triggerMonsterAction(a.mesh,'attack',0.26);spawnElementalFX(move.type,a.mesh.position.clone().add(new THREE.Vector3(0,.65,0)),'summon',0.9);spawnGroundDecal(move.type,anchor,{radius:Math.min(2.8,command.radiusM),duration:1.45,intensity:1.15});spawnAreaWave(move.type,anchor,command.radiusM);triggerCameraShake(.11,.17);});
     for(let targetIndex=0;targetIndex<targets.length;targetIndex++){
       const target=targets[targetIndex],effect=planned.targetResults[targetIndex],damageResult=effect.damageResult;
-      res={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
+      const plannedRes={damage:effect.damage,eff:damageResult.typeMultiplier??1,stab:damageResult.stab??1,crit:damageResult.critical===true};
       if(!effect.hit)continue;
-      spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);
-      spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:.9,duration:1.05,intensity:res.eff>1?1.15:.9});
-      damageWild(target,res.damage,{type:move.type,eff:res.eff});
-      if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;
-      total+=res.damage;
+      const damageReceipt=targetDamageReceipts[targetIndex];
+      damageWild(target,plannedRes.damage,{type:move.type,eff:plannedRes.eff,deferDefeat:true,commitReceipt:damageReceipt});
+      if(!damageReceipt.committed)continue;
+      targetDamageCommitted[targetIndex]=true;
+      const committedDamage=damageReceipt.damage;
+      targetCommittedDamage[targetIndex]=committedDamage;
+      res={...plannedRes,damage:committedDamage};actualHitCount++;actualTotalDamage+=committedDamage;
+      if(!target.dead&&target.hp>0&&effect.nextStatusState){
+        target.statusState=effect.nextStatusState;
+        actualStatusAppliedCount+=(effect.statusResults||[]).filter(result=>result.applied).length;
+      }
+      runBestEffortCombatPresentation(()=>{spawnElementalFX(move.type,target.mesh.position.clone().add(new THREE.Vector3(0,.45,0)),'impact',0.75);spawnGroundDecal(move.type,target.mesh.position.clone(),{radius:.9,duration:1.05,intensity:plannedRes.eff>1?1.15:.9});});
     }
-    msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${planned.hitCount}/${targets.length} ตัว • รวม ${total} Damage${planned.statusAppliedCount?` • Status ${planned.statusAppliedCount}`:''}`);
+    runBestEffortCombatPresentation(()=>msg(`${displayName(a.inst)} ใช้ ${move.name} แบบ Area • โดน ${actualHitCount}/${targets.length} ตัว • รวม ${actualTotalDamage} Damage${actualStatusAppliedCount?` • Status ${actualStatusAppliedCount}`:''}`));
   }
-  applyPlannedActorEffect(a,move,planned.actorResult);
-  activateSkillField(a,move,planned.fieldResult);
-  const mobilityAppliedCount=applyPlannedMobilityEffects(a,move,planned.movementResult,planned.displacementResults,targets);
-  const closureAppliedCount=applyPlannedClosureEffects(a,move,planned.healModifierResult,planned.summonResult);
-  a.inst.bond=clamp(a.inst.bond+.3);
-  awardAcceptedSkillMastery(a,move,res);
-  renderParty();renderSkillButtons();
-  return Object.freeze({effectMode:planned.effectMode,hitCount:planned.hitCount,totalDamage:planned.totalDamage,statusAppliedCount:planned.statusAppliedCount,mobilityAppliedCount,closureAppliedCount,rngDraws:planned.rngDraws});
+  actualStatusAppliedCount+=applyPlannedActorEffect(a,move,planned.actorResult,contributionEvents);
+  activateSkillField(a,move,planned.fieldResult,effectRequest.attacker,effectRequest.nowSec);
+  const mobilityAppliedCount=applyPlannedMobilityEffects(a,move,planned.movementResult,planned.displacementResults,targets,targetDamageCommitted,actualHitCount);
+  const closureAppliedCount=applyPlannedClosureEffects(a,move,planned.healModifierResult,planned.summonResult,actualTotalDamage,effectRequest.attacker,effectRequest.nowSec,contributionEvents);
+  const requiresTargetDamage=planned.targetResults.length>0;
+  if(!requiresTargetDamage||planned.hitCount===0||actualHitCount>0)a.inst.bond=clamp(a.inst.bond+.3);
+  if(!requiresTargetDamage||actualHitCount>0)awardAcceptedSkillMastery(a,move,res);
+  receipt=Object.freeze({effectMode:planned.effectMode,hitCount:actualHitCount,totalDamage:actualTotalDamage,statusAppliedCount:actualStatusAppliedCount,mobilityAppliedCount,closureAppliedCount,rngDraws:planned.rngDraws});
+  }finally{
+    for(let targetIndex=0;targetIndex<targetDamageReceipts.length;targetIndex++){
+      const damageReceipt=targetDamageReceipts[targetIndex];
+      if(!damageReceipt.committed||targetDamageCommitted[targetIndex]===true)continue;
+      targetDamageCommitted[targetIndex]=true;targetCommittedDamage[targetIndex]=damageReceipt.damage;
+      actualHitCount++;actualTotalDamage+=damageReceipt.damage;
+    }
+    settleCommittedSkillBattleTransaction(targets,targetDamageCommitted,targetCommittedDamage,move.power||10,a.inst.instanceId,contributionEvents);
+  }
+  runBestEffortCombatPresentation(()=>{renderParty();renderSkillButtons();});
+  return receipt;
 }
 function skillFailureMessage(move,result){
   const reasons={
@@ -4189,6 +4610,7 @@ function skillFailureMessage(move,result){
     ground_point_required:`${move?.name||'สกิล'}: เล็งพื้นไม่สำเร็จ`,
     ground_point_out_of_range:`${move?.name||'สกิล'}: จุดเล็งอยู่นอกระยะ`,
     status_controlled:`${move?.name||'สกิล'}: ใช้ไม่ได้ขณะติดสถานะควบคุม`,
+    invalid_status_context:`${move?.name||'สกิล'}: สถานะการต่อสู้ไม่สมบูรณ์ • ยกเลิกเพื่อความปลอดภัย`,
     not_equipped:'ยังไม่มีสกิลช่องนี้',
     not_ready:'Targeting พร้อมแล้ว • เอฟเฟกต์สกิลนี้รอระบบขั้นถัดไป',
     duplicate_cast:'คำสั่งซ้ำถูกปฏิเสธ',
@@ -4218,8 +4640,8 @@ function useSkill(index,intent={}){
   const a=activeSummon,slot=MANUAL_SKILL_SLOTS[index],move=canonicalCombatSkills(a.inst)[index];
   if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});announceCombatReason(skillFailureMessage(move,result));return result;}
   const control=resolveCombatStatusRuntime(a.statusState);
-  if(control.ok&&!control.canUseSkill){
-    const result=Object.freeze({ok:false,reason:'status_controlled'});
+  if(!control.ok||!control.canUseSkill){
+    const result=Object.freeze({ok:false,reason:control.ok?'status_controlled':'invalid_status_context'});
     announceCombatReason(skillFailureMessage(move,result));
     return result;
   }
@@ -4253,20 +4675,21 @@ function fillOwnedBasicAiRequest(scratch,a,liveWilds){
   actor.alive=(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0;
   actor.position.x=a?.mesh?.position?.x;
   actor.position.z=a?.mesh?.position?.z;
-  const count=Array.isArray(liveWilds)?liveWilds.length:0;
+  const count=Array.isArray(liveWilds)?liveWilds.length:0;let targetCount=0;
   for(let index=0;index<count;index++){
     const wild=liveWilds[index];
-    let target=scratch.enemyPool[index];
-    if(!target){target={id:null,alive:false,targetable:false,position:{x:0,z:0}};scratch.enemyPool[index]=target;}
+    if(!wild||wild.dead===true||wild.retired===true||!Number.isFinite(wild.mesh?.position?.x)||!Number.isFinite(wild.mesh?.position?.z))continue;
+    let target=scratch.enemyPool[targetCount];
+    if(!target){target={id:null,alive:false,targetable:false,position:{x:0,z:0}};scratch.enemyPool[targetCount]=target;}
     target.id=wild?.id;
     target.alive=wild?.dead===false&&Number.isFinite(wild?.hp)&&wild.hp>0;
-    target.targetable=wild?.capturing===undefined||wild.capturing===false;
+    target.targetable=(wild?.capturing===undefined||wild.capturing===false)&&isWildDamageReady(wild);
     if(wild?.combatEnabled===false)target.targetable=false;
     target.position.x=wild?.mesh?.position?.x;
     target.position.z=wild?.mesh?.position?.z;
-    request.enemies[index]=target;
+    request.enemies[targetCount++]=target;
   }
-  request.enemies.length=count;
+  request.enemies.length=targetCount;
   request.currentTargetId=a?.target?.id??null;
   request.attackReady=a?.attackCd<=0;
   return request;
@@ -4296,6 +4719,7 @@ function materializeOwnedBasicAiTarget(a,decision){
   const actorPosition=a?.mesh?.position,targetPosition=target?.mesh?.position;
   if(target.dead!==false||!Number.isFinite(target.hp)||target.hp<=0
     ||!(target.capturing===undefined||target.capturing===false)||target.combatEnabled===false
+    ||!isWildDamageReady(target)
     ||!Number.isFinite(actorPosition?.x)||!Number.isFinite(actorPosition?.z)
     ||!Number.isFinite(targetPosition?.x)||!Number.isFinite(targetPosition?.z))return null;
   const distanceM=distXZ(actorPosition,targetPosition);
@@ -4303,10 +4727,16 @@ function materializeOwnedBasicAiTarget(a,decision){
   if(decision.action==='basic_attack'&&distanceM>OWNED_BASIC_AI_POLICY.basicAttackRangeM)return null;
   return target;
 }
+function commitOwnedBasicDamage(liveTarget,res,basic){
+  const commitReceipt={committed:false,damage:0};
+  try{return damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff,deferDefeat:true,commitReceipt});}
+  finally{if(commitReceipt.committed){try{logBattleEvent('power',commitReceipt.damage,true,liveTarget.id,basic.sourceInstanceId);}finally{finalizePendingWildDefeat(liveTarget,basic.sourceInstanceId);}}}
+}
 function updateOwned(dt){
   const a=activeSummon;if(!a)return;const sp=spById[a.inst.speciesId];
+  if(!isEncounterStatusState(a.statusState)||a.statusState.ended){cancelOwnedAIAction(a,'invalid_status_context');return;}
   const statusAdvance=advanceEncounterEffects(a.statusState,{toSec:a.statusState.currentTimeSec+dt,targetHp:a.inst.hp,targetMaxHp:a.inst.maxHp});
-  if(statusAdvance.ok){a.statusState=statusAdvance.state;if(statusAdvance.damage>0){const tickDamage=Math.max(1,Math.round(statusAdvance.damage));a.inst.hp=statusAdvance.targetHp;const tickType=statusDamageType(statusAdvance.ticks,monsterTypes(a.inst)[0]);ownedBasicAiImpactScratch.copy(a.mesh.position);ownedBasicAiImpactScratch.y+=1.25;spawnDamageNumber(tickDamage,ownedBasicAiImpactScratch,{type:tickType,label:'STATUS'});triggerMonsterAction(a.mesh,'hurt',0.16);renderParty();if(statusAdvance.fainted){faintActive();return;}}}
+  if(statusAdvance.ok){a.statusState=statusAdvance.state;if(statusAdvance.damage>0){const tickDamage=Math.max(1,Math.round(statusAdvance.damage));a.inst.hp=statusAdvance.targetHp;const tickType=statusDamageType(statusAdvance.ticks,monsterTypes(a.inst)[0]);ownedBasicAiImpactScratch.copy(a.mesh.position);ownedBasicAiImpactScratch.y+=1.25;if(statusAdvance.fainted){faintActive();runBestEffortCombatPresentation(()=>spawnDamageNumber(tickDamage,ownedBasicAiImpactScratch,{type:tickType,label:'STATUS'}));return;}runBestEffortCombatPresentation(()=>{spawnDamageNumber(tickDamage,ownedBasicAiImpactScratch,{type:tickType,label:'STATUS'});triggerMonsterAction(a.mesh,'hurt',0.16);renderParty();});}}
   const selfModifiers=resolveActiveSelfStatusModifiers(a.statusState);
   const control=resolveCombatStatusRuntime(a.statusState);
   const attackMultiplier=selfModifiers.ok?selfModifiers.attackMultiplier:1;
@@ -4314,39 +4744,105 @@ function updateOwned(dt){
   const critBonusPct=selfModifiers.ok?selfModifiers.critChancePct:0;
   const cooldownElapsed=dt*(control.ok?control.cooldownRecoveryMultiplier:1);
   a.attackCd=tickCooldown(a.attackCd,cooldownElapsed);for(let i=0;i<a.skillCds.length;i++)a.skillCds[i]=Math.max(0,a.skillCds[i]-cooldownElapsed);if(shouldRunOwnedCadence(a,'skillUiElapsed',dt,10))updateOwnedSkillCooldownUi(a);
-  if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision))a.aiDecision=resolveOwnedBasicAiAction(fillOwnedBasicAiRequest(ownedBasicAiScratch,a,wilds));
+  if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision)){
+    const previousDecision=a.aiDecision,decisionStarted=MONSTER_AI_DEBUG?performance.now():0;
+    a.aiDecision=resolveOwnedBasicAiAction(fillOwnedBasicAiRequest(ownedBasicAiScratch,a,wilds));
+    recordOwnedAiTrace(a,{fromState:previousDecision?.action??'idle',toState:a.aiDecision?.action??'idle',targetId:a.aiDecision?.targetId??null,action:a.aiDecision?.action??'idle',reason:a.aiDecision?.reason??'resolver_rejected',timeSec:a.statusState.currentTimeSec,durationMs:MONSTER_AI_DEBUG?performance.now()-decisionStarted:0,rejected:a.aiDecision?.ok!==true,decision:true});
+  }
   const decision=a.aiDecision;
-  const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;if(!t&&decision?.targetId!==null)a.aiDecision=null;let moving=false;
+  const t=materializeOwnedBasicAiTarget(a,decision);a.target=t;if(!t&&decision?.targetId!==null)cancelOwnedAIAction(a,'runtime_revalidation_rejected');let moving=false;
   if(t&&control.ok&&control.forcedRetreat&&control.canMove){
     moving=true;const dir=ownedBasicAiMoveScratch.copy(a.mesh.position).sub(t.mesh.position);dir.y=0;if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
-  }else if(t&&decision.action==='move'&&(!control.ok||control.canMove)){
+  }else if(t&&decision.action==='move'&&control.ok&&control.canMove){
     moving=true;const dir=ownedBasicAiMoveScratch.set(decision.direction.x,0,decision.direction.z);a.mesh.position.addScaledVector(dir,(a.inst.spd*.18+1.5)*speedMultiplier*dt);a.mesh.rotation.y=monsterLookYaw(dir,a.mesh);
-  }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0&&(!control.ok||control.canAttack)){
+  }else if(t&&decision.action==='basic_attack'&&a.attackCd<=0&&!a.inst.fainted&&a.inst.hp>0&&control.ok&&control.canAttack){
     const liveTarget=materializeOwnedBasicAiTarget(a,decision);
-    if(liveTarget){a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;if(control.ok&&Math.random()>=control.accuracyMultiplier){spawnDamageNumber(0,ownedBasicAiImpactScratch,{miss:true});msg(`${displayName(a.inst)} โจมตีพลาดเพราะสถานะ`);}else{spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62);const basic={name:'Basic Attack',type:sp.types[0],category:'Physical',power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource};const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});damageWild(liveTarget,res.damage,{type:basic.type,eff:res.eff});logBattleEvent('power',res.damage);}}
+    if(liveTarget){
+      a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;
+      recordOwnedAiTrace(a,{fromState:decision.action,toState:decision.action,targetId:liveTarget.id,action:'basic_attack',reason:'runtime_commit',timeSec:a.statusState.currentTimeSec});
+      runBestEffortCombatPresentation(()=>triggerMonsterAction(a.mesh,'attack',0.22));
+      ownedBasicAiImpactScratch.copy(liveTarget.mesh.position);ownedBasicAiImpactScratch.y+=.45;
+      if(control.ok&&Math.random()>=control.accuracyMultiplier){
+        runBestEffortCombatPresentation(()=>{spawnDamageNumber(0,ownedBasicAiImpactScratch,{miss:true});msg(`${displayName(a.inst)} โจมตีพลาดเพราะสถานะ`);});
+      }else{
+        const basic={name:'Basic Attack',type:sp.types[0],category:'Physical',power:OWNED_BASIC_AI_POLICY.basicAttackPower,commandSource:OWNED_BASIC_AI_POLICY.commandSource,sourceInstanceId:a.inst.instanceId};
+        const res=monsterDamage(a.inst,basic,liveTarget,attackMultiplier,{allowSkillMastery:false,critBonusPct});
+        const committed=commitOwnedBasicDamage(liveTarget,res,basic);
+        if(committed)runBestEffortCombatPresentation(()=>spawnElementalFX(monsterTypes(a.inst)[0],ownedBasicAiImpactScratch,'impact',0.62));
+      }
+    }
+    else cancelOwnedAIAction(a,'pre_damage_revalidation_rejected');
   }
   animateEntity(a.mesh,dt,moving,1); animateMonster(a.mesh,dt,moving);
 }
 const wildAggressorCandidates=[];
 const wildAggressorCandidatePool=[];
 const engagedWildIdsScratch=new Set();
+let wildAiFrameTarget=null;
+function currentWildAiTargetKey(){return activeSummon&&activeSummon.mesh?ownedWildAiTargetId(activeSummon):playerWildAiTargetId();}
+function resolveWildAiTarget(){
+  const encounterId=wildAiEncounterId();
+  if(activeSummon&&activeSummon.mesh){
+    const summon=activeSummon,id=ownedWildAiTargetId(summon),position=summon.mesh?.position;
+    return{id,kind:'owned',encounterId,runtimeGeneration:zoneGeneration,entity:summon,position,alive:(summon.inst?.fainted===undefined||summon.inst.fainted===false)&&Number.isFinite(summon.inst?.hp)&&summon.inst.hp>0,targetable:!!id&&Number.isFinite(position?.x)&&Number.isFinite(position?.z)};
+  }
+  const position=player?.position;
+  return{id:playerWildAiTargetId(),kind:'player',encounterId,runtimeGeneration:zoneGeneration,entity:player,position,alive:Number.isFinite(playerData?.hp)&&playerData.hp>0,targetable:Number.isFinite(position?.x)&&Number.isFinite(position?.z)};
+}
+function wildAiTargetAvailable(target){
+  if(!target||target.runtimeGeneration!==zoneGeneration||target.id!==currentWildAiTargetKey()||!target.alive||!target.targetable||!Number.isFinite(target.position?.x)||!Number.isFinite(target.position?.z))return false;
+  if(target.kind==='owned')return target.entity===activeSummon&&ownedWildAiTargetId(activeSummon)===target.id&&(activeSummon.inst?.fainted===undefined||activeSummon.inst.fainted===false)&&Number.isFinite(activeSummon.inst?.hp)&&activeSummon.inst.hp>0;
+  return target.kind==='player'&&target.entity===player&&Number.isFinite(playerData?.hp)&&playerData.hp>0;
+}
 function selectWildAggressors(){
-  const target=(activeSummon&&activeSummon.mesh)?activeSummon.mesh:player;
-  if(!target?.position){engagedWildIdsScratch.clear();return engagedWildIdsScratch;}
+  wildAiFrameTarget=resolveWildAiTarget();
+  const target=wildAiFrameTarget;
+  if(!wildAiTargetAvailable(target)){engagedWildIdsScratch.clear();return engagedWildIdsScratch;}
   for(let index=0;index<wilds.length;index++){
     const w=wilds[index];
     let candidate=wildAggressorCandidatePool[index];
-    if(!candidate){candidate={id:null,dead:true,engaged:false,targetValid:false,distanceToTarget:Infinity,distanceFromHome:Infinity};wildAggressorCandidatePool[index]=candidate;}
+    if(!candidate){candidate={id:null,dead:true,capturing:false,engaged:false,resumePriority:false,targetValid:false,distanceToTarget:Infinity,distanceFromHome:Infinity};wildAggressorCandidatePool[index]=candidate;}
     candidate.id=w?.id;
     candidate.dead=w?.dead;
+    candidate.capturing=w?.capturing;
     candidate.engaged=w?.engaged;
+    candidate.resumePriority=w?.captureEngagementResumePending===true;
     candidate.targetValid=!!w?.mesh?.position&&canCombatTargetWild(w);
+    if(w?.retired||w?.runtimeGeneration!==zoneGeneration)candidate.targetValid=false;
     candidate.distanceToTarget=w?.mesh?.position?distXZ(w.mesh.position,target.position):Infinity;
     candidate.distanceFromHome=w?.mesh?.position&&w?.home?distXZ(w.mesh.position,w.home):Infinity;
     wildAggressorCandidates[index]=candidate;
   }
   wildAggressorCandidates.length=wilds.length;
-  return fillEngagedWildIds(wildAggressorCandidates,ENCOUNTER_POLICY,engagedWildIdsScratch);
+  return fillEngagedWildIds(wildAggressorCandidates,ENCOUNTER_POLICY,engagedWildIdsScratch,bossChallengeSession.activeBossId);
+}
+function wildEncounterResetCause({assigned=true,targetAvailable=true,combatAuthorized=true,distanceToTarget=Infinity,distanceFromHome=Infinity}={}){
+  if(!Number.isFinite(distanceFromHome)||distanceFromHome>ENCOUNTER_POLICY.leashRadius)return'outside_leash';
+  if(!targetAvailable||!combatAuthorized)return'target_invalid';
+  if(!Number.isFinite(distanceToTarget)||distanceToTarget>ENCOUNTER_POLICY.disengageRadius)return'outside_disengage';
+  if(!assigned)return'engagement_slot_lost';
+  return'policy_reset';
+}
+function preflightWildEncounterBoundaries(){
+  const engagedWildIds=selectWildAggressors(),target=wildAiFrameTarget;
+  const targetAvailable=wildAiTargetAvailable(target);
+  for(let index=wilds.length-1;index>=0;index--){
+    const w=wilds[index];
+    if(!w||w.dead||w.retired||w.capturing||!w.engaged)continue;
+    const assigned=engagedWildIds.has(w.id);
+    const combatAuthorized=canCombatTargetWild(w),targetValid=assigned&&targetAvailable&&combatAuthorized;
+    const resetRequest=wildUpdateScratch.resetRequest;
+    resetRequest.engaged=true;
+    resetRequest.targetValid=targetValid;
+    resetRequest.distanceToTarget=targetAvailable?distXZ(w.mesh.position,target.position):Infinity;
+    resetRequest.distanceFromHome=distXZ(w.mesh.position,w.home);
+    if(!shouldResetEncounter(resetRequest))continue;
+    const resetCause=wildEncounterResetCause({assigned,targetAvailable,combatAuthorized,distanceToTarget:resetRequest.distanceToTarget,distanceFromHome:resetRequest.distanceFromHome});
+    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id))exitBossChallenge(resetCause);
+    else resetWild(w,resetCause);
+  }
+  for(let index=0;index<wilds.length;index++){const w=wilds[index];if(w?.captureEngagementResumePending===true&&engagedWildIds.has(w.id))w.captureEngagementResumePending=false;}
+  return engagedWildIds;
 }
 const wildUpdateScratch={
   statusRequest:{toSec:0,targetHp:0,targetMaxHp:1},
@@ -4356,106 +4852,227 @@ const wildUpdateScratch={
   direction:new THREE.Vector3(),
   impact:new THREE.Vector3(),
 };
-function updateWild(w,dt,canEngage=false){
-  if(!w||w.dead||!w.mesh||w.capturing)return;
+function createWildAiScratch(){
+  const self={id:null,encounterId:null,alive:false,capturing:false,engaged:false,hp:0,maxHp:1,position:{x:0,z:0},home:{x:0,z:0},attackReady:false,canMove:false,canAttack:false,forcedRetreat:false};
+  const target={id:null,encounterId:null,alive:false,targetable:false,capturing:false,position:{x:0,z:0},recentDamage:0,rolePriority:0};
+  return{request:{state:null,snapshot:{nowSec:0,dtSec:0,self,targets:[],profile:WILD_BASIC_AI_POLICY},canEngage:false},target};
+}
+const wildAiScratch=createWildAiScratch();
+function fillWildAiRequest(scratch,w,dt,canEngage,control,target){
+  const request=scratch.request,snapshot=request.snapshot,self=snapshot.self;
+  request.state=w?.aiState;
+  request.canEngage=canEngage===true;
+  snapshot.profile=wildAiPolicy(w);
+  snapshot.nowSec=Number.isFinite(w?.statusState?.currentTimeSec)?w.statusState.currentTimeSec:0;
+  snapshot.dtSec=Number.isFinite(dt)&&dt>0?dt:0;
+  self.id=w?.id;
+  self.encounterId=w?.aiEncounterId;
+  self.alive=w?.dead===false&&w?.retired===false&&Number.isFinite(w?.hp)&&w.hp>0;
+  self.capturing=w?.capturing===true;
+  self.engaged=w?.engaged===true;
+  self.hp=w?.hp;
+  self.maxHp=w?.maxHp;
+  self.position.x=w?.mesh?.position?.x;
+  self.position.z=w?.mesh?.position?.z;
+  self.home.x=w?.home?.x;
+  self.home.z=w?.home?.z;
+  self.attackReady=Number.isFinite(w?.attackCd)&&w.attackCd<=0;
+  self.canMove=control?.ok===true&&control.canMove===true;
+  self.canAttack=control?.ok===true&&control.canAttack===true;
+  self.forcedRetreat=control?.ok===true&&control.forcedRetreat===true;
+  if(wildAiTargetAvailable(target)){
+    const targetSnapshot=scratch.target;
+    targetSnapshot.id=target.id;
+    targetSnapshot.encounterId=w.aiEncounterId;
+    targetSnapshot.alive=target.alive===true;
+    targetSnapshot.targetable=target.targetable===true;
+    targetSnapshot.capturing=false;
+    targetSnapshot.position.x=target.position?.x;
+    targetSnapshot.position.z=target.position?.z;
+    targetSnapshot.recentDamage=0;
+    targetSnapshot.rolePriority=0;
+    snapshot.targets[0]=targetSnapshot;
+    snapshot.targets.length=1;
+  }else snapshot.targets.length=0;
+  return request;
+}
+function materializeWildAiIntentTarget(w,intent,canEngage,frameTargetKey,frameRuntime=null){
+  const policy=wildAiPolicy(w);
+  if(!w||w.dead||w.retired||w.capturing||!Number.isFinite(w.hp)||w.hp<=0||!w.mesh||w.runtimeGeneration!==zoneGeneration||w.aiEncounterId!==wildAiEncounterId()
+    ||!intent||intent.actorId!==w.id||intent.encounterId!==w.aiEncounterId||intent.actionToken===w.lastCommittedAiActionToken
+    ||intent.kind!=='basic_attack'||intent.skillId!==null||intent.commandSource!==policy.commandSource||intent.usesConsumed!==0
+    ||!Number.isFinite(intent.issuedAtSec)||!Number.isFinite(w.statusState?.currentTimeSec)||intent.issuedAtSec>w.statusState.currentTimeSec
+    ||!canEngage||!canCombatTargetWild(w)||currentWildAiTargetKey()!==frameTargetKey
+    ||w.aiState?.state!=='attack_windup'||w.aiState?.targetId!==intent.targetId
+    ||w.aiState?.pendingAction?.token!==intent.actionToken||!Number.isFinite(w.attackCd)||w.attackCd>0)return null;
+  const target=resolveWildAiTarget();
+  if(!wildAiTargetAvailable(target)||target.id!==intent.targetId)return null;
+  const distance=distXZ(w.mesh.position,target.position);
+  if(!Number.isFinite(distance)||distance>policy.preferredRangeMaxM)return null;
+  const control=frameRuntime?.actor===w&&frameRuntime.statusState===w.statusState?frameRuntime.control:resolveCombatStatusRuntime(w.statusState);
+  if(!control.ok||!control.canAttack||!Number.isFinite(control.accuracyMultiplier)||control.accuracyMultiplier<0||control.accuracyMultiplier>1)return null;
+  return{target,control};
+}
+function cacheWildAiMotion(w,decision){
+  const motion=w?.aiMotion;
+  if(!motion)return false;
+  motion.action=decision?.action==='wander'?'wander':decision?.action==='move'?'move':'idle';
+  motion.targetId=motion.action==='move'?decision.targetId:null;
+  if(motion.action==='move'&&Number.isFinite(decision.direction?.x)&&Number.isFinite(decision.direction?.z))motion.direction.set(decision.direction.x,0,decision.direction.z);
+  else if(motion.action==='move'){motion.action='idle';motion.targetId=null;}
+  return true;
+}
+function advanceWildLifecycle(w,dt,frameRuntime=null){
+  if(w?.capturing)return false;
+  let runtime=frameRuntime??wildFrameRuntimeCache.get(w)??null;
+  if(!wildFrameRuntimeUsable(w,runtime)&&!validateWildRuntimeActor(w)){
+    if(w&&!w.dead&&!w.retired)quarantineWildAIActor(w);
+    return false;
+  }
+  if(!wildFrameRuntimeUsable(w,runtime))runtime=markWildRuntimeValidated(w);
   const statusRequest=wildUpdateScratch.statusRequest;
   statusRequest.toSec=w.statusState.currentTimeSec+dt;statusRequest.targetHp=w.hp;statusRequest.targetMaxHp=w.maxHp;
   const statusAdvance=advanceEncounterEffects(w.statusState,statusRequest);
-  if(statusAdvance.ok){w.statusState=statusAdvance.state;if(statusAdvance.damage>0){damageWild(w,Math.max(1,Math.round(statusAdvance.damage)),{type:statusDamageType(statusAdvance.ticks,wildTypes(w)[0]),eff:1,statusDamage:true});if(w.dead)return;}}
+  if(!statusAdvance.ok){quarantineWildAIActor(w);return false;}
+  w.statusState=statusAdvance.state;
+  if(statusAdvance.damage>0){
+    if(!commitAttributedStatusDamage(w,Math.max(1,Math.round(statusAdvance.damage)),{type:statusDamageType(statusAdvance.ticks,wildTypes(w)[0]),eff:1,statusDamage:true},statusAdvance.ticks))return false;
+    if(w.dead||w.retired)return false;
+  }
   const control=resolveCombatStatusRuntime(w.statusState);
   const selfModifiers=resolveActiveSelfStatusModifiers(w.statusState);
+  if(!control.ok||!selfModifiers.ok){quarantineWildAIActor(w);return false;}
+  runtime.statusState=w.statusState;runtime.control=control;runtime.selfModifiers=selfModifiers;
   const cooldownElapsed=dt*(control.ok?control.cooldownRecoveryMultiplier:1);
   w.attackCd=tickCooldown(w.attackCd,cooldownElapsed);
   w.wanderT=(Number.isFinite(w.wanderT)?w.wanderT:0)-dt;
-  w.dir=ensureDirection(w.dir||w.wanderDir);
-  w.wanderDir=w.dir;
-
-  const target=(activeSummon&&activeSummon.mesh)?activeSummon.mesh:player;
-  const targetValid=!!target?.position;
-  const distanceToTarget=targetValid?distXZ(w.mesh.position,target.position):Infinity;
-  const distanceFromHome=w.home?distXZ(w.mesh.position,w.home):Infinity;
-  const resetRequest=wildUpdateScratch.resetRequest;
-  resetRequest.engaged=w.engaged;resetRequest.targetValid=targetValid;resetRequest.distanceToTarget=distanceToTarget;resetRequest.distanceFromHome=distanceFromHome;
-  if(shouldResetEncounter(resetRequest)){
-    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id)){exitBossChallenge('leash');return;}
-    resetWild(w);
-  }
-
-  if(!canEngage||!targetValid){
-    if(w.engaged)resetWild(w);
-    for(const other of wilds){if(other===w||other.dead)continue;const d=distXZ(w.mesh.position,other.mesh.position);if(d<1.2&&d>0.001){const push=wildUpdateScratch.collision.copy(w.mesh.position).sub(other.mesh.position);push.y=0;push.normalize().multiplyScalar((1.2-d)*dt*2);w.mesh.position.add(push);}}
-    if(w.wanderT<=0){
-      w.state='wander';
-      w.wanderT=1.6+Math.random()*2.2;
-      w.dir=ensureDirection(null);
-      w.wanderDir=w.dir;
-    }
-    let moving=false;
-    if(w.state==='wander'&&(!control.ok||control.canMove)){
-      const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(w.dir,dt*.9);
-      if(w.home&&distXZ(next,w.home)>2.2){w.dir.multiplyScalar(-1);w.wanderDir=w.dir;}
-      moving=moveWildWithFieldCollision(w,w.dir,dt*.9);
-      w.mesh.rotation.y=monsterLookYaw(w.dir,w.mesh);
-    }
-    animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
-    animateMonster(w.mesh,dt,moving);
-    return;
-  }
-
-  ensureCaptureReferenceLevel(w);
-  w.engaged=true;
-  w.state='chase';
-  let moving=false;
-  const distance=distXZ(w.mesh.position,target.position);
-  if(control.ok&&control.forcedRetreat&&control.canMove){
-    const dir=wildUpdateScratch.direction.copy(w.mesh.position).sub(target.position);dir.y=0;
-    if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
-    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*(selfModifiers.ok?selfModifiers.speedMultiplier:1)*dt);
-    w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
-  }else if(distance>1.25&&(!control.ok||control.canMove)){
-    moving=true;
-    const dir=wildUpdateScratch.direction.copy(target.position).sub(w.mesh.position);dir.y=0;
-    if(dir.lengthSq()>0.000001)dir.normalize();else dir.set(0,0,-1);
-    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*(selfModifiers.ok?selfModifiers.speedMultiplier:1)*dt);
-    w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
-  }else if(w.attackCd<=0&&(!control.ok||control.canAttack)){
-    w.attackCd=w.boss?.85:1.2;
-    triggerMonsterAction(w.mesh,'attack',0.22);
-    const impact=wildUpdateScratch.impact.copy(target.position);impact.y+=.55;
-    spawnElementalFX(wildTypes(w)[0],impact,'impact',0.65);
-    if(activeSummon&&activeSummon.mesh){
-      const incomingType=wildTypes(w)[0],guard=resolveActiveSelfStatusModifiers(activeSummon.statusState,{incomingType});
-      const statusMissed=control.ok&&Math.random()>=control.accuracyMultiplier;
-      const evaded=guard.ok&&guard.evasionChancePct>0&&Math.random()<guard.evasionChancePct/100;
-      if(statusMissed){spawnDamageNumber(0,impact,{miss:true});msg(`${spById[w.speciesId].name} โจมตีพลาดเพราะสถานะ`);}
-      else if(evaded){msg(`${displayName(activeSummon.inst)} หลบการโจมตีได้`);}
-      else{
-        const res=wildDamage(w,activeSummon.inst,guard.ok?guard.defenseMultiplier:1,selfModifiers.ok?selfModifiers.attackMultiplier:1);
-        const finalMultiplier=guard.ok?guard.damageTakenMultiplier*guard.elementDamageTakenMultiplier:1;
-        const dmg=Math.max(1,Math.round(res.damage*finalMultiplier));
-        activeSummon.inst.hp-=dmg;
-        impact.copy(activeSummon.mesh.position);impact.y+=1.25;
-        spawnDamageNumber(dmg,impact,{type:incomingType,eff:res.eff});
-        triggerCameraShake(w.boss?.15:.09,w.boss?.2:.14);
-        if(activeSummon.inst.hp<=0)faintActive();
-      }
-      renderParty();
-    }else if(playerData.invuln<=0){
-      const playerDmg=Math.round(w.atk*(w.boss?.7:.48));
-      playerData.hp-=playerDmg;playerData.invuln=.5;
-      spawnDamageNumber(playerDmg,playerHitText(),{type:wildTypes(w)[0]});
-      triggerCameraShake(w.boss?.17:.1,w.boss?.22:.15);
-      playerVisual.play('hurt',{duration:.24});
-      impact.copy(player.position);impact.y+=1;
-      spawnBurst(impact,0xef4444,{count:8,life:.22,size:.04,gravity:1});
-      if(playerData.hp<=0){playerData.hp=playerData.maxHp;msg('ผู้เล่นหมด HP • กลับ Ranch Hub');switchZone('hub',true);}
-      renderHUD();
-    }
-  }
-  animateEntity(w.mesh,dt,moving,w.boss?1.2:1);
-  animateMonster(w.mesh,dt,moving);
+  w.dir=ensureDirection(w.dir||w.wanderDir);w.wanderDir=w.dir;
+  return runtime;
 }
-function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];if(!p?.mesh||!p.start||!p.end){if(p?.mesh)removeAndDispose(scene, p.mesh);projectiles.splice(i,1);continue;}p.t+=dt/p.duration;const t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}if(t-p.lastTrail>.08){p.lastTrail=t;if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else{spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03,priority:p.type==='capture'?'P0':'P1'});}}if(t>=1){const mesh=p.mesh;projectiles.splice(i,1);if(p.type==='capture'){p.onHit?.(mesh);continue;}spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04,priority:'P1'});removeAndDispose(scene, mesh);p.onHit?.();}}}
+function applyWildMotionAndPresentation(w,dt,target=wildAiFrameTarget,frameTargetKey=target?.id??null,frameRuntime=null){
+  if(!wildFrameRuntimeUsable(w,frameRuntime)||w.capturing)return false;
+  const {control,selfModifiers}=frameRuntime;
+  const motion=w.aiMotion;
+  let moving=false;
+  if(motion?.action==='wander'){
+    for(const other of wilds){if(other===w||other?.dead||!other?.mesh)continue;const d=distXZ(w.mesh.position,other.mesh.position);if(d<1.2&&d>0.001){const push=wildUpdateScratch.collision.copy(w.mesh.position).sub(other.mesh.position);push.y=0;push.normalize().multiplyScalar((1.2-d)*dt*2);w.mesh.position.add(push);}}
+    if(w.wanderT<=0){w.wanderT=1.6+Math.random()*2.2;w.dir=ensureDirection(null);w.wanderDir=w.dir;}
+    if(control.ok&&control.canMove){
+      const next=wildUpdateScratch.next.copy(w.mesh.position).addScaledVector(w.dir,dt*.9);
+      if(distXZ(next,w.home)>2.2){w.dir.multiplyScalar(-1);w.wanderDir=w.dir;}
+      moving=moveWildWithFieldCollision(w,w.dir,dt*.9);w.mesh.rotation.y=monsterLookYaw(w.dir,w.mesh);
+    }
+  }else if(motion?.action==='move'&&wildAiTargetAvailable(target)&&target.id===frameTargetKey&&motion.targetId===target.id&&control.ok&&control.canMove){
+    const dir=wildUpdateScratch.direction.copy(motion.direction);
+    moving=moveWildWithFieldCollision(w,dir,(w.spd*.16+1.2)*(selfModifiers.ok?selfModifiers.speedMultiplier:1)*dt);
+    w.mesh.rotation.y=monsterLookYaw(dir,w.mesh);
+  }
+  animateEntity(w.mesh,dt,moving,w.boss?1.2:1);animateMonster(w.mesh,dt,moving);
+  return true;
+}
+function updateWild(w,dt,canEngage=false,target=wildAiFrameTarget,frameTargetKey=target?.id??null,frameRuntime=null){
+  if(!wildFrameRuntimeUsable(w,frameRuntime)||w.capturing)return false;
+  const {control}=frameRuntime;
+  const targetValid=wildAiTargetAvailable(target)&&target.id===frameTargetKey;
+  const resetRequest=wildUpdateScratch.resetRequest;
+  resetRequest.engaged=w.engaged;resetRequest.targetValid=targetValid&&canEngage;resetRequest.distanceToTarget=targetValid?distXZ(w.mesh.position,target.position):Infinity;resetRequest.distanceFromHome=distXZ(w.mesh.position,w.home);
+  if(shouldResetEncounter(resetRequest)){
+    const resetCause=wildEncounterResetCause({assigned:canEngage,targetAvailable:targetValid,combatAuthorized:canCombatTargetWild(w),distanceToTarget:resetRequest.distanceToTarget,distanceFromHome:resetRequest.distanceFromHome});
+    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id)){exitBossChallenge(resetCause);return false;}
+    resetWild(w,resetCause);return false;
+  }
+  const previousState=w.aiState,decisionStarted=MONSTER_AI_DEBUG?performance.now():0;
+  const decision=resolveWildMonsterAI(fillWildAiRequest(wildAiScratch,w,dt,canEngage,control,target));
+  const decisionDuration=MONSTER_AI_DEBUG?performance.now()-decisionStarted:0;
+  if(!decision.ok){recordWildAiTrace(w,{fromState:w.state,toState:w.state,targetId:null,reason:decision.reason,durationMs:decisionDuration,rejected:true,decision:true});if(decision.reason==='action_sequence_exhausted')quarantineWildAIActor(w);else cancelWildAIAction(w,'resolver_rejected',{clearEngagement:true});return false;}
+  if(previousState?.pendingAction&&!decision.nextState?.pendingAction)clearWildAiTelegraph(w);
+  if(!commitWildAIState(w,decision.nextState)){cancelWildAIAction(w,'invalid_resolver_state',{clearEngagement:true});return false;}
+  cacheWildAiMotion(w,decision);
+  if(decision.targetId!==null){ensureCaptureReferenceLevel(w);w.engaged=true;}
+  recordWildAiTrace(w,{fromState:previousState.state,toState:w.state,targetId:decision.targetId,action:decision.action,reason:decision.reason,timeSec:w.statusState.currentTimeSec,durationMs:decisionDuration,decision:true});
+  const aiPolicy=wildAiPolicy(w);
+  if(decision.transition?.toState==='alert')createWildAiTelegraph(w,w.mesh.position,0xfacc15,{scale:w.boss?.8:.46,life:aiPolicy.alertDurationSec,y:.08,priority:'P0'});
+  if(decision.transition?.toState==='attack_windup'){
+    const telegraphReady=targetValid&&createWildAiTelegraph(w,target.position,w.boss?0xfb7185:0xf97316,{scale:w.boss?.72:.42,life:aiPolicy.windupDurationSec,y:.08,priority:'P0'},target);
+    if(w.boss&&!telegraphReady){cancelWildAIAction(w,'boss_attack_telegraph_unavailable');return false;}
+    runBestEffortCombatPresentation(()=>triggerMonsterAction(w.mesh,'attack',aiPolicy.windupDurationSec));
+  }
+  if(decision.action==='reset'){
+    if(w.boss&&bossCombatAuthorized(bossChallengeSession,w.id)){exitBossChallenge(decision.reason);return false;}
+    resetWild(w,decision.reason);return false;
+  }
+  if(decision.action==='basic_attack')executeWildAiIntent(w,decision,canEngage,frameTargetKey,frameRuntime);
+  return !w.retired&&w.runtimeGeneration===zoneGeneration&&!!w.mesh;
+}
+function wildAiStateOwnsIntent(w,intent){return !!w&&!!intent&&w.aiState?.state==='attack_windup'&&w.aiState.actorId===intent.actorId&&w.aiState.encounterId===intent.encounterId&&w.aiState.targetId===intent.targetId&&w.aiState.pendingAction?.targetId===intent.targetId&&w.aiState.pendingAction?.token===intent.actionToken&&w.aiState.pendingAction?.issuedAtSec===intent.issuedAtSec&&w.aiState.pendingAction?.commandSource===intent.commandSource;}
+function rejectWildAiIntent(w,decision,reason='runtime_revalidation_rejected'){
+  clearWildAiTelegraph(w);
+  const rejected=settleWildAIIntent(w?.aiState,decision?.intent,false);
+  if(rejected.ok){if(!commitWildAIState(w,rejected.nextState))cancelWildAIAction(w,'invalid_rejected_intent_state',{clearEngagement:true});}
+  else cancelWildAIAction(w,'invalid_rejected_intent_settlement',{clearEngagement:true});
+  recordWildAiTrace(w,{fromState:'attack_windup',toState:w?.state??'chase',targetId:decision?.targetId??null,action:'idle',reason,timeSec:w?.statusState?.currentTimeSec??0,rejected:true});
+  return false;
+}
+function executeWildAiIntent(w,decision,canEngage,frameTargetKey,frameRuntime=null){
+  if(!wildAiStateOwnsIntent(w,decision?.intent)){recordWildAiTrace(w,{fromState:w?.state??null,toState:w?.state??null,targetId:decision?.targetId??null,action:'idle',reason:'stale_intent_ignored',timeSec:w?.statusState?.currentTimeSec??0,rejected:true});return false;}
+  const live=materializeWildAiIntentTarget(w,decision?.intent,canEngage,frameTargetKey,frameRuntime);
+  if(!live)return rejectWildAiIntent(w,decision);
+  const {target,control}=live,incomingType=wildTypes(w)[0],selfModifiers=frameRuntime?.actor===w&&frameRuntime.statusState===w.statusState?frameRuntime.selfModifiers:resolveActiveSelfStatusModifiers(w.statusState);
+  if(!selfModifiers.ok||!Number.isFinite(selfModifiers.attackMultiplier))return rejectWildAiIntent(w,decision,'attacker_status_invalid');
+  const guard=target.kind==='owned'?resolveActiveSelfStatusModifiers(target.entity?.statusState,{incomingType}):null;
+  if(target.kind==='owned'&&(!guard?.ok||!Number.isFinite(guard.defenseMultiplier)||!Number.isFinite(guard.evasionChancePct)||!Number.isFinite(guard.damageTakenMultiplier)||!Number.isFinite(guard.elementDamageTakenMultiplier)))return rejectWildAiIntent(w,decision,'defender_status_invalid');
+  const settled=settleWildAIIntent(w.aiState,decision.intent,true);
+  if(!settled.ok){cancelWildAIAction(w,'invalid_accepted_intent_settlement',{clearEngagement:true});recordWildAiTrace(w,{fromState:'attack_windup',toState:w.state,targetId:decision.targetId,reason:settled.reason,rejected:true});return false;}
+  if(!commitWildAIState(w,settled.nextState)){cancelWildAIAction(w,'invalid_accepted_intent_state',{clearEngagement:true});return false;}
+  w.lastCommittedAiActionToken=decision.intent.actionToken;
+  w.attackCd=wildAiPolicy(w).basicAttackCooldownSec;
+  runBestEffortCombatPresentation(()=>clearWildAiTelegraph(w));
+  recordWildAiTrace(w,{fromState:'attack_windup',toState:w.state,targetId:target.id,action:'basic_attack',reason:settled.reason,timeSec:w.statusState.currentTimeSec});
+  const impact=wildUpdateScratch.impact.copy(target.position);impact.y+=.55;
+  const statusMissed=Math.random()>=control.accuracyMultiplier;
+  if(target.kind==='owned'){
+    const summon=target.entity;
+    const evaded=!statusMissed&&guard.evasionChancePct>0&&Math.random()<guard.evasionChancePct/100;
+    if(statusMissed)runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);spawnDamageNumber(0,impact,{miss:true});msg(`${spById[w.speciesId].name} โจมตีพลาดเพราะสถานะ`);});
+    else if(evaded)runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);msg(`${displayName(summon.inst)} หลบการโจมตีได้`);});
+    else{
+      const res=wildDamage(w,summon.inst,guard.ok?guard.defenseMultiplier:1,selfModifiers.ok?selfModifiers.attackMultiplier:1);
+      const finalMultiplier=guard.ok?guard.damageTakenMultiplier*guard.elementDamageTakenMultiplier:1;
+      const dmg=Math.max(1,Math.round(res.damage*finalMultiplier));
+      impact.copy(summon.mesh.position);impact.y+=1.25;
+      summon.inst.hp-=dmg;
+      if(summon===activeSummon&&summon.inst.hp<=0)faintActive();
+      runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);spawnDamageNumber(dmg,impact,{type:incomingType,eff:res.eff});triggerCameraShake(w.boss?.15:.09,w.boss?.2:.14);});
+    }
+    runBestEffortCombatPresentation(()=>renderParty());
+  }else if(target.kind==='player'&&statusMissed){
+    runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);spawnDamageNumber(0,impact,{miss:true});msg(`${spById[w.speciesId].name} โจมตีพลาดเพราะสถานะ`);});
+  }else if(target.kind==='player'&&playerData.invuln<=0){
+    const playerDmg=Math.round(w.atk*(w.boss?.7:.48)*selfModifiers.attackMultiplier);
+    playerData.hp-=playerDmg;playerData.invuln=.5;
+    impact.copy(player.position);impact.y+=1;
+    runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);spawnDamageNumber(playerDmg,playerHitText(),{type:wildTypes(w)[0]});triggerCameraShake(w.boss?.17:.1,w.boss?.22:.15);playerVisual.play('hurt',{duration:.24});spawnBurst(impact,0xef4444,{count:8,life:.22,size:.04,gravity:1});});
+    if(playerData.hp<=0){playerData.hp=playerData.maxHp;msg('ผู้เล่นหมด HP • กลับ Ranch Hub');switchZone('hub',true);}
+    runBestEffortCombatPresentation(()=>renderHUD());
+  }else if(target.kind==='player')runBestEffortCombatPresentation(()=>spawnElementalFX(incomingType,impact,'impact',0.65));
+  return true;
+}
+function updateProjectiles(dt){
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i];
+    if(!p?.mesh||!p.start||!p.end){if(p?.mesh)try{removeAndDispose(scene,p.mesh);}catch{}projectiles.splice(i,1);if(p?.type==='capture')abortCaptureSequence();continue;}
+    let t=0;
+    try{p.t+=dt/p.duration;t=Math.min(1,p.t);p.mesh.position.lerpVectors(p.start,p.end,t);p.mesh.position.y+=Math.sin(t*Math.PI)*2.2;if(p.mesh.userData.spin){p.mesh.rotation.x+=dt*10;p.mesh.rotation.y+=dt*14;}}
+    catch{try{removeAndDispose(scene,p.mesh);}catch{}projectiles.splice(i,1);if(p.type==='capture')abortCaptureSequence();continue;}
+    if(t-p.lastTrail>.08){p.lastTrail=t;runBestEffortCombatPresentation(()=>{if(p.type==='summon'&&pendingSummon){const inst=getInst(pendingSummon.instanceId);if(inst)spawnElementalFX(monsterTypes(inst)[0],p.mesh.position.clone(),'trail',0.55);}else spawnBurst(p.mesh.position.clone(),p.color,{count:3,life:.12,size:.03,priority:p.type==='capture'?'P0':'P1'});});}
+    if(t<1)continue;
+    const mesh=p.mesh;projectiles.splice(i,1);
+    if(p.type==='capture'){try{p.onHit?.(mesh);}catch{try{removeAndDispose(scene,mesh);}catch{}abortCaptureSequence();}continue;}
+    try{removeAndDispose(scene,mesh);}catch{}
+    try{p.onHit?.();}catch{}
+    runBestEffortCombatPresentation(()=>spawnBurst(safeVec3(p.end),p.color,{count:6,life:.16,size:.04,priority:'P1'}));
+  }
+}
 
 // ---------- V8.2.0 Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
@@ -5522,7 +6139,7 @@ function renderCombatPresentation(){
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
   const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
   const statusControl=activeSummon?resolveCombatStatusRuntime(activeSummon.statusState):null;
-  const skillStatusLocked=statusControl?.ok&&!statusControl.canUseSkill;
+  const skillStatusLocked=!!activeSummon&&(!statusControl?.ok||!statusControl.canUseSkill);
   MANUAL_SKILL_SLOTS.forEach((_,index)=>{
     const button=el(`skill${index+1}Btn`),skill=skillDefs[index],view=presentation.skills[index];
     const iconUrl=getSkillIcon(skill);
@@ -6266,11 +6883,12 @@ el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg
 let wildEmptyTimer=0;
 let autoSaveTick=30;
 function ensureWildPopulation(dt){
-  if(state.currentZone==='hub'){wildEmptyTimer=0;return;}
+  if(state.currentZone==='hub'){wildEmptyTimer=0;wildPopulationRecoveryPending=false;return;}
+  if(wildPopulationRecoveryPending){wildPopulationRecoveryPending=false;ensureProgressionEncounter(state.currentZone);}
   const alive=livingWilds().length;
   if(alive>0){wildEmptyTimer=0;return;}
   wildEmptyTimer+=dt;
-  if(wildEmptyTimer>=1.2){wildEmptyTimer=0;clearWilds();spawnZone(state.currentZone);msg(`ระบบเติม Wild Monster อัตโนมัติ • พบ ${livingWilds().length} ตัว`);renderHUD();}
+  if(wildEmptyTimer>=1.2){wildEmptyTimer=0;clearWilds();spawnZone(state.currentZone);runBestEffortCombatPresentation(()=>{msg(`ระบบเติม Wild Monster อัตโนมัติ • พบ ${livingWilds().length} ตัว`);renderHUD();});}
 }
 
 // ---------- Frame ----------
@@ -6328,7 +6946,10 @@ function loop(now){
       if(frameMs>50)STREAM_HITCH.over50++;
     }
     updatePlayer(dt);
+    wildRuntimeFrameToken=wildRuntimeFrameToken>=Number.MAX_SAFE_INTEGER?1:wildRuntimeFrameToken+1;
+    quarantineInvalidWildActors();
     updateWorldStream();
+    preflightWildEncounterBoundaries();
     updateWarpPrompt(dt);
     updateBossChallengePrompt();
     updateCamera(dt);
@@ -6346,13 +6967,23 @@ function loop(now){
     updateRanchVisuals(dt);
     ensureWildPopulation(dt);
     const engagedWildIds=selectWildAggressors();
+    syncWildAiTelegraphs(wildAiFrameTarget);
+    const wildLoopGeneration=zoneGeneration,wildLoopTargetKey=wildAiFrameTarget?.id??null;
     wildFrameSnapshot.length=wilds.length;
     for(let wildIndex=0;wildIndex<wilds.length;wildIndex++)wildFrameSnapshot[wildIndex]=wilds[wildIndex];
     for(let wildIndex=0;wildIndex<wildFrameSnapshot.length;wildIndex++){
       const w=wildFrameSnapshot[wildIndex];
-      const distance=distXZ(player.position,w.mesh.position);
-      const aiDt=distanceTickScheduler.advance(w.id,distance,dt,engagedWildIds.has(w.id));
-      if(aiDt>0)updateWild(w,aiDt,engagedWildIds.has(w.id));
+      if(zoneGeneration!==wildLoopGeneration||currentWildAiTargetKey()!==wildLoopTargetKey)break;
+      if(!w||w.retired||w.runtimeGeneration!==wildLoopGeneration)continue;
+      const frameRuntime=advanceWildLifecycle(w,dt);
+      if(!frameRuntime)continue;
+      const targetAvailable=wildAiTargetAvailable(wildAiFrameTarget);
+      const aiDistance=targetAvailable?distXZ(w.mesh.position,wildAiFrameTarget.position):Infinity;
+      const urgentCancel=!!w.aiState?.pendingAction&&(!engagedWildIds.has(w.id)||w.aiState.targetId!==wildLoopTargetKey||!targetAvailable);
+      const aiDt=distanceTickScheduler.advance(w.id,aiDistance,dt,urgentCancel);
+      if(aiDt>0)updateWild(w,aiDt,engagedWildIds.has(w.id),wildAiFrameTarget,wildLoopTargetKey,frameRuntime);
+      if(zoneGeneration!==wildLoopGeneration||currentWildAiTargetKey()!==wildLoopTargetKey)break;
+      if(!w.retired&&w.runtimeGeneration===wildLoopGeneration)applyWildMotionAndPresentation(w,dt,wildAiFrameTarget,wildLoopTargetKey,frameRuntime);
     }
     ranchPad.ring.rotation.y+=dt*.2;
     breedingPad.ring.rotation.y-=dt*.16;

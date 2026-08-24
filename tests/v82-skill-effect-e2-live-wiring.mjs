@@ -37,15 +37,15 @@ export function assertE2LiveWiring(source) {
   const acceptedApply = functionSource(source, 'applyAcceptedSkillCommand');
   const updateOwned = functionSource(source, 'updateOwned');
   const wildDamage = functionSource(source, 'wildDamage');
-  const updateWild = functionSource(source, 'updateWild');
+  const executeWildAiIntent = functionSource(source, 'executeWildAiIntent');
 
   assert.match(catalogSkills, /effectAvailable:canExecuteReviewedSkillEffect\(definition\.id\)/);
   assert.match(spawnOwned, /statusState:createEncounterStatusState\(\{encounterId:`owned:\$\{inst\.instanceId\}`,nowSec:0\}\)/,
     'owned encounter creates canonical actor status state');
-  assert.match(recall, /endEncounterEffects\(activeSummon\.statusState/,
-    'Recall clears all actor encounter statuses');
-  assert.match(faint, /endEncounterEffects\(activeSummon\.statusState/,
-    'Faint clears all actor encounter statuses');
+  assert.match(recall, /summon\.statusState=endEncounterEffects\(summon\.statusState/,
+    'Recall clears the snapshot-local summon status before activeSummon is released');
+  assert.match(faint, /summon\.statusState=endEncounterEffects\(summon\.statusState/,
+    'Faint clears the snapshot-local summon status before activeSummon is released');
 
   assert.match(request, /targets:command\.targetKind==='Self'\?Object\.freeze\(\[\]\):canonicalSkillEffectTargets\(materialized\)/,
     'Self requests cannot reinterpret the actor as an enemy target');
@@ -55,7 +55,7 @@ export function assertE2LiveWiring(source) {
 
   const planAt = acceptedApply.indexOf('const planned=resolveReviewedSkillEffects(');
   const cooldownAt = acceptedApply.indexOf('a.skillCds[index]=command.startCooldownSec;');
-  const actorAt = acceptedApply.indexOf('applyPlannedActorEffect(a,move,planned.actorResult);');
+  const actorAt = acceptedApply.indexOf('applyPlannedActorEffect(a,move,planned.actorResult,contributionEvents);');
   assert.ok(planAt >= 0 && cooldownAt > planAt && actorAt > cooldownAt,
     'pure full-effect planning precedes the sole cooldown and actor mutations');
   assert.equal((acceptedApply.match(/a\.skillCds\[index\]=command\.startCooldownSec/g) ?? []).length, 1);
@@ -81,10 +81,10 @@ export function assertE2LiveWiring(source) {
     'SPD applies to chase and forced-retreat movement');
   assert.match(wildDamage, /def:\(inst\.def\|\|10\)\*defenseMultiplier/,
     'DEF buff enters incoming damage defense');
-  assert.match(updateWild, /resolveActiveSelfStatusModifiers\(activeSummon\.statusState,\{incomingType\}\)/);
-  assert.match(updateWild, /guard\.evasionChancePct\/100/,
+  assert.match(executeWildAiIntent, /resolveActiveSelfStatusModifiers\(target\.entity\?\.statusState,\{incomingType\}\)/);
+  assert.match(executeWildAiIntent, /guard\.evasionChancePct\/100/,
     'Evasion buff can avoid incoming wild attacks');
-  assert.match(updateWild, /guard\.damageTakenMultiplier\*guard\.elementDamageTakenMultiplier/,
+  assert.match(executeWildAiIntent, /guard\.damageTakenMultiplier\*guard\.elementDamageTakenMultiplier/,
     'DamageReduce and elemental shield layers both affect incoming damage');
   assert.equal((source.match(/guard\.damageTakenMultiplier\*guard\.elementDamageTakenMultiplier/g) ?? []).length, 2,
     'elemental shield layers affect Basic and wild incoming damage paths');

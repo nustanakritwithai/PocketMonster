@@ -27,26 +27,47 @@ function functionSource(source, name) {
   assert.fail(`${name} must have a balanced body`);
 }
 
-function materializerFromSource(gameSource, wilds) {
+function basicDamageReadyStub(wild) {
+  return (wild?.capturing === undefined || wild.capturing === false)
+    && wild?.combatEnabled !== false;
+}
+
+function materializerFromSource(gameSource, wilds, isWildDamageReady = basicDamageReadyStub) {
   const source = functionSource(gameSource, 'materializeOwnedBasicAiTarget');
   return Function(
     'wilds',
     'distXZ',
     'OWNED_BASIC_AI_POLICY',
+    'isWildDamageReady',
     `'use strict';${source};return materializeOwnedBasicAiTarget;`,
   )(
     wilds,
     (left, right) => Math.hypot(right.x - left.x, right.z - left.z),
     Object.freeze({ retainRangeM: 12, basicAttackRangeM: 1.35 }),
+    isWildDamageReady,
   );
 }
 
-function aiRequestFromSource(gameSource) {
+function aiRequestFromSource(gameSource, isWildDamageReady = basicDamageReadyStub) {
   const createSource = functionSource(gameSource, 'createOwnedBasicAiScratch');
   const fillSource = functionSource(gameSource, 'fillOwnedBasicAiRequest');
   return Function(
+    'isWildDamageReady',
     `'use strict';${createSource};${fillSource};return {createOwnedBasicAiScratch,fillOwnedBasicAiRequest};`,
-  )();
+  )(isWildDamageReady);
+}
+
+function wildDamageReadinessFromSource(gameSource) {
+  const source = functionSource(gameSource, 'isWildDamageReady');
+  return Function(
+    'validateWildRuntimeActor', 'canCombatTargetWild', 'distXZ', 'ENCOUNTER_POLICY',
+    `'use strict';${source};return isWildDamageReady;`,
+  )(
+    wild => wild?.schemaValid === true,
+    wild => wild?.bossAuthorized === true,
+    (left, right) => Math.hypot(right.x - left.x, right.z - left.z),
+    Object.freeze({ leashRadius: 18 }),
+  );
 }
 
 function monsterDamageFromSource(gameSource, forgedSkill, calls = { count: 0 }) {
@@ -88,10 +109,14 @@ export function assertBasicAiLiveWiring(gameSource) {
   assert.match(gameSource, /function fillOwnedBasicAiRequest\(/);
   assert.match(gameSource, /function materializeOwnedBasicAiTarget\(/);
   assert.match(fillRequest, /target\.alive=wild\?\.dead===false&&Number\.isFinite\(wild\?\.hp\)&&wild\.hp>0/);
-  assert.match(fillRequest, /target\.targetable=wild\?\.capturing===undefined\|\|wild\.capturing===false/);
+  assert.match(fillRequest, /target\.targetable=\(wild\?\.capturing===undefined\|\|wild\.capturing===false\)/);
+  assert.match(fillRequest, /&&isWildDamageReady\(wild\)/,
+    'Owned candidate snapshots use the pure damage-readiness gate');
   assert.match(gameSource, /matchCount!==1/);
   assert.match(gameSource, /target\.dead!==false/);
   assert.match(gameSource, /!\(target\.capturing===undefined\|\|target\.capturing===false\)/);
+  assert.match(gameSource, /\|\|!isWildDamageReady\(target\)/,
+    'Owned final materialization rechecks damage readiness before cooldown commit');
   assert.match(gameSource, /target\.hp\)|target\.hp<=0/);
   assert.match(updateOwned, /resolveOwnedBasicAiAction\(/);
   assert.match(updateOwned, /fillOwnedBasicAiRequest\(ownedBasicAiScratch,a,wilds\)/);
@@ -158,6 +183,19 @@ export function assertBasicAiLiveWiring(gameSource) {
   assert.equal(snapshots[0].alive, true);
   assert.equal(snapshots[0].targetable, true, 'undefined capturing is the normal targetable state');
   assert.equal(snapshots[1].alive, false, 'zero-HP world records are not eligible');
+
+  const liveDamageReady = wildDamageReadinessFromSource(gameSource);
+  const outsideLeash = world({
+    schemaValid: true, bossAuthorized: true, home: { x: 19.000001, z: 0 },
+  });
+  const outsideRequestTools = aiRequestFromSource(gameSource, liveDamageReady);
+  const outsideSnapshot = outsideRequestTools.fillOwnedBasicAiRequest(
+    outsideRequestTools.createOwnedBasicAiScratch(), snapshotOwner, [outsideLeash],
+  ).enemies[0];
+  assert.equal(outsideSnapshot.targetable, false,
+    'Owned resolver cannot acquire a target already outside its home leash');
+  assert.equal(materializerFromSource(gameSource, [outsideLeash], liveDamageReady)(actor, decision), null,
+    'Owned pre-damage materialization rejects leash drift before cooldown commit');
   for (const malformed of [
     { dead: 1 },
     { dead: 'yes' },
