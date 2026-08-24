@@ -1,0 +1,20 @@
+{
+  "configVersion": 1,
+  "environment": "firebase-only",
+  "apiBaseUrl": "",
+  "webSocketUrl": "",
+  "apiVersion": "",
+  "minimumClientVersion": "8.2.0",
+  "saveSchemaVersion": 1,
+  "deployedRelease": "",
+  "featureFlags": {
+    "vpsEnabled": false,
+    "vpsReads": false,
+    "vpsWrites": false,
+    "playerDataWrites": false,
+    "accountMigration": false,
+    "saveMigration": false,
+    "economyMutation": false,
+    "firebaseFallback": true
+  }
+}
