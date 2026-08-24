@@ -26,6 +26,9 @@ export const BUILD_RUNTIME_CONFIG = Object.freeze({
     saveMigration: false,
     economyMutation: false,
     firebaseFallback: true,
+    firebaseAuthBridge: false,
+    accountLinking: false,
+    profileReads: false,
   }),
 });
 
@@ -50,17 +53,22 @@ function normalizeManifest(manifest = {}) {
     if (source[key] !== undefined) config[key] = source[key];
   }
   for (const key of URL_KEYS) config[key] = cleanUrl(source[key], key);
+  config.firebase = source.firebase && typeof source.firebase === 'object' ? Object.freeze({ ...source.firebase }) : undefined;
   config.featureFlags = { ...BUILD_RUNTIME_CONFIG.featureFlags };
   if (source.featureFlags && typeof source.featureFlags === 'object') {
     for (const key of FLAG_KEYS) if (typeof source.featureFlags[key] === 'boolean') config.featureFlags[key] = source.featureFlags[key];
   }
-  // Goal 1 is read-only.  A future goal must explicitly change this contract.
+  // Player save writes remain locked. Economy has its own explicit server-authoritative gate.
   config.featureFlags.vpsWrites = false;
   config.featureFlags.playerDataWrites = false;
   config.featureFlags.accountMigration = false;
   config.featureFlags.saveMigration = false;
-  config.featureFlags.economyMutation = false;
   config.featureFlags.firebaseFallback = true;
+  if (!config.featureFlags.vpsEnabled || !config.featureFlags.vpsReads) {
+    config.featureFlags.firebaseAuthBridge = false;
+    config.featureFlags.accountLinking = false;
+    config.featureFlags.profileReads = false;
+  }
   config.canWritePlayerData = false;
   return Object.freeze({ ...config, featureFlags: Object.freeze(config.featureFlags) });
 }

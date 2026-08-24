@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "pocketmonster-game"
+    "default": "pocketmonster-game",
+    "auth-staging": "studio-9398155272-b7220"
   }
 }

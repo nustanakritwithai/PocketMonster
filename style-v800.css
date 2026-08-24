@@ -1095,3 +1095,12 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .auth-primary,.auth-google,.auth-guest{min-height:32px;padding:5px 8px;font-size:12px;margin-top:4px}
 }
 /* Mobile menu density pass end */
+/* MonsterLife auth/profile staging bridge: read-only and dismissible. */
+.monsterlife-profile-panel{position:fixed;right:12px;top:12px;z-index:1200;max-width:min(420px,calc(100vw - 24px));padding:8px 12px;border-radius:10px;background:#17202acc;color:#eaf6ff;border:1px solid #5c7487;font:600 12px/1.35 system-ui}
+.monsterlife-profile-panel[data-state="linked"]{border-color:#47c58a}
+.monsterlife-link-dialog{max-width:min(440px,calc(100vw - 28px));border:1px solid #607d8b;border-radius:16px;background:#17202a;color:#fff;padding:22px}
+.monsterlife-link-dialog::backdrop{background:#071018bb}
+.monsterlife-link-dialog form,.monsterlife-link-dialog label{display:grid;gap:10px}
+.monsterlife-link-dialog input{font:inherit;padding:10px;border-radius:8px;border:1px solid #78909c}
+.monsterlife-link-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.monsterlife-link-actions button{padding:9px 14px;border-radius:8px;border:0;cursor:pointer}

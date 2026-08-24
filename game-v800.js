@@ -46,6 +46,9 @@ import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadou
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
+import { establishReadOnlyBridge } from './server-auth.mjs';
+import { mountServerEconomy } from './server-economy.mjs';
+import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { healthVersionGate, publishServerGateTelemetry } from './server-sync.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -128,7 +131,17 @@ if (typeof window !== 'undefined') {
 if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
   console.info(`Server contract gate: ${serverGate.state} (${serverGate.reason || 'read-only check'}) • Firebase fallback=${serverGate.allowFirebaseFallback}`);
 }
-await requireFirebaseLogin();
+const firebaseUser = await requireFirebaseLogin(runtimeConfig);
+const authProfileBridge = serverGate.state === 'healthy'
+  ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
+  : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
+if (typeof window !== 'undefined') {
+  window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });
+  document.documentElement.dataset.authProfileBridge = authProfileBridge.state;
+  window.dispatchEvent(new CustomEvent('pocketmonster:auth-profile-bridge', { detail: window.POCKETMONSTER_AUTH_PROFILE_BRIDGE }));
+}
+await presentAuthProfileBridge(runtimeConfig, firebaseUser, authProfileBridge);
+await mountServerEconomy(runtimeConfig, authProfileBridge);
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
 startupText('กำลังสร้าง Monster Life RPG V8.2.0…');
