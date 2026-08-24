@@ -4,9 +4,9 @@ import { compareSemanticVersions, healthVersionGate } from '../server-sync.mjs';
 
 const headers = (apiVersion = '1.1') => ({ get: (name) => name === 'X-API-Version' ? apiVersion : null });
 const reply = (payload, status = 200, apiVersion = '1.1') => ({ ok: status >= 200 && status < 300, status, headers: headers(apiVersion), json: async () => payload });
-const fetchPair = (health, version, healthStatus = 200, versionStatus = 200, apiVersion = '1.1') => async (url, options) => {
+const fetchPair = (health, version, healthStatus = 200, versionStatus = 200, healthApiVersion = '1.1', versionApiVersion = healthApiVersion) => async (url, options) => {
   assert.equal(options.headers['X-Request-Id'], 'goal1-test');
-  return url.endsWith('/api/health') ? reply(health, healthStatus, apiVersion) : reply(version, versionStatus, apiVersion);
+  return url.endsWith('/api/health') ? reply(health, healthStatus, healthApiVersion) : reply(version, versionStatus, versionApiVersion);
 };
 
 const safe = await loadRuntimeConfig({ fetchImpl: async () => ({ ok: true, json: async () => ({ environment: 'hybrid', featureFlags: { vpsEnabled: true, vpsReads: true, vpsWrites: true, playerDataWrites: true } }) }), locationHref: 'https://game.invalid/' });
@@ -25,7 +25,7 @@ assert.equal(disabled.state, 'disabled');
 assert.equal(calls, 0);
 
 const config = await loadRuntimeConfig({ manifest: { environment: 'hybrid', apiBaseUrl: 'https://server.invalid', apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, featureFlags: { vpsEnabled: true, vpsReads: true } } });
-const release = { version: '1.1.0', commitSha: 'abc123', builtAtUtc: '2026-08-24T00:00:00Z' };
+const release = { version: '1.1.0', commitSha: '0123456789abcdef0123456789abcdef01234567', builtAtUtc: '2026-08-24T00:00:00Z' };
 const healthy = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready', maintenance: false, apiVersion: '1.1' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }) });
 assert.equal(healthy.state, 'healthy');
 assert.deepEqual(healthy.server.deployedRelease, release);
@@ -43,6 +43,13 @@ const malformed = await healthVersionGate(config, { correlationId: 'goal1-test',
 assert.equal(malformed.state, 'offline');
 const badHeader = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }, 200, 200, '1.0') });
 assert.equal(badHeader.state, 'invalid');
+assert.equal(badHeader.reason, 'health-api-version-header-mismatch');
+const badVersionHeader = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }, 200, 200, '1.1', '1.0') });
+assert.equal(badVersionHeader.state, 'invalid');
+assert.equal(badVersionHeader.reason, 'version-api-version-header-mismatch');
+const shortSha = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: { ...release, commitSha: 'abc123' } }) });
+assert.equal(shortSha.state, 'incompatible');
+assert.equal(shortSha.reason, 'release-unverified');
 const offline = await healthVersionGate(config, { timeoutMs: 1, fetchImpl: async () => { await new Promise((resolve) => setTimeout(resolve, 10)); return reply({}); } });
 assert.equal(offline.state, 'offline');
 assert.equal(healthy.allowPlayerDataWrites, false);

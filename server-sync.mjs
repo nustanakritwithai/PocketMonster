@@ -36,7 +36,7 @@ function normalizePayload(payload) {
 function validRelease(release) {
   return Boolean(release && typeof release === 'object' && !Array.isArray(release)
     && typeof release.version === 'string' && release.version
-    && typeof release.commitSha === 'string' && release.commitSha && release.commitSha !== 'unavailable'
+    && typeof release.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(release.commitSha)
     && typeof release.builtAtUtc === 'string' && release.builtAtUtc);
 }
 
@@ -74,8 +74,11 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
     const health = normalizePayload(healthPayload);
     const version = normalizePayload(versionPayload);
     if (!health || !version) return { state: 'invalid', reason: 'malformed-payload', correlationId };
-    const server = { ...health, ...version, status: health.status, maintenance: health.maintenance || version.maintenance, apiResponseVersion: healthResponse.headers?.get?.('X-API-Version') || versionResponse.headers?.get?.('X-API-Version') || '' };
-    if (config.apiVersion && server.apiResponseVersion !== config.apiVersion) return { state: 'invalid', reason: 'api-version-header-mismatch', server, correlationId };
+    const healthApiResponseVersion = healthResponse.headers?.get?.('X-API-Version') || '';
+    const versionApiResponseVersion = versionResponse.headers?.get?.('X-API-Version') || '';
+    const server = { ...health, ...version, status: health.status, maintenance: health.maintenance || version.maintenance, healthApiResponseVersion, versionApiResponseVersion };
+    if (config.apiVersion && healthApiResponseVersion !== config.apiVersion) return { state: 'invalid', reason: 'health-api-version-header-mismatch', server, correlationId };
+    if (config.apiVersion && versionApiResponseVersion !== config.apiVersion) return { state: 'invalid', reason: 'version-api-version-header-mismatch', server, correlationId };
     if (server.maintenance) return { state: 'maintenance', server, correlationId };
     if (healthResponse.status === 503 || versionResponse.status === 503 || health.status !== 'ready') return { state: 'offline', reason: health.status === 'not_ready' ? 'server-not-ready' : `http-${Math.max(healthResponse.status, versionResponse.status)}`, server, correlationId };
     if (!healthResponse.ok || !versionResponse.ok) return { state: 'offline', reason: `http-${Math.max(healthResponse.status, versionResponse.status)}`, server, correlationId };
