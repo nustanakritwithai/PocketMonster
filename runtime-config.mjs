@@ -29,6 +29,7 @@ export const BUILD_RUNTIME_CONFIG = Object.freeze({
     firebaseAuthBridge: false,
     accountLinking: false,
     profileReads: false,
+    playerStateReads: false,
   }),
 });
 

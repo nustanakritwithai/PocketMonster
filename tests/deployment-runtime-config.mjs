@@ -17,7 +17,7 @@ assert.throws(() => createReadOnlyRuntimeConfig('https://user:pass@157.85.96.139
 const preview = createAuthProfilePreviewConfig('https://157.85.96.139/auth-staging/', { apiKey: 'test-key', authDomain: 'test.example', projectId: 'test-project', appId: 'test-app' });
 assert.equal(preview.apiBaseUrl, 'https://157.85.96.139/auth-staging');
 assert.equal(preview.firebase.projectId, 'test-project');
-for (const flag of ['firebaseAuthBridge', 'accountLinking', 'profileReads']) assert.equal(preview.featureFlags[flag], true);
+for (const flag of ['firebaseAuthBridge', 'accountLinking', 'profileReads', 'playerStateReads']) assert.equal(preview.featureFlags[flag], true);
 for (const flag of ['vpsWrites', 'playerDataWrites', 'saveMigration', 'economyMutation']) assert.equal(preview.featureFlags[flag], false);
 assert.throws(() => createAuthProfilePreviewConfig('https://157.85.96.139', { projectId: 'incomplete' }));
 

@@ -6,7 +6,10 @@ function endpoint(config, path) {
 }
 
 async function request(config, path, { method = 'GET', token, body, fetchImpl = globalThis.fetch } = {}) {
-  const headers = { Accept: 'application/json', 'X-API-Version': config.apiVersion };
+  // Keep authenticated requests within the VPS CORS allow-list. The server
+  // negotiates its API contract through /api/version; X-API-Version is not an
+  // allowed request header and makes browsers reject the preflight entirely.
+  const headers = { Accept: 'application/json' };
   if (token) headers[SESSION_HEADER] = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetchImpl(endpoint(config, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });

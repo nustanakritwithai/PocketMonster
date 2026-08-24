@@ -14,9 +14,11 @@ const fetchImpl = async (url, init) => {
 await exchangeFirebaseIdentity(config, user, { fetchImpl });
 assert.equal(calls[0].url, 'https://vps.example/auth-staging/api/auth/firebase/login');
 assert.equal(calls[0].init.headers.Authorization, 'Bearer firebase-id-token');
+assert.equal(calls[0].init.headers['X-API-Version'], undefined, 'bridge requests must stay within the VPS CORS allow-list');
 assert.equal(JSON.parse(calls[0].init.body).idToken, undefined, 'Firebase token must never be sent in JSON');
 await readMonsterLifeProfile(config, 'server-session', { fetchImpl });
 assert.equal(calls[1].init.headers.Authorization, 'Bearer server-session');
+assert.equal(calls[1].init.headers['X-API-Version'], undefined, 'profile reads must not trigger a rejected CORS preflight');
 await linkFirebaseAccount(config, user, { username: 'approved', password: 'secret', linkRequestId: 'request-1' }, { fetchImpl });
 assert.deepEqual(JSON.parse(calls[2].init.body), { username: 'approved', password: 'secret', linkRequestId: 'request-1' });
 

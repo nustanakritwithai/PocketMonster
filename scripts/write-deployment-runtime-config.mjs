@@ -29,6 +29,7 @@ export function createReadOnlyRuntimeConfig(origin) {
       firebaseAuthBridge: false,
       accountLinking: false,
       profileReads: false,
+      playerStateReads: false,
     },
   };
 }
@@ -42,7 +43,7 @@ export function createAuthProfilePreviewConfig(origin, firebase) {
     ...config,
     environment: 'hybrid',
     firebase: { ...firebase },
-    featureFlags: { ...config.featureFlags, firebaseAuthBridge: true, accountLinking: true, profileReads: true },
+    featureFlags: { ...config.featureFlags, firebaseAuthBridge: true, accountLinking: true, profileReads: true, playerStateReads: true },
   };
 }
 
