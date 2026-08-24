@@ -313,6 +313,9 @@ const updateOwnedSource = functionSource(activeJs, 'updateOwned');
 const materializeOwnedSource = functionSource(activeJs, 'materializeOwnedBasicAiTarget');
 const selectAggressorsSource = functionSource(activeJs, 'selectWildAggressors');
 const updateWildSource = functionSource(activeJs, 'updateWild');
+const advanceWildLifecycleSource = functionSource(activeJs, 'advanceWildLifecycle');
+const applyWildMotionSource = functionSource(activeJs, 'applyWildMotionAndPresentation');
+const preflightWildBoundariesSource = functionSource(activeJs, 'preflightWildEncounterBoundaries');
 const updateFloatingTextsSource = functionSource(activeJs, 'updateFloatingTexts');
 const loopSource = functionSource(activeJs, 'loop');
 assert.doesNotMatch(updateOwnedSource, /a\.skillCds=a\.skillCds\.map/,
@@ -331,12 +334,16 @@ assert.doesNotMatch(updateOwnedSource, /querySelector|createElement|toFixed/,
   'the per-frame owned loop must not allocate cooldown DOM/string presentation');
 assert.doesNotMatch(selectAggressorsSource, /wilds\.map|new Set/,
   'wild aggressor selection must reuse candidate and Set buffers');
-assert.doesNotMatch(updateWildSource, /safeVec3|new THREE\.Vector3/,
+assert.doesNotMatch(`${updateWildSource}${advanceWildLifecycleSource}${applyWildMotionSource}`, /safeVec3|new THREE\.Vector3/,
   'wild combat/movement hot paths must reuse vector scratch');
-assert.match(updateWildSource, /advanceEncounterEffects\(w\.statusState,statusRequest\)/,
+assert.match(advanceWildLifecycleSource, /advanceEncounterEffects\(w\.statusState,statusRequest\)/,
   'wild status advancement reuses its request buffer');
 assert.match(updateWildSource, /shouldResetEncounter\(resetRequest\)/,
+  'wild decision leash evaluation reuses its request buffer');
+assert.match(preflightWildBoundariesSource, /shouldResetEncounter\(resetRequest\)/,
   'wild leash evaluation reuses its request buffer');
+assert.doesNotMatch(`${updateWildSource}${preflightWildBoundariesSource}`, /shouldResetEncounter\(\{\.\.\.resetRequest\}\)/,
+  'wild leash checks cannot allocate request spreads');
 assert.doesNotMatch(updateFloatingTextsSource, /safeVec3|new THREE\.Vector3/,
   'floating combat text must reuse projection vectors');
 assert.match(updateFloatingTextsSource, /worldToScreen\(p,floatingTextProjectionScratch\.screen,p\)/);
@@ -352,7 +359,10 @@ assert.doesNotMatch(loopSource, /wildIndex=wilds\.length-1/,
 const createScratchSource = functionSource(activeJs, 'createOwnedBasicAiScratch');
 const fillRequestSource = functionSource(activeJs, 'fillOwnedBasicAiRequest');
 const createOwnedBasicAiScratch = Function(`'use strict';${createScratchSource};return createOwnedBasicAiScratch;`)();
-const fillOwnedBasicAiRequest = Function(`'use strict';${fillRequestSource};return fillOwnedBasicAiRequest;`)();
+const fillOwnedBasicAiRequest = Function(
+  'isWildDamageReady',
+  `'use strict';${fillRequestSource};return fillOwnedBasicAiRequest;`,
+)(wild => (wild?.capturing === undefined || wild.capturing === false) && wild?.combatEnabled !== false);
 const aiScratch = createOwnedBasicAiScratch();
 const owned = {
   inst: { instanceId: 'owned-1', speciesId: 'normalooze', fainted: false, hp: 10 },
@@ -363,8 +373,11 @@ const owned = {
 const firstWilds = [
   { id: 'wild-1', dead: false, hp: 10, capturing: false, mesh: { position: { x: 3, z: 4 } } },
   { id: 'wild-2', dead: false, hp: 8, mesh: { position: { x: 5, z: 6 } } },
+  { id: 'quarantined', dead: true, retired: true, hp: 8, mesh: null },
 ];
 const firstRequest = fillOwnedBasicAiRequest(aiScratch, owned, firstWilds);
+assert.deepEqual(firstRequest.enemies.map(enemy => enemy.id), ['wild-1', 'wild-2'],
+  'quarantined/no-position Wild actors never poison the exact Owned AI request');
 const identities = {
   request: firstRequest,
   actor: firstRequest.actor,

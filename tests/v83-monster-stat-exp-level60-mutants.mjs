@@ -94,7 +94,7 @@ function assertSave(module) {
 }
 
 function assertGame(source) {
-  const defeat = source.match(/function defeatWild\(w\)\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const defeat = source.match(/function defeatWild\(w,rewardOwnerInstanceId=null\)\{[\s\S]*?\n\}/)?.[0] ?? '';
   const make = source.match(/function makeInstance\(sp,level=1,opts=\{\}\)\{[\s\S]*?\n\}/)?.[0] ?? '';
   assert.match(defeat, /monsterStatCatalogEntry\(w\.canonicalFormId\)/);
   assert.match(defeat, /baseExpYield:enemyForm\?\.baseExpYield/);

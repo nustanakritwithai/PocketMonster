@@ -65,13 +65,30 @@ export function assertE1LiveWiring(source) {
   assert.equal((apply.match(/a\.skillCds\[index\]=command\.startCooldownSec/g) ?? []).length, 1,
     'cooldown commits exactly once');
   assert.doesNotMatch(apply, /monsterDamage\(/, 'manual skills no longer use legacy damage');
+  assert.match(apply, /const targetDamageCommitted=new Array\(targets\.length\)\.fill\(false\)/,
+    'live target commits are tracked in canonical target order');
+  assert.match(apply, /const targetDamageReceipts=targets\.map\(\(\)=>\(\{committed:false,damage:0\}\)\)/,
+    'HP commit receipts are allocated before presentation can throw');
   assert.equal((apply.match(/target\.statusState=effect\.nextStatusState/g) ?? []).length, 2,
     'single and area branches commit canonical status state after hit');
-  assert.ok(apply.indexOf('damageWild(target,res.damage', apply.indexOf("if(command.targetKind==='NearestEnemy')"))
-    < apply.indexOf('target.statusState=effect.nextStatusState'),
-  'direct damage resolves before status application');
+  assert.equal((apply.match(/if\(!target\.dead&&target\.hp>0&&effect\.nextStatusState\)/g) ?? []).length, 2,
+    'pending-defeat targets cannot receive survivor-only status state');
+  const nearestStart = apply.indexOf("}else if(command.targetKind==='NearestEnemy')");
+  const areaStart = apply.indexOf("}else if(command.targetKind==='GroundPoint')");
+  const nearest = apply.slice(nearestStart, areaStart);
+  assert.match(nearest,
+    /damageWild\(target,plannedRes\.damage,\{type:move\.type,eff:plannedRes\.eff,deferDefeat:true,commitReceipt:damageReceipt\}\);\s+if\(damageReceipt\.committed\)\{\s+targetDamageCommitted\[0\]=true/,
+    'nearest-target accounting enters only after a successful live damage commit');
+  assert.ok(nearest.indexOf('if(damageReceipt.committed){') < nearest.indexOf('target.statusState=effect.nextStatusState;'),
+    'a rejected nearest-target damage commit cannot restore a stale planned status after reset');
+  assert.match(apply,
+    /damageWild\(target,plannedRes\.damage,\{type:move\.type,eff:plannedRes\.eff,deferDefeat:true,commitReceipt:damageReceipt\}\);\s+if\(!damageReceipt\.committed\)continue;[\s\S]*?target\.statusState=effect\.nextStatusState/,
+    'a rejected area-target damage commit cannot restore a stale planned status after reset');
+  assert.match(apply, /finally\{\s+for\(let targetIndex=0;targetIndex<targetDamageReceipts\.length;targetIndex\+\+\)/,
+    'outer transaction reconciles committed HP receipts before defeat finalization');
+  assert.match(apply, /hitCount:actualHitCount,totalDamage:actualTotalDamage,statusAppliedCount:actualStatusAppliedCount/,
+    'accepted receipt reports live committed target totals');
   assert.match(apply, /effectMode:planned\.effectMode/);
-  assert.match(apply, /statusAppliedCount:planned\.statusAppliedCount/);
   assert.match(apply, /rngDraws:planned\.rngDraws/);
   assert.doesNotMatch(apply, /legacy_damage_compatibility/);
 

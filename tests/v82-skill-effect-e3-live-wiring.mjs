@@ -23,6 +23,64 @@ function functionSource(source, name) {
   assert.fail(`${name} must have a balanced body`);
 }
 
+function assertCastTimeFieldSnapshot(source) {
+  const presentationSource = functionSource(source, 'runBestEffortCombatPresentation');
+  const activateSource = functionSource(source, 'activateSkillField');
+  const liveSkillFields = [];
+  const constructionRuntimeCounts = [];
+  let failNextVisualConstruction = true;
+  class Mesh {
+    constructor() {
+      constructionRuntimeCounts.push(liveSkillFields.length);
+      if (failNextVisualConstruction) {
+        failNextVisualConstruction = false;
+        throw new Error('field-visual-construction-failure');
+      }
+      this.position = { set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
+      this.rotation = { x: 0, y: 0 };
+      this.castShadow = false;
+    }
+  }
+  let sceneAdds = 0;
+  const activate = Function(
+    'liveSkillFields', 'THREE', 'scene',
+    `'use strict';${presentationSource}${activateSource};return activateSkillField;`,
+  )(
+    liveSkillFields,
+    Object.freeze({
+      Mesh,
+      BoxGeometry: class {}, RingGeometry: class {},
+      MeshStandardMaterial: class {}, MeshBasicMaterial: class {},
+      DoubleSide: 2,
+    }),
+    Object.freeze({ add() { sceneAdds += 1; } }),
+  );
+  const actor = { statusState: { currentTimeSec: 99 } };
+  const castSnapshot = Object.freeze({ id: 'caster', level: 7, stats: Object.freeze({ ATK: 31 }) });
+  const fieldResult = Object.freeze({
+    kind: 'hazard', skillId: 'SK_FIRE_06', radiusM: 2, durationSec: 3,
+    center: Object.freeze({ x: 1, z: 2 }), tickIntervalSec: 0.5,
+  });
+  assert.doesNotThrow(() => activate(actor, { type: 'Fire' }, fieldResult, castSnapshot, 4),
+    'field visual construction is best-effort after the runtime field commits');
+  assert.equal(liveSkillFields.length, 1,
+    'a first visual construction failure cannot erase the accepted live field');
+  assert.deepEqual(constructionRuntimeCounts, [1],
+    'the field runtime is registered before its first visual constructor runs');
+  assert.strictEqual(liveSkillFields[0].attacker, castSnapshot,
+    'field stores the already accepted cast snapshot instead of recapturing after damage/growth');
+  assert.equal(liveSkillFields[0].attackerNowSec, 4);
+  assert.equal(liveSkillFields[0].mesh, null,
+    'a failed optional visual leaves an executable headless field runtime');
+
+  activate(actor, { type: 'Fire' }, fieldResult, castSnapshot, 4);
+  assert.equal(liveSkillFields.length, 2);
+  assert.deepEqual(constructionRuntimeCounts, [1, 2],
+    'successful visual construction also observes its runtime registration first');
+  assert.ok(liveSkillFields[1].mesh instanceof Mesh);
+  assert.equal(sceneAdds, 1);
+}
+
 export function assertE3LiveWiring(source) {
   const attacker = functionSource(source, 'canonicalSkillEffectAttacker');
   const request = functionSource(source, 'canonicalSkillEffectRequest');
@@ -31,9 +89,10 @@ export function assertE3LiveWiring(source) {
   const blocks = functionSource(source, 'fieldBlocksPosition');
   const move = functionSource(source, 'moveWildWithFieldCollision');
   const updateFields = functionSource(source, 'updateSkillFields');
-  const updateWild = functionSource(source, 'updateWild');
+  const applyWildMotion = functionSource(source, 'applyWildMotionAndPresentation');
   const switchZone = functionSource(source, 'switchZone');
   const loop = functionSource(source, 'loop');
+  assertCastTimeFieldSnapshot(source);
 
   assert.match(source, /resolveWorkbookDirectDamage/);
   assert.match(attacker, /position:Object\.freeze\(\{x:a\.mesh\.position\.x,z:a\.mesh\.position\.z\}\)/,
@@ -41,10 +100,11 @@ export function assertE3LiveWiring(source) {
   assert.match(request, /targets:command\.targetKind==='Self'\?Object\.freeze\(\[\]\):canonicalSkillEffectTargets\(materialized\)/);
   assert.match(request, /command,/);
 
-  const planAt = accepted.indexOf('const planned=resolveReviewedSkillEffects(');
+  const requestAt = accepted.indexOf('const effectRequest=canonicalSkillEffectRequest(');
+  const planAt = accepted.indexOf('const planned=resolveReviewedSkillEffects(effectRequest');
   const cooldownAt = accepted.indexOf('a.skillCds[index]=command.startCooldownSec;');
-  const fieldAt = accepted.indexOf('activateSkillField(a,move,planned.fieldResult);');
-  assert.ok(planAt >= 0 && cooldownAt > planAt && fieldAt > cooldownAt,
+  const fieldAt = accepted.indexOf('activateSkillField(a,move,planned.fieldResult,effectRequest.attacker,effectRequest.nowSec);');
+  assert.ok(requestAt >= 0 && planAt > requestAt && cooldownAt > planAt && fieldAt > cooldownAt,
     'field plan is pure before the sole cooldown and live field mutation');
   assert.equal((accepted.match(/a\.skillCds\[index\]=command\.startCooldownSec/g) ?? []).length, 1);
   assert.match(accepted, /else if\(command\.targetKind==='GroundPoint'\)/,
@@ -55,13 +115,16 @@ export function assertE3LiveWiring(source) {
   assert.match(activate, /new THREE\.BoxGeometry\(fieldResult\.lengthM,1\.8,fieldResult\.thicknessM\)/,
     'wall owns disposable geometry instead of corrupting the shared cache');
   assert.match(activate, /new THREE\.RingGeometry\(fieldResult\.radiusM\*\.72,fieldResult\.radiusM,32\)/);
-  assert.match(activate, /attacker:canonicalSkillEffectAttacker\(a,move\)/,
+  assert.match(activate, /attacker:attackerSnapshot/,
     'hazard stores a cast-time canonical attacker snapshot');
+  assert.match(activate, /attackerNowSec,/);
+  assert.match(activate, /liveSkillFields\.push\(field\);\s+runBestEffortCombatPresentation\(\(\)=>\{/,
+    'field runtime registration precedes all optional visual construction');
   assert.match(blocks, /field\.kind!=='wall'/);
   assert.match(blocks, /Math\.abs\(along\)<=field\.lengthM\/2\+\.35/);
   assert.match(move, /if\(fieldBlocksPosition\(next\)\)return false/);
-  assert.equal((updateWild.match(/moveWildWithFieldCollision\(/g) ?? []).length, 3,
-    'wall collision gates wander, chase, and forced-retreat movement');
+  assert.equal((applyWildMotion.match(/moveWildWithFieldCollision\(/g) ?? []).length, 2,
+    'wall collision gates wander and all cached combat movement intents');
 
   assert.match(updateFields, /field\.nextTickSec<=Math\.min\(field\.ageSec,field\.durationSec\)/);
   assert.match(updateFields, /distXZ\(field\.center,w\.mesh\.position\)>field\.radiusM/,

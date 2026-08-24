@@ -138,7 +138,7 @@ for (const [name, from, to] of runtimeMutations) {
 assertE2LiveWiring(gameSource);
 const liveMutations = [
   ['drop owned status creation', 'statusState:createEncounterStatusState({encounterId:`owned:${inst.instanceId}`,nowSec:0})', 'statusState:null'],
-  ['keep statuses after Recall', 'activeSummon.statusState=endEncounterEffects(activeSummon.statusState,{nowSec:activeSummon.statusState.currentTimeSec});', 'void activeSummon.statusState;'],
+  ['keep statuses after Recall', 'summon.statusState=endEncounterEffects(summon.statusState,{nowSec:summon.statusState.currentTimeSec});', 'void summon.statusState;'],
   ['drop actor HP commit', 'a.inst.hp=actorResult.predictedHp;', 'void actorResult.predictedHp;'],
   ['drop actor status commit', 'a.statusState=actorResult.nextStatusState;', 'void actorResult.nextStatusState;'],
   ['drop owned lifecycle advance', 'const statusAdvance=advanceEncounterEffects(a.statusState,', 'const statusAdvance=mutantEncounterEffects(a.statusState,'],

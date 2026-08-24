@@ -128,7 +128,7 @@ export function createDistanceTickScheduler({
 } = {}) {
   if (!(nearDistance > 0) || !(midDistance > nearDistance)) throw new RangeError('distance bands are invalid');
   for (const value of [nearHz, midHz, farHz]) if (!(value > 0)) throw new RangeError('tick frequencies must be positive');
-  const elapsedById = new Map();
+  const timingById = new Map();
 
   function intervalFor(distance) {
     if (distance <= nearDistance) return 1 / nearHz;
@@ -139,21 +139,29 @@ export function createDistanceTickScheduler({
   return Object.freeze({
     advance(id, distance, dt, force = false) {
       const frameDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
+      let timing = timingById.get(id);
+      if (!timing) {
+        timing = { phaseSec: 0, elapsedSec: 0 };
+        timingById.set(id, timing);
+      }
+      timing.phaseSec += frameDt;
+      timing.elapsedSec += frameDt;
       if (force) {
-        elapsedById.set(id, 0);
+        timing.phaseSec = 0;
+        timing.elapsedSec = 0;
         return Math.min(maxStep, frameDt);
       }
-      const elapsed = (elapsedById.get(id) ?? 0) + frameDt;
-      if (elapsed + Number.EPSILON < intervalFor(Number.isFinite(distance) ? distance : Infinity)) {
-        elapsedById.set(id, elapsed);
-        return 0;
-      }
-      elapsedById.set(id, 0);
+      const interval = intervalFor(Number.isFinite(distance) ? distance : Infinity);
+      if (timing.phaseSec + Number.EPSILON < interval) return 0;
+      const elapsed = timing.elapsedSec;
+      timing.phaseSec %= interval;
+      if (timing.phaseSec + Number.EPSILON >= interval) timing.phaseSec = 0;
+      timing.elapsedSec = 0;
       return Math.min(maxStep, elapsed);
     },
-    clear(id) { elapsedById.delete(id); },
-    clearAll() { elapsedById.clear(); },
-    size: () => elapsedById.size,
+    clear(id) { timingById.delete(id); },
+    clearAll() { timingById.clear(); },
+    size: () => timingById.size,
   });
 }
 

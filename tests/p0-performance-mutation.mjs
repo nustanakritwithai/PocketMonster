@@ -109,8 +109,42 @@ function assertLivePerformance(source){
   const materialize=functionSource(source,'materializeOwnedBasicAiTarget');
   const selectAggressors=functionSource(source,'selectWildAggressors');
   const updateWild=functionSource(source,'updateWild');
+  const advanceWildLifecycle=functionSource(source,'advanceWildLifecycle');
+  const applyWildMotion=functionSource(source,'applyWildMotionAndPresentation');
+  const preflightWildBoundaries=functionSource(source,'preflightWildEncounterBoundaries');
   const updateFloatingTexts=functionSource(source,'updateFloatingTexts');
   const loop=functionSource(source,'loop');
+  const respawnWild=functionSource(source,'respawnWild');
+  const clearWildRespawnTimers=functionSource(source,'clearWildRespawnTimers');
+  const clearWilds=functionSource(source,'clearWilds');
+  const ensureWildPopulation=functionSource(source,'ensureWildPopulation');
+  assert.match(clearWilds,/clearWildRespawnTimers\(\)/,
+    'a full population replacement cancels all old same-zone respawn timers');
+  assert.ok(ensureWildPopulation.indexOf('clearWilds()')<ensureWildPopulation.indexOf('spawnZone(state.currentZone)'),
+    'empty-population recovery invalidates old respawns before rebuilding the zone baseline');
+  assert.match(ensureWildPopulation,/runBestEffortCombatPresentation\(\(\)=>\{msg\(/,
+    'population-recovery HUD is best-effort after the baseline rebuild');
+  const scheduled=new Map(),created=[];let nextTimer=1;
+  const timerApi=Function(
+    'wildRespawnTimers','zoneGeneration','state','ZONES','spById','createWild','setTimeout','clearTimeout',
+    `'use strict';${respawnWild}${clearWildRespawnTimers};return{respawnWild,clearWildRespawnTimers,size:()=>wildRespawnTimers.size};`,
+  )(
+    new Set(),7,{currentZone:'grass-meadow'},{'grass-meadow':{}},{species:{}},
+    (...args)=>created.push(args),
+    callback=>{const id=nextTimer++;scheduled.set(id,{callback,cancelled:false});return id;},
+    id=>{const record=scheduled.get(id);if(record)record.cancelled=true;},
+  );
+  const respawnActor={zone:'grass-meadow',speciesId:'species',level:3,boss:false,elite:false,rare:false,home:{x:1,z:2},evolutionPath:null};
+  timerApi.respawnWild(respawnActor,7000);timerApi.respawnWild(respawnActor,8000);
+  assert.equal(timerApi.size(),2);
+  timerApi.clearWildRespawnTimers();
+  assert.equal(timerApi.size(),0);
+  for(const record of scheduled.values())if(!record.cancelled)record.callback();
+  assert.equal(created.length,0,'old same-zone respawns cannot duplicate a recovered population');
+  const liveTimer=timerApi.respawnWild(respawnActor,9000),liveRecord=scheduled.get(liveTimer);
+  liveRecord.callback();
+  assert.equal(created.length,1);
+  assert.equal(timerApi.size(),0,'a naturally fired respawn releases its registry handle');
   assert.doesNotMatch(updateOwned,/a\.skillCds=a\.skillCds\.map/);
   assert.doesNotMatch(updateOwned,/new THREE\.Vector3/);
   assert.match(updateOwned,/fillOwnedBasicAiRequest\(ownedBasicAiScratch,a,wilds\)/);
@@ -119,9 +153,11 @@ function assertLivePerformance(source){
   assert.doesNotMatch(updateOwned,/querySelector|createElement|toFixed/);
   assert.doesNotMatch(materialize,/wilds\.filter/);
   assert.doesNotMatch(selectAggressors,/wilds\.map|new Set/);
-  assert.doesNotMatch(updateWild,/safeVec3|new THREE\.Vector3/);
-  assert.match(updateWild,/advanceEncounterEffects\(w\.statusState,statusRequest\)/);
+  assert.doesNotMatch(`${updateWild}${advanceWildLifecycle}${applyWildMotion}`,/safeVec3|new THREE\.Vector3/);
+  assert.match(advanceWildLifecycle,/advanceEncounterEffects\(w\.statusState,statusRequest\)/);
   assert.match(updateWild,/shouldResetEncounter\(resetRequest\)/);
+  assert.match(preflightWildBoundaries,/shouldResetEncounter\(resetRequest\)/);
+  assert.doesNotMatch(`${updateWild}${preflightWildBoundaries}`,/shouldResetEncounter\(\{\.\.\.resetRequest\}\)/);
   assert.doesNotMatch(updateFloatingTexts,/safeVec3|new THREE\.Vector3/);
   assert.match(updateFloatingTexts,/worldToScreen\(p,floatingTextProjectionScratch\.screen,p\)/);
   assert.doesNotMatch(loop,/\[\.\.\.wilds\]/);
@@ -130,7 +166,9 @@ function assertLivePerformance(source){
   assert.doesNotMatch(loop,/wildIndex=wilds\.length-1/);
   const createSource=functionSource(source,'createOwnedBasicAiScratch');
   const fillSource=functionSource(source,'fillOwnedBasicAiRequest');
-  const helpers=Function(`'use strict';${createSource};${fillSource};return {createOwnedBasicAiScratch,fillOwnedBasicAiRequest};`)();
+  const helpers=Function('isWildDamageReady',`'use strict';${createSource};${fillSource};return {createOwnedBasicAiScratch,fillOwnedBasicAiRequest};`)(
+    wild=>(wild?.capturing===undefined||wild.capturing===false)&&wild?.combatEnabled!==false,
+  );
   const scratch=helpers.createOwnedBasicAiScratch();
   const request=helpers.fillOwnedBasicAiRequest(scratch,{
     inst:{instanceId:'owned-live',speciesId:'flameling',fainted:false,hp:10},
@@ -138,6 +176,7 @@ function assertLivePerformance(source){
   },[
     {id:'retained',dead:false,hp:10,capturing:false,mesh:{position:{x:8,z:0}}},
     {id:'nearest',dead:false,hp:10,capturing:false,mesh:{position:{x:2,z:0}}},
+    {id:'quarantined',dead:true,retired:true,hp:10,capturing:false,mesh:null},
   ]);
   assert.equal(request.actor.id,'owned-live');
   assert.equal(request.actor.speciesId,'flameling');
@@ -199,12 +238,14 @@ await expectKilled(
   mutate(
     runtimeSource,
     `if (force) {
-        elapsedById.set(id, 0);
+        timing.phaseSec = 0;
+        timing.elapsedSec = 0;
         return Math.min(maxStep, frameDt);
       }`,
     `if (force) {
-        const elapsed = (elapsedById.get(id) ?? 0) + frameDt;
-        elapsedById.set(id, 0);
+        const elapsed = timing.elapsedSec;
+        timing.phaseSec = 0;
+        timing.elapsedSec = 0;
         return Math.min(maxStep, elapsed);
       }`,
     'engaged-ai-replays-throttled-backlog',
@@ -352,10 +393,16 @@ const liveMutants=[
   ['owned-species-id-forged',mutate(activeSource,'actor.speciesId=a?.inst?.speciesId;',"actor.speciesId='normalooze';",'owned-species-id-forged')],
   ['owned-enemy-id-forged',mutate(activeSource,'target.id=wild?.id;',"target.id='wild-forged';",'owned-enemy-id-forged')],
   ['owned-enemy-position-forged',mutate(activeSource,'target.position.x=wild?.mesh?.position?.x;','target.position.x=999;','owned-enemy-position-forged')],
+  ['owned-quarantined-enemy-not-filtered',mutate(
+    activeSource,
+    'if(!wild||wild.dead===true||wild.retired===true||!Number.isFinite(wild.mesh?.position?.x)||!Number.isFinite(wild.mesh?.position?.z))continue;',
+    'if(false)continue;',
+    'owned-quarantined-enemy-not-filtered',
+  )],
   ['owned-resolver-cadence-bypassed',mutate(
     activeSource,
-    "if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision))a.aiDecision=resolveOwnedBasicAiAction(",
-    'if(true)a.aiDecision=resolveOwnedBasicAiAction(',
+    "if(shouldRunOwnedCadence(a,'aiDecisionElapsed',dt,qualityProfile.nearAiHz,!a.aiDecision)){",
+    'if(true){',
     'owned-resolver-cadence-bypassed',
   )],
   ['owned-ui-cadence-bypassed',mutate(
@@ -384,8 +431,8 @@ const liveMutants=[
   )],
   ['wild-chase-vector-allocates',mutate(
     activeSource,
-    'const dir=wildUpdateScratch.direction.copy(target.position).sub(w.mesh.position);',
-    'const dir=safeVec3(target.position).sub(w.mesh.position);',
+    'const dir=wildUpdateScratch.direction.copy(motion.direction);',
+    'const dir=new THREE.Vector3(motion.direction.x,0,motion.direction.z);',
     'wild-chase-vector-allocates',
   )],
   ['floating-text-vector-allocates',mutate(
@@ -405,6 +452,30 @@ const liveMutants=[
     'for(let wildIndex=0;wildIndex<wildFrameSnapshot.length;wildIndex++){',
     'for(let wildIndex=wildFrameSnapshot.length-1;wildIndex>=0;wildIndex--){',
     'wild-loop-order-reversed',
+  )],
+  ['population-recovery-keeps-old-respawn-timers',mutate(
+    activeSource,
+    'clearWildRespawnTimers();\n  abortCaptureSequence();',
+    'abortCaptureSequence();',
+    'population-recovery-keeps-old-respawn-timers',
+  )],
+  ['respawn-timer-handle-never-registered',mutate(
+    activeSource,
+    'wildRespawnTimers.add(timer);',
+    'void timer;',
+    'respawn-timer-handle-never-registered',
+  )],
+  ['fired-respawn-timer-leaks-registry-handle',mutate(
+    activeSource,
+    'wildRespawnTimers.delete(timer);',
+    'void timer;',
+    'fired-respawn-timer-leaks-registry-handle',
+  )],
+  ['population-recovery-presentation-escapes-frame',mutate(
+    activeSource,
+    'runBestEffortCombatPresentation(()=>{msg(`ระบบเติม Wild Monster อัตโนมัติ • พบ ${livingWilds().length} ตัว`);renderHUD();});',
+    'msg(`ระบบเติม Wild Monster อัตโนมัติ • พบ ${livingWilds().length} ตัว`);renderHUD();',
+    'population-recovery-presentation-escapes-frame',
   )],
 ];
 let liveKilled=0;

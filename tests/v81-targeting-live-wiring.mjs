@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { executeEquippedSkillCommand } from '../skill-command-runtime.mjs';
 
 function functionSource(source, name) {
   const start = source.indexOf(`function ${name}(`);
@@ -14,6 +15,91 @@ function functionSource(source, name) {
     if (depth === 0) return source.slice(start, index + 1);
   }
   assert.fail(`${name} must have a complete body`);
+}
+
+function assertWildDamageReadiness(gameSource) {
+  const readySource = functionSource(gameSource, 'isWildDamageReady');
+  const ready = Function(
+    'validateWildRuntimeActor', 'canCombatTargetWild', 'distXZ', 'ENCOUNTER_POLICY',
+    `'use strict';${readySource};return isWildDamageReady;`,
+  )(
+    wild => wild?.schemaValid === true,
+    wild => wild?.bossAuthorized === true,
+    (left, right) => Math.hypot(right.x - left.x, right.z - left.z),
+    Object.freeze({ leashRadius: 18 }),
+  );
+  const world = overrides => ({
+    schemaValid: true,
+    bossAuthorized: true,
+    capturing: false,
+    mesh: { position: { x: 18, z: 0 } },
+    home: { x: 0, z: 0 },
+    ...overrides,
+  });
+  assert.equal(ready(world()), true, 'leash boundary is damage-ready inclusively');
+  assert.equal(ready(world({ mesh: { position: { x: 18.000001, z: 0 } } })), false,
+    'known outside-leash targets fail readiness before resource commit');
+  assert.equal(ready(world({ schemaValid: false })), false, 'invalid runtime/status schema fails readiness');
+  assert.equal(ready(world({ bossAuthorized: false })), false, 'unauthorized Boss fails readiness');
+  assert.equal(ready(world({ capturing: true })), false, 'capture target fails readiness');
+
+  const snapshotsSource = functionSource(gameSource, 'skillEnemySnapshots');
+  const materializeSource = functionSource(gameSource, 'materializeSkillTargets');
+  const snapshotsFor = wilds => Function(
+    'wilds', 'isWildDamageReady',
+    `'use strict';${snapshotsSource};return skillEnemySnapshots;`,
+  )(wilds, ready)();
+  const materializeFor = wilds => Function(
+    'wilds', 'isWildDamageReady',
+    `'use strict';${materializeSource};return materializeSkillTargets;`,
+  )(wilds, ready);
+  const instance = {
+    instanceId: 'readiness-caster',
+    speciesId: 'flameling',
+    skills: [{ skillId: 'SK_FIRE_01', slot: 's1', currentUses: 28 }],
+  };
+  const actor = {
+    inst: instance,
+    mesh: { position: { x: 0, z: 0 } },
+  };
+  const outside = world({
+    id: 'outside-leash', dead: false, hp: 10,
+    mesh: { position: { x: 1, z: 0 } }, home: { x: 19.000001, z: 0 },
+  });
+  let cooldownSec = 0;
+  const usesBefore = instance.skills[0].currentUses;
+  const rejected = executeEquippedSkillCommand(instance, {
+    slot: 's1', commandId: 'outside-leash-before-dispatch',
+    actor: { id: instance.instanceId, alive: true, position: { x: 0, z: 0 } },
+    enemies: snapshotsFor([outside]), cooldownRemainingSec: cooldownSec,
+  }, {
+    materializeTargets: command => materializeFor([outside])(actor, command),
+    canApply: () => true,
+    applyAccepted(command) { cooldownSec = command.startCooldownSec; },
+  });
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.reason, 'no_valid_target');
+  assert.equal(rejected.consumed, 0);
+  assert.equal(instance.skills[0].currentUses, usesBefore, 'outside-leash rejection preserves Uses');
+  assert.equal(cooldownSec, 0, 'outside-leash rejection does not start cooldown');
+
+  outside.home.x = 1;
+  const eligibleSnapshot = snapshotsFor([outside]);
+  outside.home.x = 19.000001;
+  const staleRejected = executeEquippedSkillCommand(instance, {
+    slot: 's1', commandId: 'outside-leash-before-materialize',
+    actor: { id: instance.instanceId, alive: true, position: { x: 0, z: 0 } },
+    enemies: eligibleSnapshot, cooldownRemainingSec: cooldownSec,
+  }, {
+    materializeTargets: command => materializeFor([outside])(actor, command),
+    canApply: () => true,
+    applyAccepted(command) { cooldownSec = command.startCooldownSec; },
+  });
+  assert.equal(staleRejected.ok, false);
+  assert.equal(staleRejected.stage, 'materialize');
+  assert.equal(staleRejected.consumed, 0);
+  assert.equal(instance.skills[0].currentUses, usesBefore, 'stale leash drift preserves Uses');
+  assert.equal(cooldownSec, 0, 'stale leash drift preserves cooldown');
 }
 
 export function assertLiveTargetingWiring({ js, html, versionedHtml, css, hud }) {
@@ -54,6 +140,14 @@ export function assertLiveTargetingWiring({ js, html, versionedHtml, css, hud })
     'a stale target cancels the whole cast instead of substituting another enemy');
   assert.doesNotMatch(materialize, /nearestWild\(|wilds\.filter|\.find\(/,
     'materialization cannot perform a second target selection');
+  assert.match(materialize, /!isWildDamageReady\(wild\)/,
+    'materialization rechecks pure live damage readiness before Uses commit');
+  const enemySnapshots = functionSource(js, 'skillEnemySnapshots');
+  assert.match(enemySnapshots, /targetable:isWildDamageReady\(wild\)/,
+    'target snapshots exclude known invalid/leashed/Boss-gated targets before resolution');
+  const canApply = functionSource(js, 'canApplyLiveSkill');
+  assert.match(canApply, /materialized\.some\(target=>!isWildDamageReady\(target\.world\)\)/,
+    'readiness hook closes world drift immediately before resource commit');
 
   const apply = functionSource(js, 'applyAcceptedSkillCommand');
   const cooldownAt = apply.indexOf('a.skillCds[index]=command.startCooldownSec');
@@ -70,6 +164,8 @@ export function assertLiveTargetingWiring({ js, html, versionedHtml, css, hud })
   assert.match(mastery, /getSkill\(a\.inst,move\.skillId\)/, 'mastery uses the canonical SkillID');
   assert.match(mastery, /res&&Number\.isFinite\(res\.eff\)\?res\.eff:1/,
     'immune effectiveness 0 remains zero-quality mastery input');
+
+  assertWildDamageReadiness(js);
 }
 
 const root = new URL('../', import.meta.url);

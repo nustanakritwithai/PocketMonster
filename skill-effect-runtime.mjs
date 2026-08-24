@@ -217,6 +217,22 @@ function effectResult(ok, reason, detail = {}) {
   return Object.freeze({ ok, reason, ...detail });
 }
 
+const EMPTY_ACTIVE_SELF_STATUS_IDS = Object.freeze([]);
+export const NEUTRAL_SELF_STATUS_MODIFIERS = Object.freeze({
+  ok: true,
+  reason: null,
+  attackMultiplier: 1,
+  specialAttackMultiplier: 1,
+  defenseMultiplier: 1,
+  speedMultiplier: 1,
+  damageTakenMultiplier: 1,
+  elementDamageTakenMultiplier: 1,
+  critChancePct: 0,
+  evasionChancePct: 0,
+  poisonResistancePct: 0,
+  activeStatusIds: EMPTY_ACTIVE_SELF_STATUS_IDS,
+});
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -729,6 +745,7 @@ export function resolveActiveSelfStatusModifiers(statusState, { nowSec = statusS
     || (incomingType !== null && !RUNTIME_TYPE_SET.has(incomingType))) {
     return effectResult(false, 'invalid_status_context');
   }
+  if (statusState.statuses.length === 0) return NEUTRAL_SELF_STATUS_MODIFIERS;
   const definitions = activeStatusIds({ statusState }, nowSec)
     .map(statusCatalogEntry)
     .filter(Boolean);

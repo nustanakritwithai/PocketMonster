@@ -20,6 +20,17 @@ function replaceNth(source, before, after, occurrence) {
   return `${source.slice(0, index)}${after}${source.slice(index + before.length)}`;
 }
 
+function moveOwnedCooldownAfterFirstSideEffect() {
+  const cooldown = 'a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;';
+  const sideEffect = "runBestEffortCombatPresentation(()=>triggerMonsterAction(a.mesh,'attack',0.22));";
+  const withoutCooldown = mutate(cooldown, '');
+  assert.ok(withoutCooldown.includes(sideEffect), 'owned Basic side-effect target drifted');
+  return withoutCooldown.replace(
+    sideEffect,
+    `${sideEffect}${cooldown}`,
+  );
+}
+
 const materializeCall = 'materializeOwnedBasicAiTarget(a,decision)';
 const mutants = [
   ['snapshot accepts malformed dead state', mutate(
@@ -31,8 +42,12 @@ const mutants = [
     'target.alive=wild?.dead===false',
   )],
   ['snapshot accepts malformed capturing state', mutate(
-    'target.targetable=wild?.capturing===undefined||wild.capturing===false',
-    'target.targetable=wild?.capturing!==true',
+    'target.targetable=(wild?.capturing===undefined||wild.capturing===false)&&isWildDamageReady(wild);',
+    'target.targetable=wild?.capturing!==true;',
+  )],
+  ['snapshot bypasses damage readiness', mutate(
+    'target.targetable=(wild?.capturing===undefined||wild.capturing===false)&&isWildDamageReady(wild);',
+    'target.targetable=(wild?.capturing===undefined||wild.capturing===false);',
   )],
   ['snapshot accepts malformed fainted actor', mutate(
     'actor.alive=(a?.inst?.fainted===undefined||a.inst.fainted===false)&&Number.isFinite(a?.inst?.hp)&&a.inst.hp>0',
@@ -44,6 +59,10 @@ const mutants = [
   ['materialize malformed capturing target', mutate(
     '!(target.capturing===undefined||target.capturing===false)',
     'target.capturing===true',
+  )],
+  ['materialize bypasses damage readiness', mutate(
+    '||!isWildDamageReady(target)',
+    '||false',
   )],
   ['materialize non-finite actor', mutate(
     '||!Number.isFinite(actorPosition?.x)||!Number.isFinite(actorPosition?.z)',
@@ -70,10 +89,7 @@ const mutants = [
     'a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;',
     '',
   )],
-  ['commit cooldown after first side effect', mutate(
-    "a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;triggerMonsterAction(a.mesh,'attack',0.22);",
-    "triggerMonsterAction(a.mesh,'attack',0.22);a.attackCd=OWNED_BASIC_AI_POLICY.basicAttackCooldownSec;",
-  )],
+  ['commit cooldown after first side effect', moveOwnedCooldownAfterFirstSideEffect()],
   ['cross legacy nearest targeting', mutate(
     'const t=materializeOwnedBasicAiTarget(a,decision);',
     'const t=nearestWild(9,a.mesh.position);',
