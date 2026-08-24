@@ -23,6 +23,17 @@
       <div id="registerStatus" class="account-status"></div>
     </div>
   </div>
+  <div id="monsterLifeProfilePanel" class="monsterlife-profile-panel" hidden aria-live="polite"></div>
+  <dialog id="monsterLifeLinkDialog" class="monsterlife-link-dialog">
+    <form id="monsterLifeLinkForm" method="dialog">
+      <h2>เชื่อมบัญชีทดสอบ MonsterLife</h2>
+      <p>ใช้เพื่ออ่าน Identity และ Character profile จาก staging เท่านั้น ข้อมูลเกมและ Firebase save จะไม่ถูกเขียนทับ</p>
+      <label>ชื่อบัญชี MonsterLife<input id="monsterLifeUsername" autocomplete="username" required maxlength="50"></label>
+      <label>รหัสผ่าน MonsterLife<input id="monsterLifePassword" type="password" autocomplete="current-password" required></label>
+      <div id="monsterLifeLinkStatus" class="account-status" aria-live="polite"></div>
+      <div class="monsterlife-link-actions"><button id="monsterLifeLinkLater" type="button">ไว้ภายหลัง</button><button id="monsterLifeLinkSubmit" type="submit">เชื่อมบัญชี</button></div>
+    </form>
+  </dialog>
   <div id="startupStatus" class="startup-status">กำลังเริ่มเกม…</div>
   <div id="immersiveGate" class="immersive-gate hidden">
     <div class="immersive-card">

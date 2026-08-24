@@ -1,9 +1,7 @@
-import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import { firebaseConfig } from './firebase-config.mjs';
+import { getPocketMonsterFirebaseApp } from './firebase-runtime.mjs';
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+let auth;
 
 const text = (id, value, ok = false) => { const node = document.getElementById(id); if (node) { node.textContent = value; node.className = `account-status${ok ? ' ok' : ''}`; } };
 const gate = () => document.getElementById('accountGate');
@@ -40,10 +38,11 @@ function bindAuthUi() {
   });
 }
 
-export function requireFirebaseLogin() {
+export function requireFirebaseLogin(runtimeConfig) {
+  auth = getAuth(getPocketMonsterFirebaseApp(runtimeConfig));
   window.POCKETMONSTER_LOGIN_REQUIRED = true;
   bindAuthUi();
   return new Promise(resolve => onAuthStateChanged(auth, user => { if (user) { gate()?.classList.add('hidden'); resolve(user); } else gate()?.classList.remove('hidden'); }));
 }
 
-export async function logoutFirebase() { await signOut(auth); location.reload(); }
+export async function logoutFirebase() { if (!auth) auth = getAuth(getPocketMonsterFirebaseApp()); await signOut(auth); location.reload(); }
