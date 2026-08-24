@@ -40,7 +40,7 @@ function assertFormula(module) {
 }
 
 function assertMonster(module) {
-  assert.equal(module.INSTANCE_SAVE_VERSION, 13);
+  assert.equal(module.INSTANCE_SAVE_VERSION, 15);
   assert.equal(module.INSTANCE_EXP_SCHEMA_VERSION, 'workbook-exp/v1');
   const migrated = module.normalizeInstance({
     instanceId: 'mut-legacy', speciesId: 'emberdrake', formId: 'emberdrake', level: 20, growthExp: 14820,
@@ -87,14 +87,14 @@ function assertBattle(module) {
 }
 
 function assertSave(module) {
-  assert.equal(module.SAVE_SCHEMA_VERSION, 13);
-  assert.deepEqual(module.SAVE_MIGRATION_REGISTRY.map(entry => entry.id).slice(-2), [
-    'canonical-monster-stats-v12', 'canonical-monster-exp-v13',
+  assert.equal(module.SAVE_SCHEMA_VERSION, 15);
+  assert.deepEqual(module.SAVE_MIGRATION_REGISTRY.map(entry => entry.id).slice(-3), [
+    'canonical-monster-exp-v13', 'skill-item-acquisition-v14', 'merchant-wallet-purchase-v15',
   ]);
 }
 
 function assertGame(source) {
-  const defeat = source.match(/function defeatWild\(w\)\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const defeat = source.match(/function defeatWild\(w,rewardOwnerInstanceId=null\)\{[\s\S]*?\n\}/)?.[0] ?? '';
   const make = source.match(/function makeInstance\(sp,level=1,opts=\{\}\)\{[\s\S]*?\n\}/)?.[0] ?? '';
   assert.match(defeat, /monsterStatCatalogEntry\(w\.canonicalFormId\)/);
   assert.match(defeat, /baseExpYield:enemyForm\?\.baseExpYield/);
@@ -121,7 +121,7 @@ const mutations = [
   ['formula', 'cap at Lv50', 'if (L >= cap) return 0;', 'if (L >= 50) return 0;', assertFormula],
   ['formula', 'resolve no Lv60', 'while (level < cap && cumulativeForCurve', 'while (level < 50 && cumulativeForCurve', assertFormula],
   ['formula', 'drop overflow', 'Math.max(0, Math.round(total - threshold))', '0', assertFormula],
-  ['monster', 'retain v12 schema', 'export const INSTANCE_SAVE_VERSION = 13;', 'export const INSTANCE_SAVE_VERSION = 12;', assertMonster],
+  ['monster', 'retain v13 schema', 'export const INSTANCE_SAVE_VERSION = 15;', 'export const INSTANCE_SAVE_VERSION = 13;', assertMonster],
   ['monster', 'change EXP schema marker', "'workbook-exp/v1'", "'legacy-exp'", assertMonster],
   ['monster', 'force Medium growth profile', 'growthCurve: form.growthCurve,', "growthCurve: 'Medium',", assertMonster],
   ['monster', 'skip legacy conversion', ': migrateLegacyGrowthExp({ level: declaredLevel, totalExp: sourceGrowthExp, growthCurve });', ': sourceGrowthExp;', assertMonster],
@@ -131,7 +131,7 @@ const mutations = [
   ['battle', 'ignore BaseExpYield', 'enemy.baseExpYield,', 'null,', assertBattle],
   ['battle', 'drop Elite variant', "tier === 'elite' ? 'Elite'", "tier === 'elite' ? 'Normal'", assertBattle],
   ['battle', 'bypass Workbook reward', 'const growthExp = expPreview.ok ? expPreview.reward : 0;', 'const growthExp = baseExpYield;', assertBattle],
-  ['save', 'retain v12 save schema', 'export const SAVE_SCHEMA_VERSION = 13;', 'export const SAVE_SCHEMA_VERSION = 12;', assertSave],
+  ['save', 'retain v13 save schema', 'export const SAVE_SCHEMA_VERSION = 15;', 'export const SAVE_SCHEMA_VERSION = 13;', assertSave],
   ['save', 'drop M7 migration', "  Object.freeze({\n    id: 'canonical-monster-exp-v13',\n    targetVersion: 13,\n    migrate: migrateState,\n  }),\n", '', assertSave],
   ['game', 'drop canonical enemy EXP profile', 'monsterStatCatalogEntry(w.canonicalFormId)', 'null', assertGame],
   ['game', 'drop enemy BaseExpYield', 'baseExpYield:enemyForm?.baseExpYield', 'baseExpYield:undefined', assertGame],

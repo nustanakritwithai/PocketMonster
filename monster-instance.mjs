@@ -19,7 +19,7 @@ import {
   clamp,
 } from './balance-formulas.mjs';
 
-export const INSTANCE_SAVE_VERSION = 13;
+export const INSTANCE_SAVE_VERSION = 15;
 export const INSTANCE_STAT_SCHEMA_VERSION = 'monster-instance-stats/v1';
 export const INSTANCE_EXP_SCHEMA_VERSION = 'workbook-exp/v1';
 export const TRAINING_LINES = Object.freeze(['power', 'defense', 'speed', 'technique', 'spirit']);

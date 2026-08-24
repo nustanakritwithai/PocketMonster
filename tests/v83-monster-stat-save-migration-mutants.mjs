@@ -16,7 +16,7 @@ async function loadSource(source, filename, label) {
 }
 
 function assertMonster(module) {
-  assert.equal(module.INSTANCE_SAVE_VERSION, 13);
+  assert.equal(module.INSTANCE_SAVE_VERSION, 15);
   assert.equal(module.INSTANCE_STAT_SCHEMA_VERSION, 'monster-instance-stats/v1');
   const base = module.normalizeInstance({
     instanceId: 'mut-base', speciesId: 'flameling', formId: 'flameling',
@@ -42,13 +42,15 @@ function assertMonster(module) {
 }
 
 function assertSave(module) {
-  assert.equal(module.SAVE_SCHEMA_VERSION, 13);
+  assert.equal(module.SAVE_SCHEMA_VERSION, 15);
   assert.deepEqual(module.SAVE_MIGRATION_REGISTRY.map(entry => [entry.id, entry.targetVersion]), [
     ['monster-instance-v9-skill-runtime', 9],
     ['breeding-egg-v10', 10],
     ['passive-instance-v11', 11],
     ['canonical-monster-stats-v12', 12],
     ['canonical-monster-exp-v13', 13],
+    ['skill-item-acquisition-v14', 14],
+    ['merchant-wallet-purchase-v15', 15],
   ]);
 }
 
@@ -56,7 +58,7 @@ assertMonster(await loadSource(sources.monster[1], sources.monster[0], 'monster-
 assertSave(await loadSource(sources.save[1], sources.save[0], 'monster-stat-schema-current'));
 
 const mutations = [
-  ['monster', 'retain v11 instance schema', 'export const INSTANCE_SAVE_VERSION = 13;', 'export const INSTANCE_SAVE_VERSION = 11;', assertMonster],
+  ['monster', 'retain v13 instance schema', 'export const INSTANCE_SAVE_VERSION = 15;', 'export const INSTANCE_SAVE_VERSION = 13;', assertMonster],
   ['monster', 'change stat schema identity', "'monster-instance-stats/v1'", "'monster-instance-stats/legacy'", assertMonster],
   ['monster', 'map ATK from defense', "atk: 'power'", "atk: 'defense'", assertMonster],
   ['monster', 'map HP from power', 'hp: null', "hp: 'power'", assertMonster],
@@ -68,7 +70,7 @@ const mutations = [
   ['monster', 'persist camel-case special attack', 'spatk: training.spAtk,', 'spAtk: training.spAtk,', assertMonster],
   ['monster', 'drop canonical stat normalization', 'statTraining: normalizeInstanceStatTraining(source.statTraining, source.training),', 'statTraining: {},', assertMonster],
   ['monster', 'do not synchronize Ranch training', 'if (canonicalStat) addStatTraining(instance, canonicalStat, applied);', 'if (false) addStatTraining(instance, canonicalStat, applied);', assertMonster],
-  ['save', 'retain v11 save schema', 'export const SAVE_SCHEMA_VERSION = 13;', 'export const SAVE_SCHEMA_VERSION = 11;', assertSave],
+  ['save', 'retain v13 save schema', 'export const SAVE_SCHEMA_VERSION = 15;', 'export const SAVE_SCHEMA_VERSION = 13;', assertSave],
   ['save', 'drop v12 migration registry', "  Object.freeze({\n    id: 'canonical-monster-stats-v12',\n    targetVersion: 12,\n    migrate: migrateState,\n  }),\n", '', assertSave],
 ];
 

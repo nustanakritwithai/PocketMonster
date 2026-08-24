@@ -76,14 +76,14 @@ assert.match(css,/width:min\(156px,24vw\)/,'Quest tracker stays a compact left c
 assert.match(css,/\.quest-step\.todo\{display:none\}/,'Upcoming quest steps stay collapsed so the chip does not cover the playfield');
 assert.doesNotMatch(css,/\.starter-journey\{[^}]*left:50%;transform:translateX\(-50%\)/,'Old centered objective banner must stay removed');
 assert.match(js,/stageObjectiveTracker\(objective,\{stageId:zoneId,stageName,monsterName\}\)/,'Live HUD uses the shared tracker view model');
-assert.match(js,/function ensureProgressionEncounter\([\s\S]*?objective=currentStageObjective\(zone\);\s*renderStarterJourney\(\);\s*if\(!cfg\|\|!objective\.encounter\)/,'Objective HUD refreshes when the Boss clear transitions to a completed stage');
+assert.match(js,/function ensureProgressionEncounter\([\s\S]*?objective=currentStageObjective\(zone\);\s*runBestEffortCombatPresentation\(\(\)=>renderStarterJourney\(\)\);\s*if\(!cfg\|\|!objective\.encounter\)/,'Objective HUD refreshes best-effort when the Boss clear transitions to a completed stage');
 assert.match(js,/const step=zoneId==='grass-meadow'\?'2\/3':'1\/2'/,'Later stages start their visible objective count at Elite 1/2 instead of Grass 2/3');
 assert.match(js,/if\(objective\.encounter!=='elite'&&cfg\.rareSpawn\?\.length&&Math\.random\(\)<cfg\.rareChance\)/,'Required Elite encounter suppresses a competing random Rare spawn');
 assert.match(js,/function ensureProgressionEncounter\(/,'Runtime can spawn the required progression encounter immediately');
 assert.match(js,/finishCaptureSuccess[\s\S]*?ensureProgressionEncounter\(state\.currentZone\)/,'Starter capture advances the encounter without requiring a zone reload');
 assert.match(js,/finishCaptureSuccess[\s\S]*?const replacesProgressionElite=[\s\S]*?if\(!replacesProgressionElite\)respawnWild\(w,wildRespawnDelay\(w\)\);[\s\S]*?ensureProgressionEncounter\(state\.currentZone\)/,'Capturing the required Elite replaces it once without scheduling a duplicate Elite');
 assert.match(js,/defeatWild[\s\S]*?retireWild\(w\);\s*ensureProgressionEncounter\(w\.zone\)/,'Elite defeat advances to the Boss in the same zone visit');
-assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?state\.stageProgress=next;[\s\S]*?renderWarpPrompt\(\);/,'Boss clear refreshes an already-visible warp prompt immediately');
+assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?state\.stageProgress=next;[\s\S]*?runBestEffortCombatPresentation\(\(\)=>\{renderStageSelect\(\);renderWarpPrompt\(\);renderStageReward/,'Boss clear refreshes an already-visible warp prompt best-effort after progression commits');
 assert.match(js,/function reconcilePendingStageClear\(zone,objective\)[\s\S]*?completeStageClear:stageId=>completeStageClear\(stageId,\{recovered:true\}\)[\s\S]*?currentStageObjective\(zone\)/,'Interrupted Boss saves are reconciled through the canonical stage-clear path without a fake run time');
 assert.match(js,/function spawnZone\(zone\)[\s\S]*?objective=reconcilePendingStageClear\(zone,objective\)/,'Zone load reconciles pending Boss clear before choosing progression spawns');
 assert.match(js,/if\(w\.boss\)markBossProgress\(w,'defeated',false\)/,'Boss defeat does not persist a half-completed state before stage clear is recorded');

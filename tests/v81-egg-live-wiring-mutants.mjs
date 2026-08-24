@@ -121,7 +121,7 @@ const mutants = [
   ['ignore hatch ledger marker in countdown', "const hatched=card.dataset.eggHatched==='true';", 'const hatched=false;'],
   ['shift deadline on every load', 'state.eggs=clean.eggs||[];', 'state.eggs=(clean.eggs||[]).map(e=>({...e,readyAt:e.readyAt||Date.now()+30000}));'],
   ['bypass Firebase persistence adapter', 'state:sanitizeStateForPersistence(persistableState(state))', 'state:persistableState(state)'],
-  ['drop Firebase schema version', ',saveSchemaVersion:SAVE_SCHEMA_VERSION', ''],
+  ['drop Firebase schema version', 'return {state:sanitizeStateForPersistence(persistableState(state)),playerHp:playerData.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION};', 'return {state:sanitizeStateForPersistence(persistableState(state)),playerHp:playerData.hp};'],
   ['use display lifeStage as authority', 'return inst&&resolveWorkbookEvolutionStage(inst).stage2;', "return inst&&['Adult','Mature'].includes(inst.lifeStage);"],
   ['use runtime breeding group in parent card', 'profile=workbookBreedingProfile(inst.speciesId)', 'profile={breedingGroup:sp.breedingGroup}', 'parentButtonHTML'],
 ];

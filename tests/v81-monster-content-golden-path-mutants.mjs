@@ -61,7 +61,7 @@ const liveMutants = [
   ['detach canonical hatch', source => replaceOnce(source, 'const result=hatchBreedingEggTransaction(state,{eggId,now});', 'const result=mutantHatchEgg(state,{eggId,now});')],
   ['skip save normalization', source => replaceOnce(source, 'const clean=normalizeSavedState(s,{ranchCap:RANCH_ACTIVE_MAX,now:Date.now()});', 'const clean=s;')],
   ['skip transient save sanitization', source => replaceOnce(source, 'sanitizeStateForPersistence(persistableState(state))', 'persistableState(state)')],
-  ['detach local save writer', source => replaceOnce(source, 'writeStoredSave(localStorage,envelope);', 'mutantWriteStoredSave(localStorage,envelope);')],
+  ['detach local save writer', source => replaceOnce(source, 'const envelope=currentSaveEnvelope();\n  writeStoredSave(localStorage,envelope);', 'const envelope=currentSaveEnvelope();\n  mutantWriteStoredSave(localStorage,envelope);')],
   ['detach current/backup/legacy reader', source => replaceOnce(source, 'const saved=readStoredSave(localStorage);', 'const saved=mutantReadStoredSave(localStorage);')],
 ];
 

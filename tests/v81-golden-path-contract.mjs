@@ -91,7 +91,10 @@ export function assertGoldenPathLiveWiring({ js, packageJson }) {
 
   assert.match(summonThrow, /if\(activeSummon\|\|pendingSummon\)/, 'only one owned monster may be active or in flight');
   assert.match(summonThrow, /spawnOwned\(inst,end\)/, 'accepted summon materializes the selected owned instance');
-  assert.match(spawnOwned, /activeSummon=\{inst,mesh,target:null/, 'summon binds one active owned instance');
+  assert.match(spawnOwned, /summon=\{inst,mesh,target:null/, 'summon builds one provisional owned runtime');
+  assert.match(spawnOwned, /activeSummon=summon/, 'summon publishes the fully initialized owned runtime');
+  assert.ok(spawnOwned.indexOf('setupMonsterMotion(mesh,sp,inst)') < spawnOwned.indexOf('activeSummon=summon'),
+    'summon cannot publish a half-initialized scene runtime');
   assert.match(spawnOwned, /skillCds:MANUAL_SKILL_SLOTS\.map/, 'active runtime has exactly the manual-slot cooldown vector');
 
   assert.match(updateOwned, /resolveOwnedBasicAiAction\(/, 'active owned AI uses the canonical Basic AI resolver');

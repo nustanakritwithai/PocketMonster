@@ -14,7 +14,7 @@ assert.doesNotMatch(js,/captureBalls\s*--|captureBalls\s*-=\s*1/,'scene code mus
 must('captureWorkbookVariant(w)','boss/elite capture variants must enter the workbook resolver');
 must('resolveWorkbookCapture(input)','live capture coefficients must come from CAP_v1.0');
 must('commitCaptureAttempt(captureAttemptLedger','capture completion must be idempotent');
-must('resetWild(w)','wild encounter reset must exist');
+must('function resetWild(w,cause=','wild encounter reset with an observable cause must exist');
 must('inst.fainted=true','Fainted state must exist');
 must('faintActive()','Fainted auto recall path must exist');
 must('evaluateStandardBreedingCompatibility(roles.eggHolder,roles.partner','breeding enters the canonical Stage2/Level/Bond/gender/group gate');

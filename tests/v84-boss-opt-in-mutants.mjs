@@ -41,19 +41,31 @@ async function assertPolicy(source,label='baseline'){
 function assertRuntime(game,html=htmlSource){
   const spawnZone=game.match(/function spawnZone\(zone\)\{[\s\S]*?\n\}/)?.[0]??'';
   const exitBossChallengeSource=functionSource(game,'exitBossChallenge');
+  const closeBossChallengeSource=functionSource(game,'closeBossChallengeUi');
+  const finishBossChallengeSource=functionSource(game,'finishBossChallenge');
+  const defeatWildSource=functionSource(game,'defeatWild');
   assert.ok(spawnZone.indexOf('spawnRecords(cfg.spawn)')>=0);
   assert.ok(spawnZone.indexOf('spawnRecords(cfg.spawn)')<spawnZone.indexOf("if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}"));
-  assert.match(game,/w\.engaged=true;if\(!canCombatTargetWild\(w\)\)\{w\.engaged=false;return false;\}/);
-  assert.match(game,/targetable:!wild\.capturing&&canCombatTargetWild\(wild\)/);
-  assert.match(game,/target\.targetable=wild\?\.capturing===undefined\|\|wild\.capturing===false;\s*if\(wild\?\.combatEnabled===false\)target\.targetable=false/);
+  assert.match(game,/function wildDamageTargetAvailable\([\s\S]*?return canCombatTargetWild\(w\);/);
+  assert.match(game,/function damageWild\([\s\S]*?!wildDamageTargetAvailable\(w\)[\s\S]*?w\.engaged=true/);
+  assert.match(game,/targetable:isWildDamageReady\(wild\)/);
+  assert.match(game,/target\.targetable=\(wild\?\.capturing===undefined\|\|wild\.capturing===false\)&&isWildDamageReady\(wild\);\s*if\(wild\?\.combatEnabled===false\)target\.targetable=false/);
   assert.match(game,/target\.combatEnabled===false/);
   assert.match(game,/candidate\.targetValid=!!w\?\.mesh\?\.position&&canCombatTargetWild\(w\)/);
   assert.match(game,/w\.dead\|\|w\.capturing\|\|!canCombatTargetWild\(w\)\|\|distXZ/);
   assert.match(game,/candidate\.dead\|\|candidate\.capturing\|\|!canCombatTargetWild\(candidate\)/);
-  assert.match(exitBossChallengeSource,/retreatBossChallenge\(bossChallengeSession,boss\.id\);\s*resetWild\(boss\);/);
-  assert.match(exitBossChallengeSource,/clearBossChallengeCombatEffects\(\);battleEventLog\.length=0;/);
+  assert.match(exitBossChallengeSource,/retreatBossChallenge\(bossChallengeSession,boss\.id\);\s*resetWild\(boss,resetCause\);/);
+  assert.match(exitBossChallengeSource,/abortCaptureSequence\(boss\);\s*bossChallengeSession=retreatBossChallenge/);
+  assert.match(exitBossChallengeSource,/clearBossChallengeCombatEffects\(\);discardBattleEventsForTarget\(boss\.id\);/);
   assert.match(exitBossChallengeSource,/resetActiveBossChallengeStatus\(\)/);
-  assert.match(game,/exitBossChallenge\('leash'\)/);
+  assert.ok(closeBossChallengeSource.indexOf('bossChallengeSession=createBossChallengeSession()')
+    < closeBossChallengeSource.indexOf('runBestEffortCombatPresentation('));
+  assert.match(finishBossChallengeSource,/runBestEffortCombatPresentation\(\(\)=>playBGM\(state\.currentZone\)\)/);
+  assert.match(defeatWildSource,/progressionBossCleared=Boolean\(w\.boss&&w\.speciesId===progressionBossSpeciesId&&state\.bossProgress\?\.defeated\?\.\[progressionKey\]\)/);
+  assert.match(defeatWildSource,/if\(!stageEliteCleared&&!progressionBossCleared\)respawnWild/);
+  assert.match(game,/exitBossChallenge\('outside_leash'\)/);
+  assert.match(game,/exitBossChallenge\(resetCause\)/);
+  assert.match(game,/exitBossChallenge\(decision\.reason\)/);
   assert.match(game,/updateBossChallengePrompt\(\);/);
   assert.match(html,/id="bossChallengeAccept"/);
   assert.match(html,/id="bossChallengeDecline"/);
@@ -84,18 +96,34 @@ for(const [name,from,to] of policyMutants){
 
 const runtimeMutants=[
   ['restore Boss-only map',gameSource.replace("  spawnRecords(cfg.spawn);\n  if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}","  if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}\n  spawnRecords(cfg.spawn);")],
-  ['allow direct dormant damage',gameSource.replace('if(!canCombatTargetWild(w)){w.engaged=false;return false;}','')],
-  ['allow manual targeting',gameSource.replace('targetable:!wild.capturing&&canCombatTargetWild(wild)','targetable:!wild.capturing')],
-  ['allow Basic AI targeting',gameSource.replace('    if(wild?.combatEnabled===false)target.targetable=false;','')],
+  ['allow direct dormant damage',gameSource.replace('  return canCombatTargetWild(w);','  return true;')],
+  ['allow manual targeting',gameSource.replace('targetable:isWildDamageReady(wild)','targetable:true')],
+  ['allow Basic AI targeting',gameSource.replace('    target.targetable=(wild?.capturing===undefined||wild.capturing===false)&&isWildDamageReady(wild);','    target.targetable=true;')],
   ['allow stale Basic AI action',gameSource.replace('||target.combatEnabled===false','||false')],
   ['restore proximity aggro',gameSource.replace('candidate.targetValid=!!w?.mesh?.position&&canCombatTargetWild(w);','candidate.targetValid=!!w?.mesh?.position;')],
   ['let hazards hit dormant Boss',gameSource.replace('w.dead||w.capturing||!canCombatTargetWild(w)||distXZ','w.dead||w.capturing||distXZ')],
   ['let swarms hit dormant Boss',gameSource.replace('candidate.dead||candidate.capturing||!canCombatTargetWild(candidate)||','candidate.dead||candidate.capturing||')],
-  ['exit without Boss reset',gameSource.replace('  resetWild(boss);','  void boss;')],
-  ['exit leaves encounter effects',gameSource.replace('  clearBossChallengeCombatEffects();battleEventLog.length=0;','  void battleEventLog;')],
+  ['exit without Boss reset',gameSource.replace('  resetWild(boss,resetCause);','  void boss;')],
+  ['collapse Boss boundary reset cause',gameSource
+    .replaceAll('exitBossChallenge(resetCause)',"exitBossChallenge('outside_leash')")
+    .replaceAll('exitBossChallenge(decision.reason)',"exitBossChallenge('outside_leash')")],
+  ['exit leaves Boss capture active',gameSource.replace('  abortCaptureSequence(boss);','  void boss.capturing;')],
+  ['exit leaves encounter effects',gameSource.replace('  clearBossChallengeCombatEffects();discardBattleEventsForTarget(boss.id);','  void boss.id;')],
+  ['Boss exit clears other encounters globally',gameSource.replace('discardBattleEventsForTarget(boss.id);','battleEventLog.length=0;')],
   ['exit leaves owned statuses',gameSource.replace('    resetActiveBossChallengeStatus();','')],
-  ['remove leash exit',gameSource.replace("exitBossChallenge('leash');return;","resetWild(w);return;")],
+  ['remove leash exit',gameSource
+    .replaceAll("exitBossChallenge('outside_leash')","resetWild(w,'outside_leash')")
+    .replaceAll('exitBossChallenge(resetCause)','resetWild(w,resetCause)')
+    .replaceAll('exitBossChallenge(decision.reason)','resetWild(w,decision.reason)')],
   ['remove live prompt update',gameSource.replace('    updateBossChallengePrompt();','')],
+  ['Boss victory BGM escapes presentation isolation',gameSource.replace(
+    'runBestEffortCombatPresentation(()=>playBGM(state.currentZone));',
+    'playBGM(state.currentZone);',
+  )],
+  ['defeated progression Boss schedules direct respawn',gameSource.replace(
+    'if(!stageEliteCleared&&!progressionBossCleared)respawnWild',
+    'if(!stageEliteCleared)respawnWild',
+  )],
 ];
 for(const [name,game] of runtimeMutants){
   assert.notEqual(game,gameSource,`${name} mutation must apply`);

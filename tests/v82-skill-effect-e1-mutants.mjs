@@ -166,9 +166,14 @@ assertE1LiveWiring(gameSource);
 const liveMutations = [
   ['enable every HUD skill', 'effectAvailable:canExecuteReviewedSkillEffect(definition.id),', 'effectAvailable:true,'],
   ['bypass pre-commit readiness', 'return validateReviewedSkillEffectRequest(canonicalSkillEffectRequest(a,move,command,materialized)).ok;', 'return true;'],
-  ['commit cooldown before planning', 'const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});', 'a.skillCds[index]=command.startCooldownSec;\n  const planned=resolveReviewedSkillEffects(canonicalSkillEffectRequest(a,move,command,materialized),{rng:Math.random});'],
+  ['commit cooldown before planning', 'const planned=resolveReviewedSkillEffects(effectRequest,{rng:Math.random});', 'a.skillCds[index]=command.startCooldownSec;\n  const planned=resolveReviewedSkillEffects(effectRequest,{rng:Math.random});'],
   ['duplicate cooldown commit', 'a.skillCds[index]=command.startCooldownSec;', 'a.skillCds[index]=command.startCooldownSec;\n  a.skillCds[index]=command.startCooldownSec;'],
-  ['drop live status commit', 'if(!target.dead&&effect.nextStatusState)target.statusState=effect.nextStatusState;', 'void effect.nextStatusState;'],
+  ['ignore rejected nearest damage commit', 'if(damageReceipt.committed){\n        targetDamageCommitted[0]=true;', 'if(true){\n        targetDamageCommitted[0]=true;'],
+  ['nearest damage bypasses deferred defeat transaction', 'deferDefeat:true,commitReceipt:damageReceipt', 'deferDefeat:false,commitReceipt:damageReceipt'],
+  ['drop nearest HP commit receipt', 'deferDefeat:true,commitReceipt:damageReceipt', 'deferDefeat:true,commitReceipt:null'],
+  ['restore stale area status after reset', 'if(!damageReceipt.committed)continue;', 'if(false)continue;'],
+  ['apply status to pending-defeat target', 'if(!target.dead&&target.hp>0&&effect.nextStatusState)', 'if(!target.dead&&effect.nextStatusState)'],
+  ['drop live status commit', 'target.statusState=effect.nextStatusState;', 'void effect.nextStatusState;'],
   ['restore legacy effect receipt', 'effectMode:planned.effectMode', "effectMode:'legacy_damage_compatibility'"],
 ];
 

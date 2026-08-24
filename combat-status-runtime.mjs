@@ -46,6 +46,21 @@ function result(ok, reason, detail = {}) {
   return Object.freeze({ ok, reason, ...detail });
 }
 
+const EMPTY_ACTIVE_STATUS_IDS = Object.freeze([]);
+export const NEUTRAL_COMBAT_STATUS_RUNTIME = Object.freeze({
+  ok: true,
+  reason: null,
+  activeStatusIds: EMPTY_ACTIVE_STATUS_IDS,
+  canMove: true,
+  canAttack: true,
+  canUseSkill: true,
+  actionLocked: false,
+  movementLocked: false,
+  forcedRetreat: false,
+  accuracyMultiplier: 1,
+  cooldownRecoveryMultiplier: 1,
+});
+
 function activeEntries(statusState, nowSec) {
   return statusState.statuses.filter(status => status.appliedAtSec <= nowSec && status.expiresAtSec > nowSec);
 }
@@ -78,6 +93,7 @@ export function resolveCombatStatusRuntime(statusState, { nowSec = statusState?.
     || !Number.isFinite(nowSec) || nowSec < statusState.currentTimeSec) {
     return result(false, 'invalid_status_context');
   }
+  if (statusState.statuses.length === 0) return NEUTRAL_COMBAT_STATUS_RUNTIME;
   const definitions = activeEntries(statusState, nowSec).map(status => statusCatalogEntry(status.statusId)).filter(Boolean);
   const ids = definitions.map(definition => definition.id);
   const actionLocked = ids.some(id => ['ST_FREEZE', 'ST_STUN', 'ST_STAGGER'].includes(id));

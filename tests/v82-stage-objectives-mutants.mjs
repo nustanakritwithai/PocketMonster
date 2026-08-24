@@ -46,7 +46,7 @@ function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v
   assert.match(css,/\.quest-step\.todo\{display:none\}/);
   assert.doesNotMatch(css,/\.starter-journey\{[^}]*left:50%;transform:translateX\(-50%\)/);
   assert.match(game,/stageObjectiveTracker\(objective,\{stageId:zoneId,stageName,monsterName\}\)/);
-  assert.match(game,/objective=currentStageObjective\(zone\);\s*renderStarterJourney\(\);\s*if\(!cfg\|\|!objective\.encounter\)/);
+  assert.match(game,/objective=currentStageObjective\(zone\);\s*runBestEffortCombatPresentation\(\(\)=>renderStarterJourney\(\)\);\s*if\(!cfg\|\|!objective\.encounter\)/);
   assert.match(game,/if\(objective\.encounter==='boss'\)\{ensureProgressionEncounter\(zone\);return;\}/);
   assert.match(game,/if\(objective\.encounter==='elite'\)ensureProgressionEncounter\(zone\)/);
   assert.match(game,/objective\.encounter!=='elite'&&cfg\.rareSpawn\?\.length/);
@@ -55,7 +55,7 @@ function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v
   assert.match(game,/defeatWild[\s\S]*?retireWild\(w\);\s*ensureProgressionEncounter\(w\.zone\)/);
   assert.match(game,/availability\.requires===state\.currentZone[\s\S]*?stageObjectiveText\(currentStageObjective\(\)\)/);
   const completeStageClear=game.match(/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(completeStageClear,/state\.stageProgress=next;\s*saveGame\(false\);[\s\S]*?renderWarpPrompt\(\);/);
+  assert.match(completeStageClear,/state\.stageProgress=next;\s*try\{saveGame\(false\);\}catch\{\}[\s\S]*?runBestEffortCombatPresentation\(\(\)=>\{renderStageSelect\(\);renderWarpPrompt\(\);renderStageReward/);
   assert.match(game,/function reconcilePendingStageClear\(zone,objective\)[\s\S]*?completeStageClear:stageId=>completeStageClear\(stageId,\{recovered:true\}\)[\s\S]*?currentStageObjective\(zone\)/);
   assert.match(game,/function spawnZone\(zone\)[\s\S]*?objective=reconcilePendingStageClear\(zone,objective\)/);
   assert.match(game,/if\(w\.boss\)markBossProgress\(w,'defeated',false\)/);
@@ -89,7 +89,7 @@ const runtimeMutants=[
   ['keep the oversized tracker under the top menu',gameSource,htmlSource,fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8').replace('top:calc(var(--safe-top) + var(--touch-min) + 20px)','top:54px').replace('width:min(156px,24vw)','width:min(212px,36vw)')],
   ['drop MMO tracker list',gameSource,htmlSource.replace('id="stageObjectiveList"','id="removedObjectiveList"')],
   ['stop using tracker view model',gameSource.replace('stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName})','({title:stageName,status:"",steps:[]})'),htmlSource],
-  ['leave completed objective stale',gameSource.replace('renderStarterJourney();\n  if(!cfg||!objective.encounter)return null;','if(!cfg||!objective.encounter)return null;'),htmlSource],
+  ['leave completed objective stale',gameSource.replace('runBestEffortCombatPresentation(()=>renderStarterJourney());\n  if(!cfg||!objective.encounter)return null;','if(!cfg||!objective.encounter)return null;'),htmlSource],
   ['remove deterministic Boss spawn',gameSource.replace("if(objective.encounter==='boss'){ensureProgressionEncounter(zone);return;}","if(objective.encounter==='boss')return;"),htmlSource],
   ['remove deterministic Elite spawn',gameSource.replace("if(objective.encounter==='elite')ensureProgressionEncounter(zone);","if(objective.encounter==='elite')return;"),htmlSource],
   ['allow Rare to compete with required Elite',gameSource.replace("objective.encounter!=='elite'&&",''),htmlSource],
@@ -97,13 +97,13 @@ const runtimeMutants=[
   ['schedule a duplicate captured progression Elite',gameSource.replace('if(!replacesProgressionElite)respawnWild(w,wildRespawnDelay(w));','respawnWild(w,wildRespawnDelay(w));'),htmlSource],
   ['require reload after Elite',gameSource.replace('ensureProgressionEncounter(w.zone);','void w.zone;'),htmlSource],
   ['restore generic warp lock text',gameSource.replace("if(availability.requires===state.currentZone)return stageObjectiveText(currentStageObjective());",''),htmlSource],
-  ['leave an open warp prompt locked after Boss clear',gameSource.replace('  renderWarpPrompt();\n  renderStageReward({definition,first,rewards,elapsed});','  renderStageReward({definition,first,rewards,elapsed});'),htmlSource],
+  ['leave an open warp prompt locked after Boss clear',gameSource.replace('runBestEffortCombatPresentation(()=>{renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});});','runBestEffortCombatPresentation(()=>{renderStageSelect();renderStageReward({definition,first,rewards,elapsed});});'),htmlSource],
   ['leave interrupted Boss clear unreconciled',gameSource.replace('  objective=reconcilePendingStageClear(zone,objective);','  void objective;'),htmlSource],
   ['persist half-completed Boss defeat',gameSource.replace("markBossProgress(w,'defeated',false)","markBossProgress(w,'defeated')"),htmlSource],
-  ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  saveGame(false);','  state.stageProgress=next;'),htmlSource],
+  ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  try{saveGame(false);}catch{}','  state.stageProgress=next;'),htmlSource],
   ['record fake recovery best time',gameSource.replace('const elapsed=!recovered&&stageRunStartedAt?', 'const elapsed=stageRunStartedAt?'),htmlSource],
   ['leave cloud save pending clear unreconciled',gameSource.replace('      reloadWorldFromLoadedState();','      void remote.state;'),htmlSource],
-  ['drop local saves during initial Cloud sync',gameSource.replace('  else if(remoteSaveSyncing)remoteSavePending=true;',''),htmlSource],
+  ['drop local saves during initial Cloud sync',gameSource.replace("  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }\n  else if(remoteSaveSyncing)remoteSavePending=true;", "  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }"),htmlSource],
   ['leave reconciled Cloud document stale',gameSource.replace('    await flushRemoteSaveUntilSettled();','    void currentSaveEnvelope();'),htmlSource],
 ];
 for(const [name,game,html,css] of runtimeMutants){
