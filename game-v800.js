@@ -45,6 +45,8 @@ import { combatStatusDescriptors, resolveCombatStatusRuntime } from './combat-st
 import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadoutPreview, EQUIPMENT_SLOTS } from './equipment.mjs';
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
+import { loadRuntimeConfig } from './runtime-config.mjs';
+import { healthVersionGate, publishServerGateTelemetry } from './server-sync.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
@@ -114,6 +116,18 @@ async function loadThree(){
 }
 
 let THREE;
+const runtimeConfig = await loadRuntimeConfig();
+const serverGate = await healthVersionGate(runtimeConfig);
+const serverGateObservation = publishServerGateTelemetry(serverGate);
+if (typeof window !== 'undefined') {
+  window.POCKETMONSTER_RUNTIME_CONFIG = runtimeConfig;
+  window.POCKETMONSTER_SERVER_GATE = serverGate;
+  window.POCKETMONSTER_SERVER_GATE_OBSERVATION = serverGateObservation;
+  document.documentElement.dataset.serverGate = serverGate.state;
+}
+if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
+  console.info(`Server contract gate: ${serverGate.state} (${serverGate.reason || 'read-only check'}) • Firebase fallback=${serverGate.allowFirebaseFallback}`);
+}
 await requireFirebaseLogin();
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
