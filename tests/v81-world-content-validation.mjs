@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateZoneEncounterConfig } from '../stage-catalog.mjs';
+import { stageLevelRange, validateStageLevelProgression, validateZoneEncounterConfig } from '../stage-catalog.mjs';
 import { WARP_ROUTES, validateWarpRoutes } from '../warp-routes.mjs';
 
 assert.equal(validateWarpRoutes().ok,true,'all live warp destinations and coordinate records are valid');
@@ -51,13 +51,16 @@ const game=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const zonesStart=game.indexOf('const ZONES=')+'const ZONES='.length;
 const zonesEnd=game.indexOf('\n};\nconst zoneContentValidation',zonesStart)+2;
 assert.ok(zonesStart>='const ZONES='.length&&zonesEnd>zonesStart,'live ZONES literal is extractable for validation');
-const liveZones=Function('BALANCE',`"use strict";return (${game.slice(zonesStart,zonesEnd)});`)({
+const liveZones=Function('BALANCE','stageLevelRange',`"use strict";return (${game.slice(zonesStart,zonesEnd)});`)({
   grassMeadowRare:{level:2,chance:.24},
   grassMeadowBoss:{level:5},
-});
+},stageLevelRange);
 const liveValidation=validateZoneEncounterConfig(liveZones);
 assert.equal(liveValidation.ok,true,JSON.stringify(liveValidation.issues));
+const liveLevelValidation=validateStageLevelProgression(liveZones);
+assert.equal(liveLevelValidation.ok,true,JSON.stringify(liveLevelValidation.issues));
 assert.match(game,/const zoneContentValidation=validateZoneEncounterConfig\(ZONES\)/,'live boot validates actual zone encounter data');
+assert.match(game,/const stageLevelValidation=validateStageLevelProgression\(ZONES\)/,'live boot validates catalog level parity and progression');
 assert.match(game,/const warpContentValidation=validateWarpRoutes\(\)/,'live boot validates actual warp data');
 assert.match(game,/throw new Error\(`World content validation failed:/,'invalid world content fails closed');
 

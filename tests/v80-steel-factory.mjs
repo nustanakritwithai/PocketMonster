@@ -17,7 +17,7 @@ for(const id of ['frozen-pass','rocky-canyon','sky-ruins','poison-marsh','dream-
 assert.equal(stageUnlockReason(progress,'steel-factory').ok,true,'Shadow City clear unlocks Steel Factory');
 const route=routesFrom('shadow-city').find(candidate=>candidate.to==='steel-factory');
 assert.equal(warpAvailability(progress,route,stageUnlockReason).ok,true,'Steel Factory route is available after Shadow City');
-const zoneBlock=js.match(/['"]steel-factory['"]\s*:\s*\{[\s\S]*?(?=\n  ['"]sky-ruins['"]\s*:)/)?.[0]||'';
+const zoneBlock=js.match(/['"]steel-factory['"]\s*:\s*\{[\s\S]*?(?=\n  ['"][^'"]+['"]\s*:\s*\{)/)?.[0]||'';
 assert.match(zoneBlock,/stageId:'steel-factory'/,'Steel Factory runtime zone is catalog-linked');
 assert.match(zoneBlock,/spawn:\[/,'Steel Factory has Normal encounter spawn data');
 assert.match(zoneBlock,/eliteSpawn:\[/,'Steel Factory has Elite encounter data');

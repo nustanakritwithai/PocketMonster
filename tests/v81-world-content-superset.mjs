@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { MONSTER_CATALOG } from '../monster-catalog.mjs';
-import { STAGE_CATALOG } from '../stage-catalog.mjs';
+import { STAGE_CATALOG, stageLevelRange } from '../stage-catalog.mjs';
 import { WARP_ROUTES } from '../warp-routes.mjs';
 import {
+  CANONICAL_FINAL_WORLD_ADDITIONS,
+  CANONICAL_LEVEL_RESOLUTION,
   CANONICAL_MAIN_WORLD_ADDITIONS,
   WORKBOOK_WORLD_BASELINE,
+  WORKBOOK_WORLD_WARNING_SNAPSHOT,
+  WORLD_RESOLUTION_BASELINE,
   WORLD_WARNING_BASELINE,
   normalizeWorldRouteRows,
   normalizeWorldSpawnRows,
@@ -21,10 +25,10 @@ function extractLiveZones() {
   const start = game.indexOf(startMarker) + startMarker.length;
   const end = game.indexOf('\n};\nconst zoneContentValidation', start) + 2;
   assert.ok(start >= startMarker.length && end > start, 'live ZONES literal is extractable');
-  return Function('BALANCE', `"use strict";return (${game.slice(start, end)});`)({
+  return Function('BALANCE', 'stageLevelRange', `"use strict";return (${game.slice(start, end)});`)({
     grassMeadowRare: { level: 2, chance: .24 },
     grassMeadowBoss: { level: 5 },
-  });
+  }, stageLevelRange);
 }
 
 function inputs(overrides = {}) {
@@ -61,33 +65,47 @@ assert.equal(CANONICAL_MAIN_WORLD_ADDITIONS.routes.count, 8);
 assert.deepEqual(CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds, [
   'haunted-woods', 'shadow-city', 'steel-factory',
 ]);
-assert.equal(WORLD_WARNING_BASELINE.length, 9);
+assert.equal(CANONICAL_LEVEL_RESOLUTION.resolvedAuditIds.length, 8);
+assert.equal(CANONICAL_FINAL_WORLD_ADDITIONS.spawnPlacements.count, 32);
+assert.equal(CANONICAL_FINAL_WORLD_ADDITIONS.routes.count, 9);
+assert.equal(CANONICAL_FINAL_WORLD_ADDITIONS.stages.count, 4);
+assert.equal(WORKBOOK_WORLD_WARNING_SNAPSHOT.length, 9);
+assert.equal(WORLD_RESOLUTION_BASELINE.length, 8);
+assert.equal(WORLD_WARNING_BASELINE.length, 1);
 
 const currentInput = inputs();
 const beforeCurrent = structuredClone(currentInput);
 const current = validateWorldContentSuperset(currentInput);
 assert.equal(current.ok, true, JSON.stringify(current.issues));
 assert.deepEqual(current.issues, []);
-assert.equal(current.warnings.length, 9);
+assert.equal(current.warnings.length, 1);
 assert.deepEqual(current.counts, {
-  actualZoneEntries: 15,
+  actualZoneEntries: 19,
   workbookZoneEntries: 12,
   canonicalAddedZoneEntries: 3,
-  actualSpawnPlacements: 133,
+  finalAddedZoneEntries: 4,
+  actualSpawnPlacements: 165,
   workbookSpawnPlacements: 109,
   canonicalAddedSpawnPlacements: 24,
-  actualRoutes: 28,
+  finalAddedSpawnPlacements: 32,
+  actualRoutes: 37,
   workbookRoutes: 20,
   canonicalAddedRoutes: 8,
-  actualImplementedStages: 12,
+  finalAddedRoutes: 9,
+  actualImplementedStages: 16,
   workbookImplementedStages: 9,
   canonicalAddedImplementedStages: 3,
+  finalAddedImplementedStages: 4,
   stageCatalogEntries: 16,
   landmarks: 9,
 });
 assert.deepEqual(currentInput, beforeCurrent, 'validation is presentation/data-only and does not mutate input');
 assertDeepFrozen(WORKBOOK_WORLD_BASELINE);
 assertDeepFrozen(CANONICAL_MAIN_WORLD_ADDITIONS);
+assertDeepFrozen(CANONICAL_LEVEL_RESOLUTION);
+assertDeepFrozen(CANONICAL_FINAL_WORLD_ADDITIONS);
+assertDeepFrozen(WORKBOOK_WORLD_WARNING_SNAPSHOT);
+assertDeepFrozen(WORLD_RESOLUTION_BASELINE);
 assertDeepFrozen(WORLD_WARNING_BASELINE);
 assertDeepFrozen(current);
 assert.equal(current.warnings, WORLD_WARNING_BASELINE, 'known warnings reuse the frozen evidence snapshot');
@@ -100,40 +118,28 @@ const normalizedSpawns = normalizeWorldSpawnRows(currentInput.zones);
 const normalizedRoutes = normalizeWorldRouteRows(currentInput.routes);
 const workbookSpawnRows = normalizedSpawns.filter(row => WORKBOOK_WORLD_BASELINE.zoneIds.includes(row[0]));
 const canonicalSpawnRows = normalizedSpawns.filter(row => CANONICAL_MAIN_WORLD_ADDITIONS.zoneIds.includes(row[0]));
+const finalSpawnRows = normalizedSpawns.filter(row => CANONICAL_FINAL_WORLD_ADDITIONS.zoneIds.includes(row[0]));
 const workbookRouteRows = normalizedRoutes.filter(row => WORKBOOK_WORLD_BASELINE.routeIds.includes(row[0]));
 const canonicalRouteRows = normalizedRoutes.filter(row => CANONICAL_MAIN_WORLD_ADDITIONS.routeIds.includes(row[0]));
-assert.equal(worldContentDigest(workbookSpawnRows), '9db9a6fde19e982db534558b2831e0d32d6a224995570921852fb186f4f8e381');
+const finalRouteRows = normalizedRoutes.filter(row => CANONICAL_FINAL_WORLD_ADDITIONS.routeIds.includes(row[0]));
+assert.equal(worldContentDigest(workbookSpawnRows), 'ffaef02fa95bdcd6d17bf258aa34b1bc9576595c20688908ed617e98a0d7a3ac');
 assert.equal(worldContentDigest(canonicalSpawnRows), 'f197115fbacd6d0bba952228b9e0b90ef56107b92f2dcf112fe03d094fd7a2d8');
-assert.equal(worldContentDigest(normalizedSpawns), '4ec0ae4727b20df38f7467d50d6e868f689099b48ec0ae296db1c01300b67b48');
+assert.equal(worldContentDigest(finalSpawnRows), '315af5a853a4ddd04b765828479d71e4b6cd244929be9fed65c5b076e531e656');
+assert.equal(worldContentDigest(normalizedSpawns), '749d78dda7fbda36f41ad51ec965f8615889ae45c90fa65e9188a99e198f3c3a');
 assert.equal(worldContentDigest(workbookRouteRows), 'cd5b18b1ea4c5a6e48ecd1e04a452514b784ea194fa4a38eeb969b34300bb99b');
 assert.equal(worldContentDigest(canonicalRouteRows), 'becea50e803e45ca6e3d39dab5dead86c33313303b3890100b8b2f76512fba96');
-assert.equal(worldContentDigest(normalizedRoutes), '8e62e63bb31c8de25171e84b49d717f1840a7a7fd1ec98427448f54683c17e15');
-assert.equal(worldContentDigest(normalizeWorldStageRows(currentInput.zones, currentInput.stages, WORKBOOK_WORLD_BASELINE.implementedStageIds)), 'add440d4971b34fddb714b7f70dc43f72e2c8d00d7952698ec9d1df60d193a93');
+assert.equal(worldContentDigest(finalRouteRows), '5a7aa79073481145c44b99469fcdfb50001f64aaa64f0b40c7e5ab36176ed6e4');
+assert.equal(worldContentDigest(normalizedRoutes), 'cac2bf0459e7baa62bee4732770dded90e7072afe4eb16babc68b5077bcd31b9');
+assert.equal(worldContentDigest(normalizeWorldStageRows(currentInput.zones, currentInput.stages, WORKBOOK_WORLD_BASELINE.implementedStageIds)), '7c16946b377095907fe8bd4d376ed9767c2534757f855a3e22cf7e93e172b2f6');
 assert.equal(worldContentDigest(normalizeWorldStageRows(currentInput.zones, currentInput.stages, CANONICAL_MAIN_WORLD_ADDITIONS.implementedStageIds)), '5768654e398c121c45721ae113407a755207007d09736de3bf86501aba95b9e4');
-assert.equal(worldContentDigest(normalizeWorldStageRows({}, currentInput.stages, WORKBOOK_WORLD_BASELINE.plannedNoRuntimeStageIds)), '78f2703a5f49c444162196d150d533b5021276d54b695fcf8cff34088ce66f40');
+assert.equal(worldContentDigest(normalizeWorldStageRows(currentInput.zones, currentInput.stages, CANONICAL_FINAL_WORLD_ADDITIONS.implementedStageIds)), 'ff5ac7f28d89a8304e9bd4c3141a5ae4a4b622c895ec564b0da3a2f85f9b7f9a');
 assertDeepFrozen(normalizedSpawns);
 assertDeepFrozen(normalizedRoutes);
-assert.deepEqual(current.warnings.filter(row => row.code === 'level_range_mismatch').map(row => [row.mapId, row.runtimeLevel, row.catalogLevel]), [
-  ['ember-valley', '4-8', '4-7'],
-  ['misty-lake', '7-12', '5-8'],
-  ['storm-field', '12-18', '6-10'],
-  ['frozen-pass', '16-22', '10-14'],
-  ['rocky-canyon', '20-26', '12-16'],
-  ['sky-ruins', '24-30', '14-18'],
-  ['poison-marsh', '30-38', '16-20'],
-]);
+assert.equal(current.warnings.some(row => row.code === 'level_range_mismatch'), false);
 assert.equal(current.warnings.some(row => row.code === 'fairy_light_deferred'), true);
-assert.equal(current.warnings.some(row => row.code === 'poison_dream_level_inversion'), true);
+assert.equal(current.warnings.some(row => row.code === 'poison_dream_level_inversion'), false);
 assert.deepEqual(current.warnings.map(row => [row.id, row.auditId, row.severity, row.sourceCell]), [
-  ['MAP-A01:ember-valley', 'MAP-A01', 'HIGH', 'Map_Audit!A18:D18'],
-  ['MAP-A01:misty-lake', 'MAP-A01', 'HIGH', 'Map_Audit!A19:D19'],
-  ['MAP-A01:storm-field', 'MAP-A01', 'HIGH', 'Map_Audit!A20:D20'],
-  ['MAP-A01:frozen-pass', 'MAP-A01', 'HIGH', 'Map_Audit!A21:D21'],
-  ['MAP-A01:rocky-canyon', 'MAP-A01', 'HIGH', 'Map_Audit!A22:D22'],
-  ['MAP-A01:sky-ruins', 'MAP-A01', 'HIGH', 'Map_Audit!A23:D23'],
-  ['MAP-A01:poison-marsh', 'MAP-A01', 'HIGH', 'Map_Audit!A24:D24'],
   ['MAP-A03', 'MAP-A03', 'HIGH', 'Map_Audit!F6'],
-  ['MAP-A06', 'MAP-A06', 'HIGH', 'Map_Audit!F9'],
 ]);
 
 const reorderedInput = inputs();
@@ -223,12 +229,12 @@ const shiftedCanonicalRoute = inputs();
 shiftedCanonicalRoute.routes.find(route => route.id === 'dream-to-haunted').spawn[0] = -18;
 assert.equal(hasIssue(validateWorldContentSuperset(shiftedCanonicalRoute), 'missing_canonical_route'), true);
 
-const plannedDestination = inputs();
-plannedDestination.routes.push({
-  id: 'rogue-to-planned', from: 'hub', to: 'dragon-crater', label: 'Rogue',
+const unknownDestination = inputs();
+unknownDestination.routes.push({
+  id: 'rogue-to-missing', from: 'hub', to: 'missing-stage', label: 'Rogue',
   position: [1, 1], spawn: [0, 0, 0], kind: 'forward',
 });
-assert.equal(hasIssue(validateWorldContentSuperset(plannedDestination), 'unknown_route_destination'), true, 'known routes are constrained to live zones, not the planned catalog');
+assert.equal(hasIssue(validateWorldContentSuperset(unknownDestination), 'unknown_route_destination'), true, 'routes remain constrained to live zones');
 
 const missingWorkbookStage = inputs();
 delete missingWorkbookStage.zones['dream-shrine'];
@@ -237,6 +243,10 @@ assert.equal(hasIssue(validateWorldContentSuperset(missingWorkbookStage), 'missi
 const missingCanonicalStage = inputs();
 delete missingCanonicalStage.zones['haunted-woods'];
 assert.equal(hasIssue(validateWorldContentSuperset(missingCanonicalStage), 'missing_canonical_stage'), true);
+
+const missingFinalStage = inputs();
+delete missingFinalStage.zones['dragon-crater'];
+assert.equal(hasIssue(validateWorldContentSuperset(missingFinalStage), 'missing_final_stage'), true);
 
 const rogueZone = inputs();
 rogueZone.zones['rogue-zone'] = rogueZone.zones['haunted-woods'];
@@ -319,17 +329,17 @@ danglingMapping.speciesMappings = danglingMapping.speciesMappings.filter(mapping
 assert.equal(hasIssue(validateWorldContentSuperset(danglingMapping), 'missing_spawn_species_mapping'), true);
 
 const warningRewrite = inputs();
-warningRewrite.zones['ember-valley'].recommendedLevel.max = 7;
+warningRewrite.zones['ember-valley'].recommendedLevel.max = 8;
 const warningRewriteResult = validateWorldContentSuperset(warningRewrite);
-assert.equal(hasIssue(warningRewriteResult, 'known_warning_mismatch'), true, 'known workbook warnings cannot disappear silently');
+assert.equal(hasIssue(warningRewriteResult, 'stage_level_range_mismatch'), true, 'resolved level mismatch cannot regress');
 assertDeepFrozen(warningRewriteResult);
 const inversionRewrite = inputs();
 inversionRewrite.zones['dream-shrine'].recommendedLevel.min = 39;
-assert.equal(hasIssue(validateWorldContentSuperset(inversionRewrite), 'known_warning_mismatch'), true);
+assert.equal(hasIssue(validateWorldContentSuperset(inversionRewrite), 'stage_level_range_mismatch'), true);
 
 assert.throws(() => { WORLD_WARNING_BASELINE[0].runtimeLevel = 'mutated'; }, TypeError);
 assert.throws(() => { WORKBOOK_WORLD_BASELINE.sourceRanges.audit = 'mutated'; }, TypeError);
-assert.equal(WORLD_WARNING_BASELINE[0].runtimeLevel, '4-8');
+assert.equal(WORLD_WARNING_BASELINE[0].id, 'MAP-A03');
 assert.equal(WORKBOOK_WORLD_BASELINE.sourceRanges.audit, 'Map_Audit!A1:F24');
 
 for (const pattern of [

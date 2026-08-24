@@ -11,6 +11,37 @@ export const SKY_STOPS = Object.freeze({
   0x334155: Object.freeze({ top: 0x1a1a2e, mid: 0x1e293b, bottom: 0x334155 }),
 });
 
+export const STAGE_GROUND_PROFILES = Object.freeze({
+  dragon: Object.freeze({
+    seedSalt: 0xd2a60001,
+    marks: Object.freeze([
+      Object.freeze({ count: 38, width: 3, height: 2, color: Object.freeze([127, 29, 29]), alpha: 0.19, seedSalt: 0xd4a60011 }),
+      Object.freeze({ count: 18, width: 1, height: 3, color: Object.freeze([251, 146, 60]), alpha: 0.18, seedSalt: 0xe4be0012 }),
+    ]),
+  }),
+  fairy: Object.freeze({
+    seedSalt: 0xfa170001,
+    marks: Object.freeze([
+      Object.freeze({ count: 36, width: 2, height: 2, color: Object.freeze([244, 114, 182]), alpha: 0.15, seedSalt: 0xfa170011 }),
+      Object.freeze({ count: 18, width: 1, height: 3, color: Object.freeze([216, 180, 254]), alpha: 0.16, seedSalt: 0xfae10012 }),
+    ]),
+  }),
+  arena: Object.freeze({
+    seedSalt: 0xa2e6a001,
+    marks: Object.freeze([
+      Object.freeze({ count: 40, width: 4, height: 1, color: Object.freeze([120, 53, 15]), alpha: 0.14, seedSalt: 0xa2e6a011 }),
+      Object.freeze({ count: 16, width: 2, height: 2, color: Object.freeze([250, 204, 21]), alpha: 0.12, seedSalt: 0xc0110012 }),
+    ]),
+  }),
+  wildlands: Object.freeze({
+    seedSalt: 0x71d1a001,
+    marks: Object.freeze([
+      Object.freeze({ count: 42, width: 3, height: 3, color: Object.freeze([101, 163, 13]), alpha: 0.14, seedSalt: 0x71d1a011 }),
+      Object.freeze({ count: 20, width: 2, height: 4, color: Object.freeze([54, 83, 20]), alpha: 0.15, seedSalt: 0x71f70012 }),
+    ]),
+  }),
+});
+
 export function hexToRgb(color) {
   const n = Number(color) >>> 0;
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -75,13 +106,23 @@ function scatter(img, count, w, h, rgb, alpha, seed) {
   }
 }
 
+function paintStageProfile(img, profile, seed) {
+  for (const mark of profile.marks) {
+    scatter(img, mark.count, mark.width, mark.height, mark.color, mark.alpha, seed ^ mark.seedSalt);
+  }
+}
+
 export function paintGroundGrid(zoneColor, zoneType = 'grass') {
   const img = makeImage(GROUND_TILE, GROUND_TILE, hexToRgb(zoneColor));
   strokeGrid(img, GROUND_GRID, 1, 0.14);
   strokeGrid(img, GROUND_COARSE, 2, 0.24);
-  const seed = ((Number(zoneColor) >>> 0) ^ (zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : zoneType === 'factory' ? 0x5fac7001 : 0x9a55)) >>> 0;
+  const stageProfile = Object.prototype.hasOwnProperty.call(STAGE_GROUND_PROFILES, zoneType) ? STAGE_GROUND_PROFILES[zoneType] : null;
+  const legacySeedSalt = zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : zoneType === 'factory' ? 0x5fac7001 : 0x9a55;
+  const seed = ((Number(zoneColor) >>> 0) ^ (stageProfile ? stageProfile.seedSalt : legacySeedSalt)) >>> 0;
   scatter(img, 40, 2, 2, [255, 255, 255], 0.05, seed);
-  if (zoneType === 'cave') {
+  if (stageProfile) {
+    paintStageProfile(img, stageProfile, seed);
+  } else if (zoneType === 'cave') {
     scatter(img, 36, 3, 3, [0, 0, 0], 0.18, seed ^ 0x11111111);
   } else if (zoneType === 'frozen') {
     scatter(img, 34, 2, 3, [125, 211, 252], 0.16, seed ^ 0x33333333);
