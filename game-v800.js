@@ -49,6 +49,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { establishReadOnlyBridge } from './server-auth.mjs';
 import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
+import { configureServerPlayerState, loadServerPlayerState, mergeServerMonsterProgress } from './server-player-state.mjs';
 import { healthVersionGate, publishServerGateTelemetry } from './server-sync.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -135,6 +136,7 @@ const firebaseUser = await requireFirebaseLogin(runtimeConfig);
 const authProfileBridge = serverGate.state === 'healthy'
   ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
   : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
+configureServerPlayerState(runtimeConfig, authProfileBridge.sessionToken);
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });
   document.documentElement.dataset.authProfileBridge = authProfileBridge.state;
@@ -7139,6 +7141,7 @@ function reloadWorldFromLoadedState(){
   state.currentZone='hub';
   return switchZone(loadedZone,true)||switchZone('hub',true);
 }
+function reloadWorldFromServerState(){return reloadWorldFromLoadedState();}
 async function flushRemoteSaveUntilSettled(){
   do{
     remoteSavePending=false;
@@ -7159,6 +7162,13 @@ async function syncCloudSave(){
       reloadWorldFromLoadedState();
       renderAll();
       successMessage='โหลดข้อมูล Cloud สำเร็จ';
+    }
+    const serverPlayerState=await loadServerPlayerState();
+    if(serverPlayerState?.monsters?.length||serverPlayerState?.progress){
+      migrateLoadedState(mergeServerMonsterProgress(persistableState(state),serverPlayerState));
+      reloadWorldFromServerState();
+      renderAll();
+      successMessage='โหลด Monster และ Progress จาก VPS สำเร็จ';
     }
     await flushRemoteSaveUntilSettled();
     msg(successMessage);

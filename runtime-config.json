@@ -18,7 +18,8 @@
     "firebaseFallback": true,
     "firebaseAuthBridge": true,
     "accountLinking": true,
-    "profileReads": true
+    "profileReads": true,
+    "playerStateReads": true
   },
   "firebase": {
     "apiKey": "AIzaSyBNKirSYZ0Yz-yGFIb0HRvgainkXY4bqsE",
