@@ -2,6 +2,10 @@ import { runtimeWritePolicy } from './runtime-config.mjs';
 
 export const SERVER_GATE_STATES = Object.freeze(['disabled', 'healthy', 'maintenance', 'offline', 'incompatible', 'invalid']);
 
+function defaultClock() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
 function joinUrl(base, path) {
   if (!base) return path;
   return new URL(path, `${base.replace(/\/$/, '')}/`).toString();
@@ -73,7 +77,9 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
     const [healthPayload, versionPayload] = await Promise.all([readJson(healthResponse), readJson(versionResponse)]);
     const health = normalizePayload(healthPayload);
     const version = normalizePayload(versionPayload);
-    if (!health || !version) return { state: 'invalid', reason: 'malformed-payload', correlationId };
+    if (!health || !version || !['ready', 'not_ready'].includes(health.status) || !version.apiVersion) {
+      return { state: 'invalid', reason: 'malformed-payload', correlationId };
+    }
     const healthApiResponseVersion = healthResponse.headers?.get?.('X-API-Version') || '';
     const versionApiResponseVersion = versionResponse.headers?.get?.('X-API-Version') || '';
     const server = { ...health, ...version, status: health.status, maintenance: health.maintenance || version.maintenance, healthApiResponseVersion, versionApiResponseVersion };
@@ -90,7 +96,34 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
 }
 
 export async function healthVersionGate(config, options = {}) {
+  const clock = typeof options.clock === 'function' ? options.clock : defaultClock;
+  const startedAt = clock();
   const result = await requestServerContract(config, options);
   const fallback = config?.featureFlags?.firebaseFallback !== false;
-  return Object.freeze({ ...result, allowFirebaseFallback: fallback, allowPlayerDataWrites: false, writePolicy: runtimeWritePolicy(config) });
+  const latencyMs = Math.max(0, Math.round(clock() - startedAt));
+  return Object.freeze({ ...result, latencyMs, allowFirebaseFallback: fallback, allowPlayerDataWrites: false, writePolicy: runtimeWritePolicy(config) });
+}
+
+export function serverGateTelemetry(result, { observedAtUtc = new Date().toISOString() } = {}) {
+  const release = result?.server?.deployedRelease;
+  return Object.freeze({
+    requestId: typeof result?.correlationId === 'string' ? result.correlationId : '',
+    latencyMs: Number.isFinite(result?.latencyMs) ? Math.max(0, Math.round(result.latencyMs)) : null,
+    gateState: SERVER_GATE_STATES.includes(result?.state) ? result.state : 'invalid',
+    reason: typeof result?.reason === 'string' ? result.reason : '',
+    observedAtUtc,
+    release: Object.freeze({
+      version: typeof release?.version === 'string' ? release.version : '',
+      commitSha: typeof release?.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(release.commitSha) ? release.commitSha : '',
+      builtAtUtc: typeof release?.builtAtUtc === 'string' ? release.builtAtUtc : '',
+    }),
+  });
+}
+
+export function publishServerGateTelemetry(result, { target = globalThis.window, observedAtUtc } = {}) {
+  const detail = serverGateTelemetry(result, { observedAtUtc });
+  if (target && typeof target.dispatchEvent === 'function' && typeof globalThis.CustomEvent === 'function') {
+    target.dispatchEvent(new CustomEvent('pocketmonster:server-gate', { detail }));
+  }
+  return detail;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { BUILD_RUNTIME_CONFIG, loadRuntimeConfig, runtimeWritePolicy, validateRuntimeManifest } from '../runtime-config.mjs';
-import { compareSemanticVersions, healthVersionGate } from '../server-sync.mjs';
+import { compareSemanticVersions, healthVersionGate, serverGateTelemetry } from '../server-sync.mjs';
 
 const headers = (apiVersion = '1.1') => ({ get: (name) => name === 'X-API-Version' ? apiVersion : null });
 const reply = (payload, status = 200, apiVersion = '1.1') => ({ ok: status >= 200 && status < 300, status, headers: headers(apiVersion), json: async () => payload });
@@ -29,6 +29,10 @@ const release = { version: '1.1.0', commitSha: '0123456789abcdef0123456789abcdef
 const healthy = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready', maintenance: false, apiVersion: '1.1' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }) });
 assert.equal(healthy.state, 'healthy');
 assert.deepEqual(healthy.server.deployedRelease, release);
+assert.equal(Number.isInteger(healthy.latencyMs), true);
+assert.deepEqual(serverGateTelemetry(healthy, { observedAtUtc: '2026-08-24T12:00:00Z' }), {
+  requestId: 'goal1-test', latencyMs: healthy.latencyMs, gateState: 'healthy', reason: '', observedAtUtc: '2026-08-24T12:00:00Z', release,
+});
 
 const maintenance = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready', maintenance: true }, { apiVersion: '1.1', deployedRelease: release }) });
 assert.equal(maintenance.state, 'maintenance');
@@ -40,7 +44,8 @@ const unverifiedRelease = await healthVersionGate(config, { correlationId: 'goal
 assert.equal(unverifiedRelease.state, 'incompatible');
 assert.equal(unverifiedRelease.reason, 'release-unverified');
 const malformed = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({}, { apiVersion: '1.1' }) });
-assert.equal(malformed.state, 'offline');
+assert.equal(malformed.state, 'invalid');
+assert.equal(malformed.reason, 'malformed-payload');
 const badHeader = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }, 200, 200, '1.0') });
 assert.equal(badHeader.state, 'invalid');
 assert.equal(badHeader.reason, 'health-api-version-header-mismatch');
@@ -50,6 +55,9 @@ assert.equal(badVersionHeader.reason, 'version-api-version-header-mismatch');
 const shortSha = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: { ...release, commitSha: 'abc123' } }) });
 assert.equal(shortSha.state, 'incompatible');
 assert.equal(shortSha.reason, 'release-unverified');
+const nonHexSha = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: { ...release, commitSha: `g${'0'.repeat(39)}` } }) });
+assert.equal(nonHexSha.state, 'incompatible');
+assert.equal(nonHexSha.reason, 'release-unverified');
 const offline = await healthVersionGate(config, { timeoutMs: 1, fetchImpl: async () => { await new Promise((resolve) => setTimeout(resolve, 10)); return reply({}); } });
 assert.equal(offline.state, 'offline');
 assert.equal(healthy.allowPlayerDataWrites, false);

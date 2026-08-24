@@ -46,7 +46,7 @@ import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadou
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { healthVersionGate } from './server-sync.mjs';
+import { healthVersionGate, publishServerGateTelemetry } from './server-sync.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
@@ -118,9 +118,11 @@ async function loadThree(){
 let THREE;
 const runtimeConfig = await loadRuntimeConfig();
 const serverGate = await healthVersionGate(runtimeConfig);
+const serverGateObservation = publishServerGateTelemetry(serverGate);
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_RUNTIME_CONFIG = runtimeConfig;
   window.POCKETMONSTER_SERVER_GATE = serverGate;
+  window.POCKETMONSTER_SERVER_GATE_OBSERVATION = serverGateObservation;
   document.documentElement.dataset.serverGate = serverGate.state;
 }
 if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
