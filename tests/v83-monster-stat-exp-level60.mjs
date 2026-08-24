@@ -29,8 +29,8 @@ assert.equal(WORKBOOK_EXP_ADAPTER.curveDecision, 'M7_WORKBOOK_CURVES_LIVE');
 assert.equal(BALANCE_CONFIG.level.cap, 60);
 assert.equal(BALANCE_CONFIG.level.defaultCurve, 'Medium');
 assert.equal(INSTANCE_EXP_SCHEMA_VERSION, 'workbook-exp/v1');
-assert.equal(INSTANCE_SAVE_VERSION, 13);
-assert.equal(SAVE_SCHEMA_VERSION, 13);
+assert.equal(INSTANCE_SAVE_VERSION, 15);
+assert.equal(SAVE_SCHEMA_VERSION, 15);
 
 for (const curve of Object.keys(WORKBOOK_EXP_ADAPTER.curves)) {
   let previous = -1;
@@ -134,7 +134,7 @@ assert.equal(persisted.growthExpSchemaVersion, INSTANCE_EXP_SCHEMA_VERSION);
 assert.equal(persisted.growthCurve, 'Slow');
 const state = normalizeSavedState({ collection: [persisted], party: [persisted.instanceId] });
 const saved = sanitizeStateForPersistence(state);
-assert.equal(saved.saveVersion, 13);
+assert.equal(saved.saveVersion, 15);
 assert.equal(saved.collection[0].level, 20);
 assert.equal(saved.collection[0].growthExp, 10799);
 assert.deepEqual(normalizeSavedState(saved), state, 'save/reload is twice-is-same after M7 migration');

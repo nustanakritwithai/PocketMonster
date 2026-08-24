@@ -38,6 +38,8 @@ assert.deepEqual(
     ['passive-instance-v11', 11],
     ['canonical-monster-stats-v12', 12],
     ['canonical-monster-exp-v13', 13],
+    ['skill-item-acquisition-v14', 14],
+    ['merchant-wallet-purchase-v15', 15],
   ],
   'the supported instance migration is explicit and versioned',
 );

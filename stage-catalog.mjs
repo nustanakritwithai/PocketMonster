@@ -182,10 +182,20 @@ export const STAGE_REWARD_PROFILES=Object.freeze({
   'stage-steel-factory-v1':Object.freeze({captureBalls:5,mineralBite:2,trainingChow:1}),
 });
 
+export const STAGE_CURRENCY_REWARD_PROFILES=Object.freeze(Object.fromEntries(
+  Object.keys(STAGE_REWARD_PROFILES).map(profileId=>[profileId,Object.freeze({gold:300})]),
+));
+
 export function stageRewards(stageId){
   const definition=STAGE_BY_ID[stageId];
   if(!definition)return {};
   return {...(STAGE_REWARD_PROFILES[definition.rewardProfileId]||{})};
+}
+
+export function stageCurrencyRewards(stageId){
+  const definition=STAGE_BY_ID[stageId];
+  if(!definition)return {};
+  return {...(STAGE_CURRENCY_REWARD_PROFILES[definition.rewardProfileId]||{})};
 }
 
 export function createStageProgress(){

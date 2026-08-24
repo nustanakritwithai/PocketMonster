@@ -5,7 +5,7 @@ import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
-import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
+import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageRewards, stageUnlockReason, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, nextWarpPromptState, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
@@ -31,6 +31,9 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, setManualSkillSlot, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
+import { commitSkillItemUse, resolveSkillItemUse, SKILL_ITEM_REASONS } from './skill-items.mjs';
+import { MERCHANT_PURCHASE_REASONS, commitMerchantPurchase } from './merchant-purchase.mjs';
+import { MERCHANT_OFFER_IDS, merchantOffers } from './merchant-shop-catalog.mjs';
 import { skillButtonIconContract } from './skill-icon-runtime.mjs';
 import { enemyAreaIconProfile } from './skill-area-icon-profile.mjs';
 import { passiveCatalogEntry } from './passive-catalog.mjs';
@@ -55,8 +58,10 @@ import {
   RAISING_EVENT_CATALOG,
   SKILL_CANDIDATES,
   SKILL_MUTATIONS,
+  SKILL_ITEM_CATALOG,
   equipmentById,
   foodById,
+  skillItemById,
 } from './content-catalog.mjs';
 import { createSpeciesCatalogAdapter, monsterCatalogEntry } from './monster-catalog.mjs';
 import { monsterStatCatalogEntry } from './monster-stat-catalog.mjs';
@@ -2330,10 +2335,12 @@ function clearTransientEffects(){
 
 
 // ---------- State / save ----------
-const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
+const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
+let pendingSkillItemUse=null;
+let skillItemCommandSequence=0;
 function starterJourneyDefaults(){return{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}};}
 function markRareDiscovery(w,kind='found'){
   if(!w?.rare)return;
@@ -2735,6 +2742,83 @@ function renderFocusedSkillLoadoutV2(panel,inst,presentation,documentRef=documen
   tree.root.dataset.modelState=model.ok?'ready':model.available?'invalid':'empty';
   return model;
 }
+const SKILL_ITEM_REASON_TH=Object.freeze({
+  [SKILL_ITEM_REASONS.ITEM_EMPTY]:'ผลไฟหมด',
+  [SKILL_ITEM_REASONS.INCOMPATIBLE_TYPE]:'ธาตุของมอนสเตอร์ไม่ตรงเงื่อนไข Skill Item',
+  [SKILL_ITEM_REASONS.LEVEL_REQUIRED]:'เลเวลของมอนสเตอร์ยังไม่ถึงเงื่อนไข',
+  [SKILL_ITEM_REASONS.ALREADY_LEARNED]:'มอนสเตอร์ตัวนี้เรียน Ember แล้ว',
+  [SKILL_ITEM_REASONS.INVALID_SLOT]:'กรุณาเลือกสล็อต S1–S4',
+  [SKILL_ITEM_REASONS.SLOT_LOCKED]:'สล็อตระบบไม่รับสกิลจากไอเทม',
+  [SKILL_ITEM_REASONS.INVALID_SLOT_STATE]:'Loadout ปัจจุบันไม่ถูกต้อง กรุณาจัดสล็อตใหม่',
+  [SKILL_ITEM_REASONS.CONFIRMATION_REQUIRED]:'สล็อตนี้มีสกิลอยู่ ต้องยืนยันการแทนที่',
+  [SKILL_ITEM_REASONS.STALE_SLOT]:'สล็อตเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง',
+  [SKILL_ITEM_REASONS.DUPLICATE_COMMAND]:'คำสั่งนี้ถูกบันทึกไปแล้ว',
+  [SKILL_ITEM_REASONS.PERSISTENCE_FAILED]:'บันทึกไม่สำเร็จ — ไอเทมยังไม่ถูกใช้',
+});
+function skillItemReasonText(reason){return SKILL_ITEM_REASON_TH[reason]||`ใช้ Skill Item ไม่สำเร็จ • ${reason||'unknown'}`;}
+function skillNameLabel(skillId){const def=skillCatalogEntry(skillId);return def?`${def.nameTH} (${def.nameEN})`:skillId;}
+function renderSkillItemPanel(inst){
+  const item=SKILL_ITEM_CATALOG.emberFruit,skill=skillCatalogEntry(item.grantsSkillId),quantity=state.inventory[item.id]||0;
+  const options=MANUAL_SKILL_SLOTS.map(slot=>{const occupant=(inst.skills||[]).find(owned=>owned.slot===slot);return `<option value="${slot}">${slot.toUpperCase()}${occupant?` • แทนที่ ${skillNameLabel(occupant.skillId)}`:' • ว่าง'}</option>`;}).join('');
+  const preview=resolveSkillItemUse({state,monsterId:inst.instanceId,itemId:item.id,slot:'s1',commandId:`preview:${inst.instanceId}:${quantity}`});
+  const available=preview.ok||preview.reason===SKILL_ITEM_REASONS.CONFIRMATION_REQUIRED;
+  const reason=available?'':skillItemReasonText(preview.reason);
+  return `<section class="skill-item-panel" data-skill-item-panel="emberFruit"><div class="skill-item-head"><div><b>🍎 ${item.name} ×${quantity}</b><span>เรียนถาวร: ${skillNameLabel(skill.id)} ${typeBadge(skill.runtimeType)}</span></div><span class="skill-item-rarity">${item.rarity}</span></div><div class="skill-detail">Power ${skill.power} • CD ${skill.cooldownSec}s • Uses ${skill.maxUses} • ใช้ได้กับธาตุ ${item.compatibility.allowedTypes.join('/')}</div><div class="skill-item-controls"><label>ติดตั้งช่อง <select data-skill-item-slot="${item.id}" ${available?'':'disabled'}>${options}</select></label><button data-use-skill-item="${item.id}" ${available?'':'disabled'}>กินเพื่อเรียนสกิล</button></div>${reason?`<div class="skill-req" data-skill-item-reason>${reason}</div>`:'<div class="skill-item-warning">ยืนยันก่อนใช้ทุกครั้ง • ถ้าแทนที่ สกิลเดิมยังอยู่และคง Mastery/Uses</div>'}</section>`;
+}
+function closeSkillItemConfirmation(){
+  pendingSkillItemUse=null;
+  el('skillItemConfirm')?.classList.add('hidden');
+}
+function showSkillItemConfirmation(command,resolution){
+  const inst=getInst(command.monsterId),item=skillItemById(command.itemId),skill=skillCatalogEntry(item?.grantsSkillId);
+  if(!inst||!item||!skill)return;
+  const oldSkillId=resolution.occupantSkillId||resolution.operation?.expectedOccupantSkillId||null;
+  const body=el('skillItemConfirmBody');
+  if(body)body.innerHTML=`<div class="skill-item-confirm-summary"><b>${displayName(inst)}</b><div>🍎 ${item.name} ×1 → ${skillNameLabel(skill.id)}</div><div>ติดตั้งที่ <strong>${command.slot.toUpperCase()}</strong></div>${oldSkillId?`<div class="skill-item-replace-note">แทนที่ ${skillNameLabel(oldSkillId)} ในสล็อตนี้<br><small>สกิลเดิมไม่ถูกลบ และค่า Mastery/Uses ยังคงเดิม</small></div>`:'<div class="skill-item-empty-note">สล็อตนี้ว่าง</div>'}<div class="skill-item-warning">ไอเทมจะลดลงเมื่อบันทึกสำเร็จเท่านั้น</div></div>`;
+  if(el('skillItemConfirmAccept'))el('skillItemConfirmAccept').disabled=false;
+  el('skillItemConfirm')?.classList.remove('hidden');
+}
+function startSkillItemUse(monsterId,itemId,slot){
+  if(!assertCharacterMutable(monsterId))return;
+  const now=Date.now(),commandId=`skill-item:${now}:${++skillItemCommandSequence}`;
+  let command={monsterId,itemId,slot,commandId,now};
+  const resolution=resolveSkillItemUse({state,...command});
+  if(!resolution.ok&&resolution.reason!==SKILL_ITEM_REASONS.CONFIRMATION_REQUIRED){msg(skillItemReasonText(resolution.reason));renderSkills();return;}
+  command={...command,expectedOccupantSkillId:resolution.reason===SKILL_ITEM_REASONS.CONFIRMATION_REQUIRED?resolution.occupantSkillId:null};
+  pendingSkillItemUse=Object.freeze(command);
+  showSkillItemConfirmation(command,resolution);
+}
+function confirmSkillItemUse(){
+  const command=pendingSkillItemUse;
+  if(!command)return;
+  const accept=el('skillItemConfirmAccept');if(accept)accept.disabled=true;
+  let candidateForPublish=null;
+  const committed=commitSkillItemUse({
+    state,
+    command,
+    persistCandidate(nextState){
+      candidateForPublish={...nextState,saveVersion:SAVE_SCHEMA_VERSION,lifeLastAt:command.now};
+      const envelope={state:sanitizeStateForPersistence(persistableState(candidateForPublish)),playerHp:playerData.hp,saveSchemaVersion: SAVE_SCHEMA_VERSION};
+      return writeStoredSave(localStorage, envelope);
+    },
+  });
+  if(!committed.ok){
+    if(accept)accept.disabled=false;
+    msg(skillItemReasonText(committed.reason));
+    if(committed.reason===SKILL_ITEM_REASONS.STALE_SLOT||committed.reason===SKILL_ITEM_REASONS.ALREADY_LEARNED)closeSkillItemConfirmation();
+    renderSkills();
+    return;
+  }
+  Object.assign(state,candidateForPublish);
+  closeSkillItemConfirmation();
+  spawnFeedEffect(fxWorldPos(command.monsterId),FOOD_FX_COLOR.emberFruit);
+  playSFX('sfx_feed');
+  const replaced=committed.displacedSkillId?` • เก็บ ${skillNameLabel(committed.displacedSkillId)} ไว้นอกสล็อต`:'';
+  msg(`${displayName(committed.nextMonster)} เรียน ${skillNameLabel(committed.learnedSkill.skillId)} ที่ ${command.slot.toUpperCase()} สำเร็จ${replaced}`);
+  if(remoteSaveReady)void saveRemoteSave(committed.persisted).catch(error=>console.warn('cloud save failed',error));
+  else if(remoteSaveSyncing){remoteSavePending=true;}
+  renderManager();renderSkills();renderParty();renderHUD();
+}
 function renderSkills(targetPanel=null){
   const panel=targetPanel||characterSystemPanel('skills','skillsPanel');
   if(!panel)return;
@@ -2781,11 +2865,12 @@ function renderSkills(targetPanel=null){
   }).join('');
   const memoryEligibility=resolveInheritedSkillMemoryEligibility(inst);
   const memoryHTML=inst.inheritedSkillMemoryId?`<div class="skills-section-title">Skill Memory จากการผสมพันธุ์</div><div class="skill-card ${memoryEligibility.eligible?'':'skill-locked'}"><div class="skill-card-header"><b>${memoryEligibility.definition?.nameTH||inst.inheritedSkillMemoryId} • ${inst.inheritedSkillMemoryId}</b><span class="skill-mastery-label">${memoryEligibility.method||'Memory'}</span></div><div class="skill-detail">บันทึกจาก Partner • ไม่ติดตั้งสล็อตอัตโนมัติ</div>${memoryEligibility.eligible?`<button data-learn-memory="${inst.instanceId}">เรียนจาก Memory</button>`:`<div class="skill-req">${SKILL_MEMORY_REASON_TH[memoryEligibility.reason]||memoryEligibility.reason}</div>`}</div>`:'';
-  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div><div class="skill-help"><b>จัด Loadout:</b> เลือก S1–S4 จากสกิลที่เรียนแล้ว • ถ้าช่องมีสกิลอยู่ ระบบจะสลับหรือถอดตัวเดิมโดยไม่รีเซ็ต Uses/Cooldown/Mastery</div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
+  panel.innerHTML=`<div class="skills-panel"><div class="monster-selector"><select data-monster-select>${monsterSelectHTML(selectedId)}</select></div>${renderSkillItemPanel(inst)}<div class="skill-help"><b>จัด Loadout:</b> เลือก S1–S4 จากสกิลที่เรียนแล้ว • ถ้าช่องมีสกิลอยู่ ระบบจะสลับหรือถอดตัวเดิมโดยไม่รีเซ็ต Uses/Cooldown/Mastery</div>${learnedHTML?`<div class="skills-section-title">สกิลที่เรียนรู้ (${(inst.skills||[]).length})</div>${learnedHTML}`:'<div class="manager-empty">ยังไม่ได้เรียนสกิล — ใช้สกิลในการต่อสู้เพื่อสะสม EXP</div>'}${memoryHTML}${lockedMoves?`<div class="skills-section-title">สกิลที่ยังไม่เรียน</div>${lockedMoves}`:''}${candHTML?`<div class="skills-section-title">สกิล candidate</div>${candHTML}`:''}<div class="skill-help"><b>ระดับ Mastery:</b> เริ่มต้น → คุ้นเคย → ชำนาญ → เชี่ยวชาญ → ปรมาจารย์<br><b>EXP สะสม:</b> 100 / 300 / 700 / 1500<br><b>Power bonus:</b> +0% / +2% / +5% / +8% / +11%<br>ใช้สกิลซ้ำๆ ใน battle เดียว = EXP ลดลง (novelty decay 0.7x)</div></div>`;
   bindMonsterSelect(panel,'skillsSelectedId',renderSkills);
   panel.querySelectorAll('[data-learn]').forEach(b=>b.onclick=()=>learnCandidateSkill(inst.instanceId,b.dataset.learn));
   panel.querySelectorAll('[data-learn-memory]').forEach(b=>b.onclick=()=>learnSkillMemory(b.dataset.learnMemory));
   panel.querySelectorAll('[data-skill-loadout]').forEach(select=>select.onchange=()=>setMonsterSkillLoadout(inst.instanceId,select.dataset.skillLoadout,select.value||null));
+  panel.querySelectorAll('[data-use-skill-item]').forEach(button=>button.onclick=()=>{const slot=panel.querySelector(`[data-skill-item-slot="${button.dataset.useSkillItem}"]`)?.value;startSkillItemUse(inst.instanceId,button.dataset.useSkillItem,slot);});
 }
 function renderFocusedEquipmentLoadout(){
   const presentation=focusedCharacterPresentation();
@@ -3764,14 +3849,18 @@ function completeStageClear(stageId,{recovered=false}={}){
   const next=recordStageClear(state.stageProgress,stageId,{bestTime:elapsed});
   const first=!next.firstClearRewards[stageId];
   const rewards=stageRewards(stageId);
+  const currencyRewards=stageCurrencyRewards(stageId);
   if(first){
     for(const [key,value] of Object.entries(rewards))state.inventory[key]=(state.inventory[key]||0)+value;
+    const gold=Number.isSafeInteger(currencyRewards.gold)?currencyRewards.gold:0;
+    state.wallet={...state.wallet,gold:Math.max(0,state.wallet?.gold||0)+gold};
     next.firstClearRewards[stageId]={grantedAt:Date.now(),rewards};
   }
   state.stageProgress=next;
   try{saveGame(false);}catch{}
   runBestEffortCombatPresentation(()=>{renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});});
-  return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}`:' • เคลียร์ด่านแล้ว';
+  const goldText=first&&currencyRewards.gold?` +${currencyRewards.gold} Gold`:'';
+  return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}${goldText}`:' • เคลียร์ด่านแล้ว';
 }
 function defeatWild(w,rewardOwnerInstanceId=null){
   if(w.dead)return;
@@ -5113,6 +5202,7 @@ const FOOD_DEFS=FOOD_CATALOG;
 function feedMonster(id,food){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
+  if(skillItemById(food)){msg('ผลไฟเป็น Skill Item • ใช้จากแท็บ Skills และยืนยันสล็อต S1–S4');return;}
   if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
   state.inventory[food]--;
   // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
@@ -5471,11 +5561,18 @@ function updateNpcUI(){
   if(target){const p=worldToScreen(target.position.clone().add(new THREE.Vector3(0,2.0,0)));if(p.visible){b.classList.remove('hidden');b.textContent=target===merchantNpc?'ร้านค้า':target===trainerNpc?'ฝึก':target===evolutionNpc?'วิวัฒนาการ':target===breedingNpc?'ผสมพันธุ์':'คุย';b.classList.toggle('merchant-btn',target===merchantNpc);b.classList.toggle('trainer-btn',target===trainerNpc);b.classList.toggle('evolution-btn',target===evolutionNpc);b.classList.toggle('breeding-btn',target===breedingNpc);b.style.left=`${p.x}px`;b.style.top=`${p.y}px`;return;}}
   b.classList.add('hidden');
 }
-const MERCHANT_STOCK=Object.freeze([
-  {id:'hpPotion',name:'ยาฟื้นพลัง',price:50,icon:'🧪',note:'ฟื้น HP ของมอนสเตอร์'},
-  {id:'captureBalls',name:'ลูกแก้วจับมอน',price:200,icon:'🔴',note:'ใช้จับมอนสเตอร์'},
-  {id:'trainingChow',name:'อาหารบำรุง',price:150,icon:'🍖',note:'ใช้ดูแลและฝึกมอนสเตอร์'},
-]);
+let merchantPurchaseSequence=0;
+let merchantPurchasePending=false;
+const MERCHANT_PURCHASE_REASON_TH=Object.freeze({
+  [MERCHANT_PURCHASE_REASONS.INSUFFICIENT_FUNDS]:'Gold ไม่พอสำหรับสินค้านี้',
+  [MERCHANT_PURCHASE_REASONS.INVENTORY_FULL]:'ช่องเก็บไอเทมเต็ม',
+  [MERCHANT_PURCHASE_REASONS.DUPLICATE_COMMAND]:'คำสั่งซื้อนี้ถูกบันทึกแล้ว',
+  [MERCHANT_PURCHASE_REASONS.STALE_PRICE]:'ราคาสินค้าเปลี่ยนแล้ว กรุณาเปิดร้านใหม่',
+  [MERCHANT_PURCHASE_REASONS.STALE_CATALOG]:'รายการสินค้าล้าสมัย กรุณาเปิดร้านใหม่',
+  [MERCHANT_PURCHASE_REASONS.STALE_STATE]:'ข้อมูลกระเป๋าเปลี่ยนแล้ว กรุณาลองใหม่',
+  [MERCHANT_PURCHASE_REASONS.PERSISTENCE_FAILED]:'ซื้อไม่สำเร็จ — Gold และไอเทมไม่เปลี่ยน',
+});
+function merchantPurchaseReasonText(reason){return MERCHANT_PURCHASE_REASON_TH[reason]||`ซื้อไม่สำเร็จ • ${reason||'unknown'}`;}
 function openMerchant(){
   if(!isNearMerchant()){msg('เข้าใกล้พ่อค้าก่อน');return;}
   el('merchantShop').classList.remove('hidden');
@@ -5483,6 +5580,48 @@ function openMerchant(){
   playSFX('sfx_ui_open');
 }
 function closeMerchant(){el('merchantShop').classList.add('hidden');playSFX('sfx_ui_close');}
+function beginMerchantPurchase(offerId){
+  if(merchantPurchasePending)return;
+  const offer=merchantOffers().find(entry=>entry.offerId===offerId);
+  if(!offer)return;
+  if(offer.requiresConfirmation&&typeof window.confirm==='function'&&!window.confirm(`${offer.name}\nราคา ${offer.price.amount} Gold\nซื้อเข้ากระเป๋า 1 ครั้งหรือไม่?`))return;
+  merchantPurchasePending=true;
+  renderMerchantShop();
+  const now=Date.now();
+  const command={
+    commandId:`merchant-purchase:${now}:${++merchantPurchaseSequence}`,
+    offerId:offer.offerId,
+    quantity:offer.quantity,
+    expectedCatalogVersion:offer.catalogVersion,
+    expectedUnitPrice:offer.price.amount,
+    expectedCurrencyId:offer.price.currencyId,
+    expectedGoldBefore:state.wallet?.gold,
+    expectedItemQuantityBefore:state.inventory?.[offer.itemId],
+    purchasedAt:now,
+  };
+  let candidateForPublish=null;
+  const committed=commitMerchantPurchase({
+    state,
+    command,
+    persistCandidate(nextState){
+      candidateForPublish={...nextState,saveVersion:SAVE_SCHEMA_VERSION,lifeLastAt:now};
+      const envelope={state:sanitizeStateForPersistence(persistableState(candidateForPublish)),playerHp:playerData.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION};
+      const written=writeStoredSave(localStorage,envelope);
+      return {ok:true,envelope:written};
+    },
+  });
+  merchantPurchasePending=false;
+  if(!committed.ok){
+    msg(merchantPurchaseReasonText(committed.reason));
+    renderMerchantShop();
+    return;
+  }
+  Object.assign(state,candidateForPublish);
+  msg(`${offer.name} เข้ากระเป๋าแล้ว • -${offer.price.amount} Gold`);
+  renderMerchantShop();renderManager();renderHUD();
+  if(remoteSaveReady)void saveRemoteSave(committed.persisted.envelope).catch(error=>console.warn('cloud save failed',error));
+  else if(remoteSaveSyncing)remoteSavePending=true;
+}
 function openTrainer(){
   if(!isNearTrainer()){msg('เข้าใกล้ครูฝึกก่อน');return;}
   el('trainerPanel').classList.remove('hidden');
@@ -5546,14 +5685,14 @@ function renderEvolutionGuide(){
 }
 function renderMerchantShop(){
   const box=el('merchantProducts');if(!box)return;
-  box.innerHTML=MERCHANT_STOCK.map(item=>`<div class="merchant-item"><div class="merchant-icon">${item.icon}</div><div class="merchant-info"><b>${item.name}</b><small>${item.note}</small><span>${item.price} เหรียญ</span></div><button data-buy-item="${item.id}">ซื้อ</button></div>`).join('');
-  box.querySelectorAll('[data-buy-item]').forEach(button=>button.onclick=()=>{
-    const item=MERCHANT_STOCK.find(entry=>entry.id===button.dataset.buyItem);if(!item)return;
-    // Phase 1: catalog and interaction are live; trusted currency purchase will move to VPS.
-    state.inventory[item.id]=(state.inventory[item.id]||0)+1;
-    msg(`${item.name} เข้ากระเป๋าแล้ว • ราคาทดสอบ ${item.price} เหรียญ`);
-    renderMerchantShop();renderHUD();saveGame(false);
-  });
+  const gold=state.wallet?.gold??0;
+  const balance=el('merchantGold');if(balance)balance.textContent=`${gold}`;
+  box.innerHTML=merchantOffers().map(offer=>{
+    const owned=state.inventory?.[offer.itemId]||0;
+    const canAfford=gold>=offer.price.amount;
+    return `<div class="merchant-item" data-offer-id="${offer.offerId}"><div class="merchant-icon">${offer.icon}</div><div class="merchant-info"><b>${offer.name}</b><small>${offer.note}</small><span>${offer.price.amount} Gold • มี ${owned}</span></div><button data-buy-offer="${offer.offerId}" ${merchantPurchasePending||!canAfford?'disabled':''}>ซื้อ ${offer.quantity}</button></div>`;
+  }).join('');
+  box.querySelectorAll('[data-buy-offer]').forEach(button=>button.onclick=()=>beginMerchantPurchase(button.dataset.buyOffer));
 }
 function assertCharacterMutable(id){
   const gate=characterUI.requestMutate(id);
@@ -5721,7 +5860,7 @@ function monsterCard(inst,where){
   const sp=spById[inst.speciesId],types=monsterTypes(inst).map(typeBadge).join(''),wrap=document.createElement('div');wrap.className='manager-item';if(state.ui?.focusedMonsterId===inst.instanceId)wrap.classList.add('focused-monster');const active=state.ranchActive.includes(inst.instanceId),faint=inst.fainted||inst.hp<=0,cr=monsterCrValue(inst);
   const eq=inst.equipment||{};
   const stash=(state.inventory.stash||[]).map(equipmentById).filter(Boolean);
-  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SP.ATK ${inst.spAtk} • SP.DEF ${inst.spDef} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="emberFruit">ผลไฟ</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
+  wrap.innerHTML=`<div class="monster-main"><div class="monster-title"><b>${displayName(inst)}</b>${types}</div><div class="monster-meta">Lv.${inst.level} • ${inst.lifeStage} • Gen ${inst.generation} • ${inst.personality} • <span class="gender">${GENDER_TH[inst.gender]||inst.gender}</span> • Group ${sp.breedingGroup}<br>HP ${fmt(inst.hp)}/${inst.maxHp} • ATK ${inst.atk} • DEF ${inst.def} • SP.ATK ${inst.spAtk} • SP.DEF ${inst.spDef} • SPD ${inst.spd} • CR ${cr??'—'} • Bond ${fmt(inst.bond)} ${faint?'<span class="fainted">• FAINTED</span>':''}</div>${needsHTML(inst)}${breakdownHTML(inst)}${familyHTML(inst)}<div class="gene-line">${geneHTML(inst)}</div>${where==='storage'?trainingPoolHTML(inst):''}${skillsMiniHTML(inst)}${equipMiniHTML(inst)}${skillPanelHTML(inst)}<div class="feed-actions"><button data-feed="protein">โปรตีน</button><button data-feed="healthy">สุขภาพ</button><button data-feed="favorite">ของโปรด</button><button data-feed="trainingChow">อาหารฝึก</button><button data-feed="mineralBite">แร่บำรุง</button><button data-feed="moonFruit">ผลจันทร์</button></div><div class="care-actions"><button data-care="rest">💤 พักผ่อน</button><button data-care="play">🎾 เล่นด้วย</button></div><div class="equip-actions">${stash.map(item=>`<button data-equip="${item.id}">${eq[item.slot]?.id===item.id?'ถอด':'ใส่'} ${item.name}</button>`).join('')}</div>${where==='storage'?`<div class="train-actions"><button data-train="power">Power</button><button data-train="defense">Defense</button><button data-train="speed">Speed</button><button data-train="technique">Technique</button><button data-train="spirit">Spirit</button></div>`:''}</div><div class="manager-actions"><button class="move-btn ${where==='storage'?'withdraw':''}">${where==='storage'?'เข้า Party':'ฝาก Storage'}</button>${where==='storage'?`<button class="ranch-toggle ${active?'active':''}">${active?'เก็บจากลาน':'ปล่อยใน Ranch'}</button>`:''}${sp.evolutionPaths?.length?'<button class="evo-btn">ดู Evolution</button>':''}<button class="cr-btn">ดู CR</button></div>`;
   wrap.querySelectorAll('[data-feed]').forEach(b=>b.onclick=()=>feedMonster(inst.instanceId,b.dataset.feed));
   wrap.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>careAction(inst.instanceId,b.dataset.care));
   wrap.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>toggleStarterEquip(inst.instanceId,b.dataset.equip));
@@ -6172,6 +6311,7 @@ function renderHUD(){
   setTextIfChanged(el('collectionCount'),state.collection.length);
   const balls=state.inventory.captureBalls||0;
   setTextIfChanged(el('captureBallCount'),balls);
+  setTextIfChanged(el('goldCount'),state.wallet?.gold??0);
   document.querySelector('.ball-pill')?.classList.toggle('warning',balls<=2);
   setTextIfChanged(el('playerExp'),Math.floor(state.exp));
   setTextIfChanged(el('ranchCount'),`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`);
@@ -6567,8 +6707,12 @@ function migrateLoadedState(s){
   state.selectedSlot=clean.selectedSlot;
   state.exp=Number.isFinite(clean.exp)?clean.exp:0;
   state.lifeLastAt=clean.lifeLastAt;
+  state.wallet=clean.wallet||{gold:0};
   state.inventory=clean.inventory;
+  state.merchantPurchaseCommandIds=clean.merchantPurchaseCommandIds||[];
+  state.merchantPurchaseHistory=clean.merchantPurchaseHistory||[];
   state.eggs=clean.eggs||[];
+  state.skillItemUseCommandIds=clean.skillItemUseCommandIds||[];
   applyBreedingSkillMemoryRequestLedger(state,clean);
   state.breeding=clean.breeding||{parentA:null,parentB:null};
   state.evolutionCandidate=null;
@@ -6827,7 +6971,7 @@ el('menuBtn').onclick=()=>{playSFX('sfx_ui_click');el('utilityMenu').classList.t
 window.addEventListener('resize',syncOrientationLock); window.addEventListener('orientationchange',syncOrientationLock); document.addEventListener('fullscreenchange',syncOrientationLock);
 startGameInteraction(); setTimeout(syncOrientationLock,80);
 el('parentABtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentA');};el('parentBBtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentB');};el('breedBtn').onclick=()=>{playSFX('sfx_ui_click');createEgg();};el('closePicker').onclick=()=>{playSFX('sfx_ui_click');closeMonsterPicker();};el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
-el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;state.inventory.captureBalls=(state.inventory.captureBalls||0)+5;msg('NPC มอบ Capture Ball ทดสอบ +5');renderManager();renderHUD();saveGame(false);};el('refillFoodBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;for(const key of ['protein','healthy','favorite','trainingChow','mineralBite','emberFruit','moonFruit'])state.inventory[key]=(state.inventory[key]||0)+3;msg('NPC มอบอาหารทดสอบ +3 ทุกชนิด');renderManager();saveGame(false);};
+el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;const balls=state.inventory.captureBalls||0;if(balls>0){msg('ยังมี Capture Ball อยู่ — safety floor จะทำงานเมื่อหมดเท่านั้น');return;}state.inventory.captureBalls=5;msg('NPC มอบ Capture Ball ฉุกเฉิน +5');renderManager();renderHUD();saveGame(false);};
 function bindActionPress(button,handler){
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();
@@ -6865,6 +7009,10 @@ bindActionPress(el('skill1Btn'),()=>dispatchSkill(0));
 bindActionPress(el('skill2Btn'),()=>dispatchSkill(1));
 bindActionPress(el('skill3Btn'),()=>dispatchSkill(2));
 bindActionPress(el('skill4Btn'),()=>dispatchSkill(3));
+el('skillItemConfirmCancel').onclick=()=>closeSkillItemConfirmation();
+el('skillItemConfirmAccept').onclick=()=>confirmSkillItemUse();
+el('skillItemConfirm').addEventListener('pointerdown',event=>{if(event.target===el('skillItemConfirm'))closeSkillItemConfirmation();});
+addEventListener('keydown',event=>{if(event.key==='Escape'&&!el('skillItemConfirm').classList.contains('hidden'))closeSkillItemConfirmation();});
 el('saveBtn').onclick=()=>saveGame(true);
 el('muteBtn').onclick=()=>{const m=toggleMute();el('muteBtn').textContent=m?'🔇 เสียงปิด':'🔊 เสียงเปิด';localStorage.setItem('mlr-audio-muted',String(m));};
 {const savedVol=localStorage.getItem('mlr-audio-volume');if(savedVol){setVolume(parseFloat(savedVol));el('volumeSlider').value=Math.round(parseFloat(savedVol)*100);}const savedMute=localStorage.getItem('mlr-audio-muted');if(savedMute==='true'){toggleMute();el('muteBtn').textContent='🔇 เสียงปิด';}}

@@ -103,7 +103,7 @@ const runtimeMutants=[
   ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  try{saveGame(false);}catch{}','  state.stageProgress=next;'),htmlSource],
   ['record fake recovery best time',gameSource.replace('const elapsed=!recovered&&stageRunStartedAt?', 'const elapsed=stageRunStartedAt?'),htmlSource],
   ['leave cloud save pending clear unreconciled',gameSource.replace('      reloadWorldFromLoadedState();','      void remote.state;'),htmlSource],
-  ['drop local saves during initial Cloud sync',gameSource.replace('  else if(remoteSaveSyncing)remoteSavePending=true;',''),htmlSource],
+  ['drop local saves during initial Cloud sync',gameSource.replace("  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }\n  else if(remoteSaveSyncing)remoteSavePending=true;", "  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }"),htmlSource],
   ['leave reconciled Cloud document stale',gameSource.replace('    await flushRemoteSaveUntilSettled();','    void currentSaveEnvelope();'),htmlSource],
 ];
 for(const [name,game,html,css] of runtimeMutants){

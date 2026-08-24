@@ -29,6 +29,28 @@ export const FOOD_CATALOG = Object.freeze({
   moonFruit: Object.freeze({ id: 'moonFruit', category: 'evolution', name: 'ผลจันทร์', effects: Object.freeze({}) }),
 });
 
+// Skill Items use their own command/transaction path. The legacy `skill` food
+// row remains above as a read-only compatibility surface for older V8 content
+// checks, but live UI must never route these items through resolveFeed().
+export const SKILL_ITEM_CATALOG = Object.freeze({
+  emberFruit: Object.freeze({
+    id: 'emberFruit',
+    category: 'skillItem',
+    name: 'ผลไฟ',
+    grantsSkillId: 'SK_FIRE_01',
+    compatibility: Object.freeze({
+      // Fire species already learn Ember at Lv.1 from their canonical
+      // learnset. Normal compatibility keeps the item usable as an actual
+      // customization path while duplicate learning still fails closed.
+      allowedTypes: Object.freeze(['Fire', 'Normal']),
+      minLevel: 5,
+    }),
+    consumeOn: 'success',
+    rarity: 'Common',
+    catalogVersion: 1,
+  }),
+});
+
 export const EQUIPMENT_CATALOG = Object.freeze([
   Object.freeze({ id: 'ranch_band', slot: 'gear', name: 'Ranch Band', affixes: Object.freeze([Object.freeze({ group: 'atk', stat: 'atk', value: 2 })]) }),
   Object.freeze({ id: 'guard_charm', slot: 'charm', name: 'Guard Charm', affixes: Object.freeze([Object.freeze({ group: 'def', stat: 'def', value: 2 })]) }),
@@ -45,7 +67,7 @@ export const DEFAULT_INVENTORY = Object.freeze({
   favorite: 6,
   trainingChow: 3,
   mineralBite: 3,
-  emberFruit: 2,
+  emberFruit: 1,
   moonFruit: 2,
   stash: Object.freeze(['ranch_band', 'guard_charm', 'swift_lens', 'flame_claw', 'guard_band', 'focus_lens']),
 });
@@ -176,6 +198,10 @@ export function equipmentById(id) {
 
 export function foodById(id) {
   return FOOD_CATALOG[id] ?? null;
+}
+
+export function skillItemById(id) {
+  return SKILL_ITEM_CATALOG[id] ?? null;
 }
 
 export function personalityTrainingMultiplier(personalityId, line) {

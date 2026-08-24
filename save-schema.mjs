@@ -10,10 +10,19 @@ import {
   eggCollectionDiagnostics,
   normalizeEggsForPersistence,
 } from './breeding.mjs';
+import {
+  normalizeSkillItemCommandIds,
+  skillItemAcquisitionDiagnostics,
+} from './skill-items.mjs';
+import {
+  merchantPurchaseDiagnostics,
+  normalizeMerchantPurchaseCommandIds,
+  normalizeMerchantPurchaseHistory,
+} from './merchant-purchase.mjs';
 
 export const APP_VERSION = '8.2.0';
 export const ASSET_REVISION = '810';
-export const SAVE_SCHEMA_VERSION = 13;
+export const SAVE_SCHEMA_VERSION = 15;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
 export const LEGACY_SAVE_KEYS = Object.freeze([
@@ -51,7 +60,36 @@ export const SAVE_MIGRATION_REGISTRY = Object.freeze([
     targetVersion: 13,
     migrate: migrateState,
   }),
+  Object.freeze({
+    id: 'skill-item-acquisition-v14',
+    targetVersion: 14,
+    migrate: migrateState,
+  }),
+  Object.freeze({
+    id: 'merchant-wallet-purchase-v15',
+    targetVersion: 15,
+    migrate: migrateMerchantWalletState,
+  }),
 ]);
+
+function validGold(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function migrateMerchantWalletState(input, { sourceVersion = 0 } = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const wallet = source.wallet && typeof source.wallet === 'object' && !Array.isArray(source.wallet)
+    ? source.wallet
+    : null;
+  const gold = validGold(wallet?.gold) ? wallet.gold : (sourceVersion < SAVE_SCHEMA_VERSION ? 300 : 0);
+  return {
+    ...source,
+    wallet: { gold },
+    merchantPurchaseCommandIds: normalizeMerchantPurchaseCommandIds(source.merchantPurchaseCommandIds),
+    merchantPurchaseHistory: normalizeMerchantPurchaseHistory(source.merchantPurchaseHistory),
+    saveVersion: SAVE_SCHEMA_VERSION,
+  };
+}
 
 export function sanitizeStateForPersistence(input) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -62,14 +100,20 @@ export function sanitizeStateForPersistence(input) {
     ? source.collection.map(sanitizeMonsterInstanceForPersistence)
     : [];
   state.eggs = normalizeEggsForPersistence(source.eggs);
+  state.skillItemUseCommandIds = normalizeSkillItemCommandIds(source.skillItemUseCommandIds);
+  const wallet = source.wallet && typeof source.wallet === 'object' && !Array.isArray(source.wallet) ? source.wallet : {};
+  state.wallet = { gold: validGold(wallet.gold) ? wallet.gold : 0 };
+  state.merchantPurchaseCommandIds = normalizeMerchantPurchaseCommandIds(source.merchantPurchaseCommandIds);
+  state.merchantPurchaseHistory = normalizeMerchantPurchaseHistory(source.merchantPurchaseHistory);
   state.saveVersion = SAVE_SCHEMA_VERSION;
   return state;
 }
 
 export function applySaveMigrations(input, { now = Date.now() } = {}) {
   let state = input && typeof input === 'object' ? input : {};
+  const sourceVersion = Number.isSafeInteger(state.saveVersion) ? state.saveVersion : 0;
   for (const migration of SAVE_MIGRATION_REGISTRY) {
-    state = migration.migrate(state, { now });
+    state = migration.migrate(state, { now, sourceVersion });
   }
   return state;
 }
@@ -78,6 +122,8 @@ function reportSaveDiagnostics(state, onDiagnostic) {
   const diagnostics = Object.freeze([
     ...catalogIdentityDiagnostics(state),
     ...eggCollectionDiagnostics(state.eggs),
+    ...skillItemAcquisitionDiagnostics(state),
+    ...merchantPurchaseDiagnostics(state),
   ]);
   if (typeof onDiagnostic === 'function') {
     for (const diagnostic of diagnostics) onDiagnostic(diagnostic);
@@ -150,14 +196,15 @@ export function normalizeSavedState(input, { ranchCap = 6, now = Date.now(), onD
       favorite: source.inventory?.favorite ?? 6,
       trainingChow: source.inventory?.trainingChow ?? 3,
       mineralBite: source.inventory?.mineralBite ?? 3,
-      emberFruit: source.inventory?.emberFruit ?? 2,
+      emberFruit: source.inventory?.emberFruit ?? (Number.isSafeInteger(source.saveVersion) && source.saveVersion >= SAVE_SCHEMA_VERSION ? 0 : 1),
       moonFruit: source.inventory?.moonFruit ?? 2,
       stash: Array.isArray(source.inventory?.stash)
         ? source.inventory.stash.filter(id => typeof id === 'string')
         : ['ranch_band', 'guard_charm', 'swift_lens', 'flame_claw', 'guard_band', 'focus_lens'],
     },
     eggs: normalizeEggsForPersistence(source.eggs),
-    saveVersion: SAVE_SCHEMA_VERSION,
+    skillItemUseCommandIds: normalizeSkillItemCommandIds(source.skillItemUseCommandIds),
+    saveVersion: Number.isSafeInteger(source.saveVersion) ? source.saveVersion : 0,
   };
   const migrated = applySaveMigrations(canonical, { now });
   reportSaveDiagnostics(migrated, onDiagnostic);
