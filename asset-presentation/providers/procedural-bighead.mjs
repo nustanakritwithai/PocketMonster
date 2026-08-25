@@ -7,8 +7,13 @@ import { registerOwned } from '../ownership.mjs';
 
 async function browserLoadFace(source) {
   if (typeof document === 'undefined') throw new Error('browser face loader needs document');
-  const url = new URL(source, document.baseURI).href;
+  // Appearance paths are rooted at the game bundle. The launcher can live on a
+  // different origin (for example Firebase Hosting), so document.baseURI is not
+  // a reliable base for these assets.
+  const gameBundleRoot = new URL('../../', import.meta.url);
+  const url = new URL(String(source).replace(/^\.\//, ''), gameBundleRoot).href;
   const img = new Image();
+  img.crossOrigin = 'anonymous';
   img.src = url;
   await img.decode();
   const canvas = document.createElement('canvas');

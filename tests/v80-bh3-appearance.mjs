@@ -7,6 +7,10 @@ import { createBigheadProvider } from '../asset-presentation/providers/procedura
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 assert.doesNotMatch(js, /head\.front\.png/, 'gameplay source must not name appearance files');
+const providerJs = fs.readFileSync(new URL('../asset-presentation/providers/procedural-bighead.mjs', import.meta.url), 'utf8');
+assert.match(providerJs, /new URL\('\.\.\/\.\.\/', import\.meta\.url\)/, 'appearance images must resolve from the game bundle, not the launcher document');
+assert.doesNotMatch(providerJs, /new URL\(source, document\.baseURI\)/, 'appearance images must not resolve against a cross-origin launcher');
+assert.match(providerJs, /img\.crossOrigin = 'anonymous'/, 'cross-origin appearance images must remain readable by the atlas canvas');
 
 const playerPack = JSON.parse(fs.readFileSync(new URL('../assets/appearances/player-orange/appearance.json', import.meta.url), 'utf8'));
 const keeperPack = JSON.parse(fs.readFileSync(new URL('../assets/appearances/keeper-green/appearance.json', import.meta.url), 'utf8'));
