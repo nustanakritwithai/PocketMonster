@@ -41,6 +41,10 @@ export async function learnMonsterSkill(config, sessionToken, instanceId, skillI
   return serverMutation(config, sessionToken, '/api/player/skills/learn', { instanceId, skillId, slot }, options);
 }
 
+export async function learnMonsterSkillFromItem(config, sessionToken, instanceId, itemId, slot, commandId, options = {}) {
+  return serverMutation(config, sessionToken, '/api/player/skills/learn-item', { instanceId, itemId, slot, commandId }, options);
+}
+
 export async function applyMonsterAction(config, sessionToken, instanceId, action, value, options = {}) {
   return serverMutation(config, sessionToken, '/api/player/monster-action', { instanceId, action, value }, options);
 }

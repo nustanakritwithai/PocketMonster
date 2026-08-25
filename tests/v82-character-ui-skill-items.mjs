@@ -41,19 +41,14 @@ assert.match(begin, /pendingSkillItemUse=Object\.freeze\(command\)/);
 assert.doesNotMatch(begin, /inventory\[[^\]]+\]--|Object\.assign\(state/);
 
 const confirm = extractFunction(game, 'confirmSkillItemUse');
-assert.match(confirm, /commitSkillItemUse\(\{/);
-assert.match(confirm, /persistCandidate\(nextState\)/);
-assert.match(confirm, /writeStoredSave\(localStorage,\s*envelope\)/);
-assert.match(confirm, /if\(!committed\.ok\)/);
-assert.match(confirm, /Object\.assign\(state,candidateForPublish\)/);
+assert.match(confirm, /await learnMonsterSkillFromItem\(/);
+assert.match(confirm, /applyAuthoritativeMonster\(command\.monsterId,result\.monsterJson\)/);
+assert.match(confirm, /state\.inventory\[command\.itemId\]=result\.quantity/);
 assert.ok(
-  confirm.indexOf('writeStoredSave(localStorage, envelope)') < confirm.indexOf('Object.assign(state,candidateForPublish)'),
-  'local persistence boundary occurs before publishing candidate state',
+  confirm.indexOf('await learnMonsterSkillFromItem(') < confirm.indexOf('applyAuthoritativeMonster(command.monsterId,result.monsterJson)'),
+  'server confirmation occurs before publishing authoritative state',
 );
-assert.ok(
-  confirm.indexOf('if(!committed.ok)') < confirm.indexOf('Object.assign(state,candidateForPublish)'),
-  'failure returns before live mutation',
-);
+assert.doesNotMatch(confirm, /commitSkillItemUse|Object\.assign\(state/);
 
 const feed = extractFunction(game, 'feedMonster');
 assert.ok(feed.indexOf('if(skillItemById(food))') < feed.indexOf('requireServerMutation()'), 'legacy food guard runs before the server mutation');

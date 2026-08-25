@@ -52,7 +52,8 @@ const game = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8'
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(game, /return manualSkillLoadout\(inst\)\.map\(/, 'combat adapter reads learned manual loadout');
 assert.match(game, /bindActionPress\(el\('skill4Btn'\),\(\)=>dispatchSkill\(3\)\)/, 'S4 reaches runtime dispatcher');
-assert.match(game, /commitSkillItemUse\(\{[\s\S]*?persistCandidate\(nextState\)/, 'live acquisition uses canonical transaction');
+assert.match(game, /await learnMonsterSkillFromItem\(command\.monsterId,command\.itemId,command\.slot,command\.commandId\)/, 'live acquisition uses the atomic server transaction');
+assert.match(game, /applyAuthoritativeMonster\(command\.monsterId,result\.monsterJson\)/, 'live acquisition applies only the authoritative monster response');
 assert.match(game, /if\(skillItemById\(food\)\)\{msg\('[^']*Skill Item/, 'legacy feed path rejects Skill Items before inventory decrement');
 assert.doesNotMatch(game, /data-feed="emberFruit"/, 'emberFruit is not exposed as ordinary food');
 assert.match(html, /id="skill4Btn"/);

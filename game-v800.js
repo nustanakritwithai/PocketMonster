@@ -31,7 +31,7 @@ import { initAudio, playSFX, playBGM, stopBGM, startAmbient, stopAmbient, setVol
 import { resolveFeed, careRest, carePlay, nutritionUsed, nutritionRemaining, nutritionFlat, activeTrainingFoodMultiplier, FOOD_CATEGORIES } from './food-care.mjs';
 import { computeSkillExp, addSkillExp, masteryRankFromExp, masteryRawPower, getSkill, learnSkill, listSkillCandidates, evaluateSkillCandidate, applyMutation, synchronizeStage1Learnset, manualSkillLoadout, MANUAL_SKILL_SLOTS, SKILL_SLOTS, setManualSkillSlot, learnInheritedSkillMemory, listBreedingSkillMemoryCandidates, resolveInheritedSkillMemoryEligibility } from './skill-progression.mjs';
 import { skillCatalogEntry } from './skill-catalog.mjs';
-import { commitSkillItemUse, resolveSkillItemUse, SKILL_ITEM_REASONS } from './skill-items.mjs';
+import { resolveSkillItemUse, SKILL_ITEM_REASONS } from './skill-items.mjs';
 import { MERCHANT_PURCHASE_REASONS, commitMerchantPurchase } from './merchant-purchase.mjs';
 import { MERCHANT_OFFER_IDS, merchantOffers } from './merchant-shop-catalog.mjs';
 import { skillButtonIconContract } from './skill-icon-runtime.mjs';
@@ -49,7 +49,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { establishReadOnlyBridge } from './server-auth.mjs';
 import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
-import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
+import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, logoutServerSession, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
@@ -164,6 +164,7 @@ function requireServerMutation(){
 }
 const setMonsterEquipment=(instanceId,itemId,slot,unequip=false)=>requestSetMonsterEquipment(runtimeConfig,authProfileBridge.sessionToken,instanceId,itemId,slot,unequip);
 const learnMonsterSkill=(instanceId,skillId,slot)=>requestLearnMonsterSkill(runtimeConfig,authProfileBridge.sessionToken,instanceId,skillId,slot);
+const learnMonsterSkillFromItem=(instanceId,itemId,slot,commandId)=>requestLearnMonsterSkillFromItem(runtimeConfig,authProfileBridge.sessionToken,instanceId,itemId,slot,commandId);
 const applyMonsterAction=(instanceId,action,value)=>requestMonsterAction(runtimeConfig,authProfileBridge.sessionToken,instanceId,action,value);
 const consumeInventory=(itemId,amount,reason)=>requestConsumeInventory(runtimeConfig,authProfileBridge.sessionToken,itemId,amount,reason);
 function applyAuthoritativeMonster(instanceId,monsterJson){
@@ -2878,36 +2879,24 @@ function startSkillItemUse(monsterId,itemId,slot){
   pendingSkillItemUse=Object.freeze(command);
   showSkillItemConfirmation(command,resolution);
 }
-function confirmSkillItemUse(){
+async function confirmSkillItemUse(){
   const command=pendingSkillItemUse;
   if(!command)return;
   const accept=el('skillItemConfirmAccept');if(accept)accept.disabled=true;
-  let candidateForPublish=null;
-  const committed=commitSkillItemUse({
-    state,
-    command,
-    persistCandidate(nextState){
-      candidateForPublish={...nextState,saveVersion:SAVE_SCHEMA_VERSION,lifeLastAt:command.now};
-      const envelope={state:sanitizeStateForPersistence(persistableState(candidateForPublish)),playerHp:playerData.hp,saveSchemaVersion: SAVE_SCHEMA_VERSION};
-      return writeStoredSave(localStorage, envelope);
-    },
-  });
-  if(!committed.ok){
+  try{
+    if(!requireServerMutation()){if(accept)accept.disabled=false;return;}
+    const result=await learnMonsterSkillFromItem(command.monsterId,command.itemId,command.slot,command.commandId);
+    applyAuthoritativeMonster(command.monsterId,result.monsterJson);
+    if(Number.isInteger(result.quantity))state.inventory[command.itemId]=result.quantity;
+    closeSkillItemConfirmation();
+    spawnFeedEffect(fxWorldPos(command.monsterId),FOOD_FX_COLOR.emberFruit);
+    playSFX('sfx_feed');
+    msg(`${displayName(getInst(command.monsterId))} เรียน ${skillNameLabel(result.skillId)} ที่ ${command.slot.toUpperCase()} สำเร็จ`);
+    saveGame(false);renderManager();renderSkills();renderParty();renderHUD();
+  }catch(error){
     if(accept)accept.disabled=false;
-    msg(skillItemReasonText(committed.reason));
-    if(committed.reason===SKILL_ITEM_REASONS.STALE_SLOT||committed.reason===SKILL_ITEM_REASONS.ALREADY_LEARNED)closeSkillItemConfirmation();
-    renderSkills();
-    return;
+    msg(error?.message||'ใช้ Skill Item ไม่สำเร็จ');renderSkills();
   }
-  Object.assign(state,candidateForPublish);
-  closeSkillItemConfirmation();
-  spawnFeedEffect(fxWorldPos(command.monsterId),FOOD_FX_COLOR.emberFruit);
-  playSFX('sfx_feed');
-  const replaced=committed.displacedSkillId?` • เก็บ ${skillNameLabel(committed.displacedSkillId)} ไว้นอกสล็อต`:'';
-  msg(`${displayName(committed.nextMonster)} เรียน ${skillNameLabel(committed.learnedSkill.skillId)} ที่ ${command.slot.toUpperCase()} สำเร็จ${replaced}`);
-  if(remoteSaveReady)void saveRemoteSave(committed.persisted).catch(error=>console.warn('cloud save failed',error));
-  else if(remoteSaveSyncing){remoteSavePending=true;}
-  renderManager();renderSkills();renderParty();renderHUD();
 }
 function renderSkills(targetPanel=null){
   const panel=targetPanel||characterSystemPanel('skills','skillsPanel');
