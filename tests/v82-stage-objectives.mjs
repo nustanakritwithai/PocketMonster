@@ -91,7 +91,7 @@ assert.match(js,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)
 assert.match(js,/function reloadWorldFromLoadedState\(\)[\s\S]*?switchZone\(loadedZone,true\)\|\|switchZone\('hub',true\)/,'Loaded state rebuilds the scene through the normal zone path');
 assert.match(js,/async function syncCloudSave\(\)[\s\S]*?migrateLoadedState\(remote\.state\)[\s\S]*?reloadWorldFromLoadedState\(\)/,'Cloud saves also execute pending stage-clear reconciliation');
 assert.match(js,/function saveGame\(show=true\)[\s\S]*?else if\(remoteSaveSyncing\)remoteSavePending=true;/,'Local saves made during initial Cloud sync are queued for writeback');
-assert.match(js,/async function flushRemoteSaveUntilSettled\(\)[\s\S]*?do\{[\s\S]*?remoteSavePending=false;[\s\S]*?await saveRemoteSave\(currentSaveEnvelope\(\)\);[\s\S]*?\}while\(remoteSavePending\);[\s\S]*?remoteSaveReady=true;[\s\S]*?remoteSaveSyncing=false;/,'Cloud sync flushes every intervening local save before becoming ready');
+assert.match(js,/async function flushRemoteSaveUntilSettled\(\)[\s\S]*?do\{[\s\S]*?remoteSavePending=false;[\s\S]*?await savePrimaryRemoteSave\(currentSaveEnvelope\(\)\);[\s\S]*?\}while\(remoteSavePending\);[\s\S]*?remoteSaveReady=true;[\s\S]*?remoteSaveSyncing=false;/,'Cloud sync flushes every intervening local save before becoming ready');
 assert.match(js,/async function syncCloudSave\(\)[\s\S]*?remoteSaveSyncing=true;[\s\S]*?reloadWorldFromLoadedState\(\)[\s\S]*?await flushRemoteSaveUntilSettled\(\)/,'Recovered Cloud progress is durably flushed before sync completes');
 
 console.log('V8 deterministic stage objectives: PASS');

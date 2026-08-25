@@ -45,7 +45,7 @@ function assertRuntimeLearnsetHooks(source){
   assert.doesNotMatch(mastery,/learnSkill\(a\.inst/,'accepted mastery never lazy-learns a missing record');
   assert.match(mastery,/const skillRec=getSkill\(a\.inst,move\.skillId\)/,'live mastery reads the canonical equipped SkillID');
   assert.match(mastery,/addSkillExp\(a\.inst,move\.skillId,sExp\)/,'live mastery follows the canonical equipped learned record');
-  assert.match(learnCandidate,/learnSkill\(inst,\{skillId:def\.id,slot:null\}\)/,'legacy candidates learn unequipped instead of colliding with workbook defaults');
+  assert.match(learnCandidate,/learnMonsterSkill\(id,def\.id,null\)/,'legacy candidates learn unequipped instead of colliding with workbook defaults');
 }
 
 const below=normalizeInstance({instanceId:'below',speciesId:'flameling',level:4,skills:[]},{now:1000});

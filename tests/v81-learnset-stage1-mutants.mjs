@@ -72,7 +72,7 @@ function runtimeContract(source){
   assert.doesNotMatch(mastery,/learnSkill\(a\.inst/);
   assert.match(mastery,/const skillRec=getSkill\(a\.inst,move\.skillId\)/);
   assert.match(mastery,/addSkillExp\(a\.inst,move\.skillId,sExp\)/);
-  assert.match(learnCandidate,/learnSkill\(inst,\{skillId:def\.id,slot:null\}\)/);
+  assert.match(learnCandidate,/learnMonsterSkill\(id,def\.id,null\)/);
 }
 
 contract(await loadSource(originalSource,'stage1-current'));
@@ -108,7 +108,7 @@ const runtimeMutants=[
   ['skip legacy hatch hydrator','const child=prepareHatchedChildForLive(ensureInstanceShape({...egg.child,origin:\'bred\',parentAId,parentBId}));','const child=ensureInstanceShape({...egg.child,origin:\'bred\',parentAId,parentBId});'],
   ['skip loaded-save sync','\n  state.collection.forEach(synchronizeStage1Learnset);',''],
   ['restore lazy casting learn','const skillRec=getSkill(a.inst,move.skillId);','let skillRec=getSkill(a.inst,move.skillId);if(!skillRec)skillRec=learnSkill(a.inst,{skillId:move.skillId,slot:\'s\'+(index+1)});'],
-  ['restore candidate auto-equip','learnSkill(inst,{skillId:def.id,slot:null});','learnSkill(inst,{skillId:def.id,slot:def.slot||\'s1\'});'],
+  ['restore candidate auto-equip','learnMonsterSkill(id,def.id,null)','learnMonsterSkill(id,def.id,def.slot||\'s1\')'],
   ['apply unequipped candidate','if(cand?.replaces&&rec.slot===cand.slot){','if(cand?.replaces){'],
 ];
 

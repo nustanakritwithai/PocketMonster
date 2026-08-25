@@ -14,7 +14,7 @@ assert.match(sync,/export async function applyMonsterAction/);
 assert.match(sync,/\/api\/player\/monster-action/);
 assert.match(game,/await setMonsterEquipment\(id,item\.id,item\.slot,false\)/);
 assert.match(game,/await setMonsterEquipment\(id,null,slot,true\)/);
-assert.match(game,/await learnMonsterSkill\(id,def\.id,def\.slot\|\|'s1'\)/);
+assert.match(game,/await learnMonsterSkill\(id,def\.id,null\)/);
 const equipBody=game.slice(game.indexOf('async function equipMonsterItem'),game.indexOf('async function unequipMonster'));
 const learnStart=game.indexOf('async function learnCandidateSkill');
 const learnBody=game.slice(learnStart,game.indexOf('\n}',learnStart)+2);

@@ -62,7 +62,7 @@ function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v
   assert.match(game,/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)[\s\S]*?const elapsed=!recovered&&stageRunStartedAt\?/);
   assert.match(game,/async function syncCloudSave\(\)[\s\S]*?migrateLoadedState\(remote\.state\)[\s\S]*?reloadWorldFromLoadedState\(\)/);
   assert.match(game,/function saveGame\(show=true\)[\s\S]*?else if\(remoteSaveSyncing\)remoteSavePending=true;/);
-  assert.match(game,/async function flushRemoteSaveUntilSettled\(\)[\s\S]*?do\{[\s\S]*?remoteSavePending=false;[\s\S]*?await saveRemoteSave\(currentSaveEnvelope\(\)\);[\s\S]*?\}while\(remoteSavePending\);[\s\S]*?remoteSaveReady=true;[\s\S]*?remoteSaveSyncing=false;/);
+  assert.match(game,/async function flushRemoteSaveUntilSettled\(\)[\s\S]*?do\{[\s\S]*?remoteSavePending=false;[\s\S]*?await savePrimaryRemoteSave\(currentSaveEnvelope\(\)\);[\s\S]*?\}while\(remoteSavePending\);[\s\S]*?remoteSaveReady=true;[\s\S]*?remoteSaveSyncing=false;/);
   assert.match(game,/async function syncCloudSave\(\)[\s\S]*?remoteSaveSyncing=true;[\s\S]*?reloadWorldFromLoadedState\(\)[\s\S]*?await flushRemoteSaveUntilSettled\(\)/);
 }
 
@@ -103,7 +103,7 @@ const runtimeMutants=[
   ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  try{saveGame(false);}catch{}','  state.stageProgress=next;'),htmlSource],
   ['record fake recovery best time',gameSource.replace('const elapsed=!recovered&&stageRunStartedAt?', 'const elapsed=stageRunStartedAt?'),htmlSource],
   ['leave cloud save pending clear unreconciled',gameSource.replace('      reloadWorldFromLoadedState();','      void remote.state;'),htmlSource],
-  ['drop local saves during initial Cloud sync',gameSource.replace("  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }\n  else if(remoteSaveSyncing)remoteSavePending=true;", "  writeStoredSave(localStorage,envelope);\n  if(remoteSaveReady){\n    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));\n  }"),htmlSource],
+  ['drop local saves during initial Cloud sync',gameSource.replace("  else if(remoteSaveSyncing)remoteSavePending=true;\n  const si=el('saveIndicator');", "  const si=el('saveIndicator');"),htmlSource],
   ['leave reconciled Cloud document stale',gameSource.replace('    await flushRemoteSaveUntilSettled();','    void currentSaveEnvelope();'),htmlSource],
 ];
 for(const [name,game,html,css] of runtimeMutants){

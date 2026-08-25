@@ -5313,10 +5313,16 @@ async function feedMonster(id,food){
   if(skillItemById(food)){msg('ผลไฟเป็น Skill Item • ใช้จากแท็บ Skills และยืนยันสล็อต S1–S4');return;}
   if(!requireServerMutation())return;
   try{
+    const bondBefore=Number(inst.bond||0);
     const result=await applyMonsterAction(id,'FEED',food);
+    if(result.rejected){
+      if(Number.isInteger(result.quantity))state.inventory[food]=result.quantity;
+      msg(result.message||`อาหารไม่ส่งผลกับ ${displayName(inst)}`);renderManager();return;
+    }
     applyAuthoritativeMonster(id,result.monsterJson);
     if(Number.isInteger(result.quantity))state.inventory[food]=result.quantity;
     spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);playSFX('sfx_feed');
+    if(Number(getInst(id)?.bond||0)>bondBefore)spawnBondUpEffect(fxWorldPos(id));
     msg(result.message||`ให้อาหาร ${displayName(inst)} สำเร็จ`);renderManager();renderParty();saveGame(false);
   }catch(error){msg(`อาหาร: ${error.message}`);}
 }
@@ -5992,7 +5998,7 @@ async function learnCandidateSkill(id,skillId){
   if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
   if(!requireServerMutation())return;
   try{
-    const result=await learnMonsterSkill(id,def.id,def.slot||'s1');
+    const result=await learnMonsterSkill(id,def.id,null);
     applyAuthoritativeMonster(id,result.monsterJson);
     msg(`${displayName(inst)} เรียน ${def.id} สำเร็จ`);
     renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
