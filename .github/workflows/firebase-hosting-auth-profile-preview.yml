@@ -27,7 +27,12 @@ jobs:
           FIREBASE_TEST_STORAGE_BUCKET: '${{ vars.FIREBASE_TEST_STORAGE_BUCKET }}'
           FIREBASE_TEST_MESSAGING_SENDER_ID: '${{ vars.FIREBASE_TEST_MESSAGING_SENDER_ID }}'
           FIREBASE_TEST_APP_ID: '${{ vars.FIREBASE_TEST_APP_ID }}'
-        run: node scripts/write-deployment-runtime-config.mjs
+          MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+          MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
+          MONSTERLIFE_RELEASE_VERSION: '8.4.0-preview.${{ github.sha }}'
+        run: |
+          node scripts/write-deployment-runtime-config.mjs
+          node scripts/build-firebase-launcher.mjs
       - name: Assert mutation flags remain disabled
         run: node tests/deployment-runtime-config.mjs
       - name: Deploy preview channel only

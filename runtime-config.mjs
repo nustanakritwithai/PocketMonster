@@ -8,6 +8,7 @@
 export const BUILD_RUNTIME_CONFIG = Object.freeze({
   configVersion: 1,
   environment: 'firebase-only',
+  assetBaseUrl: '',
   apiBaseUrl: '',
   webSocketUrl: '',
   healthPath: '/api/health',
@@ -32,7 +33,7 @@ export const BUILD_RUNTIME_CONFIG = Object.freeze({
   }),
 });
 
-const URL_KEYS = new Set(['apiBaseUrl', 'webSocketUrl']);
+const URL_KEYS = new Set(['assetBaseUrl', 'apiBaseUrl', 'webSocketUrl']);
 const FLAG_KEYS = Object.keys(BUILD_RUNTIME_CONFIG.featureFlags);
 
 function cleanUrl(value, key) {
@@ -41,7 +42,7 @@ function cleanUrl(value, key) {
   try {
     const parsed = new URL(value, 'https://runtime.invalid');
     if (key === 'webSocketUrl' && !['ws:', 'wss:', 'https:'].includes(parsed.protocol)) return BUILD_RUNTIME_CONFIG[key];
-    if (key === 'apiBaseUrl' && !['http:', 'https:'].includes(parsed.protocol) && parsed.origin !== 'https://runtime.invalid') return BUILD_RUNTIME_CONFIG[key];
+    if ((key === 'assetBaseUrl' || key === 'apiBaseUrl') && !['http:', 'https:'].includes(parsed.protocol) && parsed.origin !== 'https://runtime.invalid') return BUILD_RUNTIME_CONFIG[key];
     return value.replace(/\/$/, '');
   } catch { return BUILD_RUNTIME_CONFIG[key]; }
 }
@@ -93,7 +94,7 @@ export async function loadRuntimeConfig({ fetchImpl = globalThis.fetch, manifest
   if (source === undefined && typeof fetchImpl === 'function') {
     const path = manifestUrl || BUILD_RUNTIME_CONFIG.manifestPath;
     try {
-      const base = locationHref || globalThis.location?.href || 'https://runtime.invalid/';
+      const base = locationHref || import.meta.url || globalThis.location?.href || 'https://runtime.invalid/';
       const response = await fetchImpl(new URL(path, base), { headers: { Accept: 'application/json' }, cache: 'no-store' });
       if (response.ok) source = await response.json();
     } catch { /* checked-in defaults are the safe fallback */ }

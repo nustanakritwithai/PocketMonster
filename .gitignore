@@ -8,3 +8,5 @@ runtimes/
 server-integration-backup-*
 server_save_backup.json
 .cursor/
+dist-pages/
+firebase-launcher/

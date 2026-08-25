@@ -1,12 +1,13 @@
 {
   "configVersion": 1,
   "environment": "hybrid",
+  "assetBaseUrl": "https://nustanakritwithai.github.io/PocketMonster/",
   "apiBaseUrl": "https://157.85.96.139",
   "webSocketUrl": "wss://157.85.96.139/ws/chat",
   "apiVersion": "1.1",
   "minimumClientVersion": "8.3.0",
   "saveSchemaVersion": 1,
-  "deployedRelease": "8.4.0-sql-retention.20260825",
+  "deployedRelease": "8.4.0-github.45a17a2",
   "featureFlags": {
     "vpsEnabled": true,
     "vpsReads": true,
@@ -14,7 +15,7 @@
     "playerDataWrites": false,
     "accountMigration": false,
     "saveMigration": false,
-    "economyMutation": true,
+    "economyMutation": false,
     "firebaseFallback": true,
     "firebaseAuthBridge": true,
     "accountLinking": true,

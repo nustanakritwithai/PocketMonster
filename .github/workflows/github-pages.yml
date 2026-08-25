@@ -1,0 +1,49 @@
+name: Deploy PocketMonster game assets to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate GitHub Pages runtime configuration
+        env:
+          MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
+          MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+          MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
+          MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.sha }}'
+        run: node scripts/write-deployment-runtime-config.mjs
+      - name: Verify hosting architecture
+        run: |
+          node tests/check-active-syntax.mjs
+          node tests/deployment-runtime-config.mjs
+          node tests/hosting-architecture.mjs
+      - name: Build public game artifact
+        run: node scripts/build-github-pages.mjs
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-pages
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
