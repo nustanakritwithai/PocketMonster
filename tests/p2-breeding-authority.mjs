@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const sync=fs.readFileSync(new URL('../server-sync.mjs',import.meta.url),'utf8');
+const game=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
+assert.match(sync,/export async function createServerEgg/);
+assert.match(sync,/export async function hatchServerEgg/);
+assert.match(game,/async function createEgg\(\)/);
+assert.match(game,/await createServerEgg\(a\.instanceId,b\.instanceId\)/);
+assert.match(game,/async function hatchEgg\(eggId\)/);
+assert.match(game,/await hatchServerEgg\(eggId\)/);
+assert.doesNotMatch(game,/eggId:'e'\+Date\.now\(\)/);
+console.log('P2 server-authoritative breeding wiring: PASS');

@@ -56,7 +56,8 @@ assert.ok(
 );
 
 const feed = extractFunction(game, 'feedMonster');
-assert.ok(feed.indexOf('if(skillItemById(food))') < feed.indexOf('state.inventory[food]--'), 'legacy food guard runs before decrement');
+assert.ok(feed.indexOf('if(skillItemById(food))') < feed.indexOf('requireServerMutation()'), 'legacy food guard runs before the server mutation');
+assert.doesNotMatch(feed, /state\.inventory\[food\]--/, 'food inventory is decremented by the authoritative server only');
 assert.doesNotMatch(game, /data-feed="emberFruit"/);
 assert.match(game, /skillItemUseCommandIds:\[\]/);
 assert.match(game, /state\.skillItemUseCommandIds=clean\.skillItemUseCommandIds\|\|\[\]/);

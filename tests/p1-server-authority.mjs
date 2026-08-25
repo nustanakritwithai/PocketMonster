@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const game=fs.readFileSync(path.join(root,'game-v800.js'),'utf8');
+const sync=fs.readFileSync(path.join(root,'server-sync.mjs'),'utf8');
+assert.match(sync,/export async function setMonsterEquipment/);
+assert.match(sync,/\/api\/player\/equipment/);
+assert.match(sync,/export async function learnMonsterSkill/);
+assert.match(sync,/\/api\/player\/skills\/learn/);
+assert.match(sync,/export async function applyMonsterAction/);
+assert.match(sync,/\/api\/player\/monster-action/);
+assert.match(game,/await setMonsterEquipment\(id,item\.id,item\.slot,false\)/);
+assert.match(game,/await setMonsterEquipment\(id,null,slot,true\)/);
+assert.match(game,/await learnMonsterSkill\(id,def\.id,def\.slot\|\|'s1'\)/);
+const equipBody=game.slice(game.indexOf('async function equipMonsterItem'),game.indexOf('async function unequipMonster'));
+const learnStart=game.indexOf('async function learnCandidateSkill');
+const learnBody=game.slice(learnStart,game.indexOf('\n}',learnStart)+2);
+assert.doesNotMatch(equipBody,/equipItem\(inst,item\)/);
+assert.doesNotMatch(learnBody,/learnSkill\(inst/);
+assert.match(game,/await applyMonsterAction\(id,'FEED',food\)/);
+assert.match(game,/await applyMonsterAction\(id,action\.toUpperCase\(\)\)/);
+assert.match(game,/await applyMonsterAction\(id,'TRAIN',focus\)/);
+assert.doesNotMatch(game,/const used=await consumeInventory\(food,1,'FEED'\)/);
+console.log('P1 server-authoritative client wiring: PASS');

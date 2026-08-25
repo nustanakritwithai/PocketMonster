@@ -6,7 +6,7 @@
   "apiVersion": "1.1",
   "minimumClientVersion": "8.3.0",
   "saveSchemaVersion": 1,
-  "deployedRelease": "",
+  "deployedRelease": "8.4.0-sql-retention.20260825",
   "featureFlags": {
     "vpsEnabled": true,
     "vpsReads": true,

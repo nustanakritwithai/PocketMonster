@@ -20,7 +20,7 @@ import {
   normalizeMerchantPurchaseHistory,
 } from './merchant-purchase.mjs';
 
-export const APP_VERSION = '8.2.0';
+export const APP_VERSION = '8.4.0';
 export const ASSET_REVISION = '810';
 export const SAVE_SCHEMA_VERSION = 15;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';

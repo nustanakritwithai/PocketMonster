@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { EQUIPMENT_CATALOG, FOOD_CATALOG, SKILL_CANDIDATES, SKILL_ITEM_CATALOG } from '../content-catalog.mjs';
+import { SKILL_CATALOG } from '../skill-catalog.mjs';
+import { MONSTER_CATALOG } from '../monster-catalog.mjs';
+import { WORKBOOK_EVOLUTION_PATHS } from '../evolution.mjs';
+
+const here=path.dirname(fileURLToPath(import.meta.url));
+const output=process.argv[2]||path.resolve(here,'../../MonsterLifeEventsApp/scr/catalog/catalog-seed-v8.4.0.json');
+const documents=(records,idOf=record=>record.id)=>records.map(record=>({id:idOf(record),definition:record}));
+const items={...FOOD_CATALOG,...SKILL_ITEM_CATALOG,captureBalls:{id:'captureBalls',type:'CAPTURE',stackLimit:1_000_000,consumeReasons:['CAPTURE'],serverAuthoritative:true}};
+const learnsets=[];
+for(const [speciesId,candidates] of Object.entries(SKILL_CANDIDATES))for(const candidate of candidates)learnsets.push({id:`${speciesId}:${candidate.id}`,speciesId,skillId:candidate.id,method:'TRAINING',minimumLevel:candidate.required?.find?.(r=>r.field==='level')?.value??1,requirements:candidate.required??[],allowedSlots:['s1','s2','s3','s4']});
+const skills=new Map(SKILL_CATALOG.map(skill=>[skill.id,skill]));
+for(const candidates of Object.values(SKILL_CANDIDATES))for(const candidate of candidates)if(!skills.has(candidate.id))skills.set(candidate.id,{id:candidate.id,...candidate.move,allowedSlots:['s1','s2','s3','s4'],serverAuthoritative:true});
+const bundle={catalogVersion:'8.4.0-catalog.1',generatedAtUtc:new Date().toISOString(),resources:{skills:documents([...skills.values()]),items:documents(Object.values(items)),equipment:documents(EQUIPMENT_CATALOG),monsters:documents(MONSTER_CATALOG,record=>record.runtimeSpeciesId),learnsets:documents(learnsets),evolutions:documents(WORKBOOK_EVOLUTION_PATHS),breeding_rules:documents([{id:'default',minimumLevel:10,minimumBond:50,hatchMinutes:15,maximumEggs:20,disallowCloseRelatives:true}])}};
+fs.mkdirSync(path.dirname(output),{recursive:true});
+fs.writeFileSync(output,JSON.stringify(bundle,null,2)+'\n','utf8');
+console.log(`${output} resources=${Object.fromEntries(Object.entries(bundle.resources).map(([key,value])=>[key,value.length]))}`);

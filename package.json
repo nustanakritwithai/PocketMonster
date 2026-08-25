@@ -1,6 +1,6 @@
 {
   "name": "monster-life-rpg-prototype",
-  "version": "8.2.0",
+  "version": "8.4.0",
   "type": "module",
   "scripts": {
     "check": "node tests/check-active-syntax.mjs",
@@ -47,8 +47,8 @@
     "test:v88:skill-icons:live": "node tests/v88-skill-icon-live-hud.mjs && node tests/v88-skill-icon-live-hud-mutants.mjs",
     "test:v810:ai": "node tests/v810-wild-ai-resolver.mjs && node tests/v810-wild-ai-resolver-mutants.mjs && node tests/v810-wild-ai-scheduler.mjs && node tests/v810-wild-ai-scheduler-mutants.mjs && node tests/v810-wild-ai-runtime.mjs && node tests/v810-wild-ai-runtime-mutants.mjs && node tests/v810-owned-ai-closure.mjs && node tests/v810-owned-ai-closure-mutants.mjs",
     "test:v811:stages": "node tests/v811-stage-level-progression.mjs && node tests/v811-stage-level-progression-mutants.mjs && node tests/v811-final-four-stages.mjs && node tests/v811-final-four-stages-mutants.mjs && node tests/v811-stage-atmosphere.mjs && node tests/v811-stage-atmosphere-mutants.mjs",
-    "test:v811:integration": "node tests/v811-integration-foundation.mjs && node tests/deployment-runtime-config.mjs && node tests/server-auth.mjs",
+    "test:v811:integration": "node tests/v811-integration-foundation.mjs && node tests/deployment-runtime-config.mjs && node tests/server-auth.mjs && node tests/server-player-data.mjs && node tests/server-catalog.mjs && node tests/server-inventory-authority.mjs && node tests/p1-server-authority.mjs",
     "ci": "npm run check && npm run test:v811:integration && npm test && npm run test:v81:status && npm run test:v81:loadout && npm run test:v81:stage1 && npm run test:v81:targeting && npm run test:v81:breeding && npm run test:v81:skill-memory && npm run test:v81:capture && npm run test:v81:passive && npm run test:v81:ai && npm run test:v81:icons && npm run test:v81:character-skills && npm run test:v81:world && npm run test:v81:build-presets && npm run test:v81:golden-path && npm run test:v82:skill-effects && npm run test:v82:skill-effects:e1 && npm run test:v82:skill-effects:e2 && npm run test:v82:skill-effects:e3 && npm run test:v82:skill-effects:e4 && npm run test:v82:skill-effects:e5 && npm run test:v82:skill-items && npm run test:v83:monster-stats:m0 && npm run test:v83:monster-stats:m1 && npm run test:v83:monster-stats:m2 && npm run test:v83:monster-stats:m3 && npm run test:v83:monster-stats:m4 && npm run test:v83:monster-stats:m5 && npm run test:v83:monster-stats:m6 && npm run test:v83:monster-stats:m7 && npm run test:v83:monster-stats:m8 && npm run test:v84:boss-opt-in && npm run test:v85:combat-durability && npm run test:v86:combat-status-live && npm run test:v87:skill-loadout && npm run test:v88:skill-icons:contract && npm run test:v88:skill-icons:areas && npm run test:v88:skill-icons:live && npm run test:v810:ai && npm run test:v89:merchant-shop && npm run test:v811:stages"
   },
-  "description": "Monster Life RPG V8.2.0 - Progression Core live loop (balance, raising, battle growth, care, skills, equipment, evolution, events, breeding)"
+  "description": "Monster Life RPG V8.4.0 - PocketMonster latest progression, combat, ranch, skills, evolution and breeding"
 }

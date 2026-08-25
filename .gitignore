@@ -1,1 +1,10 @@
+node_modules/
 .firebase/
+logs/
+*.log
+*.exe
+*.exe.WebView2/
+runtimes/
+server-integration-backup-*
+server_save_backup.json
+.cursor/

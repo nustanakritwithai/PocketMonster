@@ -49,7 +49,9 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { establishReadOnlyBridge } from './server-auth.mjs';
 import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
-import { healthVersionGate, publishServerGateTelemetry } from './server-sync.mjs';
+import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
+import { canUseServerPlayerData, changeServerPassword, loadServerSave, logoutServerSession, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
+import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
 import { BREEDING_VERSION, applyBreedingSkillMemoryRequestLedger, createStandardBreedingEggTransaction, evaluateStandardBreedingCompatibility, hatchBreedingEggTransaction, resolveGenderFromSeed, workbookBreedingProfile } from './breeding.mjs';
@@ -100,7 +102,7 @@ const MLRPG_BALANCE = Object.freeze({
   compareBuilds,
 });
 if (typeof window !== 'undefined') window.MLRPG_BALANCE = MLRPG_BALANCE;
-console.info(`Monster Life RPG V8.2.0 • Progression Core live loop v${BALANCE_SCHEMA_VERSION} loaded`);
+console.info(`Monster Life RPG V8.4.0 • PocketMonster latest progression live loop v${BALANCE_SCHEMA_VERSION} loaded`);
 
 const startup = document.getElementById('startupStatus');
 function startupText(text, cls=''){ if(startup){ startup.textContent=text; startup.className='startup-status '+cls; } }
@@ -122,10 +124,13 @@ let THREE;
 const runtimeConfig = await loadRuntimeConfig();
 const serverGate = await healthVersionGate(runtimeConfig);
 const serverGateObservation = publishServerGateTelemetry(serverGate);
+const serverCatalog=await loadServerCatalog(runtimeConfig);
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_RUNTIME_CONFIG = runtimeConfig;
   window.POCKETMONSTER_SERVER_GATE = serverGate;
   window.POCKETMONSTER_SERVER_GATE_OBSERVATION = serverGateObservation;
+  window.POCKETMONSTER_SERVER_CATALOG=serverCatalog;
+  window.POCKETMONSTER_SERVER_CATALOG_VERSION=catalogMutationVersion(serverCatalog);
   document.documentElement.dataset.serverGate = serverGate.state;
 }
 if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
@@ -142,9 +147,33 @@ if (typeof window !== 'undefined') {
 }
 await presentAuthProfileBridge(runtimeConfig, firebaseUser, authProfileBridge);
 await mountServerEconomy(runtimeConfig, authProfileBridge);
+const serverPlayerDataActive=canUseServerPlayerData(runtimeConfig,serverGate,authProfileBridge);
+if(typeof window!=='undefined'){
+  window.POCKETMONSTER_PLAYER_DATA_MODE=serverPlayerDataActive?'server':'firebase';
+  window.POCKETMONSTER_ACCOUNT_ACTIONS=Object.freeze({
+    logout:()=>logoutServerSession(runtimeConfig,authProfileBridge.sessionToken),
+    changePassword:credentials=>changeServerPassword(runtimeConfig,authProfileBridge.sessionToken,credentials),
+    saveCharacter:character=>saveCharacterProfile(runtimeConfig,authProfileBridge.sessionToken,character),
+    redeemItemCode:code=>requestRedeemItemCode(runtimeConfig,authProfileBridge.sessionToken,code),
+  });
+}
+function requireServerMutation(){
+  if(serverPlayerDataActive)return true;
+  msg('เซิร์ฟเวอร์ข้อมูลผู้เล่นยังไม่พร้อม • ยังไม่เปลี่ยนข้อมูล');
+  return false;
+}
+const setMonsterEquipment=(instanceId,itemId,slot,unequip=false)=>requestSetMonsterEquipment(runtimeConfig,authProfileBridge.sessionToken,instanceId,itemId,slot,unequip);
+const learnMonsterSkill=(instanceId,skillId,slot)=>requestLearnMonsterSkill(runtimeConfig,authProfileBridge.sessionToken,instanceId,skillId,slot);
+const applyMonsterAction=(instanceId,action,value)=>requestMonsterAction(runtimeConfig,authProfileBridge.sessionToken,instanceId,action,value);
+const consumeInventory=(itemId,amount,reason)=>requestConsumeInventory(runtimeConfig,authProfileBridge.sessionToken,itemId,amount,reason);
+function applyAuthoritativeMonster(instanceId,monsterJson){
+  const current=getInst(instanceId);if(!current||typeof monsterJson!=='string')return null;
+  const authoritative=JSON.parse(monsterJson);Object.keys(current).forEach(key=>delete current[key]);Object.assign(current,authoritative);
+  refreshStats(current,false);return current;
+}
 try{ THREE=await loadThree(); }
 catch(err){ startupText(err.message,'error'); throw err; }
-startupText('กำลังสร้าง Monster Life RPG V8.2.0…');
+startupText('กำลังสร้าง Monster Life RPG V8.4.0…');
 const qualityProfile=selectQualityProfile({deviceMemory:navigator.deviceMemory,hardwareConcurrency:navigator.hardwareConcurrency,devicePixelRatio:window.devicePixelRatio,saveData:navigator.connection?.saveData===true});
 const assets=createAssetEngine({THREE,quality:qualityProfile.tier});
 {
@@ -3734,8 +3763,8 @@ addEventListener('keydown',()=>initAudio(),{once:true});
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
-const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.2.0 boot: #joystick not found');
-const stick=el('stick'); if(!stick) throw new Error('V8.2.0 boot: #stick not found');
+const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.4.0 boot: #joystick not found');
+const stick=el('stick'); if(!stick) throw new Error('V8.4.0 boot: #stick not found');
 
 function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
 joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyPoint(e);});joyEl.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.pid)joyPoint(e);});
@@ -5253,7 +5282,7 @@ function updateProjectiles(dt){
   }
 }
 
-// ---------- V8.2.0 Ranch / life / training core ----------
+// ---------- V8.4.0 PocketMonster Ranch / life / training core ----------
 function trainingNeed(level){return 34+level*22;}
 function levelUpInstance(inst){
   const need=Math.max(1,growthExpForLevel((inst.level||1)+1,inst.growthCurve)-(inst.growthExp||0));
@@ -5289,58 +5318,54 @@ function applyLifeSimulation(now=Date.now(),show=false){const window=resolveOffl
 }if(show&&trained>0)msg(`Ranch Training • เติม Training Pool ${trained} ตัว`);return {...window,trained};}
 // V7.4: Food definitions mapped to resolveFeed categories
 const FOOD_DEFS=FOOD_CATALOG;
-function feedMonster(id,food){
+async function feedMonster(id,food){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
   if(skillItemById(food)){msg('ผลไฟเป็น Skill Item • ใช้จากแท็บ Skills และยืนยันสล็อต S1–S4');return;}
-  if((state.inventory[food]||0)<=0){msg('อาหารหมด • รับอาหารทดสอบจาก NPC');return;}
-  state.inventory[food]--;
-  // V7.4: Use resolveFeed from food-care.mjs (needs body/mind schema)
-  const bondBefore=inst.bond||0;
-  syncToBodyMind(inst);
-  const def=FOOD_DEFS[food]||{id:food,category:'daily',effects:{}};
-  const sp=spById[inst.speciesId]||{};
-  const result=resolveFeed(inst,def,{species:sp,now:Date.now()});
-  syncFromBodyMind(inst);
-  refreshStats(inst,false);
-  if(food==='healthy'){inst.hp=inst.maxHp;inst.fainted=false;}
-  if(result.rejected){state.inventory[food]++;msg(`อาหาร: ${result.reason||'ใช้ไม่ได้'}`);renderManager();return;}
-  spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);
-  playSFX('sfx_feed');
-  if((inst.bond||0)>bondBefore){spawnBondUpEffect(fxWorldPos(id));playSFX('sfx_bond');}
-  const favText=result.favorite?' (Favorite!)':'';
-  const overText=result.overfull?' (Overfull -70%)':'';
-  const extra=result.catalyst?' • catalyst':result.category==='nutrition'?` • Nutrition +${result.applied}`:result.category==='training'?` • Training buff ×${result.multiplier}`:'';
-  msg(`ให้อาหาร ${displayName(inst)} • ${def.name||food} • Bond ${Math.round(inst.bond)}${favText}${overText}${extra}`);
-  renderManager();renderParty();saveGame(false);
+  if(!requireServerMutation())return;
+  try{
+    const result=await applyMonsterAction(id,'FEED',food);
+    applyAuthoritativeMonster(id,result.monsterJson);
+    if(Number.isInteger(result.quantity))state.inventory[food]=result.quantity;
+    spawnFeedEffect(fxWorldPos(id),FOOD_FX_COLOR[food]||0x22c55e);playSFX('sfx_feed');
+    msg(result.message||`ให้อาหาร ${displayName(inst)} สำเร็จ`);renderManager();renderParty();saveGame(false);
+  }catch(error){msg(`อาหาร: ${error.message}`);}
 }
 // V7.4: Care actions (rest/play) from food-care.mjs
-function careAction(id,action){
+async function careAction(id,action){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
-  syncToBodyMind(inst);
-  const result=action==='rest'?careRest(inst,{now:Date.now()}):carePlay(inst,{now:Date.now()});
-  syncFromBodyMind(inst);
-  refreshStats(inst,false);
-  const label=action==='rest'?'พักผ่อน':'เล่นด้วย';
-  if(action==='rest')spawnRestEffect(fxWorldPos(id));
-  else{spawnPlayEffect(fxWorldPos(id));spawnBondUpEffect(fxWorldPos(id));}
-  msg(`${displayName(inst)} • ${label} • ${action==='rest'?`พลัง ${Math.round(inst.energy)} ลดเครียด`:`อารมณ์ ${Math.round(inst.mood)} Bond ${Math.round(inst.bond)}`}`);
-  renderManager();renderParty();saveGame(false);
+  if(!requireServerMutation())return;
+  try{
+    // Keep client presentation forecasting without mutating authoritative state.
+    const preview=JSON.parse(JSON.stringify(inst));
+    if(action==='rest')careRest(preview,{now:Date.now()});else carePlay(preview,{now:Date.now()});
+    const result=await applyMonsterAction(id,action.toUpperCase());
+    applyAuthoritativeMonster(id,result.monsterJson);
+    if(action==='rest')spawnRestEffect(fxWorldPos(id));else{spawnPlayEffect(fxWorldPos(id));spawnBondUpEffect(fxWorldPos(id));}
+    msg(result.message||`${displayName(inst)} • ${action==='rest'?'พักผ่อน':'เล่นด้วย'}`);renderManager();renderParty();saveGame(false);
+  }catch(error){msg(`กิจกรรม: ${error.message}`);}
 }
 // V7.6: Equipment functions (3-slot reversible loadout)
-function equipMonsterItem(id,item){
+async function equipMonsterItem(id,item){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
-  const result=equipItem(inst,item);
-  if(result.ok){refreshStats(inst,false);msg(`${displayName(inst)} → Equip ${item.id} [${item.slot}]${result.previous?` (แทนที่ ${result.previous.id})`:''}`);renderManager();saveGame(false);}
-  else msg('Equipment: invalid item/slot');
+  if(!requireServerMutation())return;
+  try{
+    const result=await setMonsterEquipment(id,item.id,item.slot,false);
+    applyAuthoritativeMonster(id,result.monsterJson);
+    msg(`${displayName(inst)} → Equip ${item.id} [${item.slot}]`);renderManager();saveGame(false);
+  }catch(error){msg(`Equipment: ${error.message}`);}
 }
-function unequipMonster(id,slot){
+async function unequipMonster(id,slot){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
-  const removed=unequip(inst,slot);
-  if(removed){refreshStats(inst,false);msg(`${displayName(inst)} → Unequip ${slot} (${removed.id})`);renderManager();saveGame(false);}
+  if(!requireServerMutation())return;
+  try{
+    const result=await setMonsterEquipment(id,null,slot,true);
+    applyAuthoritativeMonster(id,result.monsterJson);
+    msg(`${displayName(inst)} → Unequip ${slot}`);renderManager();saveGame(false);
+  }catch(error){msg(`Equipment: ${error.message}`);}
 }
 function getEquipmentFlat(inst){
   if(!inst.equipment)return{hp:0,atk:0,def:0,spd:0};
@@ -5412,14 +5437,9 @@ function renderRaisingEventBanner(){
   box.innerHTML=`<div class="event-title">★ Event: ${displayName(inst)||'?'} • ${pendingEvent.eventDef.id}</div><div class="event-choices">${choices.map(c=>`<button data-choice="${c.id}">${c.label}</button>`).join('')}</div>`;
   box.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>resolveRaisingEvent(b.dataset.choice));
 }
-function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!assertCharacterMutable(id))return;inst.trainingFocus=focus;
-  syncToBodyMind(inst);
-  const gain=ranchTrainingGain(inst,focus,15);
-  const applied=addTrainingExp(inst,focus,gain);
-  if(applied>0){inst.trainingExp=(inst.trainingExp||0)+applied;refreshStats(inst,false);}
-  spawnTrainingEffect(fxWorldPos(id),focus);
-  msg(`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]} +${Math.round(applied)}${applied<gain?' (pool full!)':''}`);
-  renderManager();if(currentManagerTab==='training')renderTraining();if(!el('trainerPanel').classList.contains('hidden'))renderTrainerPanel();saveGame(false);}
+async function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!assertCharacterMutable(id))return;if(!requireServerMutation())return;
+  try{const result=await applyMonsterAction(id,'TRAIN',focus);applyAuthoritativeMonster(id,result.monsterJson);spawnTrainingEffect(fxWorldPos(id),focus);msg(result.message||`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]}`);renderManager();if(currentManagerTab==='training')renderTraining();if(!el('trainerPanel').classList.contains('hidden'))renderTrainerPanel();saveGame(false);}
+  catch(error){msg(`Training: ${error.message}`);}}
 let keeperRecoveryCommandSequence=0;
 function healAll(){if(!assertRanchOperation())return;const recovery=recoverSkillUses(state.collection,{routeId:'REC_NPC',commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence)});if(!recovery.ok){msg('Keeper Recovery ไม่สำเร็จ • '+recovery.reason);return;}for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();saveGame(false);}
 const ranchVisuals=new Map();
@@ -5975,15 +5995,19 @@ function toggleStarterEquip(id,itemId){
     equipMonsterItem(id,{...item,affixes:item.affixes.map(a=>({...a}))});
   }
 }
-function learnCandidateSkill(id,skillId){
+async function learnCandidateSkill(id,skillId){
   const inst=getInst(id);if(!inst)return;
   if(!assertCharacterMutable(id))return;
   const def=(SKILL_CANDIDATES[inst.speciesId]||[]).find(d=>d.id===skillId);if(!def)return;
   const ev=evaluateSkillCandidate(def,inst);
   if(!ev.eligible){msg(`ยังเรียน ${skillId} ไม่ได้ • ${(ev.failedRequired||[]).map(r=>r.field+' '+r.op+' '+r.value).join(' • ')}`);return;}
-  learnSkill(inst,{skillId:def.id,slot:null});
-  msg(`${displayName(inst)} เรียน ${def.id} • ยังไม่ติดตั้งในสล็อต`);
-  renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
+  if(!requireServerMutation())return;
+  try{
+    const result=await learnMonsterSkill(id,def.id,def.slot||'s1');
+    applyAuthoritativeMonster(id,result.monsterJson);
+    msg(`${displayName(inst)} เรียน ${def.id} สำเร็จ`);
+    renderManager();if(currentManagerTab==='skills')renderSkills();saveGame(false);
+  }catch(error){msg(`Skill: ${error.message}`);}
 }
 function learnSkillMemory(id){
   const inst=getInst(id);if(!inst)return;
@@ -6816,9 +6840,25 @@ function migrateLoadedState(s){
   attachCharacterUi(state);
   characterUI?.closeAll();
 }
-let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false;
+let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false,serverSaveRevision=0;
 function currentSaveEnvelope(){
   return {state:sanitizeStateForPersistence(persistableState(state)),playerHp:playerData.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION};
+}
+async function loadPrimaryRemoteSave(){
+  if(!serverPlayerDataActive)return loadRemoteSave();
+  const [saved,playerState]=await Promise.all([
+    loadServerSave(runtimeConfig,authProfileBridge.sessionToken),
+    readPlayerState(runtimeConfig,authProfileBridge.sessionToken),
+  ]);
+  if(typeof window!=='undefined')window.POCKETMONSTER_SERVER_PLAYER_STATE=playerState;
+  serverSaveRevision=saved?.revision??0;
+  return saved?.envelope??null;
+}
+async function savePrimaryRemoteSave(envelope){
+  if(!serverPlayerDataActive)return saveRemoteSave(envelope);
+  const result=await saveServerSave(runtimeConfig,authProfileBridge.sessionToken,envelope,{revision:serverSaveRevision,clientVersion:'8.4.0'});
+  serverSaveRevision=result.revision;
+  return result;
 }
 function saveGame(show=true){
   state.saveVersion=SAVE_SCHEMA_VERSION;
@@ -6826,12 +6866,17 @@ function saveGame(show=true){
   const envelope=currentSaveEnvelope();
   writeStoredSave(localStorage,envelope);
   if(remoteSaveReady){
-    void saveRemoteSave(envelope).catch(error=>console.warn('cloud save failed',error));
+    remoteSaveReady=false;
+    remoteSaveSyncing=true;
+    void flushRemoteSaveUntilSettled().catch(error=>{
+      remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
+      console.warn('remote save failed',error);
+    });
   }
   else if(remoteSaveSyncing)remoteSavePending=true;
   const si=el('saveIndicator');
   if(si){si.style.opacity='1';setTimeout(()=>{si.style.opacity='0';},800);}
-  if(show)msg('บันทึกเกม V8.2.0 แล้ว');
+  if(show)msg('บันทึกเกม V8.4.0 แล้ว');
 }
 function loadGame(){
   try{
@@ -6842,8 +6887,8 @@ function loadGame(){
     if(saved.source!=='current')state.currentZone='hub';
     applyLifeSimulation(Date.now(),true);
     if(saved.source==='backup')msg('กู้คืน Save สำรองสำเร็จ');
-    else if(saved.source==='current')msg('โหลดข้อมูล V8.2.0 แล้ว');
-    else msg('ย้าย Save เก่า → V8.2.0 สำเร็จ');
+    else if(saved.source==='current')msg('โหลดข้อมูล V8.4.0 แล้ว');
+    else msg('ย้าย Save เก่า → V8.4.0 สำเร็จ');
     if(saved.source!=='current')saveGame(false);
   }catch(error){
     console.warn('load failed',error);
@@ -7142,7 +7187,7 @@ function reloadWorldFromLoadedState(){
 async function flushRemoteSaveUntilSettled(){
   do{
     remoteSavePending=false;
-    await saveRemoteSave(currentSaveEnvelope());
+    await savePrimaryRemoteSave(currentSaveEnvelope());
   }while(remoteSavePending);
   remoteSaveReady=true;
   remoteSaveSyncing=false;
@@ -7150,7 +7195,7 @@ async function flushRemoteSaveUntilSettled(){
 async function syncCloudSave(){
   remoteSaveSyncing=true;
   try{
-    const remote=await loadRemoteSave();
+    const remote=await loadPrimaryRemoteSave();
     let successMessage='สร้างข้อมูลผู้เล่นบน Cloud สำเร็จ';
     if(remote?.state){
       migrateLoadedState(remote.state);
@@ -7161,6 +7206,7 @@ async function syncCloudSave(){
       successMessage='โหลดข้อมูล Cloud สำเร็จ';
     }
     await flushRemoteSaveUntilSettled();
+    if(serverPlayerDataActive)await syncPlayerData(runtimeConfig,authProfileBridge.sessionToken,{playerHp:String(playerData.hp),playerExp:String(state.exp??0),actionLog:'CLIENT_BOOT_SYNC'});
     msg(successMessage);
   }catch(error){
     remoteSaveSyncing=false;

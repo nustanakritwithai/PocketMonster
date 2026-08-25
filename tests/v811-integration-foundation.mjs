@@ -10,9 +10,9 @@ const fetchPair = (health, version, healthStatus = 200, versionStatus = 200, hea
 };
 
 const safe = await loadRuntimeConfig({ fetchImpl: async () => ({ ok: true, json: async () => ({ environment: 'hybrid', featureFlags: { vpsEnabled: true, vpsReads: true, vpsWrites: true, playerDataWrites: true } }) }), locationHref: 'https://game.invalid/' });
-assert.equal(safe.featureFlags.vpsWrites, false);
-assert.equal(safe.canWritePlayerData, false);
-assert.equal(runtimeWritePolicy(safe).playerDataWrites, false);
+assert.equal(safe.featureFlags.vpsWrites, true);
+assert.equal(safe.canWritePlayerData, true);
+assert.equal(runtimeWritePolicy(safe).playerDataWrites, true);
 assert.equal(BUILD_RUNTIME_CONFIG.featureFlags.firebaseFallback, true);
 assert.equal(BUILD_RUNTIME_CONFIG.minimumClientVersion, '8.3.0');
 assert.equal(validateRuntimeManifest({ configVersion: 99 }).valid, false);

@@ -58,9 +58,12 @@ function normalizeManifest(manifest = {}) {
   if (source.featureFlags && typeof source.featureFlags === 'object') {
     for (const key of FLAG_KEYS) if (typeof source.featureFlags[key] === 'boolean') config.featureFlags[key] = source.featureFlags[key];
   }
-  // Player save writes remain locked. Economy has its own explicit server-authoritative gate.
-  config.featureFlags.vpsWrites = false;
-  config.featureFlags.playerDataWrites = false;
+  // Player writes require both explicit deployment flags. Checked-in defaults remain off.
+  if (!config.featureFlags.vpsEnabled || !config.featureFlags.vpsReads) {
+    config.featureFlags.vpsWrites = false;
+    config.featureFlags.playerDataWrites = false;
+  }
+  if (!config.featureFlags.vpsWrites) config.featureFlags.playerDataWrites = false;
   config.featureFlags.accountMigration = false;
   config.featureFlags.saveMigration = false;
   config.featureFlags.firebaseFallback = true;
@@ -69,7 +72,8 @@ function normalizeManifest(manifest = {}) {
     config.featureFlags.accountLinking = false;
     config.featureFlags.profileReads = false;
   }
-  config.canWritePlayerData = false;
+  config.canWritePlayerData = Boolean(config.featureFlags.vpsEnabled && config.featureFlags.vpsReads
+    && config.featureFlags.vpsWrites && config.featureFlags.playerDataWrites);
   return Object.freeze({ ...config, featureFlags: Object.freeze(config.featureFlags) });
 }
 
@@ -99,5 +103,6 @@ export async function loadRuntimeConfig({ fetchImpl = globalThis.fetch, manifest
 }
 
 export function runtimeWritePolicy(config) {
-  return Object.freeze({ playerDataWrites: false, accountMigration: false, saveMigration: false, economyMutation: false, enabled: Boolean(config?.featureFlags?.vpsWrites && config?.canWritePlayerData) });
+  const enabled = Boolean(config?.featureFlags?.vpsWrites && config?.canWritePlayerData);
+  return Object.freeze({ playerDataWrites: enabled, accountMigration: false, saveMigration: false, economyMutation: false, enabled });
 }

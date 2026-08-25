@@ -1,0 +1,22 @@
+{
+  "deployedAtUtc": "2026-08-24T23:47:16.1349178Z",
+  "configuration": "Release",
+  "serverVersion": "8.4.0",
+  "serverEndpoint": "http://localhost:5000",
+  "separationPolicy": "GAME_FILES_ONLY",
+  "gameEntry": "index.html",
+  "gameFiles": [
+    "index.html",
+    "v800.html",
+    "game-v800.js",
+    "server-sync.mjs",
+    "patch-updater.mjs",
+    "on-device-translation.mjs",
+    "mall-ui.mjs",
+    "auto-quest.mjs",
+    "ai-activity.mjs",
+    "style-v800.css",
+    "save-schema.mjs",
+    "package.json"
+  ]
+}

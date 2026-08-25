@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const game=fs.readFileSync(path.join(root,'game-v800.js'),'utf8');
+const sync=fs.readFileSync(path.join(root,'server-sync.mjs'),'utf8');
+assert.match(sync,/export async function evolveServerMonster/);
+assert.match(sync,/\/api\/player\/evolution/);
+const start=game.indexOf('async function evolveMonster');
+const end=game.indexOf('\n}',start);
+const body=game.slice(start,end+2);
+assert.match(body,/await evolveServerMonster\(id,pathId\)/);
+assert.match(body,/applyServerMonsterMutation\(result\)/);
+assert.doesNotMatch(body,/commitEvolution\(inst/);
+assert.doesNotMatch(body,/inst\.evolutionPath\s*=(?!=)/);
+console.log('P2 server-authoritative evolution wiring: PASS');

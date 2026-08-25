@@ -11,6 +11,44 @@ function joinUrl(base, path) {
   return new URL(path, `${base.replace(/\/$/, '')}/`).toString();
 }
 
+async function serverMutation(config, sessionToken, path, body, { fetchImpl = globalThis.fetch } = {}) {
+  if (!config?.apiBaseUrl || !sessionToken) throw Object.assign(new Error('Server player session is unavailable'), { code: 'SERVER_SESSION_UNAVAILABLE' });
+  const response = await fetchImpl(joinUrl(config.apiBaseUrl, path), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}`, 'X-API-Version': config.apiVersion, ...(globalThis.window?.POCKETMONSTER_SERVER_CATALOG_VERSION ? { 'X-Catalog-Version': globalThis.window.POCKETMONSTER_SERVER_CATALOG_VERSION } : {}) },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  const payload = await readJson(response) || { success: false, message: 'Invalid server response' };
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.message || `MonsterLife mutation failed (${response.status})`);
+    error.code = payload.errorCode || 'MUTATION_REJECTED';
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+export async function consumeInventory(config, sessionToken, itemId, amount, reason, options = {}) {
+  return serverMutation(config, sessionToken, '/api/player/inventory/consume', { itemId, amount, reason }, options);
+}
+
+export async function setMonsterEquipment(config, sessionToken, instanceId, itemId, slot, unequip = false, options = {}) {
+  return serverMutation(config, sessionToken, '/api/player/equipment', { instanceId, itemId, slot, unequip }, options);
+}
+
+export async function learnMonsterSkill(config, sessionToken, instanceId, skillId, slot, options = {}) {
+  return serverMutation(config, sessionToken, '/api/player/skills/learn', { instanceId, skillId, slot }, options);
+}
+
+export async function applyMonsterAction(config, sessionToken, instanceId, action, value, options = {}) {
+  return serverMutation(config, sessionToken, '/api/player/monster-action', { instanceId, action, value }, options);
+}
+
+export async function redeemItemCode(config, sessionToken, code, options = {}) {
+  return serverMutation(config, sessionToken, '/api/item-code/redeem', { code }, options);
+}
+
 function parseVersion(value) {
   const match = typeof value === 'string' && value.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
   return match ? match.slice(1, 4).map(Number) : null;
@@ -101,7 +139,8 @@ export async function healthVersionGate(config, options = {}) {
   const result = await requestServerContract(config, options);
   const fallback = config?.featureFlags?.firebaseFallback !== false;
   const latencyMs = Math.max(0, Math.round(clock() - startedAt));
-  return Object.freeze({ ...result, latencyMs, allowFirebaseFallback: fallback, allowPlayerDataWrites: false, writePolicy: runtimeWritePolicy(config) });
+  const writePolicy = runtimeWritePolicy(config);
+  return Object.freeze({ ...result, latencyMs, allowFirebaseFallback: fallback, allowPlayerDataWrites: result.state === 'healthy' && writePolicy.playerDataWrites, writePolicy });
 }
 
 export function serverGateTelemetry(result, { observedAtUtc = new Date().toISOString() } = {}) {
