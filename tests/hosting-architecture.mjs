@@ -8,6 +8,7 @@ import { isPublicGameFile } from '../scripts/build-github-pages.mjs';
 assert.equal(isPublicGameFile('game-v800.js'), true);
 assert.equal(isPublicGameFile('server-sync.mjs'), true);
 assert.equal(isPublicGameFile('assets/catalog/monster-slimes.json'), true);
+assert.equal(isPublicGameFile('assets/textures/monsters/flame-wolf-f2/README.md'), false);
 assert.equal(isPublicGameFile('tests/server-auth.mjs'), false);
 assert.equal(isPublicGameFile('server_save_backup.json'), false);
 assert.equal(isPublicGameFile('firebase.json'), false);

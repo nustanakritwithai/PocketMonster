@@ -24,6 +24,7 @@ function normalize(relative) {
 
 export function isPublicGameFile(relative) {
   const name = normalize(relative);
+  if (path.extname(name).toLowerCase() === '.md') return false;
   if (PUBLIC_DIRECTORIES.some(prefix => name.startsWith(prefix))) return true;
   if (name.includes('/')) return false;
   return !ROOT_EXCLUDES.has(name) && ROOT_FILE_EXTENSIONS.has(path.extname(name).toLowerCase());
