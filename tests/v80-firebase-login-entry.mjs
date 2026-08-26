@@ -6,5 +6,7 @@ assert.match(html,/<script\s+type="module"\s+src="\.\/entry-preload\.mjs"/,'auth
 assert.match(preload,/await prepareLaunch/,'active preload must complete the launch gate before importing the game');
 assert.match(js,/import \{ requireFirebaseLogin \} from '\.\/firebase-auth-ui\.mjs';/,'game boot must own the login gate');
 assert.match(js,/await requireFirebaseLogin\(runtimeConfig\);/,'game boot must use the runtime Firebase project');
+assert.match(js,/if \(launchSession\) document\.getElementById\('accountGate'\)\?\.classList\.add\('hidden'\)/,'a redeemed launch session must hide the Firebase login gate');
+assert.match(js,/if\(launchSession&&!serverPlayerDataActive\)/,'launch-only mode must not fall through to Firebase cloud sync');
 assert.match(sync,/getPocketMonsterFirebaseApp\(globalThis\.window\?\.POCKETMONSTER_RUNTIME_CONFIG\)/,'Firebase sync must use the runtime-selected shared app');
 console.log('V8.2 Firebase login active-entry contract: PASS');

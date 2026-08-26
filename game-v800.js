@@ -137,6 +137,7 @@ if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
   console.info(`Server contract gate: ${serverGate.state} (${serverGate.reason || 'read-only check'}) • Firebase fallback=${serverGate.allowFirebaseFallback}`);
 }
 const launchSession = runtimeConfig.featureFlags?.launchTicket ? window.POCKETMONSTER_LAUNCH_SESSION : null;
+if (launchSession) document.getElementById('accountGate')?.classList.add('hidden');
 const firebaseUser = launchSession ? null : await requireFirebaseLogin(runtimeConfig);
 const authProfileBridge = launchSession && serverGate.state === 'healthy'
   ? Object.freeze({ state: 'linked', profile: await readMonsterLifeProfile(runtimeConfig, launchSession.sessionToken), expiresAtUtc: launchSession.expiresAtUtc, sessionToken: launchSession.sessionToken })
@@ -7191,6 +7192,10 @@ async function flushRemoteSaveUntilSettled(){
   remoteSaveSyncing=false;
 }
 async function syncCloudSave(){
+  if(launchSession&&!serverPlayerDataActive){
+    remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
+    return;
+  }
   remoteSaveSyncing=true;
   try{
     const remote=await loadPrimaryRemoteSave();
