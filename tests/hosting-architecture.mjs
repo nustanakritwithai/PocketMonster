@@ -22,9 +22,14 @@ try {
   assert.doesNotMatch(html, /src="\.\/game-v800\.js/);
   assert.equal(fs.existsSync(path.join(output, 'game-v800.js')), false);
   assert.equal(fs.existsSync(path.join(output, 'firebase-launcher-entry.mjs')), true);
+  for (const module of ['firebase-auth-ui.mjs', 'firebase-runtime.mjs', 'server-auth.mjs', 'launch-bootstrap.mjs']) {
+    assert.equal(fs.existsSync(path.join(output, module)), true, `${module} must be bundled with the launcher`);
+  }
   assert.equal(fs.existsSync(path.join(output, 'runtime-config.json')), true);
   const launcher = fs.readFileSync(path.join(output, 'firebase-launcher-entry.mjs'), 'utf8');
   assert.match(launcher, /issueLaunchTicket/);
+  assert.match(launcher, /import\('\.\/server-auth\.mjs'\)/);
+  assert.doesNotMatch(launcher, /new URL\('server-auth\.mjs', assetBase\)/);
   assert.match(launcher, /location\.replace/);
   assert.match(launcher, /game-v800\.js/);
   assert.match(launcher, /if \(!config\?\.featureFlags\?\.launchTicket\)/);

@@ -21,6 +21,9 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   fs.writeFileSync(path.join(output, 'index.html'), html, 'utf8');
   fs.writeFileSync(path.join(output, '404.html'), html, 'utf8');
   fs.copyFileSync(path.join(root, 'firebase-launcher-entry.mjs'), path.join(output, 'firebase-launcher-entry.mjs'));
+  for (const module of ['firebase-auth-ui.mjs', 'firebase-runtime.mjs', 'server-auth.mjs', 'launch-bootstrap.mjs']) {
+    fs.copyFileSync(path.join(root, module), path.join(output, module));
+  }
   fs.writeFileSync(path.join(output, 'runtime-config.json'), `${JSON.stringify(config, null, 2)}\n`, 'utf8');
   return { output, assetBase, release: config.deployedRelease };
 }
