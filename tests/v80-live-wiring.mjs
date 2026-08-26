@@ -22,6 +22,7 @@ import {
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
+const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 
 const species = {
   id: 'flameling',
@@ -148,7 +149,7 @@ const applySkillEnd = js.indexOf('\nfunction skillFailureMessage(', applySkillSt
 const applySkillSrc = js.slice(applySkillStart, applySkillEnd);
 assert.ok(applySkillSrc.includes('let res=null'), 'accepted compatibility executor hoists res for mastery EXP');
 assert.ok(!applySkillSrc.includes('const res=monsterDamage'), 'accepted executor must not shadow the mastery result');
-assert.ok(html.includes('game-v800.js?v=810'), 'active HTML loads the v800 runtime');
+assert.ok(html.includes('entry-preload.mjs') && preload.includes("await import('./game-v800.js?v=810')"), 'active authenticated preload loads the v800 runtime');
 assert.ok(html.includes('style-v800.css?v=810'), 'active HTML loads the v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');
 assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');

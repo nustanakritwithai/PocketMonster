@@ -2,13 +2,16 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-yHSxI6Sw4LFVhCrwsbHlrhhvxRoA8AeXPYO5l/5n9rk=' https://nustanakritwithai.github.io https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://157.85.96.139 wss://157.85.96.139 https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: blob:; style-src 'self' https://nustanakritwithai.github.io; font-src 'self' https://nustanakritwithai.github.io; media-src 'self' https://nustanakritwithai.github.io; worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#111827" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG Prototype V8.4.0</title>
-  <script type="module">import {applyPendingPatch} from './patch-updater.mjs'; await applyPendingPatch();</script>
+  <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!(t&&s&&v)});history.replaceState(null,'',u.pathname);})();</script>
+  <script type="module" src="./entry-preload.mjs"></script>
   <link rel="stylesheet" href="./style-v800.css?v=810" />
 </head>
 <body>
@@ -388,16 +391,6 @@
     <div class="help">ซ้ายเดิน • ลากขวาหมุนกล้อง • Skill 1–4 ผู้เล่นกด • Recall ก่อนปาจับ</div>
   </div>
 
-  <script>
-    window.addEventListener('error', e => {
-      const x=document.getElementById('startupStatus');
-      if(x){x.textContent='เกิดข้อผิดพลาด: '+(e.message||'ไม่ทราบสาเหตุ');x.className='startup-status error';}
-    });
-    window.addEventListener('unhandledrejection', e => {
-      const x=document.getElementById('startupStatus');
-      if(x){x.textContent='เริ่มเกมไม่สำเร็จ: '+(e.reason?.message||e.reason||'ไม่ทราบสาเหตุ');x.className='startup-status error';}
-    });
-  </script>
-  <script type="module" src="./game-v800.js?v=810"></script>
+  <script type="module" src="./startup-errors.mjs"></script>
 </body>
 </html>

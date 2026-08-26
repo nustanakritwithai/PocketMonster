@@ -18,6 +18,7 @@
     "economyMutation": false,
     "firebaseFallback": true,
     "firebaseAuthBridge": true,
+    "launchTicket": false,
     "accountLinking": true,
     "profileReads": true
   },

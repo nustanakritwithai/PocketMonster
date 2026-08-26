@@ -52,21 +52,26 @@ export async function loadServerSave(config, sessionToken, options = {}) {
 }
 
 export async function saveServerSave(config, sessionToken, envelope, {
-  revision = 0, clientVersion, ...options
+  revision, clientVersion, idempotencyKey = globalThis.crypto?.randomUUID?.(), ...options
 } = {}) {
   const version = clientVersion || config.clientVersion || config.deployedRelease?.version || config.deployedRelease;
   if (typeof version !== 'string' || !version) throw new Error('MonsterLife client version is required for server save');
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('MonsterLife save revision is required for server save');
+  if (typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) throw new Error('MonsterLife idempotency key is required for server save');
   const { payload, response } = await request(config, 'api/save', {
     ...options,
     method: 'POST',
     sessionToken,
     body: envelope,
-    headers: { 'X-Save-Revision': String(revision), 'X-Game-Version': version },
+    headers: { 'X-Save-Revision': String(revision), 'X-Idempotency-Key': idempotencyKey, 'X-Game-Version': version },
   });
   const headerRevision = Number(response.headers?.get?.('X-Save-Revision'));
   return Object.freeze({
     revision: Number.isSafeInteger(payload.revision) ? payload.revision : headerRevision,
     checksum: payload.payloadChecksum || '',
+    aggregateChecksum: payload.aggregateChecksum || '',
+    replay: payload.replay === true,
+    idempotencyKey,
     savedAtUtc: payload.serverTimestamp || '',
   });
 }

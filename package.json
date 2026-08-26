@@ -3,7 +3,7 @@
   "version": "8.4.0",
   "type": "module",
   "scripts": {
-    "check": "node tests/check-active-syntax.mjs",
+    "check": "node tests/check-active-syntax.mjs && node tests/launch-ticket-bootstrap.mjs && node tests/launch-security-artifacts.mjs",
     "manifest": "node tests/workspace-manifest.mjs",
     "build:pages": "node scripts/build-github-pages.mjs",
     "build:launcher": "node scripts/build-firebase-launcher.mjs",
