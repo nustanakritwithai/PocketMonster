@@ -27,9 +27,11 @@ try {
   }
   assert.equal(fs.existsSync(path.join(output, 'runtime-config.json')), true);
   const launcher = fs.readFileSync(path.join(output, 'firebase-launcher-entry.mjs'), 'utf8');
+  const authUi = fs.readFileSync(path.join(output, 'firebase-auth-ui.mjs'), 'utf8');
   assert.match(launcher, /issueLaunchTicket/);
   assert.match(launcher, /import\('\.\/server-auth\.mjs'\)/);
   assert.doesNotMatch(launcher, /new URL\('server-auth\.mjs', assetBase\)/);
+  assert.doesNotMatch(authUi, /await signIn[^;]+; location\.reload\(\)/, 'Firebase sign-in must continue through the auth observer without racing a page reload');
   assert.match(launcher, /location\.replace/);
   assert.match(launcher, /game-v800\.js/);
   assert.match(launcher, /if \(!config\?\.featureFlags\?\.launchTicket\)/);
