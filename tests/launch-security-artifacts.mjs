@@ -28,6 +28,7 @@ assert.match(preload, /await prepareLaunch[\s\S]*await import\('\.\/game-v800\.j
 assert.match(bootstrap, /url\.searchParams\.has\('ticket'\)/, 'query-string ticket attempts must fail closed');
 assert.match(bootstrap, /launch\.invalid\) clearLaunchSession/, 'malformed handoffs must clear copied tab state');
 assert.match(bootstrap, /else if \(launch\.ticket\)[\s\S]*clearLaunchSession[\s\S]*redeemLaunchTicket/, 'fresh tickets must supersede stale sessions');
+assert.match(bootstrap, /event\.origin !== FIREBASE_LAUNCHER_ORIGIN \|\| event\.source !== opener/, 'mobile context recovery must verify exact launcher origin and opener');
 assert.doesNotMatch(bootstrap, /localStorage/, 'session tokens must not use persistent storage');
 assert.doesNotMatch(`${bootstrap}\n${preload}`, /serviceWorker\.register/, 'launch assets must not enter a service-worker cache');
 assert.match(pagesBuilder, /launch-bootstrap\.mjs/, 'GitHub Pages build must include the launch bootstrap');

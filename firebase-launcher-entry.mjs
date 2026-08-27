@@ -14,6 +14,22 @@ try {
   if (!config?.featureFlags?.launchTicket) {
     await loadLegacyGame(config, assetBase);
   } else {
+    let brave = false;
+    try { brave = await globalThis.navigator?.brave?.isBrave?.() === true; } catch { brave = false; }
+    let gameWindow = null;
+    let pendingLaunch = null;
+    const openGameWindow = () => {
+      if (!brave || (gameWindow && !gameWindow.closed)) return gameWindow;
+      gameWindow = window.open('about:blank', 'monsterlife-game');
+      return gameWindow;
+    };
+    if (brave) {
+      window.addEventListener('pocketmonster:auth-intent', event => { if (event.detail?.method !== 'google') openGameWindow(); });
+      window.addEventListener('message', event => {
+        if (!pendingLaunch || event.origin !== assetBase.origin || event.source !== gameWindow || event.data?.kind !== 'monsterlife-launch-context-request-v1') return;
+        gameWindow.postMessage({ kind: 'monsterlife-launch-context-v1', context: pendingLaunch.launchContext }, assetBase.origin);
+      });
+    }
     const [{ requireFirebaseLogin }, { issueLaunchTicket }] = await Promise.all([
       import('./firebase-auth-ui.mjs'),
       import('./server-auth.mjs'),
@@ -29,8 +45,21 @@ try {
       launch = null;
     }
     if (launch) {
-      window.name = JSON.stringify(launch.launchContext);
-      location.replace(launch.launchUrl);
+      if (!brave) {
+        window.name = JSON.stringify(launch.launchContext);
+        location.replace(launch.launchUrl);
+      } else {
+        pendingLaunch = launch;
+        const target = openGameWindow();
+        if (target) target.location.replace(launch.launchUrl);
+        else {
+          if (status) status.textContent = 'แตะเพื่อเปิดเกมบน Brave อย่างปลอดภัย';
+          const button = document.createElement('button');
+          button.type = 'button'; button.textContent = 'เปิดเกม'; button.className = 'account-primary';
+          button.addEventListener('click', () => { const popup = openGameWindow(); if (popup) popup.location.replace(launch.launchUrl); });
+          status?.after(button);
+        }
+      }
     }
   }
 } catch (error) {
