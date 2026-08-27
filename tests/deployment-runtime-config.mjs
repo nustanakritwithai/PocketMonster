@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createAuthProfilePreviewConfig, createReadOnlyRuntimeConfig } from '../scripts/write-deployment-runtime-config.mjs';
 
 const config = createReadOnlyRuntimeConfig('https://157.85.96.139');
@@ -21,6 +22,10 @@ assert.equal(preview.firebase.projectId, 'test-project');
 for (const flag of ['firebaseAuthBridge', 'accountLinking', 'profileReads']) assert.equal(preview.featureFlags[flag], true);
 for (const flag of ['vpsWrites', 'playerDataWrites', 'saveMigration', 'economyMutation']) assert.equal(preview.featureFlags[flag], false);
 assert.throws(() => createAuthProfilePreviewConfig('https://157.85.96.139', { projectId: 'incomplete' }));
+
+const checkedInConfig = JSON.parse(fs.readFileSync('runtime-config.json', 'utf8'));
+assert.equal(checkedInConfig.firebase?.projectId, 'pocketmonster-game');
+assert.equal(checkedInConfig.firebase?.authDomain, 'pocketmonster-game.firebaseapp.com');
 
 const ticketConfig = createReadOnlyRuntimeConfig('https://157.85.96.139', { launchTicket: true });
 assert.equal(ticketConfig.featureFlags.launchTicket, true);
