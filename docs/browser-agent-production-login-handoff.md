@@ -2,9 +2,11 @@
 
 ## Objective
 
-Create or sign in the single approved QA account on the Production Firebase launcher so the rollout operator can resolve its immutable Firebase UID and complete the one-user launch-ticket allowlist.
+Create the single approved QA identity in Production Firebase Authentication so the rollout operator can resolve its immutable Firebase UID and complete the one-user launch-ticket allowlist.
 
 Target URL: `https://pocketmonster-game.web.app/`
+
+Firebase Console target: `https://console.firebase.google.com/project/pocketmonster-game/authentication/users`
 
 This is a login prerequisite only. It does not authorize a Production deploy, process restart, launch-ticket activation, save/profile mutation, or player-data write.
 
@@ -21,18 +23,21 @@ This is a login prerequisite only. It does not authorize a Production deploy, pr
 
 1. Open a fresh tab at the exact target URL above.
 2. Confirm the origin is `pocketmonster-game.web.app` and not a Preview/studio channel.
-3. If the intended QA account does not exist, let the project owner complete the supported sign-up flow using the protected input channel. Do not invent a password or select a different account.
-4. Sign in from a fresh Production root page.
-5. Confirm the login UI accepts the account and advances beyond the unauthenticated form. Because launch-ticket remains disabled, do not interpret legacy game loading as launch-ticket verification.
-6. Sign out or leave the tab in the state explicitly requested by the project owner. Do not extract session data.
-7. Post only a redacted result on this PR using the result template below.
+3. Do not treat the current in-game login form as Firebase Authentication. While `launchTicket=false`, the launcher imports the legacy game and its login can reach the HUD without creating a Firebase Auth user.
+4. Open the exact Firebase Console target above using an authorized operator session. Confirm the project selector says `pocketmonster-game`.
+5. In Authentication > Users, add the intended QA email/password using only the protected input channel. Do not copy or expose the generated UID. If the user already exists, do not create a duplicate or reset its password.
+6. Confirm only that Firebase Console now shows the intended QA user. Do not open or copy its UID.
+7. Do not claim that legacy HUD access proves Firebase authentication or launch-ticket behavior.
+8. Sign out or leave the tab in the state explicitly requested by the project owner. Do not extract session data.
+9. Post only a redacted result on this PR using the result template below.
 
 ## Result template
 
 ```text
 External Browser Agent result: PASS | BLOCKED
-Origin checked: pocketmonster-game.web.app
-QA account exists/authenticates: yes | no | not tested
+Production Firebase project checked: pocketmonster-game
+QA user exists in Firebase Authentication: yes | no | not tested
+Legacy HUD result used as Firebase evidence: no
 Credential/token/UID captured or posted: no
 Production deploy/restart/flag change: no
 launchTicket/vpsWrites/playerDataWrites changed: no
@@ -41,4 +46,4 @@ Safe next action: rollout operator may resolve the QA UID server-side | <redacte
 
 ## Acceptance boundary
 
-PASS means only that the intended QA account exists in Production Firebase Auth and successfully authenticates through the Production launcher. The rollout operator must independently resolve the UID without displaying it, build the staged configuration, run preflight, and obtain the separate final approval before stopping the Production process.
+PASS means only that the intended QA account exists in Production Firebase Auth. Legacy game login or HUD access is not Firebase-authentication evidence while the launch-ticket feature is disabled. The rollout operator must independently resolve the UID without displaying it, build the staged configuration, run preflight, and obtain the separate final approval before stopping the Production process.
