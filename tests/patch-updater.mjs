@@ -4,6 +4,7 @@ import { refreshPatchFiles } from '../patch-updater.mjs';
 
 const source = fs.readFileSync(new URL('../patch-updater.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /setTimeout\(\(\) => location\.reload\(\), 5000\)/, 'patch failure must not create an automatic reload loop');
+assert.doesNotMatch(source, /if \(canReloadSafely\)[\s\S]*location\.reload/, 'successful patching must preserve the authenticated document instead of reloading');
 assert.doesNotMatch(source, /searchParams\.set\(['"]patch['"]/, 'patch refresh must use the canonical asset cache key');
 assert.match(source, /MAX_CONCURRENT_DOWNLOADS = 6/, 'patch downloads must use bounded concurrency');
 assert.match(source, /เข้าเกมด้วยไฟล์ที่มีอยู่/, 'a failed patch must offer a non-looping continuation');

@@ -89,14 +89,10 @@ export async function applyPendingPatch() {
   try {
     status.textContent = `กำลังรับแพตช์ ${files.length} ไฟล์…`;
     await refreshPatchFiles(files, reportProgress);
-    const canReloadSafely = rememberAppliedBuild(manifest.buildId);
+    rememberAppliedBuild(manifest.buildId);
     bar.style.width = '100%';
     status.textContent = 'อัปเดตสำเร็จ กำลังเข้าเกม…';
     await new Promise(resolve => setTimeout(resolve, 500));
-    if (canReloadSafely) {
-      location.reload();
-      await new Promise(() => {});
-    }
     overlay.remove();
   } catch (error) {
     status.textContent = `อัปเดตไม่สำเร็จ: ${error.message}`;
