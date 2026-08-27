@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { cleanLaunchUrl, clearLaunchSession, prepareLaunch, readLaunchSession, redeemLaunchTicket } from '../launch-bootstrap.mjs';
+import { cleanLaunchUrl, clearLaunchSession, prepareLaunch, readLaunchSession, recoverLaunchContext, redeemLaunchTicket } from '../launch-bootstrap.mjs';
 
 const root = new URL('../', import.meta.url);
 const bootstrapPath = new URL('launch-bootstrap.mjs', root);
@@ -30,6 +30,15 @@ const duplicateTicket = cleanLaunchUrl({ href: `https://nustanakritwithai.github
 assert.equal(duplicateTicket.invalid, true, 'duplicate ticket fragments must fail closed');
 const malformedFragment = cleanLaunchUrl({ href: 'https://nustanakritwithai.github.io/PocketMonster/#ticket=short&extra=value' }, { replaceState() {} }, { name: '{}' });
 assert.equal(malformedFragment.invalid, true, 'malformed or extended fragments must fail closed');
+
+const opener = { postMessage(message, origin) { assert.equal(message.kind, 'monsterlife-launch-context-request-v1'); assert.equal(origin, 'https://pocketmonster-game.web.app'); } };
+const listeners = new Map();
+const braveWindow = { opener, addEventListener(type, listener) { listeners.set(type, listener); }, removeEventListener(type) { listeners.delete(type); } };
+const pendingLaunch = Object.freeze({ ticket: rawTicket, state: null, verifier: null, invalid: false });
+const recovery = recoverLaunchContext(pendingLaunch, { windowLike: braveWindow, timeoutMs: 100 });
+listeners.get('message')({ origin: 'https://evil.example', source: opener, data: { kind: 'monsterlife-launch-context-v1', context: { state: 'evil-state-value', verifier: 'e'.repeat(43) } } });
+listeners.get('message')({ origin: 'https://pocketmonster-game.web.app', source: opener, data: { kind: 'monsterlife-launch-context-v1', context: { state: 'mobile-state-value', verifier: 'm'.repeat(43) } } });
+assert.deepEqual(await recovery, { ticket: rawTicket, state: 'mobile-state-value', verifier: 'm'.repeat(43), invalid: false }, 'Brave fallback must recover context only from the exact launcher opener');
 
 const storage = new Map();
 const sessionStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };

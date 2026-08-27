@@ -37,6 +37,10 @@ try {
   assert.match(html, /form-action 'self'/, 'launcher forms must be handled on the same origin');
   assert.match(html, new RegExp(`connect-src[^;]*${new URL(runtimeConfig.apiBaseUrl).origin.replaceAll('.', '\\.')}`), 'launcher CSP must allow its configured API origin');
   assert.match(launcher, /location\.replace/);
+  assert.match(launcher, /navigator\?\.brave\?\.isBrave/);
+  assert.match(launcher, /monsterlife-launch-context-request-v1/);
+  assert.match(launcher, /event\.origin !== assetBase\.origin/);
+  assert.match(launcher, /event\.source !== gameWindow/);
   assert.match(launcher, /game-v800\.js/);
   assert.match(launcher, /if \(!config\?\.featureFlags\?\.launchTicket\)/);
   assert.match(launcher, /LAUNCH_TICKET_QA_ONLY/);
