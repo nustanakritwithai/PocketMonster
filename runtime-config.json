@@ -18,15 +18,16 @@
     "economyMutation": false,
     "firebaseFallback": true,
     "firebaseAuthBridge": true,
+    "launchTicket": false,
     "accountLinking": true,
     "profileReads": true
   },
   "firebase": {
-    "apiKey": "AIzaSyBNKirSYZ0Yz-yGFIb0HRvgainkXY4bqsE",
-    "authDomain": "studio-9398155272-b7220.firebaseapp.com",
-    "projectId": "studio-9398155272-b7220",
-    "storageBucket": "studio-9398155272-b7220.firebasestorage.app",
-    "messagingSenderId": "618025038190",
-    "appId": "1:618025038190:web:c67b18708371bb254fd17f"
+    "apiKey": "AIzaSyA68KnCl-joXG7jrcUgcIKLkupl-bpUChk",
+    "authDomain": "pocketmonster-game.firebaseapp.com",
+    "projectId": "pocketmonster-game",
+    "storageBucket": "pocketmonster-game.firebasestorage.app",
+    "messagingSenderId": "789294953583",
+    "appId": "1:789294953583:web:a146e9913574c72da8499a"
   }
 }

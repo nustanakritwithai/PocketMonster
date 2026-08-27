@@ -46,11 +46,11 @@ import { equipItem, unequip, equippedItems, computeEquipmentContribution, loadou
 import { loadRemoteSave, saveRemoteSave } from './firebase-game-sync.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { establishReadOnlyBridge } from './server-auth.mjs';
+import { establishReadOnlyBridge, logoutMonsterLifeSession, readMonsterLifeProfile } from './server-auth.mjs';
 import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
-import { canUseServerPlayerData, changeServerPassword, loadServerSave, logoutServerSession, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
+import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -136,10 +136,14 @@ if (typeof window !== 'undefined') {
 if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
   console.info(`Server contract gate: ${serverGate.state} (${serverGate.reason || 'read-only check'}) • Firebase fallback=${serverGate.allowFirebaseFallback}`);
 }
-const firebaseUser = await requireFirebaseLogin(runtimeConfig);
-const authProfileBridge = serverGate.state === 'healthy'
-  ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
-  : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
+const launchSession = runtimeConfig.featureFlags?.launchTicket ? window.POCKETMONSTER_LAUNCH_SESSION : null;
+if (launchSession) document.getElementById('accountGate')?.classList.add('hidden');
+const firebaseUser = launchSession ? null : await requireFirebaseLogin(runtimeConfig);
+const authProfileBridge = launchSession && serverGate.state === 'healthy'
+  ? Object.freeze({ state: 'linked', profile: await readMonsterLifeProfile(runtimeConfig, launchSession.sessionToken), expiresAtUtc: launchSession.expiresAtUtc, sessionToken: launchSession.sessionToken })
+  : serverGate.state === 'healthy'
+    ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
+    : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });
   document.documentElement.dataset.authProfileBridge = authProfileBridge.state;
@@ -151,7 +155,7 @@ const serverPlayerDataActive=canUseServerPlayerData(runtimeConfig,serverGate,aut
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_PLAYER_DATA_MODE=serverPlayerDataActive?'server':'firebase';
   window.POCKETMONSTER_ACCOUNT_ACTIONS=Object.freeze({
-    logout:()=>logoutServerSession(runtimeConfig,authProfileBridge.sessionToken),
+    logout:()=>logoutMonsterLifeSession(runtimeConfig,authProfileBridge.sessionToken),
     changePassword:credentials=>changeServerPassword(runtimeConfig,authProfileBridge.sessionToken,credentials),
     saveCharacter:character=>saveCharacterProfile(runtimeConfig,authProfileBridge.sessionToken,character),
     redeemItemCode:code=>requestRedeemItemCode(runtimeConfig,authProfileBridge.sessionToken,code),
@@ -7188,6 +7192,10 @@ async function flushRemoteSaveUntilSettled(){
   remoteSaveSyncing=false;
 }
 async function syncCloudSave(){
+  if(launchSession&&!serverPlayerDataActive){
+    remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
+    return;
+  }
   remoteSaveSyncing=true;
   try{
     const remote=await loadPrimaryRemoteSave();

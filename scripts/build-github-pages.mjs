@@ -16,6 +16,7 @@ const ROOT_EXCLUDES = new Set([
   'workspace-manifest.json',
 ]);
 const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/'];
+const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs'];
 
 function normalize(relative) {
   return relative.replaceAll('\\', '/');
@@ -23,6 +24,7 @@ function normalize(relative) {
 
 export function isPublicGameFile(relative) {
   const name = normalize(relative);
+  if (path.extname(name).toLowerCase() === '.md') return false;
   if (PUBLIC_DIRECTORIES.some(prefix => name.startsWith(prefix))) return true;
   if (name.includes('/')) return false;
   return !ROOT_EXCLUDES.has(name) && ROOT_FILE_EXTENSIONS.has(path.extname(name).toLowerCase());
@@ -40,7 +42,10 @@ function sha256(file) {
 export function buildGitHubPages({ root = process.cwd(), output = path.join(root, 'dist-pages'), writeRootManifest = false } = {}) {
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });
-  const files = trackedFiles(root).filter(isPublicGameFile).sort();
+  for (const relative of REQUIRED_BOOTSTRAP_FILES) {
+    if (!fs.existsSync(path.join(root, relative))) throw new Error(`Required bootstrap file is missing: ${relative}`);
+  }
+  const files = [...new Set([...trackedFiles(root).filter(isPublicGameFile), ...REQUIRED_BOOTSTRAP_FILES])].sort();
   for (const relative of files) {
     const source = path.join(root, relative);
     const destination = path.join(output, relative);

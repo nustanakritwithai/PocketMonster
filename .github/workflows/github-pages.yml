@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      launch_ticket:
+        description: Enable launch-ticket bootstrap for the approved QA cohort
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,12 +37,14 @@ jobs:
           MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
           MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
           MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
+          MONSTERLIFE_LAUNCH_TICKET: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_ticket || false }}
           MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.sha }}'
         run: node scripts/write-deployment-runtime-config.mjs
       - name: Verify hosting architecture
         run: |
           node tests/check-active-syntax.mjs
           node tests/deployment-runtime-config.mjs
+          node tests/production-launch-workflows.mjs
           node tests/hosting-architecture.mjs
       - name: Build public game artifact
         run: node scripts/build-github-pages.mjs
