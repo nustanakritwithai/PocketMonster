@@ -39,6 +39,8 @@ try {
   assert.match(launcher, /location\.replace/);
   assert.match(launcher, /game-v800\.js/);
   assert.match(launcher, /if \(!config\?\.featureFlags\?\.launchTicket\)/);
+  assert.match(launcher, /LAUNCH_TICKET_QA_ONLY/);
+  assert.match(launcher, /loadLegacyGame/);
 } finally {
   fs.rmSync(output, { recursive: true, force: true });
 }
