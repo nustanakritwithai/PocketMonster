@@ -5,9 +5,14 @@ import { fileURLToPath } from 'node:url';
 export function buildFirebaseLauncher({ root = process.cwd(), output = path.join(root, 'firebase-launcher') } = {}) {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'runtime-config.json'), 'utf8'));
   const assetBase = config.assetBaseUrl;
+  const apiOrigin = new URL(config.apiBaseUrl).origin;
   if (!assetBase || new URL(assetBase).protocol !== 'https:') throw new Error('runtime-config.json requires an HTTPS assetBaseUrl');
+  if (new URL(apiOrigin).protocol !== 'https:') throw new Error('runtime-config.json requires an HTTPS apiBaseUrl');
   const release = encodeURIComponent(config.deployedRelease || Date.now());
   let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  if (!html.includes(`connect-src 'self' ${apiOrigin}`)) {
+    html = html.replace(`connect-src 'self'`, `connect-src 'self' ${apiOrigin}`);
+  }
   html = html
     .replace(`src="./entry-preload.mjs"`, `src="./firebase-launcher-entry.mjs?v=${release}"`)
     .replace(`href="./style-v800.css?v=810"`, `href="${assetBase}style-v800.css?v=${release}"`)
@@ -21,6 +26,9 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   fs.writeFileSync(path.join(output, 'index.html'), html, 'utf8');
   fs.writeFileSync(path.join(output, '404.html'), html, 'utf8');
   fs.copyFileSync(path.join(root, 'firebase-launcher-entry.mjs'), path.join(output, 'firebase-launcher-entry.mjs'));
+  for (const module of ['firebase-auth-ui.mjs', 'firebase-runtime.mjs', 'firebase-config.mjs', 'server-auth.mjs', 'launch-bootstrap.mjs']) {
+    fs.copyFileSync(path.join(root, module), path.join(output, module));
+  }
   fs.writeFileSync(path.join(output, 'runtime-config.json'), `${JSON.stringify(config, null, 2)}\n`, 'utf8');
   return { output, assetBase, release: config.deployedRelease };
 }

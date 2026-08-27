@@ -11,8 +11,8 @@ try {
     if (status) status.remove();
   } else {
     const [{ requireFirebaseLogin }, { issueLaunchTicket }] = await Promise.all([
-      import(new URL('firebase-auth-ui.mjs', assetBase).href),
-      import(new URL('server-auth.mjs', assetBase).href),
+      import('./firebase-auth-ui.mjs'),
+      import('./server-auth.mjs'),
     ]);
     const user = await requireFirebaseLogin(config);
     if (status) status.textContent = 'กำลังเปิดเกมอย่างปลอดภัย…';
