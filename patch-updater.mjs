@@ -1,6 +1,22 @@
 const GAME_VERSION = '8.4.0';
 const APPLIED_KEY = 'monsterlife-applied-patch';
 const ASSET_BASE = new URL(globalThis.window?.__POCKETMONSTER_ASSET_BASE__ || '.', import.meta.url);
+const MAX_CONCURRENT_DOWNLOADS = 6;
+
+function readAppliedBuild() {
+  for (const storage of [globalThis.localStorage, globalThis.sessionStorage]) {
+    try { const value = storage?.getItem?.(APPLIED_KEY); if (value) return value; } catch { /* storage can be blocked */ }
+  }
+  return '';
+}
+
+function rememberAppliedBuild(buildId) {
+  let stored = false;
+  for (const storage of [globalThis.localStorage, globalThis.sessionStorage]) {
+    try { storage?.setItem?.(APPLIED_KEY, buildId); stored = true; } catch { /* storage can be blocked */ }
+  }
+  return stored;
+}
 
 function createPatchOverlay() {
   const overlay = document.createElement('div');
@@ -11,14 +27,13 @@ function createPatchOverlay() {
   return overlay;
 }
 
-async function downloadPatchFile(file, completedBytes, totalBytes, reportProgress) {
+async function downloadPatchFile(file, reportLoaded, fetchImpl = globalThis.fetch) {
   const url = new URL(file.path, ASSET_BASE);
-  url.searchParams.set('patch', file.sha256 || Date.now());
-  const response = await fetch(url, { cache: 'reload' });
+  const response = await fetchImpl(url, { cache: 'reload' });
   if (!response.ok) throw new Error(`ดาวน์โหลด ${file.path} ไม่สำเร็จ (${response.status})`);
   if (!response.body) {
     await response.arrayBuffer();
-    reportProgress(completedBytes + file.size);
+    reportLoaded(Number(file.size || 0));
     return;
   }
   const reader = response.body.getReader();
@@ -27,8 +42,27 @@ async function downloadPatchFile(file, completedBytes, totalBytes, reportProgres
     const { done, value } = await reader.read();
     if (done) break;
     loaded += value.byteLength;
-    reportProgress(Math.min(totalBytes, completedBytes + loaded));
+    reportLoaded(loaded);
   }
+}
+
+export async function refreshPatchFiles(files, reportProgress, { fetchImpl = globalThis.fetch, concurrency = MAX_CONCURRENT_DOWNLOADS } = {}) {
+  const loaded = files.map(() => 0);
+  let nextIndex = 0;
+  const report = (index, value) => {
+    loaded[index] = Math.max(loaded[index], Number(value || 0));
+    reportProgress(loaded.reduce((sum, bytes) => sum + bytes, 0));
+  };
+  const worker = async () => {
+    for (;;) {
+      const index = nextIndex++;
+      if (index >= files.length) return;
+      await downloadPatchFile(files[index], value => report(index, value), fetchImpl);
+      report(index, Number(files[index].size || loaded[index]));
+    }
+  };
+  const workerCount = Math.min(Math.max(1, Number(concurrency) || 1), Math.max(1, files.length));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
 }
 
 export async function applyPendingPatch() {
@@ -42,7 +76,7 @@ export async function applyPendingPatch() {
   } catch {
     return;
   }
-  if (!manifest.buildId || manifest.gameVersion !== GAME_VERSION || localStorage.getItem(APPLIED_KEY) === manifest.buildId) return;
+  if (!manifest.buildId || manifest.gameVersion !== GAME_VERSION || readAppliedBuild() === manifest.buildId) return;
 
   const overlay = createPatchOverlay();
   const bar = overlay.querySelector('#patchBar');
@@ -50,26 +84,30 @@ export async function applyPendingPatch() {
   overlay.querySelector('#patchVersion').textContent = `เซิร์ฟเวอร์ ${manifest.serverVersion} • ตัวเกม ${manifest.gameVersion} • แพตช์ ${manifest.buildId}`;
   const files = Array.isArray(manifest.files) ? manifest.files : [];
   const totalBytes = Math.max(1, files.reduce((sum, file) => sum + Number(file.size || 0), 0));
-  let completedBytes = 0;
   const reportProgress = value => { bar.style.width = `${Math.min(100, Math.round(value / totalBytes * 100))}%`; };
 
   try {
-    for (let index = 0; index < files.length; index += 1) {
-      status.textContent = `กำลังรับแพตช์ ${index + 1}/${files.length}: ${files[index].path}`;
-      await downloadPatchFile(files[index], completedBytes, totalBytes, reportProgress);
-      completedBytes += Number(files[index].size || 0);
-      reportProgress(completedBytes);
-    }
-    localStorage.setItem(APPLIED_KEY, manifest.buildId);
+    status.textContent = `กำลังรับแพตช์ ${files.length} ไฟล์…`;
+    await refreshPatchFiles(files, reportProgress);
+    const canReloadSafely = rememberAppliedBuild(manifest.buildId);
     bar.style.width = '100%';
     status.textContent = 'อัปเดตสำเร็จ กำลังเข้าเกม…';
     await new Promise(resolve => setTimeout(resolve, 500));
-    location.reload();
-    await new Promise(() => {});
+    if (canReloadSafely) {
+      location.reload();
+      await new Promise(() => {});
+    }
+    overlay.remove();
   } catch (error) {
-    status.textContent = `อัปเดตไม่สำเร็จ: ${error.message} • กำลังลองใหม่ใน 5 วินาที`;
+    status.textContent = `อัปเดตไม่สำเร็จ: ${error.message}`;
     status.style.color = '#fca5a5';
-    setTimeout(() => location.reload(), 5000);
-    await new Promise(() => {});
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;margin-top:14px';
+    const retry = document.createElement('button');
+    retry.type = 'button'; retry.textContent = 'ลองอัปเดตใหม่'; retry.onclick = () => location.reload();
+    const continueButton = document.createElement('button');
+    continueButton.type = 'button'; continueButton.textContent = 'เข้าเกมด้วยไฟล์ที่มีอยู่'; continueButton.onclick = () => overlay.remove();
+    actions.append(retry, continueButton);
+    status.parentElement?.append(actions);
   }
 }
