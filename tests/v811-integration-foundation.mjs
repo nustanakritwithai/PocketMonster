@@ -13,7 +13,7 @@ const safe = await loadRuntimeConfig({ fetchImpl: async () => ({ ok: true, json:
 assert.equal(safe.featureFlags.vpsWrites, true);
 assert.equal(safe.canWritePlayerData, true);
 assert.equal(runtimeWritePolicy(safe).playerDataWrites, true);
-assert.equal(BUILD_RUNTIME_CONFIG.featureFlags.firebaseFallback, true);
+assert.equal(BUILD_RUNTIME_CONFIG.featureFlags.firebaseFallback, false);
 assert.equal(BUILD_RUNTIME_CONFIG.minimumClientVersion, '8.3.0');
 assert.equal(validateRuntimeManifest({ configVersion: 99 }).valid, false);
 assert.equal(compareSemanticVersions('8.10.0', '8.3.0'), 1);
