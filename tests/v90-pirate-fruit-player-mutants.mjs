@@ -7,7 +7,6 @@ import { COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldByI
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
-const pirateWorldJs = fs.readFileSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -23,7 +22,8 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 assert.equal(liveHtml, versionedHtml, 'mutant 0: active V8.4 entry stays byte-identical');
 assert.doesNotMatch(liveHtml, /v900\.html|game-v900|worlds-v900|pirate-fruit-offline/, 'mutant 0b: current game version must not point at the combined channel');
 assert.match(html, /data-combined-world="pocket-monster"/, 'mutant 0c: V9 gate includes the original game');
-assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts on the pirate island');
+assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts in the real Pirate Fruit world');
+assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'mutant 0c2b: Pocket-block pirate island stage is deleted');
 assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit', 'mutant 0c3: missing ?world= resolves to pirate-fruit');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
 assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'mutant 0c5: real pirate world links into Pocket Monster');
@@ -80,11 +80,11 @@ assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop pu
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
 assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
-assert.match(pirateWorldJs, /paintGroundGrid/, 'mutant 25: pirate island uses Pocket blocky ground');
-assert.doesNotMatch(pirateWorldJs, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: do not rebuild the pirate island with capsule/cylinder silhouettes');
+assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
+assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
 assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
-assert.match(pirateWorldJs, /publishWorldState\(/, 'mutant 28: pirate island publishes shared-zone world state');
+assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
 assert.match(livingJs, /publishWorldState\(/, 'mutant 29: living world publishes shared-zone world state');
 assert.match(liveJs, /เริ่มการผจญภัย/, 'mutant 30: Ranch Hub keeps the quest tracker visible');
 assert.match(html, /id="chatToggleBtn"/, 'mutant 31: V9 HTML ships the player chat toggle');

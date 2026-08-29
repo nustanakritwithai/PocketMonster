@@ -38,7 +38,6 @@ import { PIRATE_FRUIT_CONTROL_HUD_CSS } from '../pirate-fruit-control-hud-v900.m
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
-const pirateWorldJs = fs.readFileSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
@@ -53,7 +52,8 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'world-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
+assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -138,6 +138,7 @@ assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 't
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
 assert.match(cssV900, /#pirateFruitFrame\{position:absolute;inset:0/, 'offline Pirate Fruit frame fills the game stage');
 assert.match(cssV900, /throw"\] #pirateFruitFrame\{visibility:hidden/, 'throw panel hides the real Pirate Fruit frame');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] \.message/, 'human pirate panel hides leftover Pocket stage message chrome');
 assert.match(cssV900, /\.combined-world-warp/, 'V9 styles the Pocket Monster world-link button');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
@@ -211,16 +212,7 @@ assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit
 assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'real pirate world exposes the Pocket Monster world link');
 assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'warp button loads Pocket Monster');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
-assert.doesNotMatch(boot, /world-pirate-fruit-v900/, 'pirate world no longer boots the Pocket-block island stage');
-assert.doesNotMatch(pirateWorldJs, /combinedWarpsFrom|nearestCombinedWarp|makeWorldWarpBeacon/, 'the unused island file has no fake Pocket warp stage');
-assert.match(pirateWorldJs, /paintGroundGrid/, 'island file remains Pocket blocky if imported later');
-assert.match(pirateWorldJs, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate island spawns the asset-engine pirate player');
-assert.match(pirateWorldJs, /PerspectiveCamera\(50,/, 'pirate island follow camera uses FOV 50');
-assert.match(pirateWorldJs, /distance = 5\.15/, 'pirate island camera sits behind the shoulders');
-assert.match(pirateWorldJs, /new THREE\.Vector3\(0, 1\.36, 0\)/, 'pirate island looks at the pirate chest');
-assert.doesNotMatch(pirateWorldJs, /from ['"]three['"]/, 'pirate island does not import the three npm package');
-assert.doesNotMatch(pirateWorldJs, /CapsuleGeometry|CylinderGeometry|SphereGeometry|TorusGeometry/, 'pirate island props stay in Pocket box language');
-assert.doesNotMatch(pirateWorldJs, /vpsWrites|playerDataWrites/, 'pirate island must not open VPS write flags');
+assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');

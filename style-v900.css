@@ -43,6 +43,9 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] .combat-pil
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] .ball-pill,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] .gold-pill,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] .active-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .zone-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .message,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #message,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #versionBadge,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #saveIndicator{display:none!important}
 body[data-combined-world="pirate-fruit"] #game canvas{position:absolute;inset:0;width:100%;height:100%;background:#4f9ec9}

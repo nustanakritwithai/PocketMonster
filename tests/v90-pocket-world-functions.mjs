@@ -9,7 +9,6 @@ const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf
 const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
-const pirateWorldJs = fs.readFileSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -38,7 +37,8 @@ assert.match(chat, /type: 'world-pos'/, 'chat socket publishes world position fo
 assert.match(chat, /type === 'world-snapshot'/, 'chat socket dispatches remote player snapshots');
 assert.match(chat, /POCKETMONSTER_WORLD_STATE/, 'chat reads the local world snapshot');
 assert.match(chat, /POCKETMONSTER_WORLD_PRESENCE/, 'chat forwards presence to the overlay');
-assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'animal-control overlay does not steal world presence from the pirate island');
+assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'animal-control overlay does not steal world presence from the real pirate world');
+assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
 assert.match(liveJs, /window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{zone:state\.currentZone,x:player\.position\.x,z:player\.position\.z,dir:player\.rotation\.y\}\)/, 'Pocket Monster publishes zone position');
 assert.match(liveJs, /updateRemoteWorldMarkers/, 'Pocket Monster projects remote players on the existing HUD tick');
 assert.doesNotMatch(liveJs, /setInterval\(\(\)=>\{for\(const marker of remoteWorldPlayers/, 'live presence must not add a wall-clock interval to the capture loop');
