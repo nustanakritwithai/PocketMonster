@@ -213,6 +213,13 @@ assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'real pirate worl
 assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'warp button loads Pocket Monster');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
+{
+  const serverGate = fs.readFileSync(new URL('../docs/v9-334-server-gate-response.md', import.meta.url), 'utf8');
+  assert.match(serverGate, /presentationOnly=true/, 'Server gate response records the pirate iframe as presentation-only');
+  assert.match(serverGate, /combatAuthority=false/, 'Server gate response keeps Pirate Fruit combat off Server');
+  assert.match(serverGate, /vpsWrites=false/, 'Server gate response keeps write flags closed');
+  assert.doesNotMatch(serverGate, /vpsWrites=true|playerDataWrites=true|firebaseFallback=true/, 'Server gate response must not ask Server to open writes');
+}
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');

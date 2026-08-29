@@ -85,6 +85,11 @@ assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate
 assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
 assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
+{
+  const serverGate = fs.readFileSync(new URL('../docs/v9-334-server-gate-response.md', import.meta.url), 'utf8');
+  assert.match(serverGate, /combatAuthority=false/, 'mutant 28b: Server gate response keeps the iframe off combat authority');
+  assert.doesNotMatch(serverGate, /vpsWrites=true|playerDataWrites=true/, 'mutant 28c: Server gate response does not open write flags');
+}
 assert.match(livingJs, /publishWorldState\(/, 'mutant 29: living world publishes shared-zone world state');
 assert.match(liveJs, /เริ่มการผจญภัย/, 'mutant 30: Ranch Hub keeps the quest tracker visible');
 assert.match(html, /id="chatToggleBtn"/, 'mutant 31: V9 HTML ships the player chat toggle');
