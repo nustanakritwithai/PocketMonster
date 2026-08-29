@@ -57,6 +57,6 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/captur
 assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutant 20: Pocket character system is not removed yet');
 assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
-assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\].*#cameraPad/s, 'mutant 23: pirate throw overlay hides Pocket movement pads');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\].*#joystick/s, 'mutant 23: pirate throw overlay hides Pocket movement pads');
 
 console.log('V9.0 pirate-fruit player mutants: PASS');

@@ -42,7 +42,8 @@ body[data-control-panel="human"] #stageObjective,
 body[data-control-panel="human"] #globalCharacterBtn,
 body[data-control-panel="human"] #characterAccessEntry{display:none!important}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .controls-left,
-body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #cameraPad{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #joystick,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #cameraPad,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .combat-pill,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .gold-pill,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .active-pill,
@@ -52,6 +53,10 @@ body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #fullscreen
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #message,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .zone-travel,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #huntBtn,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #actionReason,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #globalCharacterBtn,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #characterAccessEntry,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .help,
 body[data-combined-world="living-world"][data-control-panel="throw"] #huntBtn,
 body[data-combined-world="living-world"][data-control-panel="throw"] #message,
 body[data-combined-world="living-world"][data-control-panel="throw"] .zone-travel{display:none!important}
