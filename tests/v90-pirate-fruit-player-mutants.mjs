@@ -28,13 +28,14 @@ assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
-assert.match(liveJs, /if\(piratePocketPlayer\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider is gated behind piratePocketPlayer');
-assert.match(liveJs, /distance=piratePocketPlayer\?5\.15:7\.4/, 'mutant 1c: live follow distance stays 7.4; pirate Pocket uses a closer cam');
+assert.match(liveJs, /const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider always loads dynamically for the live player');
+assert.match(liveJs, /distance=5\.15/, 'mutant 1c: live follow distance is the pirate camera, not the old 7.4 overhead cam');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
 assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: pirate world must load the offline Pirate Fruit client');
 assert.match(boot, /remote: false/, 'mutant 4: pirate world must be the offline client');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'mutant 5: Pocket boot must not import the three package');
-assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'mutant 6: current version player stays bighead');
+assert.match(liveJs, /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/, 'mutant 6: live player is pirate-fruit');
+assert.doesNotMatch(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'mutant 6b: Pocket Monster player model is removed');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'keeper'/, 'mutant 7: current version keeper stays bighead');
 assert.match(livingJs, /createPirateFruitPlayerProvider\(/, 'mutant 8: living world may still use the presentation pirate traveler');
 assert.doesNotMatch(provider, /mergeGeometries/, 'mutant 9: do not vendor Pirate Fruit BufferGeometryUtils into Pocket presentation');
@@ -57,8 +58,8 @@ assert.match(html, /id="monsterThrowStage"/, 'mutant 16b: V9 has the pirate thro
 assert.doesNotMatch(liveHtml, /controlPanelSwitcher|data-control-panel|monsterThrowStage/, 'mutant 17: live index.html must not gain V9 control panels');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'mutant 18: character authority stays Pirate Fruit');
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/capture stays Pocket Monster');
-assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutant 20: Pocket character system is not removed yet');
-assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
+assert.match(panelsJs, /pocketMonsterCharacterSystem: 'removed'/, 'mutant 20: Pocket character system is removed');
+assert.match(panelsJs, /keepPocketMonsterModel: false/, 'mutant 21: Pocket character models are no longer kept as the player');
 assert.match(panelsJs, /worldId === 'pocket-monster'\) return THROW_CONTROL_PANEL/, 'mutant 21b: Pocket Monster world cannot open the attack panel');
 assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'mutant 21c: Pocket Monster world hides the Pirate Fruit attack button');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');

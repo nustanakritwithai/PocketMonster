@@ -84,7 +84,7 @@ assert.equal(sharedSize(), 1);
 disposeHandle(handle);
 
 assert.deepEqual(GAMEPLAY_LOCKS, {
-  cameraLookY: 1.10,
+  cameraLookY: 1.36,
   keeperTalkRadius: 3.40,
   projectileDuration: 0.55,
   throwDuration: 0.34,

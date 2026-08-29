@@ -19,7 +19,8 @@ assert.match(js, /kind==='monster'\?monsterProvider\(ctx\):humanoidProvider\(ctx
 assert.match(js, /createBigheadProvider\(/, 'humanoid Bighead provider stays registered');
 assert.match(js, /function makeSlimeMesh\(/, 'legacy slime builder stays');
 assert.match(js, /function makeAnimalBase\(/, 'legacy animal builder stays');
-assert.match(js, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'player spawn is unchanged');
+assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/, 'player spawn is the pirate character');
+assert.doesNotMatch(js, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'Pocket Monster player model is no longer spawned');
 assert.match(js, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'keeper'/, 'keeper spawn is unchanged');
 assert.doesNotMatch(js, /from ['"]three['"]/, 'game still does not import the three npm package');
 

@@ -9,13 +9,13 @@ const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const versioned = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 assert.equal(html, versioned, 'active entry stays byte-identical');
-assert.match(js, /new THREE\.Vector3\(0,1\.1,0\)/, 'camera look target stays y+1.10');
+assert.match(js, /new THREE\.Vector3\(0,1\.36,0\)/, 'camera look target follows the pirate player at y+1.36');
 assert.match(js, /distXZ\(player\.position,npc\.position\)<3\.4/);
 assert.match(js, /duration:\.55/, 'projectile duration stays 0.55');
 assert.match(js, /play\('throw',\{duration:\.34\}\)/);
 assert.match(js, /play\('skill',\{duration:\.28\}\)/);
 assert.match(js, /play\('hurt',\{duration:\.24\}\)/);
-assert.equal(GAMEPLAY_LOCKS.cameraLookY, 1.1);
+assert.equal(GAMEPLAY_LOCKS.cameraLookY, 1.36);
 
 function vec() {
   return { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } };

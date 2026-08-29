@@ -23,8 +23,13 @@ assert.match(
 );
 assert.match(
   js,
+  /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/,
+  'mutant 7: player spawns as pirate-fruit',
+);
+assert.doesNotMatch(
+  js,
   /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/,
-  'mutant 7: player still spawns as humanoid bighead',
+  'mutant 7b: Pocket Monster player model is not the live player',
 );
 assert.doesNotMatch(js, /import ['"]three['"]/, 'mutant 8: do not add an import of the three package');
 assert.match(

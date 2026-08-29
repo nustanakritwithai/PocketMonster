@@ -236,7 +236,6 @@ function ensureDirection(v){
 
 const el=id=>document.getElementById(id);
 const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl')==='pirate-fruit';
-const piratePocketPlayer=pirateThrowWorld||window.POCKETMONSTER_COMBINED_BOOT?.worldId==='pocket-monster';
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
@@ -332,7 +331,7 @@ function makeSkyTexture(zoneColor){
 }
 scene.background=makeSkyTexture(0x72c7ef);
 scene.fog=new THREE.Fog(0x65c9f5,30,76);
-const camera=new THREE.PerspectiveCamera(piratePocketPlayer?50:62,innerWidth/innerHeight,.1,130);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,130);
 const renderer=new THREE.WebGLRenderer({antialias:qualityProfile.antialias,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,qualityProfile.maxDpr));
 renderer.setSize(innerWidth,innerHeight);
@@ -1589,7 +1588,7 @@ const monsterProvider=createBigheadMonsterProvider({
   basicMaterial:basicMat,
 });
 assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterProvider(ctx):humanoidProvider(ctx));
-if(piratePocketPlayer){
+{
   const { createPirateFruitPlayerProvider } = await import('./asset-presentation/providers/pirate-fruit-player.mjs');
   assets.registerProvider('pirate-fruit',createPirateFruitPlayerProvider({
     THREE,
@@ -1603,9 +1602,7 @@ if(piratePocketPlayer){
   }));
 }
 // ---------- Player / NPC ----------
-const playerVisual=piratePocketPlayer
-  ? assets.spawn('character.human.pirate-fruit.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier})
-  : assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
+const playerVisual=assets.spawn('character.human.pirate-fruit.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
 const merchantVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'merchant',appearanceId:'appearance.human.merchant-brown.v1',quality:qualityProfile.tier});
 const trainerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'trainer',appearanceId:'appearance.human.trainer-blue.v1',quality:qualityProfile.tier});
@@ -3765,11 +3762,11 @@ function clearBossChallengeCombatEffects(){clearSkillFields();clearSkillSwarms()
 
 // ---------- Camera / input ----------
 let cameraYaw=0,cameraPitch=.48;
-if(piratePocketPlayer) cameraPitch=.28;
+cameraPitch=.28;
 const cameraPad=el('cameraPad');
 let camDrag={active:false,pid:null,x:0,y:0};
 cameraPad.addEventListener('pointerdown',e=>{camDrag.active=true;camDrag.pid=e.pointerId;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraPad.setPointerCapture?.(e.pointerId);});
-cameraPad.addEventListener('pointermove',e=>{if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,piratePocketPlayer?.12:.20,piratePocketPlayer?.55:.84);});
+cameraPad.addEventListener('pointermove',e=>{if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);});
 function endCam(e){if(e.pointerId!==camDrag.pid)return;camDrag.active=false;camDrag.pid=null;}
 cameraPad.addEventListener('pointerup',endCam);
 cameraPad.addEventListener('pointercancel',endCam);
@@ -7201,7 +7198,7 @@ function ensureWildPopulation(dt){
 
 // ---------- Frame ----------
 function updatePlayer(dt){if(pirateThrowPanelPaused()){playerData.invuln=Math.max(0,playerData.invuln-dt);playerVisual.update(dt,{moving:false});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});return;}playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
-function updateCamera(dt){const f=forward(),distance=piratePocketPlayer?5.15:7.4,heightLift=piratePocketPlayer?.95:1.15,lookAhead=piratePocketPlayer?2.05:1.5,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+heightLift,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));if(piratePocketPlayer&&!updateCamera.ready){camera.position.copy(desired);updateCamera.ready=true;}else camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(piratePocketPlayer?new THREE.Vector3(0,1.36,0):new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(lookAhead));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
+function updateCamera(dt){const f=forward(),distance=5.15,heightLift=.95,lookAhead=2.05,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+heightLift,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));if(!updateCamera.ready){camera.position.copy(desired);updateCamera.ready=true;}else camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.36,0)).add(f.clone().multiplyScalar(lookAhead));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
 function reloadWorldFromLoadedState(){
@@ -7343,7 +7340,7 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
-    hostCharacter:piratePocketPlayer?'pirate-fruit':'pocket-monster',
+    hostCharacter:'pirate-fruit',
     capture:captureThrow,
     summon:summonThrow,
     recall,

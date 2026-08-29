@@ -4,7 +4,7 @@ export const PRESENTATION_ANCHORS = Object.freeze([
 ]);
 
 export const GAMEPLAY_LOCKS = Object.freeze({
-  cameraLookY: 1.10,
+  cameraLookY: 1.36,
   keeperTalkRadius: 3.40,
   projectileDuration: 0.55,
   throwDuration: 0.34,
