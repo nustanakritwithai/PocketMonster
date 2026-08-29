@@ -28,7 +28,7 @@ body[data-combined-world="pocket-monster"] .zone-travel,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .zone-travel{top:176px}
 body[data-combined-world="pocket-monster"] .message,
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .message{top:226px}
-#monsterThrowStage{position:fixed;inset:0;z-index:1;display:none;background:#0b1020}
+#monsterThrowStage{position:fixed;inset:0;z-index:0;display:none;background:#0b1020}
 #monsterThrowStage canvas{display:block;width:100%;height:100%}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #monsterThrowStage{display:block}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #game iframe{visibility:hidden;pointer-events:none}

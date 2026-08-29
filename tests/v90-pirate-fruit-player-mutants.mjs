@@ -59,7 +59,7 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/captur
 assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutant 20: Pocket character system is not removed yet');
 assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
-assert.match(cssV900, /#monsterThrowStage/, 'mutant 23: pirate throw has a dedicated Pocket stage');
+assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'mutant 23c: pirate throw keeps hunt for wild animal control');
 assert.match(boot, /game-v800\.js\?v=810&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
