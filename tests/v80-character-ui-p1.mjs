@@ -150,7 +150,7 @@ const afterQuick = stack.controller.back();
 assert.equal(afterQuick.kind, 'world');
 assert.equal(stack.state.ui.characterPanel, 'closed');
 
-assert.match(js, /from '\.\/character-ui-controller\.mjs'/, 'live runtime must import the shared controller');
+assert.match(js, /from '\.\/character-ui-controller\.mjs(?:\?[^']*)?'/, 'live runtime must import the shared controller');
 assert.match(js, /attachCharacterUi\(state\)/, 'session UI is attached to the live state object');
 assert.match(js, /function currentSaveEnvelope\(\)\{\s*return \{state:sanitizeStateForPersistence\(persistableState\(state\)\),playerHp:playerData\.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION\};/, 'save envelope must strip session UI and use the canonical local\/Firebase persistence adapter');
 assert.match(extractFn('saveGame'), /currentSaveEnvelope\(\)/, 'saveGame must write the sanitized envelope');
