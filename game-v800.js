@@ -139,9 +139,6 @@ if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
 const launchSession = runtimeConfig.featureFlags?.launchTicket ? window.POCKETMONSTER_LAUNCH_SESSION : null;
 if (launchSession) document.getElementById('accountGate')?.classList.add('hidden');
 const firebaseUser = launchSession ? null : await requireFirebaseLogin(runtimeConfig);
-if (serverGate.state !== 'healthy') {
-  throw new Error(`SERVER_ONLINE_REQUIRED:${serverGate.reason || serverGate.state}`);
-}
 const authProfileBridge = launchSession && serverGate.state === 'healthy'
   ? Object.freeze({ state: 'linked', profile: await readMonsterLifeProfile(runtimeConfig, launchSession.sessionToken), expiresAtUtc: launchSession.expiresAtUtc, sessionToken: launchSession.sessionToken })
   : serverGate.state === 'healthy'

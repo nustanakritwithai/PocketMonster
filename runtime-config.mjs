@@ -26,7 +26,7 @@ export const BUILD_RUNTIME_CONFIG = Object.freeze({
     accountMigration: false,
     saveMigration: false,
     economyMutation: false,
-    firebaseFallback: false,
+    firebaseFallback: true,
     firebaseAuthBridge: false,
     accountLinking: false,
     profileReads: false,
@@ -68,7 +68,7 @@ function normalizeManifest(manifest = {}) {
   if (!config.featureFlags.vpsWrites) config.featureFlags.playerDataWrites = false;
   config.featureFlags.accountMigration = false;
   config.featureFlags.saveMigration = false;
-  config.featureFlags.firebaseFallback = false;
+  config.featureFlags.firebaseFallback = true;
   if (!config.featureFlags.vpsEnabled || !config.featureFlags.vpsReads) {
     config.featureFlags.firebaseAuthBridge = false;
     config.featureFlags.accountLinking = false;

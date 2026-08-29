@@ -106,7 +106,7 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
-  const headers = { Accept: 'application/json', 'X-Request-Id': correlationId, 'X-Game-Version': '8.4.0' };
+  const headers = { Accept: 'application/json', 'X-Request-Id': correlationId };
   try {
     const requests = Promise.all([
       fetchImpl(joinUrl(config.apiBaseUrl, config.healthPath), { method: 'GET', headers, signal: controller.signal, cache: 'no-store' }),
