@@ -84,6 +84,6 @@ assert.match(pirateWorldJs, /publishWorldState\(/, 'mutant 28: pirate island pub
 assert.match(livingJs, /publishWorldState\(/, 'mutant 29: living world publishes shared-zone world state');
 assert.match(liveJs, /เริ่มการผจญภัย/, 'mutant 30: Ranch Hub keeps the quest tracker visible');
 assert.match(html, /id="chatToggleBtn"/, 'mutant 31: V9 HTML ships the player chat toggle');
-assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'mutant 32: pirate throw overlay does not steal world presence');
+assert.match(liveJs, /updateRemoteWorldMarkers/, 'mutant 32b: remote markers project on the HUD tick, not a capture setInterval');
 
 console.log('V9.0 pirate-fruit player mutants: PASS');

@@ -2461,6 +2461,7 @@ function clearTransientEffects(){
 
 // ---------- State / save ----------
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
+let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
 window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
 const remoteWorldPlayers=new Map();
@@ -2479,7 +2480,7 @@ window.POCKETMONSTER_WORLD_PRESENCE=payload=>{
   }
   for(const [id,marker] of remoteWorldPlayers){if(!seen.has(id)){marker.remove();remoteWorldPlayers.delete(id);}}
 };
-setInterval(()=>{for(const marker of remoteWorldPlayers.values()){const x=Number(marker.dataset.x),z=Number(marker.dataset.z);const point=new THREE.Vector3(x,1.8,z).project(camera);const visible=point.z>-1&&point.z<1&&point.x>=-1.1&&point.x<=1.1&&point.y>=-1.1&&point.y<=1.1;marker.hidden=!visible;if(visible){marker.style.left=((point.x+1)*50)+'%';marker.style.top=((1-point.y)*50)+'%';}}},100);
+updateRemoteWorldMarkers=()=>{for(const marker of remoteWorldPlayers.values()){const x=Number(marker.dataset.x),z=Number(marker.dataset.z);const point=new THREE.Vector3(x,1.8,z).project(camera);const visible=point.z>-1&&point.z<1&&point.x>=-1.1&&point.x<=1.1&&point.y>=-1.1&&point.y<=1.1;marker.hidden=!visible;if(visible){marker.style.left=((point.x+1)*50)+'%';marker.style.top=((1-point.y)*50)+'%';}}};
 }
 attachCharacterUi(state);
 let characterUI=null;
@@ -7372,6 +7373,7 @@ function loop(now){
       renderHUD();
       // renderHUD() also refreshes all Combat HUD action presentation states.
       updateNpcUI();
+      updateRemoteWorldMarkers();
       if(!el('monsterManager').classList.contains('hidden')&&managerDirty.consume(now))renderManager();
     }
     updateCharacterPreview(dt);
