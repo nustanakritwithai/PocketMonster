@@ -136,6 +136,9 @@ if (typeof window !== 'undefined') {
 if (serverGate.state !== 'disabled' && serverGate.state !== 'healthy') {
   console.info(`Server contract gate: ${serverGate.state} (${serverGate.reason || 'read-only check'}) • Firebase fallback=${serverGate.allowFirebaseFallback}`);
 }
+if (serverGate.state !== 'healthy') {
+  throw new Error(`SERVER_ONLINE_REQUIRED:${serverGate.reason || serverGate.state}`);
+}
 const launchSession = runtimeConfig.featureFlags?.launchTicket ? window.POCKETMONSTER_LAUNCH_SESSION : null;
 if (launchSession) document.getElementById('accountGate')?.classList.add('hidden');
 const firebaseUser = launchSession ? null : await requireFirebaseLogin(runtimeConfig);
