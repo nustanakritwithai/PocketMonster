@@ -64,8 +64,7 @@ export async function applyPendingPatch() {
     bar.style.width = '100%';
     status.textContent = 'อัปเดตสำเร็จ กำลังเข้าเกม…';
     await new Promise(resolve => setTimeout(resolve, 500));
-    location.reload();
-    await new Promise(() => {});
+    overlay.remove();
   } catch (error) {
     status.textContent = `อัปเดตไม่สำเร็จ: ${error.message} • กำลังลองใหม่ใน 5 วินาที`;
     status.style.color = '#fca5a5';
