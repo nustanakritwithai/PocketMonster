@@ -29,6 +29,7 @@ assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined c
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
 assert.match(liveJs, /if\(piratePocketPlayer\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider is gated behind piratePocketPlayer');
+assert.match(liveJs, /distance=piratePocketPlayer\?5\.15:7\.4/, 'mutant 1c: live follow distance stays 7.4; pirate Pocket uses a closer cam');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
 assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: pirate world must load the offline Pirate Fruit client');
 assert.match(boot, /remote: false/, 'mutant 4: pirate world must be the offline client');

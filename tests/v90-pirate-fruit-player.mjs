@@ -167,6 +167,9 @@ assert.match(liveJs, /animalControl'\)==='pirate-fruit'/, 'pirate throw instance
 assert.match(liveJs, /POCKETMONSTER_COMBINED_BOOT\?\.worldId==='pocket-monster'/, 'V9 Pocket Monster world can host the pirate player without the live query');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'live loop publishes Pocket animal-control functions');
 assert.match(liveJs, /piratePocketPlayer\s*\?\s*assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'V9 Pocket loop can spawn the pirate player');
+assert.match(liveJs, /PerspectiveCamera\(piratePocketPlayer\?50:62/, 'pirate Pocket camera is closer than the live V8.4 follow cam');
+assert.match(liveJs, /distance=piratePocketPlayer\?5\.15:7\.4/, 'pirate Pocket follow distance sits behind the shoulders, not overhead');
+assert.match(liveJs, /if\(piratePocketPlayer\) cameraPitch=\.28/, 'pirate Pocket camera starts lower than the live top-down pitch');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
 assert.match(html, /frame-src 'self'/, 'V9 may iframe the offline Pirate Fruit client');
 assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก้อน/, 'gate describes the real offline Pirate Fruit game');
