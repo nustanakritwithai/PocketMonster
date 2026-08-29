@@ -3,6 +3,7 @@ import { GROUND_REPEAT, paintGroundGrid, paintSkyGradient } from './asset-presen
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
+import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
 export const PIRATE_FRUIT_WORLD_VERSION = '9.0.0-pirate-block-world';
 export const PIRATE_FRUIT_WORLD_ID = 'pirate-fruit';
@@ -210,6 +211,12 @@ scene.add(player);
 
 if (typeof window !== 'undefined') {
   window.MLRPG_ASSETS = { diagnostics: () => assets.diagnostics() };
+  publishWorldState({
+    getZone: () => PIRATE_FRUIT_WORLD_ID,
+    getPosition: () => player.position,
+    getDir: () => player.rotation.y,
+  });
+  installWorldPresence({ THREE, getCamera: () => camera, getZone: () => PIRATE_FRUIT_WORLD_ID });
 }
 
 let cameraYaw = 0.18;

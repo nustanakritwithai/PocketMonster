@@ -78,5 +78,12 @@ assert.match(boot, /source: 'pocket-block-world'/, 'mutant 24: pirate human pane
 const pirateWorldJs = fs.readFileSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 assert.match(pirateWorldJs, /paintGroundGrid/, 'mutant 25: pirate island uses Pocket blocky ground');
 assert.doesNotMatch(pirateWorldJs, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: do not rebuild the pirate island with capsule/cylinder silhouettes');
+assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');
+assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
+assert.match(pirateWorldJs, /publishWorldState\(/, 'mutant 28: pirate island publishes shared-zone world state');
+assert.match(livingJs, /publishWorldState\(/, 'mutant 29: living world publishes shared-zone world state');
+assert.match(liveJs, /เริ่มการผจญภัย/, 'mutant 30: Ranch Hub keeps the quest tracker visible');
+assert.match(html, /id="chatToggleBtn"/, 'mutant 31: V9 HTML ships the player chat toggle');
+assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'mutant 32: pirate throw overlay does not steal world presence');
 
 console.log('V9.0 pirate-fruit player mutants: PASS');

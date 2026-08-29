@@ -1,5 +1,11 @@
 const SESSION_KEY = 'monsterlife.session.v1';
-const state = { config: null, token: null, after: 0, socket: null, polling: null };
+const state = { config: null, token: null, after: 0, socket: null, polling: null, worldPulse: null };
+function ensureChatStyles() {
+  if (document.querySelector('#chatRuntimeStyles')) return;
+  const style = document.createElement('style'); style.id = 'chatRuntimeStyles';
+  style.textContent = '.chat-toggle{left:auto!important;bottom:auto!important;top:max(8px,var(--safe-top,8px))!important;right:max(86px,calc(var(--safe-right,8px) + 74px))!important;z-index:15000!important;pointer-events:auto!important}.game-chat{bottom:auto!important;max-height:calc(100dvh - 58px - 220px)!important;z-index:15001!important;pointer-events:auto!important}.game-chat.hidden{display:none!important}@media (orientation:landscape) and (max-height:560px){.game-chat{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min(340px,46vw)!important;max-height:calc(100dvh - 48px - 140px)!important}}';
+  document.head.append(style);
+}
 
 function sessionToken() {
   if (window.POCKETMONSTER_SERVER_SESSION_TOKEN) return window.POCKETMONSTER_SERVER_SESSION_TOKEN;
@@ -7,46 +13,65 @@ function sessionToken() {
 }
 function api(path) { return new URL(path.replace(/^\//, ''), `${state.config.apiBaseUrl.replace(/\/$/, '')}/`).href; }
 function addMessage(message) {
-  const row = document.createElement('div'); row.className = 'ml-chat-row';
-  const name = document.createElement('b'); name.textContent = message.username || message.displayName || 'ผู้เล่น';
-  if (String(message.username || '').startsWith('aibot_')) name.className = 'ml-chat-bot';
-  const text = document.createElement('span'); text.textContent = `: ${message.message}`;
-  row.append(name, text); document.querySelector('#mlChatMessages')?.append(row);
-  const box = document.querySelector('#mlChatMessages'); if (box) box.scrollTop = box.scrollHeight;
+  const list = document.querySelector('#chatMessages'); if (!list) return;
+  list.querySelector('.chat-empty')?.remove();
+  const row = document.createElement('div'); row.className = 'chat-row';
+  const avatar = document.createElement('div'); avatar.className = 'chat-avatar'; avatar.textContent = (message.displayName || message.username || '?').trim().charAt(0).toUpperCase();
+  const content = document.createElement('div'); content.className = 'chat-content';
+  const meta = document.createElement('div'); meta.className = 'chat-meta';
+  const name = document.createElement('b'); name.textContent = message.displayName || message.username || 'ผู้เล่น';
+  const account = document.createElement('span'); account.className = 'chat-account'; account.textContent = `@${message.username || '-'}`;
+  meta.append(name, account); content.append(meta);
+  const text = document.createElement('div'); text.className = 'chat-text'; text.textContent = message.message || ''; content.append(text);
+  row.append(avatar, content); list.append(row); list.scrollTop = list.scrollHeight;
 }
 async function pullMessages() {
   if (!state.token) return;
-  const channel = document.querySelector('#mlChatChannel')?.value || 'WORLD';
+  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
   const response = await fetch(api(`/api/chat/messages?after=${state.after}&channel=${channel}`), { headers: { Authorization: `Bearer ${state.token}`, Accept: 'application/json' }, cache: 'no-store' });
-  if (!response.ok) return;
+  if (!response.ok) { const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ'; return; }
   const payload = await response.json(); for (const message of payload.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
 }
 async function sendMessage() {
-  const input = document.querySelector('#mlChatInput'); const message = input?.value.trim(); if (!message || !state.token) return;
-  const channel = document.querySelector('#mlChatChannel')?.value || 'WORLD';
+  const input = document.querySelector('#chatInput'); const message = input?.value.trim(); if (!message || !state.token) return;
+  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
   const response = await fetch(api('/api/chat/send'), { method: 'POST', headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, channel }) });
-  if (response.ok && input) { input.value = ''; await pullMessages(); }
+  if (response.ok && input) { input.value = ''; await pullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
 }
 function connectSocket() {
   if (!state.token || !state.config.webSocketUrl) return;
-  try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
+  try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => { state.socket.send(JSON.stringify({ token: state.token })); const sendWorld = () => { const snapshot = window.POCKETMONSTER_WORLD_STATE?.(); if (!snapshot || state.socket?.readyState !== WebSocket.OPEN) return; state.socket.send(JSON.stringify({ type: 'world-pos', ...snapshot })); }; sendWorld(); state.worldPulse = setInterval(sendWorld, 250); }); state.socket.addEventListener('message', event => { try { const message = JSON.parse(event.data); if (message?.type === 'chat') void pullMessages(); if (message?.type === 'world-snapshot') window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload); } catch {} }); state.socket.addEventListener('close', () => { if (state.worldPulse) { clearInterval(state.worldPulse); state.worldPulse = null; } setTimeout(connectSocket, 5000); }); } catch { setTimeout(connectSocket, 5000); }
+}
+function ensureChatMarkup() {
+  ensureChatStyles();
+  if (document.querySelector('#gameChat')) return;
+  const root = document.createElement('div');
+  root.innerHTML = `<button id="chatToggleBtn" class="chat-toggle" aria-label="เปิดแชท">💬 <span id="chatUnread" data-count="0">0</span></button><section id="gameChat" class="game-chat hidden"><header><b>แชทผู้เล่น</b><span>กรุณาใช้คำสุภาพ</span><button id="chatCloseBtn" type="button">×</button></header><div id="chatMessages" class="chat-messages"><div class="chat-empty">ยังไม่มีข้อความ เริ่มทักทายกันได้เลย</div></div><div id="chatError" class="chat-error"></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="160" autocomplete="off" placeholder="พิมพ์ข้อความ…"><button type="submit">ส่ง</button></form></section>`;
+  document.body.append(...root.children);
 }
 function mount() {
-  if (document.querySelector('#mlChatPanel')) return;
-  const style = document.createElement('style'); style.textContent = `.ml-chat-panel{position:fixed;z-index:80;left:14px;bottom:14px;width:min(360px,calc(100vw - 28px));padding:10px;border:1px solid #ffffff26;border-radius:14px;background:rgba(7,14,25,.9);color:#f8fafc;backdrop-filter:blur(8px);font:12px system-ui,sans-serif}.ml-chat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-weight:800}.ml-chat-messages{height:130px;overflow:auto;padding:5px 7px;background:#020617aa;border-radius:9px}.ml-chat-row{padding:3px 0;line-height:1.35}.ml-chat-bot{color:#facc15}.ml-chat-compose{display:flex;gap:5px;margin-top:7px}.ml-chat-compose input{min-width:0;flex:1;padding:7px;border:0;border-radius:7px}.ml-chat-compose button,.ml-chat-channel{border:0;border-radius:7px;padding:7px;background:#2563eb;color:white}.ml-chat-channel{background:#334155}`; document.head.append(style);
-  const panel = document.createElement('section'); panel.id = 'mlChatPanel'; panel.className = 'ml-chat-panel'; panel.innerHTML = `<div class="ml-chat-head"><span>แชทโลก</span><select id="mlChatChannel" class="ml-chat-channel"><option value="WORLD">WORLD</option><option value="ZONE">ZONE</option></select></div><div id="mlChatMessages" class="ml-chat-messages"></div><form id="mlChatForm" class="ml-chat-compose"><input id="mlChatInput" maxlength="500" placeholder="พิมพ์ข้อความ..."><button type="submit">ส่ง</button></form>`; document.body.append(panel); document.querySelector('#mlChatForm').addEventListener('submit', event => { event.preventDefault(); void sendMessage(); }); document.querySelector('#mlChatChannel').addEventListener('change', () => { state.after = 0; document.querySelector('#mlChatMessages').replaceChildren(); void pullMessages(); });
+  ensureChatMarkup();
+  const panel = document.querySelector('#gameChat'); if (!panel || panel.dataset.bound) return;
+  panel.dataset.bound = 'true';
+  const headerNote = panel.querySelector('header span'); const channel = document.createElement('select'); channel.id = 'chatChannel'; channel.className = 'chat-channel'; channel.innerHTML = '<option value="WORLD">🌍 โลก</option><option value="ZONE">📍 พื้นที่</option>'; headerNote?.after(channel);
+  document.querySelector('#chatToggleBtn')?.addEventListener('click', () => { panel.classList.toggle('hidden'); if (!panel.classList.contains('hidden')) { const unread = document.querySelector('#chatUnread'); if (unread) { unread.textContent = '0'; unread.dataset.count = '0'; } document.querySelector('#chatInput')?.focus(); } });
+  document.querySelector('#chatCloseBtn')?.addEventListener('click', () => panel.classList.add('hidden'));
+  document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); void sendMessage(); });
+  channel.addEventListener('change', () => { state.after = 0; document.querySelector('#chatMessages')?.replaceChildren(); void pullMessages(); });
 }
 async function start() {
+  mount();
   const activate = () => {
     state.token = sessionToken();
     if (!state.token || !state.config || state.polling) return;
-    mount();
     void pullMessages();
     connectSocket();
     state.polling = setInterval(() => void pullMessages(), 10000);
   };
   window.addEventListener('pocketmonster:auth-profile-bridge', activate, { once: true });
-  state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json()); state.token = sessionToken();
+  state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json());
+  mount();
+  state.token = sessionToken();
   if (!state.token) return;
   activate();
 }

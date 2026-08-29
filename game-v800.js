@@ -2461,6 +2461,26 @@ function clearTransientEffects(){
 
 // ---------- State / save ----------
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
+if(!pirateThrowWorld){
+window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
+const remoteWorldPlayers=new Map();
+const remoteWorldLayer=document.createElement('div');
+remoteWorldLayer.id='remoteWorldPlayers';
+Object.assign(remoteWorldLayer.style,{position:'fixed',inset:'0',zIndex:'14000',pointerEvents:'none'});
+document.body.append(remoteWorldLayer);
+window.POCKETMONSTER_WORLD_PRESENCE=payload=>{
+  if(!payload||payload.zone!==state.currentZone)return;
+  const seen=new Set();
+  for(const item of payload.players||[]){
+    if(!item?.id||!Number.isFinite(item.x)||!Number.isFinite(item.z))continue;
+    seen.add(item.id); let marker=remoteWorldPlayers.get(item.id);
+    if(!marker){marker=document.createElement('div');marker.className='remote-world-player';Object.assign(marker.style,{position:'absolute',transform:'translate(-50%,-100%)',padding:'3px 7px',border:'1px solid #67e8f9',borderRadius:'999px',background:'#082f49e8',color:'#e0f2fe',font:'700 11px system-ui',whiteSpace:'nowrap',textShadow:'0 1px 2px #000'});remoteWorldLayer.append(marker);remoteWorldPlayers.set(item.id,marker);}
+    marker.textContent=item.name||'ผู้เล่นออนไลน์'; marker.dataset.x=item.x; marker.dataset.z=item.z;
+  }
+  for(const [id,marker] of remoteWorldPlayers){if(!seen.has(id)){marker.remove();remoteWorldPlayers.delete(id);}}
+};
+setInterval(()=>{for(const marker of remoteWorldPlayers.values()){const x=Number(marker.dataset.x),z=Number(marker.dataset.z);const point=new THREE.Vector3(x,1.8,z).project(camera);const visible=point.z>-1&&point.z<1&&point.x>=-1.1&&point.x<=1.1&&point.y>=-1.1&&point.y<=1.1;marker.hidden=!visible;if(visible){marker.style.left=((point.x+1)*50)+'%';marker.style.top=((1-point.y)*50)+'%';}}},100);
+}
 attachCharacterUi(state);
 let characterUI=null;
 let currentManagerTab='collection';
@@ -2529,7 +2549,19 @@ function stageObjectiveText(objective,zoneId=state.currentZone){
 function renderStarterJourney(){
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
-  if(!STAGE_BY_ID[state.currentZone]){panel.classList.add('hidden');return;}
+  if(!STAGE_BY_ID[state.currentZone]){
+    panel.classList.remove('hidden');
+    if(stepEl)setTextIfChanged(stepEl,'เดินไปที่ประตูวาปเพื่อเข้าสู่ Grass Meadow และเริ่มเควส');
+    if(titleEl)setTextIfChanged(titleEl,'เริ่มการผจญภัย');
+    if(listEl){
+      const item=document.createElement('li');
+      item.className='quest-step current';
+      const mark=document.createElement('i'); mark.setAttribute('aria-hidden','true');
+      const text=document.createElement('span'); text.textContent='1/3 ไป Grass Meadow';
+      item.append(mark,text); listEl.replaceChildren(item);
+    }
+    return;
+  }
   const objective=currentStageObjective();
   const zoneId=state.currentZone;
   const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;

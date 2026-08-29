@@ -22,6 +22,7 @@ if (typeof window !== 'undefined') {
 }
 
 await requireFirebaseLogin(runtimeConfig);
+await import('./chat-runtime.mjs?v=8.4.0-chat-top-right');
 
 const worldGate = document.getElementById('worldGate');
 const switcher = document.getElementById('worldSwitcher');
@@ -76,7 +77,6 @@ async function bootWorld(id) {
     startup.className = 'startup-status';
   }
   await import(world.runtime);
-  if (world.id === 'pocket-monster') await import('./chat-runtime.mjs?v=8.4.0-chat-f3914ae');
 }
 
 worldGate?.querySelectorAll('[data-combined-world]').forEach(button => {
