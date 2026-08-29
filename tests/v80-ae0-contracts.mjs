@@ -35,6 +35,7 @@ for (const file of [
   'asset-presentation/ownership.mjs',
   'asset-presentation/anchors.mjs',
   'asset-presentation/requests.mjs',
+  'asset-presentation/providers/pirate-fruit-player.mjs',
 ]) {
   const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(check.status, 0, check.stderr || `${file} syntax failed`);
@@ -44,6 +45,8 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 assert.deepEqual(validateBundle(bundle), []);
 assert.ok(bundle.assets.some(a => a.id === 'character.human.blocky-bighead.v1'));
 assert.ok(bundle.assets.some(a => a.id === 'character.human.legacy-capsule.v1'));
+assert.ok(bundle.assets.some(a => a.id === 'character.human.pirate-fruit.v1'));
+assert.equal(bundle.assets.find(a => a.id === 'character.human.pirate-fruit.v1').provider, 'pirate-fruit');
 assert.ok(bundle.appearances.some(a => a.id === 'appearance.human.player-orange.v1'));
 assert.ok(bundle.appearances.some(a => a.id === 'appearance.human.keeper-green.v1'));
 assert.equal(bundle.assets.find(a => a.id === 'character.human.blocky-bighead.v1').metrics.headY, 1.44);

@@ -5,7 +5,7 @@ import { createAssetEngine } from '../asset-presentation/engine.mjs';
 import { createBigheadProvider } from '../asset-presentation/providers/procedural-bighead.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-assert.match(js, /blocky-bighead\.v1',\{role:'player'/, 'Player must spawn as blocky-bighead');
+assert.match(js, /pirate-fruit\.v1',\{role:'player'/, 'Player must spawn as pirate-fruit');
 assert.match(js, /blocky-bighead\.v1',\{role:'keeper'/, 'Keeper also consumes the Bighead asset via role');
 assert.match(js, /playerThrowOrigin\(\)/, 'throw still uses the shared origin helper');
 

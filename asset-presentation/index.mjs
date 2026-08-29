@@ -57,6 +57,7 @@ export { createAssetEngine } from './engine.mjs';
 export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
 export { createBigheadProvider } from './providers/procedural-bighead.mjs';
 export { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';
+export { createPirateFruitPlayerProvider } from './providers/pirate-fruit-player.mjs';
 export {
   applyMonsterFourSide,
   compileMonsterFourSideAtlas,

@@ -85,6 +85,7 @@ import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
 import { createLegacyHumanoidProvider } from './asset-presentation/providers/legacy-humanoid.mjs';
 import { createBigheadProvider } from './asset-presentation/providers/procedural-bighead.mjs';
 import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
+import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
 import {
   addBigheadMonsterMarks,
   applyBigheadVisualGrowth,
@@ -1583,8 +1584,18 @@ const monsterProvider=createBigheadMonsterProvider({
   basicMaterial:basicMat,
 });
 assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterProvider(ctx):humanoidProvider(ctx));
+assets.registerProvider('pirate-fruit',createPirateFruitPlayerProvider({
+  THREE,
+  box:boxGeometry,
+  capsule:capsuleGeometry,
+  sphere:sphereGeometry,
+  cylinder:cylinderGeometry,
+  cone:coneGeometry,
+  torus:torusGeometry,
+  material:mat,
+}));
 // ---------- Player / NPC ----------
-const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
+const playerVisual=assets.spawn('character.human.pirate-fruit.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
 const merchantVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'merchant',appearanceId:'appearance.human.merchant-brown.v1',quality:qualityProfile.tier});
 const trainerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'trainer',appearanceId:'appearance.human.trainer-blue.v1',quality:qualityProfile.tier});
