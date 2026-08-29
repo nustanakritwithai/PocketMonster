@@ -91,7 +91,8 @@ assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selec
 assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
 assert.match(html, /data-control-panel="human"/, 'switcher includes the Pirate Fruit human panel');
 assert.match(html, /data-control-panel="throw"/, 'switcher includes the Pocket throw panel');
-assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel/, 'live V8.4 must not gain the V9 panel switcher');
+assert.match(html, /id="monsterThrowStage"/, 'V9 has a dedicated Pocket animal-control stage for pirate throw');
+assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel|monsterThrowStage/, 'live V8.4 must not gain the V9 panel switcher or throw stage');
 assert.equal(defaultPanelForWorld('pocket-monster'), 'throw');
 assert.equal(defaultPanelForWorld('pirate-fruit'), 'human');
 assert.equal(defaultPanelForWorld('living-world'), 'human');
@@ -107,8 +108,12 @@ assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root\.tc-desktop::before/, 'con
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is removed');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px !important; bottom: 82px !important/, 'jump sits in the prototype circular cluster, not a desktop row');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: none !important; \}/, 'desktop keyboard rectangle is not the control HUD');
-assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right/, 'throw overlay drops the Pocket rectangular action tray');
-assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay has no rectangular panel background');
+assert.match(cssV900, /#monsterThrowStage/, 'pirate throw mounts Pocket animal control in a dedicated stage');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #game iframe\{visibility:hidden/, 'throw panel keeps the Pirate Fruit iframe loaded but hidden');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
+assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
+assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'pirate throw keeps Pocket movement pads');
 
 {
   const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
@@ -132,16 +137,21 @@ assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.throwSystem, 'pocket-monster');
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.pocketMonsterCharacterSystem, 'pending-removal');
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.keepPocketMonsterModel, true);
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.animalControl, 'pocket-monster');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.animalControlHost, 'pirate-fruit');
   assert.equal(throwBtn.current, 'page');
   assert.equal(humanBtn.current, 'false');
-  assert.ok(hint.textContent.includes('ลูกบอล') || hint.textContent.includes('ปา'), 'hint describes throw mode');
+  assert.ok(hint.textContent.includes('ควบคุมสัตว์'), 'hint says the pirate character uses Pocket animal control');
   assert.equal(hintHidden.has('hidden'), false, 'applyControlPanel reveals the panel hint');
 }
 assert.match(livingJs, /presentationOnly: true/, 'living world is presentation-only');
 assert.match(livingJs, /combatAuthority: false/, 'living world is not combat authority');
 assert.doesNotMatch(livingJs, /vpsWrites|playerDataWrites/, 'living world must not open VPS write flags');
-assert.doesNotMatch(liveJs, /pirate-fruit-player\.mjs/, 'V8.4 live loop does not import the pirate provider');
-assert.doesNotMatch(liveJs, /character\.human\.pirate-fruit\.v1/, 'V8.4 Ranch Hub player stays on the current game version');
+assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'V8.4 live loop does not statically import the pirate provider');
+assert.match(liveJs, /if\(pirateThrowWorld\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'pirate provider loads only in the pirate throw instance');
+assert.match(liveJs, /animalControl'\)==='pirate-fruit'/, 'pirate throw instance is selected by the animalControl query, not by live boot');
+assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'live loop publishes Pocket animal-control functions');
+assert.match(liveJs, /pirateThrowWorld\s*\?\s*assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate throw instance can spawn the pirate player');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
 assert.match(html, /frame-src 'self'/, 'V9 may iframe the offline Pirate Fruit client');
 assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก้อน/, 'gate describes the real offline Pirate Fruit game');
@@ -150,6 +160,10 @@ assert.match(boot, /iframe/, 'offline Pirate Fruit is loaded as the real client 
 assert.match(boot, /remote: false/, 'pirate world is the offline client');
 assert.match(boot, /syncPirateFruitControlHud/, 'pirate boot injects the prototype circular control HUD');
 assert.match(boot, /controlHud: 'circular-cluster'/, 'pirate boot records the circular control HUD');
+assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
+assert.match(boot, /game-v800\.js\?v=810&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
+assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
+assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page is the real Pirate Fruit shell');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');

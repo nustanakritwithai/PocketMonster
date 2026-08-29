@@ -14,7 +14,7 @@ export const CONTROL_PANELS = Object.freeze([
     label: 'ปา',
     title: 'แผงปา • จับมอน',
     authority: 'pocket-monster',
-    detail: 'Pocket Monster เหลือโหมดถือลูกบอลจับมอน',
+    detail: 'ตัวละครจาก Pirate Fruit เข้าใช้ระบบควบคุมสัตว์ของ Pocket Monster ทั้งก้อน',
   }),
 ]);
 
@@ -40,6 +40,12 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
   const panel = panelById(id) || panelById(defaultPanelForWorld(worldId));
   if (!panel || typeof document === 'undefined') return panel;
   document.body.dataset.controlPanel = panel.id;
+  if (window.POCKETMONSTER_COMBINED_BOOT) {
+    window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
+      ...window.POCKETMONSTER_COMBINED_BOOT,
+      controlPanel: panel.id,
+    });
+  }
   window.POCKETMONSTER_CONTROL_PANEL = Object.freeze({
     id: panel.id,
     authority: panel.authority,
@@ -47,6 +53,8 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
     throwSystem: 'pocket-monster',
     pocketMonsterCharacterSystem: 'pending-removal',
     keepPocketMonsterModel: true,
+    animalControl: 'pocket-monster',
+    animalControlHost: worldId === 'pirate-fruit' ? 'pirate-fruit' : 'pocket-monster',
   });
   const switcher = document.getElementById('controlPanelSwitcher');
   if (switcher) {
@@ -61,5 +69,15 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
     hint.classList.remove('hidden');
   }
   window.POCKETMONSTER_SYNC_PIRATE_CONTROLS?.();
+  if (worldId === 'pirate-fruit' && panel.id === THROW_CONTROL_PANEL) {
+    const ensure = window.POCKETMONSTER_ENSURE_THROW_RUNTIME;
+    if (typeof ensure === 'function') {
+      void Promise.resolve(ensure()).then(() => {
+        window.dispatchEvent(new Event('resize'));
+      }).catch(err => {
+        console.error('Pocket animal control failed to load', err);
+      });
+    }
+  }
   return panel;
 }

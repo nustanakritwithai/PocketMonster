@@ -91,7 +91,6 @@ import {
   isBigheadMonsterRoot,
   markRingScale,
 } from './asset-presentation/monster-mark.mjs';
-import { paintGroundGrid, paintSkyGradient } from './asset-presentation/blocky-ground.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
@@ -235,6 +234,11 @@ function ensureDirection(v){
 }
 
 const el=id=>document.getElementById(id);
+const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl')==='pirate-fruit';
+function pirateThrowPanelPaused(){
+  return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
+}
+function gameMount(){return (pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
 const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
 const rand=a=>a[Math.floor(Math.random()*a.length)];
 const nowMs=()=>Date.now();
@@ -331,7 +335,7 @@ const renderer=new THREE.WebGLRenderer({antialias:qualityProfile.antialias,power
 renderer.setPixelRatio(Math.min(devicePixelRatio,qualityProfile.maxDpr));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=qualityProfile.shadows;
-el('game').appendChild(renderer.domElement);
+gameMount().appendChild(renderer.domElement);
 
 const hemi=new THREE.HemisphereLight(0xffffff,0x42643d,1.55); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows;
@@ -1583,8 +1587,23 @@ const monsterProvider=createBigheadMonsterProvider({
   basicMaterial:basicMat,
 });
 assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterProvider(ctx):humanoidProvider(ctx));
+if(pirateThrowWorld){
+  const { createPirateFruitPlayerProvider } = await import('./asset-presentation/providers/pirate-fruit-player.mjs');
+  assets.registerProvider('pirate-fruit',createPirateFruitPlayerProvider({
+    THREE,
+    box:boxGeometry,
+    capsule:capsuleGeometry,
+    sphere:sphereGeometry,
+    cylinder:cylinderGeometry,
+    cone:coneGeometry,
+    torus:torusGeometry,
+    material:mat,
+  }));
+}
 // ---------- Player / NPC ----------
-const playerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
+const playerVisual=pirateThrowWorld
+  ? assets.spawn('character.human.pirate-fruit.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier})
+  : assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
 const merchantVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'merchant',appearanceId:'appearance.human.merchant-brown.v1',quality:qualityProfile.tier});
 const trainerVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'trainer',appearanceId:'appearance.human.trainer-blue.v1',quality:qualityProfile.tier});
@@ -3754,7 +3773,7 @@ cameraPad.addEventListener('pointercancel',endCam);
 const keys={};
 addEventListener('pointerdown',()=>initAudio(),{once:true});
 addEventListener('keydown',()=>initAudio(),{once:true});
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
+addEventListener('keydown',e=>{if(pirateThrowPanelPaused())return;keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
 const joy={x:0,y:0,active:false,pid:null};
 const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.4.0 boot: #joystick not found');
@@ -4098,7 +4117,7 @@ function beginCaptureAim(){if(!capturePrerequisite())return false;captureAimActi
 function cancelCaptureAim(){captureAimActive=false;captureAimLine.visible=false;el('captureBtn').classList.remove('aiming');renderSkillButtons();}
 function updateCaptureAimVisual(){if(!captureAimActive)return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),start=playerThrowOrigin().clone(),end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0)),pts=[];for(let i=0;i<=18;i++){const u=i/18,p=start.clone().lerp(end,u);p.y+=Math.sin(u*Math.PI)*2.2;pts.push(p);}captureAimGeom.setFromPoints(pts);}
 function executeCaptureThrow(){if(!captureAimActive)return;captureAimActive=false;captureAimLine.visible=false;runBestEffortCombatPresentation(()=>el('captureBtn').classList.remove('aiming'));if(!capturePrerequisite())return;const t=aimedWild(BALANCE.captureRange,BALANCE.captureAimRadius),referenceLevel=t?ensureCaptureReferenceLevel(t):null,targetMonsterId=t?captureWorkbookMonsterId(t):null,attemptId=nextCaptureAttemptId();const begun=beginCaptureAttempt(captureAttemptLedger,{attemptId:attemptId,inventory:state.inventory,targetId:t?.id??null,targetMonsterId,ballClass:'Basic',ballTargetType:null,referenceLevel,ownedMonsterActive:!!(activeSummon||pendingSummon)});if(!begun.ok){runBestEffortCombatPresentation(()=>{msg(begun.reason==='no_capture_ball'?'Capture Ball หมด':'เริ่มการจับไม่ได้ • ข้อมูล encounter ไม่สมบูรณ์');renderHUD();});return;}activeCaptureAttempt={attemptId,wild:t};let targetReady=true;if(t){try{cancelOwnedAITarget(t.id,'capture_started');if(!cancelWildAIAction(t,'capture_started'))targetReady=false;else{t.captureEngagementResumePending=t.engaged===true;t.capturing=true;}}catch{targetReady=false;}}if(!targetReady){abortCaptureSequence(t);runBestEffortCombatPresentation(()=>{msg('ยกเลิกการจับ • Wild AI state ไม่สมบูรณ์');renderHUD();});try{saveGame(false);}catch{}return;}runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});playSFX('sfx_throw_ball');});let end=null,projectileStarted=false;try{end=t?t.mesh.position.clone().add(new THREE.Vector3(0,.65,0)):player.position.clone().add(forward().multiplyScalar(8)).add(new THREE.Vector3(0,.15,0));projectileStarted=throwProjectile('capture',end,ballMesh=>resolveCapture(t,ballMesh,attemptId,end));}catch{}if(!projectileStarted){abortCaptureSequence(t);runBestEffortCombatPresentation(()=>{msg('ยกเลิกการจับ • สร้าง Capture Ball ไม่สำเร็จ');renderHUD();});try{saveGame(false);}catch{}return;}runBestEffortCombatPresentation(()=>{if(t)msg(`ปา Capture Ball → ${t.boss?'BOSS ':t.elite?'ELITE ':''}${wildDisplayName(t)}`);else msg('ปา Capture Ball ตามจุดเล็ง…');renderHUD();});try{saveGame(false);}catch{}}
-function captureThrow(){if(beginCaptureAim())executeCaptureThrow();}
+function captureThrow(){if(pirateThrowPanelPaused())return;if(beginCaptureAim())executeCaptureThrow();}
 let captureSequence=null;
 function spawnCaptureResultEffect(pos,success){
   if(!pos)return;
@@ -4230,7 +4249,7 @@ function resolveCapture(w,ballMesh,attemptId,end){
   }
   startCaptureSequence(w,ballMesh,attemptId,resolution);
 }
-function summonThrow(){const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;pendingSummon={instanceId:inst.instanceId};runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});clearHubCompanion();});const started=throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return false;let spawned=false;try{spawned=spawnOwned(inst,end);}finally{pendingSummon=null;}if(!spawned)runBestEffortCombatPresentation(()=>msg(`เรียก ${displayName(inst)} ไม่สำเร็จ`));return spawned;});if(!started){pendingSummon=null;runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)} ไม่สำเร็จ`));return;}runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)}`));}
+function summonThrow(){if(pirateThrowPanelPaused())return;const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;pendingSummon={instanceId:inst.instanceId};runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});clearHubCompanion();});const started=throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return false;let spawned=false;try{spawned=spawnOwned(inst,end);}finally{pendingSummon=null;}if(!spawned)runBestEffortCombatPresentation(()=>msg(`เรียก ${displayName(inst)} ไม่สำเร็จ`));return spawned;});if(!started){pendingSummon=null;runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)} ไม่สำเร็จ`));return;}runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)}`));}
 function spawnOwned(inst,pos){
   try{clearHubCompanion();}catch{}
   try{removeSceneRole('activeSummon');}catch{}
@@ -4247,6 +4266,7 @@ function spawnOwned(inst,pos){
   return true;
 }
 function recall(show=true,setCooldown=true){
+  if(pirateThrowPanelPaused())return;
   if(pendingSummon){pendingSummon=null;clearProjectiles();}
   if(!activeSummon){removeSceneRole('activeSummon');if(show)msg('ยังไม่มีมอนในสนาม');return;}
   const summon=activeSummon,inst=summon.inst,mesh=summon.mesh,name=displayName(inst);
@@ -4838,6 +4858,7 @@ function statusDamageType(ticks,fallback='Normal'){
   return ({ST_BURN:'Fire',ST_POISON:'Poison',ST_BLEED:'Normal',ST_SWARM:'Bug'})[statusId]||fallback;
 }
 function useSkill(index,intent={}){
+  if(pirateThrowPanelPaused())return Object.freeze({ok:false,reason:'panel_paused'});
   if(!activeSummon){announceCombatReason('ต้องปาเรียกมอนออกมาก่อน');return Object.freeze({ok:false,reason:'no_active_monster'});}
   const a=activeSummon,slot=MANUAL_SKILL_SLOTS[index],move=canonicalCombatSkills(a.inst)[index];
   if(!slot||!move){const result=Object.freeze({ok:false,reason:slot?'not_equipped':'slot_locked'});announceCombatReason(skillFailureMessage(move,result));return result;}
@@ -6438,6 +6459,7 @@ function renderHUD(){
   renderStarterJourney();
 }
 function switchPartySlot(index){
+  if(pirateThrowPanelPaused())return;
   if(index<0||index>=state.party.length)return;
   const gate=characterUI.requestSwitchParty(index);
   if(!gate.ok){if(gate.reasonText)msg(gate.reasonText);return;}
@@ -7175,7 +7197,7 @@ function ensureWildPopulation(dt){
 }
 
 // ---------- Frame ----------
-function updatePlayer(dt){playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
+function updatePlayer(dt){if(pirateThrowPanelPaused()){playerData.invuln=Math.max(0,playerData.invuln-dt);playerVisual.update(dt,{moving:false});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});return;}playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=7.4,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+1.15,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.1,0)).add(f.clone().multiplyScalar(1.5));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
 loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
@@ -7302,7 +7324,7 @@ function loop(now){
     }
     updateCharacterPreview(dt);
     updateRanchClubPreview(dt);
-    renderer.render(scene,camera);
+    if(!pirateThrowPanelPaused()) renderer.render(scene,camera);
     if(firstFrame){
       firstFrame=false;
       if(startup){startup.classList.add('ok');setTimeout(()=>startup.remove(),450);}
@@ -7315,3 +7337,15 @@ function loop(now){
 }
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+if(typeof window!=='undefined'){
+  window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
+    source:'pocket-monster',
+    hostCharacter:pirateThrowWorld?'pirate-fruit':'pocket-monster',
+    capture:captureThrow,
+    summon:summonThrow,
+    recall,
+    useSkill,
+    switchPartySlot,
+    functions:Object.freeze(['captureThrow','summonThrow','recall','useSkill','switchPartySlot']),
+  });
+}
