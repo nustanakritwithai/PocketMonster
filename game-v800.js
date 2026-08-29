@@ -2500,7 +2500,19 @@ function stageObjectiveText(objective,zoneId=state.currentZone){
 function renderStarterJourney(){
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
-  if(!STAGE_BY_ID[state.currentZone]){panel.classList.add('hidden');return;}
+  if(!STAGE_BY_ID[state.currentZone]){
+    panel.classList.remove('hidden');
+    if(stepEl)setTextIfChanged(stepEl,'เดินไปที่ประตูวาปเพื่อเข้าสู่ Grass Meadow และเริ่มเควส');
+    if(titleEl)setTextIfChanged(titleEl,'เริ่มการผจญภัย');
+    if(listEl){
+      const item=document.createElement('li');
+      item.className='quest-step current';
+      const mark=document.createElement('i'); mark.setAttribute('aria-hidden','true');
+      const text=document.createElement('span'); text.textContent='1/3 ไป Grass Meadow';
+      item.append(mark,text); listEl.replaceChildren(item);
+    }
+    return;
+  }
   const objective=currentStageObjective();
   const zoneId=state.currentZone;
   const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
