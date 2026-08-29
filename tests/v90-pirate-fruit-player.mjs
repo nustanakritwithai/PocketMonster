@@ -20,6 +20,11 @@ import {
   COMBINED_VERSION,
   COMBINED_WORLD_COUNT,
   COMBINED_WORLDS,
+  COMBINED_WORLD_WARPS,
+  DEFAULT_COMBINED_WORLD,
+  combinedWarpsFrom,
+  nearestCombinedWarp,
+  resolveCombinedWorld,
   worldById,
   worldIdFromLocation,
 } from '../combined-worlds-v900.mjs';
@@ -76,6 +81,8 @@ assert.match(html, /เกมเดิม/, 'original game is labeled in V9');
 assert.match(html, /id="joystick"/, 'original game HUD is present so Ranch Hub can boot');
 assert.match(html, /id="huntBtn"/, 'original hunt button is present in V9');
 assert.match(html, /ยังไม่รวมเข้าเกม live V8\.4/, 'combined channel stays off the live V8.4 entry');
+assert.match(html, /เริ่มที่เกาะ Pirate Fruit แล้ววาปเข้าเกมเดิม/, 'login copy says V9 starts on the pirate island');
+assert.match(html, /เดินเข้าจุดวาปที่ท่าเรือเพื่อไปเกมเดิม/, 'world gate describes the pirate-to-pocket warp');
 assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
@@ -84,8 +91,20 @@ assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=900');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
+assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit');
+assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit');
+assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
+assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html?world=living-world' }), 'living-world');
+assert.deepEqual(combinedWarpsFrom('pirate-fruit').map(route => route.id), ['pirate-to-pocket-monster']);
+assert.equal(combinedWarpsFrom('pocket-monster').length, 0);
+assert.equal(COMBINED_WORLD_WARPS[0].to, 'pocket-monster');
+assert.equal(nearestCombinedWarp('pirate-fruit', { x: 0, z: -6.2 })?.id, 'pirate-to-pocket-monster');
+assert.equal(nearestCombinedWarp('pirate-fruit', { x: 0, z: 1.4 }), null);
 assert.match(worldsJs, /includesOriginalGame: true/, 'combined channel records that the original game is inside V9');
 assert.match(worldsJs, /mergedIntoLiveV800: false/, 'combined channel is not the live V8.4 entry');
+assert.match(worldsJs, /defaultWorld: DEFAULT_COMBINED_WORLD/, 'combined channel starts on the Pirate Fruit island');
+assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 boots Pirate Fruit when ?world= is missing');
+assert.doesNotMatch(worldsJs, /worldGate\?\.classList\.remove\('hidden'\)/, 'V9 no longer waits on the 3-world picker before the first world');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'V9 character system is Pirate Fruit');
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays Pocket Monster');
 assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
@@ -190,6 +209,10 @@ assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can reques
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /pirate-fruit-offline/, 'pirate human panel no longer iframes the vendored offline client');
+assert.match(pirateWorldJs, /combinedWarpsFrom\(PIRATE_FRUIT_WORLD_ID\)/, 'pirate island places the Pocket Monster world warp');
+assert.match(pirateWorldJs, /nearestCombinedWarp\(PIRATE_FRUIT_WORLD_ID, player\.position\)/, 'pirate island opens the warp when the player reaches the dock pad');
+assert.match(pirateWorldJs, /combinedLocationQuery\(route\.to, defaultPanelForWorld\(route\.to\)\)/, 'pirate warp loads Pocket Monster with the capture panel');
+assert.match(pirateWorldJs, /el\('warpPromptAction'\)/, 'pirate island reuses the shared warp prompt');
 assert.match(pirateWorldJs, /paintGroundGrid/, 'pirate island uses the Pocket blocky ground painter');
 assert.match(pirateWorldJs, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate island spawns the asset-engine pirate player');
 assert.match(pirateWorldJs, /PerspectiveCamera\(50,/, 'pirate island follow camera uses FOV 50');

@@ -30,6 +30,8 @@ assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live prelo
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=810/, 'live preload binds chat before game overlays');
 assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
 assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
+assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
+assert.match(pirateWorldJs, /combinedLocationQuery\(route\.to, defaultPanelForWorld\(route\.to\)\)/, 'pirate dock warp assigns the Pocket Monster world');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
 assert.match(chat, /type: 'world-pos'/, 'chat socket publishes world position for shared-zone presence');
 assert.match(chat, /type === 'world-snapshot'/, 'chat socket dispatches remote player snapshots');
