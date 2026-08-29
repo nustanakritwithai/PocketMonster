@@ -32,8 +32,8 @@
       <h1>V9.0 รวม 3 โลก</h1>
       <p>เลือกโลกที่จะเข้า • เกมเดิมอยู่ที่ปุ่มแรก ไม่ใช่แค่ลิงก์ออกไป V8.4</p>
       <div class="world-gate-grid">
-        <button type="button" class="world-gate-btn" data-combined-world="pocket-monster"><b>เกมเดิม</b><small>Pocket Monster • Ranch Hub มอนสเตอร์ ต่อสู้ เลี้ยง</small></button>
-        <button type="button" class="world-gate-btn" data-combined-world="pirate-fruit"><b>Pirate Fruit</b><small>เกม Pirate Fruit ออฟไลน์ทั้งก้อน • เซฟในเครื่อง</small></button>
+        <button type="button" class="world-gate-btn" data-combined-world="pocket-monster"><b>เกมเดิม</b><small>โหมดปาจับมอน • Ranch Hub เลี้ยงและจับ</small></button>
+        <button type="button" class="world-gate-btn" data-combined-world="pirate-fruit"><b>Pirate Fruit</b><small>ระบบคนและบังคับหลัก • เกม Pirate Fruit ออฟไลน์ทั้งก้อน</small></button>
         <button type="button" class="world-gate-btn" data-combined-world="living-world"><b>โลกกลาง</b><small>World Layer • พรีเซนต์เท่านั้น ยังไม่เป็น authority</small></button>
       </div>
     </div>
@@ -43,6 +43,11 @@
     <button type="button" data-combined-world="pirate-fruit">Pirate Fruit</button>
     <button type="button" data-combined-world="living-world">โลกกลาง</button>
   </nav>
+  <nav id="controlPanelSwitcher" hidden aria-label="สลับแผงบังคับ">
+    <button type="button" data-control-panel="human">คน</button>
+    <button type="button" data-control-panel="throw">ปา</button>
+  </nav>
+  <div id="controlPanelHint" class="control-panel-hint hidden" aria-live="polite"></div>
   <div id="monsterLifeProfilePanel" class="monsterlife-profile-panel" hidden aria-live="polite"></div>
   <dialog id="monsterLifeLinkDialog" class="monsterlife-link-dialog">
     <form id="monsterLifeLinkForm" method="dialog">

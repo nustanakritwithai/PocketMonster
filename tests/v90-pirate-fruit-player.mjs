@@ -23,6 +23,12 @@ import {
   worldById,
   worldIdFromLocation,
 } from '../combined-worlds-v900.mjs';
+import {
+  applyControlPanel,
+  combinedLocationQuery,
+  defaultPanelForWorld,
+  panelIdFromLocation,
+} from '../control-panels-v900.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
@@ -30,6 +36,7 @@ const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url),
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const cssV900 = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 const preloadV900 = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.meta.url), 'utf8');
 const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
@@ -39,7 +46,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -75,7 +82,54 @@ assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=p
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
 assert.match(worldsJs, /includesOriginalGame: true/, 'combined channel records that the original game is inside V9');
 assert.match(worldsJs, /mergedIntoLiveV800: false/, 'combined channel is not the live V8.4 entry');
+assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'V9 character system is Pirate Fruit');
+assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays Pocket Monster');
+assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch preserves the active control panel');
+assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
+assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
+assert.match(html, /data-control-panel="human"/, 'switcher includes the Pirate Fruit human panel');
+assert.match(html, /data-control-panel="throw"/, 'switcher includes the Pocket throw panel');
+assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel/, 'live V8.4 must not gain the V9 panel switcher');
+assert.equal(defaultPanelForWorld('pocket-monster'), 'throw');
+assert.equal(defaultPanelForWorld('pirate-fruit'), 'human');
+assert.equal(defaultPanelForWorld('living-world'), 'human');
+assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pirate-fruit' }, 'pirate-fruit'), 'human');
+assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }, 'pocket-monster'), 'throw');
+assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pirate-fruit&panel=throw' }, 'pirate-fruit'), 'throw');
+assert.equal(combinedLocationQuery('pirate-fruit', 'throw'), 'world=pirate-fruit&panel=throw');
+assert.equal(combinedLocationQuery('pocket-monster', 'bogus'), 'world=pocket-monster&panel=throw');
+assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
+assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
+assert.match(cssV900, /#controlPanelSwitcher/, 'V9 stylesheet positions the panel switcher');
+
+{
+  const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
+  const throwBtn = { dataset: { controlPanel: 'throw' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
+  const hintHidden = new Set(['hidden']);
+  const hint = { textContent: '', classList: { remove(name) { hintHidden.delete(name); } } };
+  const switcher = { hidden: true, querySelectorAll: () => [humanBtn, throwBtn] };
+  globalThis.document = {
+    body: { dataset: { combinedWorld: 'pirate-fruit' } },
+    getElementById(id) {
+      if (id === 'controlPanelSwitcher') return switcher;
+      if (id === 'controlPanelHint') return hint;
+      return null;
+    },
+  };
+  globalThis.window = globalThis;
+  const panel = applyControlPanel('throw', 'pirate-fruit');
+  assert.equal(panel.id, 'throw');
+  assert.equal(document.body.dataset.controlPanel, 'throw');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.characterSystem, 'pirate-fruit');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.throwSystem, 'pocket-monster');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.pocketMonsterCharacterSystem, 'pending-removal');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.keepPocketMonsterModel, true);
+  assert.equal(throwBtn.current, 'page');
+  assert.equal(humanBtn.current, 'false');
+  assert.ok(hint.textContent.includes('ลูกบอล') || hint.textContent.includes('ปา'), 'hint describes throw mode');
+  assert.equal(hintHidden.has('hidden'), false, 'applyControlPanel reveals the panel hint');
+}
 assert.match(livingJs, /presentationOnly: true/, 'living world is presentation-only');
 assert.match(livingJs, /combatAuthority: false/, 'living world is not combat authority');
 assert.doesNotMatch(livingJs, /vpsWrites|playerDataWrites/, 'living world must not open VPS write flags');

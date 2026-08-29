@@ -1,3 +1,4 @@
+/** V9 combined channel: 3 worlds. Control panels (human/throw) live in control-panels-v900.mjs. */
 export const COMBINED_VERSION = '9.0.0-combined';
 export const COMBINED_WORLD_COUNT = 3;
 
@@ -6,14 +7,14 @@ export const COMBINED_WORLDS = Object.freeze([
     id: 'pocket-monster',
     label: 'เกมเดิม',
     title: 'Pocket Monster',
-    detail: 'Ranch Hub, มอนสเตอร์, ต่อสู้, เลี้ยง — เกม Monster Life เดิมทั้งก้อน',
+    detail: 'โหมดปาจับมอนของ Pocket Monster • ระบบคนยังไม่ถอดในรอบนี้',
     runtime: './game-v800.js?v=810',
   }),
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
     title: 'เกม Pirate Fruit ออฟไลน์',
-    detail: 'เกม Pirate Fruit ทั้งก้อน โหมดออฟไลน์ • เซฟในเครื่อง • ไม่ยิงเซิร์ฟเวอร์',
+    detail: 'ระบบตัวละครและบังคับคนจาก Pirate Fruit • ออฟไลน์ ทั้งก้อน',
     runtime: './boot-pirate-fruit-v900.mjs?v=900',
   }),
   Object.freeze({

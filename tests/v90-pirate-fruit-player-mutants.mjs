@@ -10,6 +10,8 @@ const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.met
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const cssV900 = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+const panelsJs = fs.readFileSync(new URL('../control-panels-v900.mjs', import.meta.url), 'utf8');
 const versionedHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 const provider = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('../asset-presentation/schema.mjs', import.meta.url), 'utf8');
@@ -48,5 +50,13 @@ for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
 assert.match(provider, /setFromMatrixPosition/, 'mutant 13: worldPos scratch must implement Three.js Vector3.setFromMatrixPosition');
 assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open VPS write flags for this pirate boot');
 assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must be the offline build');
+assert.match(html, /id="controlPanelSwitcher"/, 'mutant 16: V9 ships the control-panel switcher');
+assert.doesNotMatch(liveHtml, /controlPanelSwitcher|data-control-panel/, 'mutant 17: live index.html must not gain V9 control panels');
+assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'mutant 18: character authority stays Pirate Fruit');
+assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/capture stays Pocket Monster');
+assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutant 20: Pocket character system is not removed yet');
+assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
+assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\].*#cameraPad/s, 'mutant 23: pirate throw overlay hides Pocket movement pads');
 
 console.log('V9.0 pirate-fruit player mutants: PASS');

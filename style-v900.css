@@ -9,37 +9,62 @@
 .world-gate-btn:hover,.world-gate-btn:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf822}
 .world-gate-btn b{font-size:16px}
 .world-gate-btn small{color:#94a3b8;font-size:12px;line-height:1.35}
-#worldSwitcher{position:fixed;left:8px;top:8px;z-index:9999;display:none;gap:6px;flex-wrap:wrap;max-width:70vw;pointer-events:auto}
-body[data-combined-world] #worldSwitcher{display:flex}
-#worldSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
-#worldSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}
-body[data-combined-world] #hud .compact-topbar{margin-top:34px}
-body[data-combined-world="pocket-monster"] .hunt-btn{top:128px}
-body[data-combined-world="pocket-monster"] .zone-travel{top:118px}
-body[data-combined-world="pocket-monster"] .message{top:168px}
-body[data-combined-world="pirate-fruit"] #hud,
-body[data-combined-world="pirate-fruit"] #versionBadge,
-body[data-combined-world="pirate-fruit"] #saveIndicator{display:none!important}
+#worldSwitcher,#controlPanelSwitcher{position:fixed;left:8px;z-index:9999;display:none;gap:6px;flex-wrap:wrap;max-width:70vw;pointer-events:auto}
+#worldSwitcher{top:8px}
+#controlPanelSwitcher{top:40px}
+body[data-combined-world] #worldSwitcher,
+body[data-combined-world] #controlPanelSwitcher{display:flex}
+#worldSwitcher button,#controlPanelSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
+#worldSwitcher button[aria-current="page"],
+#controlPanelSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}
+#controlPanelSwitcher button[data-control-panel="throw"][aria-current="page"]{background:#b45309}
+.control-panel-hint{position:fixed;left:8px;top:72px;z-index:9998;max-width:70vw;padding:4px 8px;border-radius:8px;background:#0f172acc;color:#cbd5e1;font:600 11px system-ui;pointer-events:none}
+body[data-combined-world] .control-panel-hint{display:block}
+.control-panel-hint.hidden{display:none!important}
+body[data-combined-world] #hud .compact-topbar{margin-top:96px}
+body[data-combined-world="pocket-monster"] .hunt-btn{top:186px}
+body[data-combined-world="pocket-monster"] .zone-travel{top:176px}
+body[data-combined-world="pocket-monster"] .message{top:226px}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #hud,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #versionBadge,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #saveIndicator{display:none!important}
 body[data-combined-world="pirate-fruit"] #game iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#06121f}
+body[data-control-panel="human"] #huntBtn,
+body[data-control-panel="human"] #party,
+body[data-control-panel="human"] .controls-right,
+body[data-control-panel="human"] #targetCard,
+body[data-control-panel="human"] #ownedStatusStrip,
+body[data-control-panel="human"] #aimReticle,
+body[data-control-panel="human"] .ball-pill,
+body[data-control-panel="human"] .active-pill,
+body[data-control-panel="human"] #actionReason,
+body[data-control-panel="human"] #stageObjective,
+body[data-control-panel="human"] #globalCharacterBtn,
+body[data-control-panel="human"] #characterAccessEntry{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .controls-left,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #cameraPad{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .combat-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .gold-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .active-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .compact-topbar .zone-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #menuBtn,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #fullscreenBtn,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #message,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .zone-travel,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #huntBtn,
+body[data-combined-world="living-world"][data-control-panel="throw"] #huntBtn,
+body[data-combined-world="living-world"][data-control-panel="throw"] #message,
+body[data-combined-world="living-world"][data-control-panel="throw"] .zone-travel{display:none!important}
 body[data-combined-world="pirate-fruit"] #immersiveGate,
 body[data-combined-world="living-world"] #immersiveGate,
-body[data-combined-world="pirate-fruit"] #huntBtn,
-body[data-combined-world="living-world"] #huntBtn,
-body[data-combined-world="pirate-fruit"] #party,
-body[data-combined-world="living-world"] #party,
-body[data-combined-world="pirate-fruit"] .controls-right,
-body[data-combined-world="living-world"] .controls-right,
+body[data-combined-world="living-world"][data-control-panel="human"] #huntBtn,
+body[data-combined-world="living-world"][data-control-panel="human"] #party,
+body[data-combined-world="living-world"][data-control-panel="human"] .controls-right,
 body[data-combined-world="pirate-fruit"] #npcBtn,
 body[data-combined-world="living-world"] #npcBtn,
-body[data-combined-world="pirate-fruit"] #targetCard,
-body[data-combined-world="living-world"] #targetCard,
-body[data-combined-world="pirate-fruit"] #globalCharacterBtn,
-body[data-combined-world="living-world"] #globalCharacterBtn,
-body[data-combined-world="pirate-fruit"] #characterAccessEntry,
-body[data-combined-world="living-world"] #characterAccessEntry,
-body[data-combined-world="pirate-fruit"] #stageObjective,
-body[data-combined-world="living-world"] #stageObjective,
-body[data-combined-world="pirate-fruit"] #actionReason,
-body[data-combined-world="living-world"] #actionReason,
-body[data-combined-world="pirate-fruit"] .help,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #globalCharacterBtn,
+body[data-combined-world="living-world"][data-control-panel="human"] #globalCharacterBtn,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #characterAccessEntry,
+body[data-combined-world="living-world"][data-control-panel="human"] #characterAccessEntry,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .help,
 body[data-combined-world="living-world"] .help{display:none!important}
