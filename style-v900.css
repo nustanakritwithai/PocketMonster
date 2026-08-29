@@ -14,6 +14,9 @@ body[data-combined-world] #worldSwitcher{display:flex}
 #worldSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
 #worldSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}
 body[data-combined-world] #hud .compact-topbar{margin-top:34px}
+body[data-combined-world="pocket-monster"] .hunt-btn{top:128px}
+body[data-combined-world="pocket-monster"] .zone-travel{top:118px}
+body[data-combined-world="pocket-monster"] .message{top:168px}
 body[data-combined-world="pirate-fruit"] #immersiveGate,
 body[data-combined-world="living-world"] #immersiveGate,
 body[data-combined-world="pirate-fruit"] #huntBtn,
