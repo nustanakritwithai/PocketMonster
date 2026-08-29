@@ -36,7 +36,14 @@ function connectSocket() {
   if (!state.token || !state.config.webSocketUrl) return;
   try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
 }
+function ensureChatMarkup() {
+  if (document.querySelector('#gameChat')) return;
+  const root = document.createElement('div');
+  root.innerHTML = `<button id="chatToggleBtn" class="chat-toggle" aria-label="เปิดแชท">💬 <span id="chatUnread" data-count="0">0</span></button><section id="gameChat" class="game-chat hidden"><header><b>แชทผู้เล่น</b><span>กรุณาใช้คำสุภาพ</span><button id="chatCloseBtn" type="button">×</button></header><div id="chatMessages" class="chat-messages"><div class="chat-empty">ยังไม่มีข้อความ เริ่มทักทายกันได้เลย</div></div><div id="chatError" class="chat-error"></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="160" autocomplete="off" placeholder="พิมพ์ข้อความ…"><button type="submit">ส่ง</button></form></section>`;
+  document.body.append(...root.children);
+}
 function mount() {
+  ensureChatMarkup();
   const panel = document.querySelector('#gameChat'); if (!panel || panel.dataset.bound) return;
   panel.dataset.bound = 'true';
   const headerNote = panel.querySelector('header span'); const channel = document.createElement('select'); channel.id = 'chatChannel'; channel.className = 'chat-channel'; channel.innerHTML = '<option value="WORLD">🌍 โลก</option><option value="ZONE">📍 พื้นที่</option>'; headerNote?.after(channel);
@@ -46,10 +53,10 @@ function mount() {
   channel.addEventListener('change', () => { state.after = 0; document.querySelector('#chatMessages')?.replaceChildren(); void pullMessages(); });
 }
 async function start() {
+  mount();
   const activate = () => {
     state.token = sessionToken();
     if (!state.token || !state.config || state.polling) return;
-    mount();
     void pullMessages();
     connectSocket();
     state.polling = setInterval(() => void pullMessages(), 10000);
