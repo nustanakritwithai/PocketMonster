@@ -58,5 +58,10 @@ assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutan
 assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\].*#joystick/s, 'mutant 23: pirate throw overlay hides Pocket movement pads');
+assert.match(boot, /syncPirateFruitControlHud/, 'mutant 24: pirate boot injects the prototype circular HUD');
+const pirateClient = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-BEToR5oK.js', import.meta.url), 'utf8');
+const hudCss = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
+assert.match(hudCss, /content: none !important/, 'mutant 25: desktop rectangular tray is suppressed');
+assert.match(pirateClient, /tc-root\.tc-desktop::before/, 'mutant 26: do not rewrite the vendored Pirate Fruit client; overlay it');
 
 console.log('V9.0 pirate-fruit player mutants: PASS');

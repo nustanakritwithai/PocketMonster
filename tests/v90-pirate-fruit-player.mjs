@@ -29,6 +29,7 @@ import {
   defaultPanelForWorld,
   panelIdFromLocation,
 } from '../control-panels-v900.mjs';
+import { PIRATE_FRUIT_CONTROL_HUD_CSS } from '../pirate-fruit-control-hud-v900.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
@@ -46,7 +47,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-fruit-control-hud-v900.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -102,6 +103,12 @@ assert.equal(combinedLocationQuery('pocket-monster', 'bogus'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /#controlPanelSwitcher/, 'V9 stylesheet positions the panel switcher');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root\.tc-desktop::before/, 'control HUD overlay targets the desktop rectangular tray');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is removed');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px !important; bottom: 82px !important/, 'jump sits in the prototype circular cluster, not a desktop row');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: none !important; \}/, 'desktop keyboard rectangle is not the control HUD');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right/, 'throw overlay drops the Pocket rectangular action tray');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay has no rectangular panel background');
 
 {
   const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
@@ -141,6 +148,8 @@ assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก�
 assert.match(boot, /pirate-fruit-offline\/index\.html/, 'pirate world boots the vendored offline client');
 assert.match(boot, /iframe/, 'offline Pirate Fruit is loaded as the real client frame');
 assert.match(boot, /remote: false/, 'pirate world is the offline client');
+assert.match(boot, /syncPirateFruitControlHud/, 'pirate boot injects the prototype circular control HUD');
+assert.match(boot, /controlHud: 'circular-cluster'/, 'pirate boot records the circular control HUD');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page is the real Pirate Fruit shell');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');

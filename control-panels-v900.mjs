@@ -60,5 +60,6 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
     hint.textContent = panel.detail;
     hint.classList.remove('hidden');
   }
+  window.POCKETMONSTER_SYNC_PIRATE_CONTROLS?.();
   return panel;
 }
