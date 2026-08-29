@@ -26,7 +26,7 @@ assert.match(html, /data-combined-world="pocket-monster"/, 'mutant 0c: V9 gate i
 assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts on the pirate island');
 assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit', 'mutant 0c3: missing ?world= resolves to pirate-fruit');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
-assert.match(pirateWorldJs, /pirate-to-pocket-monster|combinedWarpsFrom\(PIRATE_FRUIT_WORLD_ID\)/, 'mutant 0c5: pirate island has a warp into Pocket Monster');
+assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'mutant 0c5: real pirate world links into Pocket Monster');
 assert.match(html, /id="huntBtn"/, 'mutant 0d: V9 keeps the original HUD so game-v800 can boot');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810', 'mutant 0e: original game runtime is game-v800.js');
 assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=900', 'mutant 0e2: pirate world still boots through the pirate boot module');
@@ -36,7 +36,7 @@ assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from 
 assert.match(liveJs, /const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider always loads dynamically for the live player');
 assert.match(liveJs, /distance=5\.15/, 'mutant 1c: live follow distance is the pirate camera, not the old 7.4 overhead cam');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
-assert.match(boot, /world-pirate-fruit-v900\.mjs/, 'mutant 3: pirate world must load the Pocket-block pirate island');
+assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: pirate world must load the real Pirate Fruit client');
 assert.match(boot, /remote: false/, 'mutant 4: pirate world must be local, not a remote host');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'mutant 5: Pocket boot must not import the three package');
 assert.match(liveJs, /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/, 'mutant 6: live player is pirate-fruit');
@@ -79,7 +79,7 @@ assert.match(boot, /game-v800\.js\?v=810&animalControl=pirate-fruit/, 'mutant 23
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop publishes animal-control functions');
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
-assert.match(boot, /source: 'pocket-block-world'/, 'mutant 24: pirate human panel is the Pocket-block island');
+assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
 assert.match(pirateWorldJs, /paintGroundGrid/, 'mutant 25: pirate island uses Pocket blocky ground');
 assert.doesNotMatch(pirateWorldJs, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: do not rebuild the pirate island with capsule/cylinder silhouettes');
 assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');

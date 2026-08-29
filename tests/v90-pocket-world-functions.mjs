@@ -8,6 +8,7 @@ import { installWorldPresence, publishWorldState } from '../world-presence-v800.
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
+const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const pirateWorldJs = fs.readFileSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
@@ -31,7 +32,7 @@ assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v8
 assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
 assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
-assert.match(pirateWorldJs, /combinedLocationQuery\(route\.to, defaultPanelForWorld\(route\.to\)\)/, 'pirate dock warp assigns the Pocket Monster world');
+assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'real pirate world assigns Pocket Monster through the world link');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
 assert.match(chat, /type: 'world-pos'/, 'chat socket publishes world position for shared-zone presence');
 assert.match(chat, /type === 'world-snapshot'/, 'chat socket dispatches remote player snapshots');
@@ -44,9 +45,8 @@ assert.doesNotMatch(liveJs, /setInterval\(\(\)=>\{for\(const marker of remoteWor
 assert.match(liveJs, /if\(titleEl\)setTextIfChanged\(titleEl,'เริ่มการผจญภัย'\)/, 'Ranch Hub keeps the quest tracker visible');
 assert.match(liveJs, /text\.textContent='1\/3 ไป Grass Meadow'/, 'Ranch Hub tracker points at Grass Meadow');
 assert.doesNotMatch(liveJs, /if\(!STAGE_BY_ID\[state\.currentZone\]\)\{panel\.classList\.add\('hidden'\);return;\}/, 'Ranch Hub no longer hides the quest tracker');
-assert.match(pirateWorldJs, /from '\.\/world-presence-v800\.mjs'/, 'pirate island uses the shared presence helper');
-assert.match(pirateWorldJs, /publishWorldState\(/, 'pirate island publishes WORLD_STATE');
-assert.match(pirateWorldJs, /PIRATE_FRUIT_WORLD_ID/, 'pirate presence uses the pirate-fruit zone id');
+assert.match(boot, /publishWorldState\(/, 'real pirate world publishes WORLD_STATE');
+assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'pirate presence uses the pirate-fruit zone id');
 assert.match(livingJs, /from '\.\/world-presence-v800\.mjs'/, 'living world uses the shared presence helper');
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(helper, /remoteWorldPlayers/, 'presence overlay tracks remote markers');

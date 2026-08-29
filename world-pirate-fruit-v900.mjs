@@ -3,8 +3,6 @@ import { GROUND_REPEAT, paintGroundGrid, paintSkyGradient } from './asset-presen
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
-import { combinedWarpsFrom, nearestCombinedWarp } from './combined-worlds-v900.mjs';
-import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
 export const PIRATE_FRUIT_WORLD_VERSION = '9.0.0-pirate-block-world';
@@ -194,19 +192,6 @@ addBox(mast, 1.1, 0.55, 0.08, 0x7d2632, 0.55, 2.55, 0, 'pirate-fruit:flag');
 mast.position.set(3.6, 0, 4.8);
 island.add(mast);
 
-function makeWorldWarpBeacon(route) {
-  const g = new THREE.Group();
-  g.name = `pirate-fruit:warp:${route.id}`;
-  addBox(g, 1.4, 0.08, 1.4, 0xfacc15, 0, 0.04, 0, 'pirate-fruit:warp-pad');
-  addBox(g, 0.22, 1.7, 0.22, 0xfde047, 0, 0.9, 0, 'pirate-fruit:warp-beam');
-  addBox(g, 0.7, 0.22, 0.22, 0x86efac, 0, 1.65, 0, 'pirate-fruit:warp-sign');
-  g.position.set(route.position[0], 0, route.position[1]);
-  g.userData.combinedWarpId = route.id;
-  island.add(g);
-  return g;
-}
-for (const route of combinedWarpsFrom(PIRATE_FRUIT_WORLD_ID)) makeWorldWarpBeacon(route);
-
 scene.add(island);
 
 assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({
@@ -330,71 +315,13 @@ startupText('เข้าเกาะโจรสลัดแล้ว', 'ok');
 const zoneLabel = document.getElementById('zoneLabel');
 if (zoneLabel) zoneLabel.textContent = 'เกาะโจรสลัด • Pirate Fruit';
 const message = document.getElementById('message');
-if (message) message.textContent = 'เริ่มที่เกาะ Pirate Fruit • เดินไปจุดวาปที่ท่าเรือเพื่อเข้าเกมเดิม';
-
-let nearbyWorldWarp = null;
-let dismissedWorldWarpId = null;
-let worldWarpBusy = false;
-
-function renderWorldWarpPrompt() {
-  const panel = el('warpPrompt');
-  if (!panel) return;
-  if (!nearbyWorldWarp) {
-    panel.classList.add('hidden');
-    return;
-  }
-  const title = el('warpPromptTitle');
-  const detail = el('warpPromptDetail');
-  const action = el('warpPromptAction');
-  if (title) title.textContent = `ไป ${nearbyWorldWarp.label}`;
-  if (detail) detail.textContent = 'เดินทางเข้าโลก Pocket Monster ได้ทันที';
-  if (action) {
-    action.disabled = worldWarpBusy;
-    action.textContent = 'เดินทาง';
-  }
-  panel.classList.remove('hidden');
-}
-
-function startWorldWarp(route = nearbyWorldWarp) {
-  if (!route || worldWarpBusy) return;
-  worldWarpBusy = true;
-  renderWorldWarpPrompt();
-  location.assign(`${location.pathname}?${combinedLocationQuery(route.to, defaultPanelForWorld(route.to))}`);
-}
-
-function closeWorldWarpPrompt() {
-  nearbyWorldWarp = null;
-  el('warpPrompt')?.classList.add('hidden');
-}
-
-function updateWorldWarpPrompt() {
-  if (worldWarpBusy) return;
-  const found = nearestCombinedWarp(PIRATE_FRUIT_WORLD_ID, player.position);
-  if (!found) {
-    dismissedWorldWarpId = null;
-    if (nearbyWorldWarp) closeWorldWarpPrompt();
-    return;
-  }
-  if (dismissedWorldWarpId === found.id) return;
-  if (nearbyWorldWarp?.id !== found.id) {
-    nearbyWorldWarp = found;
-    renderWorldWarpPrompt();
-  }
-}
-
-el('warpPromptAction')?.addEventListener('click', () => startWorldWarp());
-el('warpPromptCancel')?.addEventListener('click', () => {
-  dismissedWorldWarpId = nearbyWorldWarp?.id || null;
-  closeWorldWarpPrompt();
-});
-
+if (message) message.textContent = 'โลก Pirate Fruit ใช้ภาษาบล็อกของ Pocket • พรีเซนต์เท่านั้น โหมดปายังเป็นระบบจับมอนของเกมเดิม';
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   updatePlayer(dt);
   updateCamera(dt);
-  updateWorldWarpPrompt();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

@@ -9,6 +9,12 @@
 .world-gate-btn:hover,.world-gate-btn:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf822}
 .world-gate-btn b{font-size:16px}
 .world-gate-btn small{color:#94a3b8;font-size:12px;line-height:1.35}
+#pirateFruitFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#06121f}
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #pirateFruitFrame{visibility:hidden;pointer-events:none}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #joystick,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #cameraPad{display:none!important}
+.combined-world-warp{position:fixed;right:8px;top:48px;z-index:9999;pointer-events:auto;border:0;border-radius:999px;padding:8px 12px;font:700 12px system-ui;background:#0f766e;color:#fff;cursor:pointer}
+.combined-world-warp[hidden]{display:none!important}
 #worldSwitcher,#controlPanelSwitcher{position:fixed;left:8px;z-index:9999;display:none;gap:6px;flex-wrap:wrap;max-width:70vw;pointer-events:auto}
 #worldSwitcher{top:8px}
 #controlPanelSwitcher{top:40px}
