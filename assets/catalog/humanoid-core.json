@@ -43,6 +43,22 @@
         "evolution": { "accessories": ["hat-a", "apron-a", "orb-a"] },
         "breeding": { "accessories": ["hat-a", "apron-a", "orb-a"] }
       }
+    },
+    {
+      "id": "character.human.pirate-fruit.v1",
+      "kind": "character",
+      "provider": "pirate-fruit",
+      "style": "pirate-fruit-v1",
+      "surfaceStyle": "four-side-block-v1",
+      "rig": "humanoid-rig-v1",
+      "metrics": {
+        "height": 1.8,
+        "head": [0.64, 0.72, 0.56],
+        "headY": 1.44
+      },
+      "roles": {
+        "player": { "accessories": ["bandana-a", "coat-a", "capture-ball-a"] }
+      }
     }
   ],
   "appearances": [

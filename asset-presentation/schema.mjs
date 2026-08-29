@@ -8,7 +8,7 @@ export const REQUIRED_ASSET_FIELDS = Object.freeze([
 ]);
 
 export const ALLOWED_KINDS = Object.freeze(['character', 'monster']);
-export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy']);
+export const ALLOWED_PROVIDERS = Object.freeze(['procedural', 'gltf', 'legacy', 'pirate-fruit']);
 export const CHARACTER_ROLES = Object.freeze(['player', 'keeper', 'merchant', 'trainer', 'evolution', 'breeding']);
 export const MONSTER_ROLES = Object.freeze(['wild', 'owned', 'boss', 'elite']);
 export const ALLOWED_ROLES = Object.freeze([...CHARACTER_ROLES, ...MONSTER_ROLES]);

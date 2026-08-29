@@ -1,0 +1,9 @@
+{
+  "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
+  "ref": "claude/blox-fruits-three-js-roadmap-1f2f5u",
+  "commit": "bde2dbf4c5f746fb06c91e0f6d1d5eec8a1a6631",
+  "mode": "offline",
+  "remote": false,
+  "viteBase": "./",
+  "note": "Playable Pirate Fruit client, built with remote/server flags off. Local save only. Not merged into live V8.4."
+}
