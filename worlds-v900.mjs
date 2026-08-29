@@ -1,6 +1,6 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, worldById, worldIdFromLocation } from './combined-worlds-v900.mjs';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs';
 import {
   applyControlPanel,
   combinedLocationQuery,
@@ -16,6 +16,7 @@ if (typeof window !== 'undefined') {
     worlds: COMBINED_WORLDS.map(world => world.id),
     includesOriginalGame: true,
     mergedIntoLiveV800: false,
+    defaultWorld: DEFAULT_COMBINED_WORLD,
     characterSystem: 'pirate-fruit',
     throwSystem: 'pocket-monster',
   });
@@ -89,9 +90,4 @@ panelSwitcher?.querySelectorAll('[data-control-panel]').forEach(button => {
   button.addEventListener('click', () => selectPanel(button.dataset.controlPanel));
 });
 
-const requested = worldIdFromLocation();
-if (requested) await bootWorld(requested);
-else {
-  worldGate?.classList.remove('hidden');
-  if (startup) startup.className = 'startup-status hidden';
-}
+await bootWorld(resolveCombinedWorld());

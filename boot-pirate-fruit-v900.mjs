@@ -1,9 +1,13 @@
-export const PIRATE_FRUIT_BLOCK_WORLD = './world-pirate-fruit-v900.mjs?v=900';
+import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs';
+import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
+import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
+
+export const PIRATE_FRUIT_OFFLINE_ENTRY = './pirate-fruit-offline/index.html';
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
 const game = document.getElementById('game');
-if (!game) throw new Error('missing #game for Pirate Fruit block world boot');
+if (!game) throw new Error('missing #game for Pirate Fruit boot');
 
 let throwRuntimePromise = null;
 
@@ -22,10 +26,39 @@ export function ensurePocketAnimalControl() {
   return throwRuntimePromise;
 }
 
+function mountPirateOffline() {
+  game.replaceChildren();
+  const frame = document.createElement('iframe');
+  frame.id = 'pirateFruitFrame';
+  frame.title = 'Pirate Fruit';
+  frame.src = PIRATE_FRUIT_OFFLINE_ENTRY;
+  frame.setAttribute('allow', 'fullscreen');
+  game.appendChild(frame);
+  return frame;
+}
+
+function assignCombinedWorld(worldId) {
+  location.assign(`${location.pathname}?${combinedLocationQuery(worldId, defaultPanelForWorld(worldId))}`);
+}
+
+function bindPocketMonsterLink() {
+  const link = combinedWorldLinksFrom('pirate-fruit')[0];
+  const button = document.getElementById('pocketWorldWarpBtn');
+  if (button && link) {
+    button.hidden = false;
+    button.textContent = `วาปเข้า${link.label}`;
+    button.onclick = () => assignCombinedWorld(link.to);
+  }
+  const zoneLabel = document.getElementById('zoneLabel');
+  if (zoneLabel) zoneLabel.textContent = 'Pirate Fruit';
+  const message = document.getElementById('message');
+  if (message) message.textContent = 'โลก Pirate Fruit จริง • กดวาปเพื่อเข้าเกมเดิม';
+}
+
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_PIRATE_FRUIT = Object.freeze({
-    source: 'pocket-block-world',
-    entry: PIRATE_FRUIT_BLOCK_WORLD,
+    source: 'pirate-fruit-offline',
+    entry: PIRATE_FRUIT_OFFLINE_ENTRY,
     remote: false,
     mergedWithV800: false,
     presentationOnly: true,
@@ -33,16 +66,27 @@ if (typeof window !== 'undefined') {
     animalControlRuntime: POCKET_ANIMAL_CONTROL_RUNTIME,
   });
   window.POCKETMONSTER_ENSURE_THROW_RUNTIME = ensurePocketAnimalControl;
+  publishWorldState({
+    getZone: () => 'pirate-fruit',
+    getPosition: () => ({ x: 0, z: 0 }),
+    getDir: () => 0,
+  });
+  installWorldPresence({ getZone: () => 'pirate-fruit' });
 }
 
 if (startup) {
   startup.textContent = document.body?.dataset?.controlPanel === 'throw'
     ? 'กำลังเปิดระบบควบคุมสัตว์ของ Pocket Monster…'
-    : 'กำลังเปิดเกาะโจรสลัดภาษาบล็อก…';
+    : 'กำลังเปิดโลก Pirate Fruit…';
   startup.className = 'startup-status';
 }
 
-await import('./world-pirate-fruit-v900.mjs?v=900');
+mountPirateOffline();
+bindPocketMonsterLink();
+if (startup) {
+  startup.textContent = 'เข้าโลก Pirate Fruit แล้ว';
+  startup.className = 'startup-status ok';
+}
 
 if (document.body?.dataset?.controlPanel === 'throw') {
   await ensurePocketAnimalControl();

@@ -1,6 +1,17 @@
 /** V9 combined channel: 3 worlds. Control panels (human/throw) live in control-panels-v900.mjs. */
 export const COMBINED_VERSION = '9.0.0-combined';
 export const COMBINED_WORLD_COUNT = 3;
+export const DEFAULT_COMBINED_WORLD = 'pirate-fruit';
+
+export const COMBINED_WORLD_LINKS = Object.freeze([
+  Object.freeze({
+    id: 'pirate-to-pocket-monster',
+    from: 'pirate-fruit',
+    to: 'pocket-monster',
+    label: 'เกมเดิม • Pocket Monster',
+    kind: 'world-link',
+  }),
+]);
 
 export const COMBINED_WORLDS = Object.freeze([
   Object.freeze({
@@ -13,8 +24,8 @@ export const COMBINED_WORLDS = Object.freeze([
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
-    title: 'เกาะโจรสลัดภาษาบล็อก',
-    detail: 'โลก Pirate Fruit ใช้ภาษาบล็อกและ asset engine ของ Pocket • โหมดปาใช้ระบบจับมอนของเกมเดิม',
+    title: 'Pirate Fruit',
+    detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • วาปเชื่อมเข้าเกมเดิม',
     runtime: './boot-pirate-fruit-v900.mjs?v=900',
   }),
   Object.freeze({
@@ -33,4 +44,12 @@ export function worldById(id) {
 export function worldIdFromLocation(locationLike = globalThis.location) {
   const id = new URL(locationLike.href).searchParams.get('world');
   return worldById(id)?.id || null;
+}
+
+export function resolveCombinedWorld(locationLike = globalThis.location) {
+  return worldIdFromLocation(locationLike) || DEFAULT_COMBINED_WORLD;
+}
+
+export function combinedWorldLinksFrom(worldId) {
+  return COMBINED_WORLD_LINKS.filter(link => link.from === worldId);
 }
