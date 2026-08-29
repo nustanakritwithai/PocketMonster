@@ -36,6 +36,7 @@ for (const file of [
   'asset-presentation/anchors.mjs',
   'asset-presentation/requests.mjs',
   'asset-presentation/providers/pirate-fruit-player.mjs',
+  'pirate-player-server.mjs',
 ]) {
   const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(check.status, 0, check.stderr || `${file} syntax failed`);

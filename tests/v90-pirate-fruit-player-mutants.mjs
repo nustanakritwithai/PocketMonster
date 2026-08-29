@@ -68,6 +68,8 @@ assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joy
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'mutant 23c: pirate throw keeps hunt for wild animal control');
 assert.match(boot, /game-v800\.js\?v=810&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop publishes animal-control functions');
+assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
+assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
 assert.match(boot, /syncPirateFruitControlHud/, 'mutant 24: pirate boot injects the prototype circular HUD');
 const pirateClient = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-BEToR5oK.js', import.meta.url), 'utf8');
 const hudCss = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');

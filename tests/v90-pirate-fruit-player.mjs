@@ -48,7 +48,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-fruit-control-hud-v900.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-fruit-control-hud-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -172,6 +172,8 @@ assert.match(liveJs, /distance=5\.15/, 'pirate follow distance sits behind the s
 assert.match(liveJs, /cameraPitch=\.28/, 'pirate camera starts lower than the old top-down pitch');
 assert.match(liveJs, /new THREE\.Vector3\(0,1\.36,0\)/, 'camera looks at the pirate chest, not the old bighead look-at');
 assert.match(liveJs, /hostCharacter:'pirate-fruit'/, 'animal control is hosted on the pirate player');
+assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'Pocket character server APIs are hosted on the pirate player');
+assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'live loop rebinds Pocket character server functions onto pirate');
 assert.match(html, /frame-src 'self'/, 'V9 may iframe the offline Pirate Fruit client');
 assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก้อน/, 'gate describes the real offline Pirate Fruit game');
 assert.match(boot, /pirate-fruit-offline\/index\.html/, 'pirate world boots the vendored offline client');

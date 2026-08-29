@@ -51,6 +51,7 @@ import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
+import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -158,7 +159,14 @@ if(typeof window!=='undefined'){
   window.POCKETMONSTER_ACCOUNT_ACTIONS=Object.freeze({
     logout:()=>logoutMonsterLifeSession(runtimeConfig,authProfileBridge.sessionToken),
     changePassword:credentials=>changeServerPassword(runtimeConfig,authProfileBridge.sessionToken,credentials),
-    saveCharacter:character=>saveCharacterProfile(runtimeConfig,authProfileBridge.sessionToken,character),
+    saveCharacter:character=>savePirateHostedCharacter({
+      saveCharacterProfile,
+      config:runtimeConfig,
+      sessionToken:authProfileBridge.sessionToken,
+      character,
+      writesEnabled:serverPlayerDataActive,
+      live:()=>({name:authProfileBridge.profile?.character?.name||authProfileBridge.profile?.displayName}),
+    }),
     redeemItemCode:code=>requestRedeemItemCode(runtimeConfig,authProfileBridge.sessionToken,code),
   });
 }
@@ -1610,6 +1618,9 @@ const evolutionVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'ev
 const breedingVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'breeding',appearanceId:'appearance.human.breeding-pink.v1',quality:qualityProfile.tier});
 await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready,trainerVisual.ready,evolutionVisual.ready,breedingVisual.ready].filter(Boolean));
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
+if(typeof window!=='undefined'){
+  window.POCKETMONSTER_PLAYER_CHARACTER=publishPlayerCharacterBinding({writeArmed:serverPlayerDataActive,name:authProfileBridge.profile?.character?.name||authProfileBridge.profile?.displayName});
+}
 flushNearbyDecos(player.position,WORLD_STREAM.zoneAttachBudget);
 const playerData={hp:100,maxHp:100,speed:5.7,invuln:0};
 const npc=keeperVisual.root; npc.position.set(4,0,3); scene.add(npc);
@@ -6872,7 +6883,10 @@ async function loadPrimaryRemoteSave(){
     loadServerSave(runtimeConfig,authProfileBridge.sessionToken),
     readPlayerState(runtimeConfig,authProfileBridge.sessionToken),
   ]);
-  if(typeof window!=='undefined')window.POCKETMONSTER_SERVER_PLAYER_STATE=playerState;
+  if(typeof window!=='undefined'){
+    window.POCKETMONSTER_SERVER_PLAYER_STATE=playerState;
+    window.POCKETMONSTER_PLAYER_CHARACTER=publishPlayerCharacterBinding({writeArmed:serverPlayerDataActive,playerState});
+  }
   serverSaveRevision=saved?.revision??0;
   return saved?.envelope??null;
 }
@@ -7232,7 +7246,13 @@ async function syncCloudSave(){
       successMessage='โหลดข้อมูล Cloud สำเร็จ';
     }
     await flushRemoteSaveUntilSettled();
-    if(serverPlayerDataActive)await syncPlayerData(runtimeConfig,authProfileBridge.sessionToken,{playerHp:String(playerData.hp),playerExp:String(state.exp??0),actionLog:'CLIENT_BOOT_SYNC'});
+    if(serverPlayerDataActive){
+      await syncPlayerData(runtimeConfig,authProfileBridge.sessionToken,{playerHp:String(playerData.hp),playerExp:String(state.exp??0),actionLog:'CLIENT_BOOT_SYNC'});
+      try{
+        const savedCharacter=await window.POCKETMONSTER_ACCOUNT_ACTIONS.saveCharacter();
+        if(savedCharacter?.character)window.POCKETMONSTER_PLAYER_CHARACTER=publishPlayerCharacterBinding({writeArmed:true,name:savedCharacter.character.name});
+      }catch(error){console.warn('pirate character profile sync failed',error);}
+    }
     msg(successMessage);
   }catch(error){
     remoteSaveSyncing=false;
@@ -7341,6 +7361,7 @@ if(typeof window!=='undefined'){
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',
+    playerCharacterServer:'pirate-fruit',
     capture:captureThrow,
     summon:summonThrow,
     recall,
