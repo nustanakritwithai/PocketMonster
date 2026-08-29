@@ -145,6 +145,7 @@ const authProfileBridge = launchSession && serverGate.state === 'healthy'
     ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
     : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
 if (typeof window !== 'undefined') {
+  window.POCKETMONSTER_SERVER_SESSION_TOKEN = authProfileBridge.sessionToken || null;
   window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });
   document.documentElement.dataset.authProfileBridge = authProfileBridge.state;
   window.dispatchEvent(new CustomEvent('pocketmonster:auth-profile-bridge', { detail: window.POCKETMONSTER_AUTH_PROFILE_BRIDGE }));

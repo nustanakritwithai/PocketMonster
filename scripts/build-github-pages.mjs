@@ -16,7 +16,7 @@ const ROOT_EXCLUDES = new Set([
   'workspace-manifest.json',
 ]);
 const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/'];
-const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs'];
+const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs', 'chat-runtime.mjs'];
 
 function normalize(relative) {
   return relative.replaceAll('\\', '/');
