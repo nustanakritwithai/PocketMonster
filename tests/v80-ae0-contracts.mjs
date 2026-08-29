@@ -51,6 +51,11 @@ assert.equal(bundle.assets.find(a => a.id === 'character.human.pirate-fruit.v1')
 assert.ok(bundle.appearances.some(a => a.id === 'appearance.human.player-orange.v1'));
 assert.ok(bundle.appearances.some(a => a.id === 'appearance.human.keeper-green.v1'));
 assert.equal(bundle.assets.find(a => a.id === 'character.human.blocky-bighead.v1').metrics.headY, 1.44);
+assert.deepEqual(
+  bundle.assets.find(a => a.id === 'character.human.pirate-fruit.v1').metrics,
+  bundle.assets.find(a => a.id === 'character.human.blocky-bighead.v1').metrics,
+  'pirate player catalog metrics match Pocket humanoids',
+);
 
 resetCatalog();
 loadCatalog(bundle);

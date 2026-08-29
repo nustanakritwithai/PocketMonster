@@ -46,6 +46,10 @@ assert.ok(pirate, 'mutant 11: catalog asset must exist');
 assert.deepEqual(validateAssetDefinition(pirate), []);
 assert.deepEqual(validateBundle(bundle), []);
 assert.deepEqual(Object.keys(pirate.metrics), ['height', 'head', 'headY']);
+assert.equal(pirate.metrics.headY, 1.44, 'mutant 11b: pirate headY matches Pocket bighead');
+assert.deepEqual(pirate.metrics.head, [0.64, 0.72, 0.56], 'mutant 11c: pirate head size matches Pocket bighead');
+assert.equal(pirate.surfaceStyle, 'four-side-block-v1', 'mutant 11d: pirate uses the Pocket four-side surface');
+assert.doesNotMatch(provider, /CapsuleGeometry|geo\.capsule\(/, 'mutant 11e: pirate mesh stays in Pocket box language');
 for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
   assert.equal(Object.hasOwn(pirate, field), false, `mutant 12: catalog must not own ${field}`);
 }

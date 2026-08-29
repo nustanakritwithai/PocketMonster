@@ -1,9 +1,11 @@
 import { GAMEPLAY_LOCKS } from '../anchors.mjs';
 import { getAppearance } from '../catalog.mjs';
+import { compileAppearance } from '../four-side/atlas.mjs';
+import { applyBoxAtlasUVs, compilePartAtlas, createAtlasTexture, detachSharedGeometry } from '../four-side/apply.mjs';
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { disposeHandle, registerOwned } from '../ownership.mjs';
 
-/** Presentation-only port of Pirate Fruit's player silhouette. Combat/stats stay in Pirate Fruit. */
+/** Presentation-only pirate identity on Pocket's blocky humanoid rig. Combat/stats stay in Pirate Fruit. */
 export const PIRATE_FRUIT_SOURCE = Object.freeze({
   repo: 'https://github.com/nustanakritwithai/Pirate-fruit-',
   visual: 'client/src/art/PiratePlayerVisual.ts',
@@ -34,6 +36,34 @@ export const PIRATE_PLAYER_PALETTE = Object.freeze({
   iris: 0x17232a,
   ball: 0x3b82f6,
 });
+
+const POCKET_HUMANOID = Object.freeze({
+  height: 1.8,
+  head: Object.freeze([0.64, 0.72, 0.56]),
+  headY: 1.44,
+  hipsY: 0.60,
+  torsoY: 0.88,
+  arm: Object.freeze({ x: 0.25, y: 1.02, z: -0.02 }),
+  leg: Object.freeze({ x: 0.11, y: 0.31, z: -0.02 }),
+  handY: -0.40,
+});
+
+async function browserLoadFace(source) {
+  if (typeof document === 'undefined') throw new Error('browser face loader needs document');
+  const gameBundleRoot = new URL('../../', import.meta.url);
+  const url = new URL(String(source).replace(/^\.\//, ''), gameBundleRoot).href;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = url;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, img.width, img.height);
+  return { width: img.width, height: img.height, rgba: new Uint8Array(data.data) };
+}
 
 function trackRest(map, node) {
   map.set(node, {
@@ -92,53 +122,21 @@ function tag(mesh, part, name) {
   return mesh;
 }
 
-function setScale(node, x, y, z) {
-  if (node.scale?.set) node.scale.set(x, y, z);
-}
-
 export function createPirateFruitPlayerProvider({
   THREE,
   box,
-  capsule,
-  sphere,
-  cylinder,
-  cone,
-  torus,
   material,
+  loadFace,
 } = {}) {
   if (!THREE?.Group || typeof box !== 'function' || typeof material !== 'function') {
     throw new Error('pirate-fruit player provider needs THREE, box(), and material()');
   }
 
-  const geo = {
-    capsule(radius, length) {
-      if (typeof capsule === 'function') return capsule(radius, length, 4, 8);
-      if (typeof cylinder === 'function') return cylinder(radius, radius, length + radius * 2, 8);
-      return box(radius * 2, length + radius * 2, radius * 2);
-    },
-    sphere(radius) {
-      if (typeof sphere === 'function') return sphere(radius, 12, 8);
-      return box(radius * 2, radius * 2, radius * 2);
-    },
-    cylinder(top, bottom, height, segments = 10) {
-      if (typeof cylinder === 'function') return cylinder(top, bottom, height, segments);
-      return box(Math.max(top, bottom) * 2, height, Math.max(top, bottom) * 2);
-    },
-    cone(radius, height, segments = 7) {
-      if (typeof cone === 'function') return cone(radius, height, segments);
-      return box(radius * 2, height, radius * 2);
-    },
-    torus(radius, tube) {
-      if (typeof torus === 'function') return torus(radius, tube, 5, 10);
-      return box(radius * 2, tube * 2, radius * 2);
-    },
-  };
-
   return function pirateFruitPlayerFactory({ request, def }) {
     const role = request.role;
     const palette = PIRATE_PLAYER_PALETTE;
-    const head = def.metrics?.head || [0.50, 0.54, 0.46];
-    const headY = def.metrics?.headY ?? 1.52;
+    const head = def.metrics?.head || POCKET_HUMANOID.head;
+    const headY = def.metrics?.headY ?? POCKET_HUMANOID.headY;
     const [headW, headH, headD] = head;
 
     const root = new THREE.Group();
@@ -146,139 +144,104 @@ export function createPirateFruitPlayerProvider({
     const visualRoot = new THREE.Group();
     root.add(visualRoot);
 
-    const hipsPivot = new THREE.Group(); hipsPivot.position.set(0, 0.62, 0); visualRoot.add(hipsPivot);
-    const torsoPivot = new THREE.Group(); torsoPivot.position.set(0, 0.98, 0); visualRoot.add(torsoPivot);
+    const hipsPivot = new THREE.Group(); hipsPivot.position.set(0, POCKET_HUMANOID.hipsY, 0); visualRoot.add(hipsPivot);
+    const torsoPivot = new THREE.Group(); torsoPivot.position.set(0, POCKET_HUMANOID.torsoY, 0); visualRoot.add(torsoPivot);
     const headPivot = new THREE.Group(); headPivot.position.set(0, headY, 0); visualRoot.add(headPivot);
-    const leftArmRoot = new THREE.Group(); leftArmRoot.position.set(-0.38, 1.16, 0); visualRoot.add(leftArmRoot);
-    const rightArmRoot = new THREE.Group(); rightArmRoot.position.set(0.38, 1.16, 0); visualRoot.add(rightArmRoot);
-    const leftLegRoot = new THREE.Group(); leftLegRoot.position.set(-0.14, 0.34, 0); visualRoot.add(leftLegRoot);
-    const rightLegRoot = new THREE.Group(); rightLegRoot.position.set(0.14, 0.34, 0); visualRoot.add(rightLegRoot);
+    const leftArmRoot = new THREE.Group(); leftArmRoot.position.set(-POCKET_HUMANOID.arm.x, POCKET_HUMANOID.arm.y, POCKET_HUMANOID.arm.z); visualRoot.add(leftArmRoot);
+    const rightArmRoot = new THREE.Group(); rightArmRoot.position.set(POCKET_HUMANOID.arm.x, POCKET_HUMANOID.arm.y, POCKET_HUMANOID.arm.z); visualRoot.add(rightArmRoot);
+    const leftLegRoot = new THREE.Group(); leftLegRoot.position.set(-POCKET_HUMANOID.leg.x, POCKET_HUMANOID.leg.y, POCKET_HUMANOID.leg.z); visualRoot.add(leftLegRoot);
+    const rightLegRoot = new THREE.Group(); rightLegRoot.position.set(POCKET_HUMANOID.leg.x, POCKET_HUMANOID.leg.y, POCKET_HUMANOID.leg.z); visualRoot.add(rightLegRoot);
 
-    const pelvis = new THREE.Mesh(geo.capsule(0.22, 0.14), material(palette.pants, 0.9, 0.04));
-    tag(pelvis, 'pelvis', 'player:hull:pelvis');
-    pelvis.position.y = 0.02;
-    hipsPivot.add(pelvis);
+    const hips = new THREE.Mesh(box(0.38, 0.22, 0.28), material(palette.pants, 0.8, 0.04));
+    tag(hips, 'hips', 'player:hips');
+    hipsPivot.add(hips);
 
-    const torso = new THREE.Mesh(geo.capsule(0.28, 0.28), material(palette.coat, 0.82, 0.04));
-    tag(torso, 'coat', 'player:hull:torso');
-    torso.position.y = 0.02;
-    torsoPivot.add(torso);
+    const coat = new THREE.Mesh(box(0.46, 0.50, 0.32), material(palette.coat, 0.82, 0.04));
+    tag(coat, 'coat', 'player:hull:torso');
+    torsoPivot.add(coat);
 
-    const shirtPanel = new THREE.Mesh(box(0.22, 0.46, 0.04), material(palette.shirt, 0.94, 0.02));
+    const shirtPanel = new THREE.Mesh(box(0.18, 0.36, 0.04), material(palette.shirt, 0.94, 0.02));
     tag(shirtPanel, 'shirt', 'player:shirt');
-    shirtPanel.position.set(0, 0.04, -0.22);
+    shirtPanel.position.set(0, 0.04, -0.18);
     torsoPivot.add(shirtPanel);
 
-    const leftLapel = new THREE.Mesh(box(0.10, 0.48, 0.05), material(palette.trim, 0.86, 0.02));
+    const leftLapel = new THREE.Mesh(box(0.08, 0.40, 0.05), material(palette.trim, 0.86, 0.02));
     tag(leftLapel, 'lapel', 'player:lapel-left');
-    leftLapel.position.set(-0.10, 0.06, -0.24);
-    leftLapel.rotation.z = -0.17;
+    leftLapel.position.set(-0.10, 0.06, -0.19);
     torsoPivot.add(leftLapel);
-    const rightLapel = new THREE.Mesh(box(0.10, 0.48, 0.05), material(palette.trim, 0.86, 0.02));
+    const rightLapel = new THREE.Mesh(box(0.08, 0.40, 0.05), material(palette.trim, 0.86, 0.02));
     tag(rightLapel, 'lapel', 'player:lapel-right');
-    rightLapel.position.set(0.10, 0.06, -0.24);
-    rightLapel.rotation.z = 0.17;
+    rightLapel.position.set(0.10, 0.06, -0.19);
     torsoPivot.add(rightLapel);
 
-    const sash = new THREE.Mesh(geo.cylinder(0.26, 0.24, 0.12, 12), material(palette.trim, 0.86, 0.02));
+    const sash = new THREE.Mesh(box(0.48, 0.10, 0.34), material(palette.trim, 0.86, 0.02));
     tag(sash, 'sash', 'player:sash');
-    sash.position.y = -0.22;
+    sash.position.y = -0.18;
     torsoPivot.add(sash);
     const buckle = new THREE.Mesh(box(0.12, 0.10, 0.05), material(palette.brass, 0.35, 0.7));
     tag(buckle, 'buckle', 'player:buckle');
-    buckle.position.set(0, -0.20, -0.24);
+    buckle.position.set(0, -0.18, -0.20);
     torsoPivot.add(buckle);
 
     for (const side of [-1, 1]) {
-      const coatTail = new THREE.Mesh(box(0.22, 0.50, 0.07), material(palette.coat, 0.82, 0.04));
-      tag(coatTail, 'coat-tail', side < 0 ? 'player:coat-tail-left' : 'player:coat-tail-right');
-      coatTail.position.set(side * 0.14, -0.42, 0.10);
-      coatTail.rotation.x = 0.10;
-      coatTail.rotation.z = side * 0.06;
+      const coatTail = new THREE.Mesh(box(0.20, 0.42, 0.08), material(palette.coat, 0.82, 0.04));
+      tag(coatTail, 'coat', side < 0 ? 'player:coat-tail-left' : 'player:coat-tail-right');
+      coatTail.position.set(side * 0.14, -0.40, 0.10);
       torsoPivot.add(coatTail);
     }
 
-    const neck = new THREE.Mesh(geo.cylinder(0.08, 0.10, 0.16, 10), material(palette.skin, 0.56, 0.02));
-    tag(neck, 'neck', 'player:neck');
-    neck.position.y = -0.16;
-    headPivot.add(neck);
+    const headMesh = new THREE.Mesh(box(headW, headH, headD), material(palette.skin, 0.72, 0.02));
+    tag(headMesh, 'head', 'player:head');
+    headPivot.add(headMesh);
 
-    const face = new THREE.Mesh(geo.sphere(0.22), material(palette.skin, 0.56, 0.02));
-    tag(face, 'face', 'player:face');
-    face.position.y = 0.04;
-    setScale(face, 0.92, 1.06, 0.88);
-    headPivot.add(face);
-
-    const hairCap = new THREE.Mesh(geo.sphere(0.21), material(palette.hair, 0.94, 0.02));
+    const hairCap = new THREE.Mesh(box(headW * 1.02, 0.14, headD * 1.02), material(palette.hair, 0.94, 0.02));
     tag(hairCap, 'hair', 'player:hair');
-    hairCap.position.set(0, 0.10, 0.02);
-    setScale(hairCap, 1.02, 0.72, 1.02);
+    hairCap.position.y = headH / 2 + 0.01;
     headPivot.add(hairCap);
 
-    const bandana = new THREE.Mesh(geo.cylinder(0.20, 0.22, 0.12, 12), material(palette.trim, 0.86, 0.02));
+    const bandana = new THREE.Mesh(box(headW * 1.06, 0.14, headD * 1.08), material(palette.trim, 0.86, 0.02));
     tag(bandana, 'bandana', 'player:bandana');
-    bandana.position.y = 0.20;
+    bandana.position.y = headH / 2 + 0.04;
     headPivot.add(bandana);
-    const bandanaKnot = new THREE.Mesh(geo.sphere(0.06), material(palette.trim, 0.86, 0.02));
+    const bandanaKnot = new THREE.Mesh(box(0.10, 0.10, 0.10), material(palette.trim, 0.86, 0.02));
     tag(bandanaKnot, 'bandana', 'player:bandana-knot');
-    bandanaKnot.position.set(-0.20, 0.16, 0.04);
+    bandanaKnot.position.set(-headW * 0.42, headH * 0.22, 0.06);
     headPivot.add(bandanaKnot);
-    const bandanaTail = new THREE.Mesh(box(0.08, 0.28, 0.03), material(palette.trim, 0.86, 0.02));
+    const bandanaTail = new THREE.Mesh(box(0.08, 0.28, 0.04), material(palette.trim, 0.86, 0.02));
     tag(bandanaTail, 'bandana', 'player:bandana-tail');
-    bandanaTail.position.set(-0.22, 0.02, 0.06);
-    bandanaTail.rotation.z = 0.24;
+    bandanaTail.position.set(-headW * 0.46, 0.02, 0.08);
     headPivot.add(bandanaTail);
 
-    for (const side of [-1, 1]) {
-      const eye = new THREE.Mesh(geo.sphere(0.035), material(palette.eye, 0.38, 0.02));
-      tag(eye, 'eye', side < 0 ? 'player:eye-left' : 'player:eye-right');
-      eye.position.set(side * 0.07, 0.06, -0.18);
-      setScale(eye, 1, 0.72, 0.42);
-      headPivot.add(eye);
-      const pupil = new THREE.Mesh(geo.sphere(0.018), material(palette.iris, 0.26, 0.02));
-      tag(pupil, 'iris', side < 0 ? 'player:iris-left' : 'player:iris-right');
-      pupil.position.set(side * 0.07, 0.06, -0.20);
-      headPivot.add(pupil);
-    }
-
-    const nose = new THREE.Mesh(geo.cone(0.035, 0.10, 7), material(palette.skin, 0.56, 0.02));
-    tag(nose, 'nose', 'player:nose');
-    nose.position.set(0, 0.02, -0.22);
-    nose.rotation.x = -Math.PI / 2;
-    headPivot.add(nose);
-
-    const beard = new THREE.Mesh(geo.capsule(0.09, 0.10), material(palette.hair, 0.94, 0.02));
+    const beard = new THREE.Mesh(box(0.28, 0.16, 0.10), material(palette.hair, 0.94, 0.02));
     tag(beard, 'beard', 'player:beard');
-    beard.position.set(0, -0.10, -0.16);
-    setScale(beard, 1.3, 1, 0.42);
+    beard.position.set(0, -headH * 0.28, -headD / 2 - 0.02);
     headPivot.add(beard);
 
-    const earring = new THREE.Mesh(geo.torus(0.045, 0.01), material(palette.brass, 0.35, 0.7));
+    const earring = new THREE.Mesh(box(0.04, 0.08, 0.04), material(palette.brass, 0.35, 0.7));
     tag(earring, 'earring', 'player:earring');
-    earring.position.set(-0.22, -0.02, 0);
-    earring.rotation.y = Math.PI / 2;
+    earring.position.set(-headW / 2 - 0.02, -0.04, 0);
     headPivot.add(earring);
 
     function makeArm(side) {
-      const upper = new THREE.Mesh(geo.capsule(0.10, 0.18), material(palette.coat, 0.82, 0.04));
+      const upper = new THREE.Mesh(box(0.12, 0.44, 0.12), material(palette.coat, 0.82, 0.04));
       tag(upper, 'arm', side < 0 ? 'player:left-arm' : 'player:right-arm');
       upper.position.set(0, -0.16, 0);
-      const shoulder = new THREE.Mesh(geo.sphere(0.12), material(palette.trim, 0.86, 0.02));
-      tag(shoulder, 'shoulder', side < 0 ? 'player:left-shoulder' : 'player:right-shoulder');
-      shoulder.position.set(0, -0.02, 0);
-      const hand = new THREE.Mesh(geo.capsule(0.08, 0.04), material(palette.skin, 0.56, 0.02));
+      const cuff = new THREE.Mesh(box(0.14, 0.08, 0.14), material(palette.trim, 0.86, 0.02));
+      tag(cuff, 'cuff', side < 0 ? 'player:left-cuff' : 'player:right-cuff');
+      cuff.position.set(0, -0.34, 0);
+      const hand = new THREE.Mesh(box(0.11, 0.11, 0.11), material(palette.skin, 0.7, 0.02));
       tag(hand, 'hand', side < 0 ? 'player:left-palm' : 'player:right-palm');
-      hand.position.set(0, -0.38, 0);
-      return { upper, shoulder, hand };
+      hand.position.set(0, POCKET_HUMANOID.handY, 0);
+      return { upper, cuff, hand };
     }
     const leftArm = makeArm(-1);
-    leftArmRoot.add(leftArm.upper); leftArmRoot.add(leftArm.shoulder); leftArmRoot.add(leftArm.hand);
+    leftArmRoot.add(leftArm.upper); leftArmRoot.add(leftArm.cuff); leftArmRoot.add(leftArm.hand);
     const rightArm = makeArm(1);
-    rightArmRoot.add(rightArm.upper); rightArmRoot.add(rightArm.shoulder); rightArmRoot.add(rightArm.hand);
+    rightArmRoot.add(rightArm.upper); rightArmRoot.add(rightArm.cuff); rightArmRoot.add(rightArm.hand);
 
     const rightHandAnchor = new THREE.Group();
     rightHandAnchor.name = 'socket:right-palm';
-    rightHandAnchor.position.set(0, -0.38, 0);
+    rightHandAnchor.position.set(0, POCKET_HUMANOID.handY, 0);
     rightArmRoot.add(rightHandAnchor);
     if (role === 'player') {
       const ball = new THREE.Mesh(box(0.09, 0.09, 0.09), material(palette.ball, 0.4, 0.1));
@@ -288,11 +251,11 @@ export function createPirateFruitPlayerProvider({
     }
 
     function makeLeg(side) {
-      const leg = new THREE.Mesh(geo.capsule(0.11, 0.22), material(palette.pants, 0.9, 0.04));
+      const leg = new THREE.Mesh(box(0.12, 0.50, 0.12), material(palette.pants, 0.78, 0.04));
       tag(leg, 'leg', side < 0 ? 'player:left-leg' : 'player:right-leg');
-      const boot = new THREE.Mesh(box(0.22, 0.16, 0.32), material(palette.boot, 0.78, 0.02));
+      const boot = new THREE.Mesh(box(0.16, 0.12, 0.28), material(palette.boot, 0.8, 0.02));
       tag(boot, 'boot', side < 0 ? 'player:left-boot' : 'player:right-boot');
-      boot.position.set(0, -0.30, -0.08);
+      boot.position.set(0, -0.31, -0.10);
       boot.userData.limbForward = 'front';
       return { leg, boot };
     }
@@ -305,21 +268,46 @@ export function createPirateFruitPlayerProvider({
     const rig = {
       rest,
       pivots: { hipsPivot, torsoPivot, headPivot, leftArmRoot, rightArmRoot, leftLegRoot, rightLegRoot, rightHandAnchor },
-      metrics: { headY, head: [headW, headH, headD] },
+      metrics: { headY, head: [headW, headH, headD], height: def.metrics?.height ?? POCKET_HUMANOID.height },
     };
     root.userData.animRig = rig;
     root.userData.isHumanoid = true;
     root.userData.assetForm = PIRATE_FRUIT_ASSET_FORM;
     root.userData.pirateFruitSource = PIRATE_FRUIT_SOURCE;
+    root.userData.surfaceStyle = 'four-side-block-v1';
 
     let action = 'idle';
     let actionTimer = 0;
     let actionDuration = 0.32;
     let phase = 0;
-    let currentAppearance = {
-      id: request.appearanceId || null,
-      contentHash: 'pirate-fruit-solid-v1',
-    };
+    let currentAppearance = compileAppearance(getAppearance(request.appearanceId) || { id: request.appearanceId, parts: {} });
+
+    async function paintPart(mesh, part) {
+      if (!mesh || !part) return;
+      const loader = loadFace || (typeof document !== 'undefined' && typeof Image !== 'undefined' ? browserLoadFace : null);
+      if (!loader) return;
+      try {
+        const atlas = await compilePartAtlas(part, currentAppearance.layout, loader);
+        detachSharedGeometry(mesh);
+        applyBoxAtlasUVs(mesh.geometry, currentAppearance.layout);
+        const next = createAtlasTexture(THREE, atlas);
+        const prev = mesh.material;
+        mesh.material = next;
+        mesh.userData.atlasApplied = true;
+        if (prev && prev !== next && typeof prev.dispose === 'function') {
+          prev.map?.dispose?.();
+          prev.dispose();
+        }
+      } catch (err) {
+        console.warn('four-side atlas apply failed', currentAppearance.id, err);
+      }
+    }
+
+    async function applyAppearanceSurfaces() {
+      const parts = getAppearance(currentAppearance.id)?.parts || {};
+      await paintPart(headMesh, parts.head);
+      return handle;
+    }
 
     const handle = {
       root,
@@ -338,7 +326,7 @@ export function createPirateFruitPlayerProvider({
         else action = 'idle';
         const walk = Math.sin(phase);
         if (moving) {
-          torsoPivot.position.y = 0.98 + Math.abs(walk) * 0.03;
+          torsoPivot.position.y = POCKET_HUMANOID.torsoY + Math.abs(walk) * 0.03;
           headPivot.rotation.z = -walk * 0.03;
           leftLegRoot.rotation.x = -walk * 0.45;
           rightLegRoot.rotation.x = walk * 0.45;
@@ -395,11 +383,12 @@ export function createPirateFruitPlayerProvider({
         return out;
       },
       setAppearance(id) {
-        const def = getAppearance(id);
-        if (!def) return handle;
-        currentAppearance = { id: def.id, contentHash: 'pirate-fruit-solid-v1' };
+        const next = getAppearance(id);
+        if (!next) return handle;
+        currentAppearance = compileAppearance(next);
         root.userData.appearanceId = currentAppearance.id;
         root.userData.appearanceHash = currentAppearance.contentHash;
+        handle.ready = applyAppearanceSurfaces();
         return handle;
       },
       appearance() { return currentAppearance; },
@@ -412,7 +401,7 @@ export function createPirateFruitPlayerProvider({
     registerOwned(handle, { dispose() {} });
     root.userData.appearanceId = currentAppearance.id;
     root.userData.appearanceHash = currentAppearance.contentHash;
-    handle.ready = Promise.resolve(handle);
+    handle.ready = applyAppearanceSurfaces();
     return assertAssetHandle(handle);
   };
 }

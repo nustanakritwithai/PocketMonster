@@ -49,12 +49,12 @@
       "kind": "character",
       "provider": "pirate-fruit",
       "style": "pirate-fruit-v1",
-      "surfaceStyle": "solid-color-v1",
+      "surfaceStyle": "four-side-block-v1",
       "rig": "humanoid-rig-v1",
       "metrics": {
         "height": 1.8,
-        "head": [0.50, 0.54, 0.46],
-        "headY": 1.52
+        "head": [0.64, 0.72, 0.56],
+        "headY": 1.44
       },
       "roles": {
         "player": { "accessories": ["bandana-a", "coat-a", "capture-ball-a"] }

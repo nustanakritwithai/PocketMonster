@@ -59,6 +59,7 @@ assert.equal(PIRATE_FRUIT_SOURCE.contract, 'presentation-only');
 assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');
+assert.doesNotMatch(providerSrc, /CapsuleGeometry|geo\.capsule|geo\.sphere|geo\.torus/, 'pirate body uses Pocket boxes, not capsule/sphere silhouette');
 assert.doesNotMatch(providerSrc, /fruitPower\s*[:=]|vitality\s*[:=]|blade\s*[:=]|mastery\s*[:=]/, 'provider must not copy Pirate Fruit combat stats');
 assert.equal(liveHtml.includes('game-v900.js'), false, 'active index.html must not boot the V9 runtime');
 assert.match(preload, /game-v800\.js\?v=810/, 'live preload still loads V8.4');
@@ -197,6 +198,11 @@ const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);
 assert.ok(pirate, 'catalog includes character.human.pirate-fruit.v1');
 assert.equal(pirate.provider, 'pirate-fruit');
 assert.equal(pirate.style, 'pirate-fruit-v1');
+assert.equal(pirate.surfaceStyle, 'four-side-block-v1');
+assert.equal(pirate.rig, 'humanoid-rig-v1');
+assert.deepEqual(pirate.metrics, { height: 1.8, head: [0.64, 0.72, 0.56], headY: 1.44 });
+const bighead = bundle.assets.find(a => a.id === 'character.human.blocky-bighead.v1');
+assert.deepEqual(pirate.metrics, bighead.metrics, 'pirate player shares Pocket humanoid metrics');
 assert.deepEqual(Object.keys(pirate.roles), ['player']);
 for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
   assert.equal(pirate[field], undefined, `catalog must not carry ${field}`);
@@ -279,6 +285,10 @@ assert.ok(named('capture-ball').length === 1, 'capture ball sits on the right pa
 assert.equal(named('coat')[0].material.color, PIRATE_PLAYER_PALETTE.coat);
 assert.equal(named('bandana')[0].material.color, PIRATE_PLAYER_PALETTE.trim);
 assert.equal(named('earring')[0].material.color, PIRATE_PLAYER_PALETTE.brass);
+assert.ok(named('head').length === 1, 'head is a Pocket box');
+for (const part of ['head', 'coat', 'bandana', 'beard', 'earring', 'capture-ball', 'hips']) {
+  assert.ok(named(part).every(mesh => mesh.geometry?.type === 'box'), `${part} is a box primitive`);
+}
 
 const boots = findBy(player.root, n => n.userData?.limbForward === 'front');
 assert.equal(boots.length, 2, 'both boots are tagged as front-facing');
@@ -288,7 +298,10 @@ assert.ok(ball.position.z < 0, 'held ball sits on the front / -Z side');
 
 const { headPivot, torsoPivot, rightHandAnchor } = player.rig.pivots;
 assert.equal(headPivot.parent, torsoPivot.parent, 'head and torso are siblings — no double transform');
-assert.equal(headPivot.position.y, 1.52);
+assert.equal(headPivot.position.y, 1.44);
+assert.equal(player.rig.pivots.leftArmRoot.position.y, 1.02);
+assert.equal(player.rig.pivots.leftArmRoot.position.x, -0.25);
+assert.equal(torsoPivot.position.y, 0.88);
 assert.doesNotThrow(() => player.anchor('throwOrigin'), 'throwOrigin must survive Three.js getWorldPosition');
 assert.doesNotThrow(() => player.anchor('hitText'), 'hitText must survive Three.js getWorldPosition');
 const throwOrigin = player.anchor('throwOrigin');
