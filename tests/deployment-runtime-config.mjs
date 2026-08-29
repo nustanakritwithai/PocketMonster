@@ -9,7 +9,7 @@ assert.equal(config.featureFlags.vpsReads, true);
 for (const flag of ['vpsWrites', 'playerDataWrites', 'accountMigration', 'saveMigration', 'economyMutation']) {
   assert.equal(config.featureFlags[flag], false, `${flag} must stay disabled`);
 }
-assert.equal(config.featureFlags.firebaseFallback, true);
+assert.equal(config.featureFlags.firebaseFallback, false);
 assert.equal(config.featureFlags.launchTicket, false);
 for (const flag of ['firebaseAuthBridge', 'accountLinking', 'profileReads']) assert.equal(config.featureFlags[flag], false);
 assert.throws(() => createReadOnlyRuntimeConfig('http://157.85.96.139'));

@@ -16,7 +16,7 @@
     "accountMigration": false,
     "saveMigration": false,
     "economyMutation": false,
-    "firebaseFallback": true,
+    "firebaseFallback": false,
     "firebaseAuthBridge": true,
     "launchTicket": true,
     "accountLinking": true,
