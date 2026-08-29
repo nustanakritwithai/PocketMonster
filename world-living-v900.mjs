@@ -5,9 +5,9 @@ import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
 
-export const NEW_WORLD_VERSION = '9.0.0-new-world';
-export const NEW_WORLD_ID = 'pirate-fruit-new-world';
-export const NEW_WORLD_LABEL = 'โลกใหม่ • Pirate Fruit';
+export const LIVING_WORLD_VERSION = '9.0.0-living-world';
+export const LIVING_WORLD_ID = 'living-world';
+export const LIVING_WORLD_LABEL = 'โลกกลาง • World Layer';
 
 const startup = document.getElementById('startupStatus');
 function startupText(text, cls = '') {
@@ -38,11 +38,12 @@ async function loadThree() {
 const runtimeConfig = await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_RUNTIME_CONFIG = runtimeConfig;
-  window.POCKETMONSTER_NEW_WORLD = Object.freeze({
-    id: NEW_WORLD_ID,
-    version: NEW_WORLD_VERSION,
-    label: NEW_WORLD_LABEL,
-    mergedWithV800: false,
+  window.POCKETMONSTER_LIVING_WORLD = Object.freeze({
+    id: LIVING_WORLD_ID,
+    version: LIVING_WORLD_VERSION,
+    label: LIVING_WORLD_LABEL,
+    presentationOnly: true,
+    combatAuthority: false,
   });
 }
 if (!window.POCKETMONSTER_COMBINED_BOOT) await requireFirebaseLogin(runtimeConfig);
@@ -54,7 +55,7 @@ try {
   startupText(err.message, 'error');
   throw err;
 }
-startupText('กำลังสร้างโลกใหม่ Pirate Fruit…');
+startupText('กำลังสร้างโลกกลาง…');
 
 const qualityProfile = selectQualityProfile({
   deviceMemory: navigator.deviceMemory,
@@ -87,51 +88,59 @@ function mat(color, rough = .72, metal = .08) {
 
 const el = id => document.getElementById(id);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x4f9ec9);
-scene.fog = new THREE.Fog(0x3d7ea8, 28, 90);
+scene.background = new THREE.Color(0x2a1b3d);
+scene.fog = new THREE.Fog(0x1a1028, 18, 64);
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, .1, 130);
 const renderer = new THREE.WebGLRenderer({ antialias: qualityProfile.antialias, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, qualityProfile.maxDpr));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = qualityProfile.shadows;
+el('game').replaceChildren();
 el('game').appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e3a5f, 1.2));
-const sun = new THREE.DirectionalLight(0xfff1c1, 1.8);
-sun.position.set(10, 16, 8);
+scene.add(new THREE.HemisphereLight(0xf3d9a8, 0x1e1030, 0.85));
+const sun = new THREE.DirectionalLight(0xffb070, 1.15);
+sun.position.set(-8, 12, 4);
 sun.castShadow = qualityProfile.shadows;
 scene.add(sun);
+const lanternLight = new THREE.PointLight(0xffcc66, 1.4, 18);
+lanternLight.position.set(0, 2.4, -2.2);
+scene.add(lanternLight);
 
-const water = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), mat(0x1d4e7a, .35, .12));
-water.rotation.x = -Math.PI / 2;
-water.position.y = -0.08;
-water.receiveShadow = true;
-scene.add(water);
+const plaza = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.6, 0.28, 12), mat(0x6b6570, .92, .08));
+plaza.name = 'living-world:plaza';
+plaza.position.y = -0.14;
+plaza.receiveShadow = true;
+scene.add(plaza);
 
-const dock = new THREE.Group();
-dock.name = 'pirate-new-world:dock';
-for (let i = 0; i < 8; i++) {
-  const plank = new THREE.Mesh(boxGeometry(2.4, 0.12, 0.42), mat(0x8b5a2b, .86, .04));
-  plank.position.set(0, 0.06, -i * 0.46);
-  plank.receiveShadow = true;
-  plank.castShadow = true;
-  dock.add(plank);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(5.1, 0.12, 8, 24), mat(0xc4b49a, .55, .22));
+ring.rotation.x = Math.PI / 2;
+ring.position.y = 0.02;
+scene.add(ring);
+
+const arch = new THREE.Group();
+arch.name = 'living-world:arch';
+const pillarL = new THREE.Mesh(boxGeometry(0.42, 3.2, 0.42), mat(0x4b4554, .88, .06));
+pillarL.position.set(-1.6, 1.6, -3.2);
+const pillarR = pillarL.clone();
+pillarR.position.x = 1.6;
+const lintel = new THREE.Mesh(boxGeometry(4.0, 0.38, 0.5), mat(0x5a5362, .86, .08));
+lintel.position.set(0, 3.28, -3.2);
+arch.add(pillarL, pillarR, lintel);
+scene.add(arch);
+
+for (const x of [-3.4, 3.4]) {
+  const post = new THREE.Mesh(boxGeometry(0.18, 1.6, 0.18), mat(0x3f3a46, .9, .04));
+  post.position.set(x, 0.8, -1.1);
+  const lamp = new THREE.Mesh(sphereGeometry(0.16, 10, 8), mat(0xffe08a, .35, .05));
+  lamp.position.set(x, 1.68, -1.1);
+  scene.add(post, lamp);
 }
-const pierPostL = new THREE.Mesh(boxGeometry(0.18, 1.1, 0.18), mat(0x5b3a1a, .9, .02));
-pierPostL.position.set(-1.15, 0.5, -1.2);
-const pierPostR = pierPostL.clone();
-pierPostR.position.x = 1.15;
-dock.add(pierPostL, pierPostR);
-const crate = new THREE.Mesh(boxGeometry(0.7, 0.55, 0.7), mat(0x92400e, .84, .04));
-crate.position.set(1.4, 0.34, -0.4);
-crate.castShadow = true;
-dock.add(crate);
-scene.add(dock);
 
-const island = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.2, 0.55, 16), mat(0xc2a36b, .95, .02));
-island.position.set(0, -0.2, 4.2);
-island.receiveShadow = true;
-scene.add(island);
+const steps = new THREE.Mesh(boxGeometry(3.4, 0.22, 1.4), mat(0x7a7380, .9, .05));
+steps.position.set(0, 0.02, 2.4);
+steps.receiveShadow = true;
+scene.add(steps);
 
 assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({
   THREE,
@@ -150,15 +159,15 @@ const playerVisual = assets.spawn('character.human.pirate-fruit.v1', {
 });
 await playerVisual.ready;
 const player = playerVisual.root;
-player.position.set(0, 0, 1.2);
+player.position.set(0, 0, 1.4);
 scene.add(player);
 
 if (typeof window !== 'undefined') {
   window.MLRPG_ASSETS = { diagnostics: () => assets.diagnostics() };
 }
 
-let cameraYaw = 0.2;
-let cameraPitch = 0.38;
+let cameraYaw = 0.05;
+let cameraPitch = 0.42;
 const camDrag = { active: false, pid: null, x: 0, y: 0 };
 const cameraPad = el('cameraPad');
 if (cameraPad) {
@@ -206,8 +215,8 @@ if (joyEl && stick) {
 function forward() { return new THREE.Vector3(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw)).normalize(); }
 function cameraRight() { const f = forward(); return new THREE.Vector3(-f.z, 0, f.x).normalize(); }
 
-const BOUNDS = Object.freeze({ minX: -8, maxX: 8, minZ: -6, maxZ: 10 });
-const speed = 5.4;
+const BOUNDS = Object.freeze({ minX: -6.4, maxX: 6.4, minZ: -5.4, maxZ: 5.8 });
+const speed = 5.0;
 
 function updatePlayer(dt) {
   let side = 0, fwd = 0;
@@ -226,7 +235,7 @@ function updatePlayer(dt) {
 }
 
 function updateCamera(dt) {
-  const f = forward(), distance = 7.4;
+  const f = forward(), distance = 7.0;
   const horizontal = Math.cos(cameraPitch) * distance;
   const height = Math.sin(cameraPitch) * distance + 1.15;
   const desired = player.position.clone().add(new THREE.Vector3(0, height, 0)).add(f.clone().multiplyScalar(-horizontal));
@@ -241,11 +250,11 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-startupText('เข้าเกาะโจรสลัดแล้ว', 'ok');
+startupText('เข้าโลกกลางแล้ว', 'ok');
 const zoneLabel = document.getElementById('zoneLabel');
-if (zoneLabel) zoneLabel.textContent = 'เกาะโจรสลัด • Pirate Fruit';
+if (zoneLabel) zoneLabel.textContent = 'โลกกลาง • World Layer';
 const message = document.getElementById('message');
-if (message) message.textContent = 'โลก Pirate Fruit ใน V9.0 รวม 3 โลก • เกมเดิมอยู่ที่ปุ่มเกมเดิม';
+if (message) message.textContent = 'ชั้นโลกกลางใน V9.0 • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP';
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);

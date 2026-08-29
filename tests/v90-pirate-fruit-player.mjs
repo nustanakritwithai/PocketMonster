@@ -16,8 +16,18 @@ import {
   createPirateFruitPlayerProvider,
 } from '../asset-presentation/providers/pirate-fruit-player.mjs';
 
+import {
+  COMBINED_VERSION,
+  COMBINED_WORLD_COUNT,
+  COMBINED_WORLDS,
+  worldById,
+  worldIdFromLocation,
+} from '../combined-worlds-v900.mjs';
+
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const js = fs.readFileSync(new URL('../game-v900.js', import.meta.url), 'utf8');
+const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
+const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
@@ -27,10 +37,10 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-const checkWorld = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../game-v900.js', import.meta.url))], { encoding: 'utf8' });
-assert.equal(checkWorld.status, 0, checkWorld.stderr || 'game-v900 syntax failed');
-const checkPreload = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../entry-preload-v900.mjs', import.meta.url))], { encoding: 'utf8' });
-assert.equal(checkPreload.status, 0, checkPreload.stderr || 'entry-preload-v900 syntax failed');
+for (const file of ['game-v900.js', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs']) {
+  const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
+}
 
 assert.equal(PIRATE_FRUIT_SOURCE.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(PIRATE_FRUIT_SOURCE.visual, 'client/src/art/PiratePlayerVisual.ts');
@@ -39,22 +49,44 @@ assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');
 assert.doesNotMatch(providerSrc, /fruitPower\s*[:=]|vitality\s*[:=]|blade\s*[:=]|mastery\s*[:=]/, 'provider must not copy Pirate Fruit combat stats');
-assert.equal(liveHtml.includes('game-v900.js'), false, 'active index.html must not boot the new-world runtime');
+assert.equal(liveHtml.includes('game-v900.js'), false, 'active index.html must not boot the V9 runtime');
 assert.match(preload, /game-v800\.js\?v=810/, 'live preload still loads V8.4');
-assert.doesNotMatch(preload, /game-v900/, 'live preload must not import the new-world runtime');
-assert.match(preloadV900, /game-v900\.js\?v=900/, 'new-world preload loads V9.0 only');
-assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate new-world entry');
-assert.match(html, /ยังไม่รวมกับ Monster Life V8\.4|ยังไม่รวมกับเกมตอนนี้|ยังไม่รวมกับ Ranch Hub/, 'new-world page states it is not merged');
+assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'live preload must not import the combined V9 channel');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=900/, 'V9.0 preload boots the 3-world orchestrator');
+assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
+assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
+assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
+assert.doesNotMatch(html, /history\.replaceState/, 'combined page must keep ?world= instead of scrubbing the query');
+assert.match(html, /id="worldGate"/, 'combined page has a 3-world gate');
+assert.match(html, /data-combined-world="pocket-monster"/, 'gate includes the original game');
+assert.match(html, /เกมเดิม/, 'original game is labeled in V9');
+assert.match(html, /id="joystick"/, 'original game HUD is present so Ranch Hub can boot');
+assert.match(html, /id="huntBtn"/, 'original hunt button is present in V9');
+assert.match(html, /ยังไม่รวมเข้าเกม live V8\.4/, 'combined channel stays off the live V8.4 entry');
+assert.equal(COMBINED_VERSION, '9.0.0-combined');
+assert.equal(COMBINED_WORLD_COUNT, 3);
+assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810');
+assert.equal(worldById('pirate-fruit').runtime, './game-v900.js?v=900');
+assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=900');
+assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
+assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
+assert.match(worldsJs, /includesOriginalGame: true/, 'combined channel records that the original game is inside V9');
+assert.match(worldsJs, /mergedIntoLiveV800: false/, 'combined channel is not the live V8.4 entry');
+assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
+assert.match(livingJs, /presentationOnly: true/, 'living world is presentation-only');
+assert.match(livingJs, /combatAuthority: false/, 'living world is not combat authority');
+assert.doesNotMatch(livingJs, /vpsWrites|playerDataWrites/, 'living world must not open VPS write flags');
 assert.doesNotMatch(liveJs, /pirate-fruit-player\.mjs/, 'V8.4 live loop does not import the pirate provider');
 assert.doesNotMatch(liveJs, /character\.human\.pirate-fruit\.v1/, 'V8.4 Ranch Hub player stays on the current game version');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
-assert.match(js, /NEW_WORLD_ID = 'pirate-fruit-new-world'/, 'V9.0 is a named new world');
-assert.match(js, /mergedWithV800: false/, 'new world records that it is not merged into V8.4');
-assert.doesNotMatch(js, /Ranch Hub/, 'new world must not boot Ranch Hub');
-assert.match(js, /createPirateFruitPlayerProvider\(/, 'new-world runtime registers the pirate-fruit provider');
+assert.match(js, /NEW_WORLD_ID = 'pirate-fruit-new-world'/, 'pirate module remains a named world inside V9');
+assert.match(js, /mergedWithV800: false/, 'pirate module records that it is not merged into live V8.4');
+assert.doesNotMatch(js, /Ranch Hub/, 'pirate module must not boot Ranch Hub itself');
+assert.match(js, /createPirateFruitPlayerProvider\(/, 'pirate world registers the pirate-fruit provider');
 assert.match(js, /assets\.registerProvider\('pirate-fruit'/, 'pirate-fruit is its own provider name');
-assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'new-world player spawn is pirate-fruit');
-assert.doesNotMatch(js, /from ['"]three['"]/, 'new world still does not import the three npm package');
+assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate-world player spawn is pirate-fruit');
+assert.doesNotMatch(js, /from ['"]three['"]/, 'pirate world still does not import the three npm package');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);

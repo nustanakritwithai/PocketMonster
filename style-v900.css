@@ -1,0 +1,38 @@
+#worldGate{position:fixed;inset:0;z-index:10001;display:grid;place-items:center;background:radial-gradient(circle at 50% 18%,#16365c 0,#020617 64%);padding:18px}
+#worldGate.hidden{display:none}
+.world-gate-card{width:min(100%,720px);padding:24px 20px;border:1px solid rgba(96,165,250,.35);border-radius:22px;background:rgba(15,23,42,.96);box-shadow:0 20px 70px #0008;color:#e2e8f0}
+.world-gate-card h1{margin:4px 0 6px;text-align:center;font-size:24px}
+.world-gate-card p{text-align:center;color:#94a3b8;font-size:13px;margin:0 0 18px}
+.world-gate-grid{display:grid;gap:10px}
+@media(min-width:720px){.world-gate-grid{grid-template-columns:repeat(3,1fr)}}
+.world-gate-btn{pointer-events:auto;display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid #334155;border-radius:16px;background:#0f172a;color:#f8fafc;text-align:left;cursor:pointer}
+.world-gate-btn:hover,.world-gate-btn:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf822}
+.world-gate-btn b{font-size:16px}
+.world-gate-btn small{color:#94a3b8;font-size:12px;line-height:1.35}
+#worldSwitcher{position:fixed;left:8px;top:8px;z-index:9999;display:none;gap:6px;flex-wrap:wrap;max-width:70vw;pointer-events:auto}
+body[data-combined-world] #worldSwitcher{display:flex}
+#worldSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
+#worldSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}
+body[data-combined-world] #hud .compact-topbar{margin-top:34px}
+body[data-combined-world="pirate-fruit"] #immersiveGate,
+body[data-combined-world="living-world"] #immersiveGate,
+body[data-combined-world="pirate-fruit"] #huntBtn,
+body[data-combined-world="living-world"] #huntBtn,
+body[data-combined-world="pirate-fruit"] #party,
+body[data-combined-world="living-world"] #party,
+body[data-combined-world="pirate-fruit"] .controls-right,
+body[data-combined-world="living-world"] .controls-right,
+body[data-combined-world="pirate-fruit"] #npcBtn,
+body[data-combined-world="living-world"] #npcBtn,
+body[data-combined-world="pirate-fruit"] #targetCard,
+body[data-combined-world="living-world"] #targetCard,
+body[data-combined-world="pirate-fruit"] #globalCharacterBtn,
+body[data-combined-world="living-world"] #globalCharacterBtn,
+body[data-combined-world="pirate-fruit"] #characterAccessEntry,
+body[data-combined-world="living-world"] #characterAccessEntry,
+body[data-combined-world="pirate-fruit"] #stageObjective,
+body[data-combined-world="living-world"] #stageObjective,
+body[data-combined-world="pirate-fruit"] #actionReason,
+body[data-combined-world="living-world"] #actionReason,
+body[data-combined-world="pirate-fruit"] .help,
+body[data-combined-world="living-world"] .help{display:none!important}

@@ -5,38 +5,408 @@
   <meta name="referrer" content="no-referrer" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://nustanakritwithai.github.io https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://157.85.96.139 wss://157.85.96.139 https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: blob:; style-src 'self' https://nustanakritwithai.github.io; font-src 'self' https://nustanakritwithai.github.io; media-src 'self' https://nustanakritwithai.github.io; worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0b3a4a" />
+  <meta name="theme-color" content="#0f766e" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Pirate Fruit โลกใหม่ V9.0 • ยังไม่รวมกับ Ranch Hub</title>
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
   <script type="module" src="./entry-preload-v900.mjs"></script>
   <link rel="stylesheet" href="./style-v800.css?v=810" />
+  <link rel="stylesheet" href="./style-v900.css?v=900" />
 </head>
 <body>
   <div id="accountGate" class="account-gate">
     <div id="loginPage" class="account-card auth-page">
-      <div class="account-logo">⚓</div><h1>Pirate Fruit โลกใหม่</h1><p>เวอร์ชันรวมแยกต่างหาก • ยังไม่รวมกับ Monster Life V8.4</p>
+      <div class="account-logo">🐾</div><h1>Monster Life RPG V9.0</h1><p>เวอร์ชันรวม 3 โลก • มีเกมเดิม Pirate Fruit และโลกกลาง • ยังไม่รวมเข้าเกม live V8.4</p>
       <form id="loginForm"><label>อีเมล<input id="loginEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>รหัสผ่าน<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="รหัสผ่าน" /></label><button id="loginAccountBtn" class="auth-primary" type="submit">เข้าสู่ระบบ</button></form><button id="googleLoginBtn" class="auth-google" type="button">เข้าสู่ระบบด้วย Google</button><button id="guestLoginBtn" class="auth-guest" type="button">เข้าเล่นแบบแขก</button>
       <div id="loginStatus" class="account-status"></div><div class="auth-switch">ยังไม่มีบัญชี? <button id="showRegisterBtn" type="button">สมัครไอดีใหม่</button></div>
     </div>
     <div id="registerPage" class="account-card auth-page hidden">
-      <button id="backToLoginBtn" class="auth-back" type="button">← กลับหน้าเข้าสู่ระบบ</button><div class="account-logo">⚓</div><h1>สมัครไอดีใหม่</h1><p>บัญชีเดียวกันใช้เข้าโลกใหม่ได้</p>
+      <button id="backToLoginBtn" class="auth-back" type="button">← กลับหน้าเข้าสู่ระบบ</button><div class="account-logo">🐾</div><h1>สมัครไอดีใหม่</h1><p>สร้างบัญชีสำหรับเวอร์ชันรวม 3 โลก</p>
       <form id="registerForm"><label>อีเมล<input id="registerEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>ชื่อในเกม<input id="registerDisplayName" maxlength="30" placeholder="ชื่อที่แสดงในเกม" /></label><label>รหัสผ่าน<input id="registerPassword" type="password" autocomplete="new-password" required placeholder="อย่างน้อย 8 ตัว" /></label><label>ยืนยันรหัสผ่าน<input id="registerConfirm" type="password" autocomplete="new-password" required placeholder="กรอกรหัสผ่านอีกครั้ง" /></label><button id="registerAccountBtn" class="auth-primary register" type="submit">สร้างบัญชี</button></form>
       <div id="registerStatus" class="account-status"></div>
     </div>
   </div>
-  <div id="startupStatus" class="startup-status">กำลังเปิดโลกใหม่…</div>
-  <div id="game"></div>
-  <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#0f766e;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V9.0 โลกใหม่</div>
-  <div id="hud">
-    <div class="topbar compact-topbar" role="group" aria-label="โลกใหม่ Pirate Fruit">
-      <div class="pill zone-pill"><span id="zoneLabel">เกาะโจรสลัด • โลกใหม่</span></div>
-      <a id="oldWorldLink" class="pill" href="./v800.html" style="pointer-events:auto;color:#fff;text-decoration:none">เปิดโลกเก่า V8.4</a>
+  <div id="worldGate" class="hidden" aria-label="เลือกโลกใน V9.0">
+    <div class="world-gate-card">
+      <h1>V9.0 รวม 3 โลก</h1>
+      <p>เลือกโลกที่จะเข้า • เกมเดิมอยู่ที่ปุ่มแรก ไม่ใช่แค่ลิงก์ออกไป V8.4</p>
+      <div class="world-gate-grid">
+        <button type="button" class="world-gate-btn" data-combined-world="pocket-monster"><b>เกมเดิม</b><small>Pocket Monster • Ranch Hub มอนสเตอร์ ต่อสู้ เลี้ยง</small></button>
+        <button type="button" class="world-gate-btn" data-combined-world="pirate-fruit"><b>Pirate Fruit</b><small>เกาะโจรสลัด • ผู้เล่น Pirate Fruit</small></button>
+        <button type="button" class="world-gate-btn" data-combined-world="living-world"><b>โลกกลาง</b><small>World Layer • พรีเซนต์เท่านั้น ยังไม่เป็น authority</small></button>
+      </div>
     </div>
-    <div id="message" class="message">เวอร์ชันรวม Pirate Fruit แยกจาก Ranch Hub • ยังไม่รวมกับเกมตอนนี้</div>
+  </div>
+  <nav id="worldSwitcher" hidden aria-label="สลับโลกใน V9.0">
+    <button type="button" data-combined-world="pocket-monster">เกมเดิม</button>
+    <button type="button" data-combined-world="pirate-fruit">Pirate Fruit</button>
+    <button type="button" data-combined-world="living-world">โลกกลาง</button>
+  </nav>
+  <div id="monsterLifeProfilePanel" class="monsterlife-profile-panel" hidden aria-live="polite"></div>
+  <dialog id="monsterLifeLinkDialog" class="monsterlife-link-dialog">
+    <form id="monsterLifeLinkForm" method="dialog">
+      <h2>เชื่อมบัญชีทดสอบ MonsterLife</h2>
+      <p>ใช้เพื่ออ่าน Identity และ Character profile จาก staging เท่านั้น ข้อมูลเกมและ Firebase save จะไม่ถูกเขียนทับ</p>
+      <label>ชื่อบัญชี MonsterLife<input id="monsterLifeUsername" autocomplete="username" required maxlength="50"></label>
+      <label>รหัสผ่าน MonsterLife<input id="monsterLifePassword" type="password" autocomplete="current-password" required></label>
+      <div id="monsterLifeLinkStatus" class="account-status" aria-live="polite"></div>
+      <div class="monsterlife-link-actions"><button id="monsterLifeLinkLater" type="button">ไว้ภายหลัง</button><button id="monsterLifeLinkSubmit" type="submit">เชื่อมบัญชี</button></div>
+    </form>
+  </dialog>
+  <div id="startupStatus" class="startup-status">กำลังเปิด V9.0 รวม 3 โลก…</div>
+  <div id="immersiveGate" class="immersive-gate hidden">
+    <div class="immersive-card">
+      <div class="immersive-title">Monster Life RPG</div>
+      <div class="immersive-sub">เวอร์ชัน V9.0 รวม 3 โลก • เกมเดิมอยู่ในปุ่มเกมเดิม</div>
+      <div class="immersive-steps">1) กดปุ่มด้านล่าง<br>2) อนุญาต Full Screen<br>3) หากยังไม่เป็นแนวนอน ให้หมุนเครื่อง</div>
+      <button id="enterImmersiveBtn" class="immersive-btn">เข้าเกมแบบเต็มจอแนวนอน</button>
+    </div>
+  </div>
+  <div id="rotateNotice" class="rotate-notice hidden">
+    <div class="rotate-card">
+      <div class="rotate-icon">⤾</div>
+      <div class="rotate-title">กรุณาหมุนเป็นแนวนอน</div>
+      <div class="rotate-sub">เกมนี้ออกแบบสำหรับ Full Screen แนวนอน</div>
+      <button id="retryImmersiveBtn" class="immersive-btn small-alt">ลองเปิดเต็มจออีกครั้ง</button>
+    </div>
+  </div>
+  <div id="game"></div>
+
+  <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#0f766e;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V9.0 • 3 โลก</div>
+  <div id="saveIndicator" style="position:fixed;right:8px;top:34px;z-index:9998;background:#059669;color:#fff;padding:3px 8px;border-radius:999px;font:700 9px system-ui;pointer-events:none;opacity:0;transition:opacity .3s">บันทึกแล้ว</div>
+
+  <div id="hud">
+    <div class="topbar compact-topbar" role="group" aria-label="สถานะผู้เล่นและการออกล่า">
+      <div class="pill combat-pill"><b>HP</b> <span id="playerHp">100/100</span></div>
+      <div class="pill ball-pill"><b>บอล</b> <span id="captureBallCount">0</span></div>
+      <div class="pill gold-pill"><b>Gold</b> <span id="goldCount">300</span></div>
+      <div class="pill active-pill"><b>คู่หู</b> <span id="activeMonsterStatus">ยังไม่เรียก</span></div>
+      <div class="pill zone-pill"><span id="zoneLabel">Ranch Hub</span></div>
+      <button id="menuBtn" class="small icon-btn" aria-label="เมนู">☰</button>
+      <button id="fullscreenBtn" class="small icon-btn" aria-label="เต็มจอ">⛶</button>
+    </div>
+
+    <div id="utilityMenu" class="utility-menu hidden">
+      <div class="utility-stats">
+        <div><b>มอนทั้งหมด</b><span id="collectionCount">0</span></div>
+        <div><b>EXP</b><span id="playerExp">0</span></div>
+        <div><b>Ranch</b><span id="ranchCount">0/6</span></div>
+        <div><b>Wild</b><span id="wildCount">0</span></div>
+      </div>
+      <button id="saveBtn" class="utility-btn">บันทึกเกม</button>
+      <div class="audio-controls" style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <button id="muteBtn" class="utility-btn" style="flex:0 0 auto">🔊 เสียงเปิด</button>
+        <input id="volumeSlider" type="range" min="0" max="100" value="60" style="flex:1;pointer-events:auto">
+      </div>
+      <button id="resetBtn" class="utility-btn danger">เริ่มใหม่</button>
+    </div>
+
+    <section id="stageReward" class="stage-reward hidden" role="dialog" aria-modal="true" aria-labelledby="stageRewardTitle">
+      <div class="stage-reward-card"><div class="stage-select-handle" aria-hidden="true"></div><header class="stage-reward-head"><div><span class="stage-select-kicker">STAGE CLEAR</span><h2 id="stageRewardTitle">ด่านเคลียร์แล้ว!</h2></div><button id="stageRewardClose" type="button" aria-label="ปิดรางวัล">✕</button></header><p id="stageRewardSummary"></p><div id="stageRewardList" class="stage-reward-list"></div><button type="button" class="stage-reward-done" id="stageRewardDone">กลับไปสำรวจ</button></div>
+    </section>
+
+    <section id="warpPrompt" class="warp-prompt hidden" role="dialog" aria-labelledby="warpPromptTitle">
+      <div class="warp-prompt-card">
+        <div class="stage-select-handle" aria-hidden="true"></div>
+        <span class="stage-select-kicker">WARP POINT</span>
+        <h2 id="warpPromptTitle">ไปพื้นที่ถัดไป</h2>
+        <p id="warpPromptDetail">เดินทางผ่านจุดวาปในฉาก</p>
+        <div class="warp-prompt-actions"><button id="warpPromptCancel" type="button">ยกเลิก</button><button id="warpPromptAction" type="button">เดินทาง</button></div>
+      </div>
+    </section>
+
+    <section id="bossChallenge" class="boss-challenge hidden" role="dialog" aria-labelledby="bossChallengeTitle" aria-describedby="bossChallengeDetail">
+      <div class="boss-challenge-card">
+        <span class="boss-challenge-kicker">OPTIONAL BOSS</span>
+        <h2 id="bossChallengeTitle">ท้าสู้ BOSS?</h2>
+        <p id="bossChallengeDetail">บอสจะยังไม่โจมตีจนกว่าจะยืนยัน</p>
+        <div class="boss-challenge-actions"><button id="bossChallengeDecline" type="button">ออก / ยังไม่สู้</button><button id="bossChallengeAccept" type="button">เข้าสู้</button></div>
+      </div>
+    </section>
+    <button id="bossRetreatBtn" class="boss-retreat-btn hidden" type="button">ออกจากไฟต์ BOSS</button>
+
+    <button id="huntBtn" class="hunt-btn">ออกล่า → ทุ่ง • Wild 6</button>
+
+    <div id="message" class="message">Ranch เป็นพื้นที่ปลอดภัย • กด “ออกล่า” หรือเลือก ทุ่ง/ถ้ำ เพื่อเจอ Wild Monster</div>
+
+    <div id="targetCard" class="target-card hidden">
+      <div class="target-row"><b id="targetName">เป้าหมาย</b> <span id="targetLevel"></span></div>
+      <div id="targetTypes" class="type-row"></div>
+      <div id="targetStatusStrip" class="combat-status-list target-status-list hidden" aria-label="สถานะต่อสู้ของเป้าหมาย"></div>
+      <div class="bar"><div id="targetHpBar" class="bar-fill"></div></div>
+      <div class="target-bottom"><span id="targetHpText" class="tiny"></span><span id="typeHint" class="tiny effect"></span></div>
+    </div>
+    <div id="ownedStatusStrip" class="combat-status-list owned-status-strip hidden" aria-label="สถานะต่อสู้ของคู่หู"></div>
+
+    <div id="worldLabels" class="world-labels"></div>
+    <div id="floatingTextLayer" class="floating-text-layer"></div>
+    <div id="aimReticle" class="aim-reticle"><span></span></div>
+    <div id="party" class="party"></div>
+    <button id="globalCharacterBtn" class="global-character-btn" type="button" aria-label="ทางเข้าตัวละคร" aria-pressed="false">ตัว</button>
+    <div id="characterAccessEntry" class="character-access-entry character-quick-panel hidden" role="dialog" aria-modal="false" aria-labelledby="characterAccessName">
+      <div class="character-quick-head">
+        <div class="character-access-kicker">ตัวละคร</div>
+        <button id="characterAccessClose" type="button" aria-label="ปิดแผงตัวละคร">ปิด</button>
+      </div>
+      <div class="character-quick-identity">
+        <span id="characterAccessPortrait" class="character-quick-portrait">?</span>
+        <div class="character-quick-copy">
+          <div id="characterAccessName" class="character-access-name">ยังไม่ได้เลือกมอน</div>
+          <div id="characterAccessMeta" class="character-quick-meta">Lv.— · HP —</div>
+          <div id="characterAccessType" class="character-quick-type"></div>
+          <div id="characterAccessCr" class="character-quick-cr">CR —</div>
+          <div id="characterAccessPlace" class="character-quick-place"></div>
+        </div>
+      </div>
+      <div id="characterAccessStats" class="character-quick-stats">ATK — · DEF — · SPD —</div>
+      <div id="characterAccessReason" class="character-quick-reason hidden"></div>
+      <div id="characterAccessActions" class="character-quick-actions">
+        <button type="button" data-character-tab="collection">รายละเอียด</button>
+        <button type="button" data-character-tab="skills">สกิล</button>
+        <button type="button" data-character-tab="equipment">อุปกรณ์</button>
+        <button type="button" data-character-tab="training">ฝึก</button>
+      </div>
+      <div id="characterQuickTabBody" class="character-quick-tab hidden"></div>
+    </div>
+
     <div class="controls-left">
       <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
     </div>
+
     <div id="cameraPad" class="camera-pad" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
+
+    <div class="controls-right">
+      <button id="skill1Btn" class="action skill skill1" aria-label="สกิล 1"></button>
+      <button id="skill2Btn" class="action skill skill2" aria-label="สกิล 2"></button>
+      <button id="skill3Btn" class="action skill skill3" aria-label="สกิล 3"></button>
+      <button id="skill4Btn" class="action skill skill4" aria-label="สกิล 4"></button>
+      <button id="captureBtn" class="action capture" aria-label="ปาจับ"></button>
+      <button id="summonBtn" class="action summon" aria-label="ปาเรียก"></button>
+      <button id="recallBtn" class="action recall" aria-label="Recall"></button>
+    </div>
+    <div id="actionReason" class="action-reason" role="status" aria-live="polite">อยู่ Ranch • ออกไป Wild Zone ก่อน</div>
+    <div id="stageObjective" class="quest-tracker starter-journey hidden" role="status" aria-live="polite" aria-label="เป้าหมายด่าน"><b class="quest-tracker-kicker">เควส</b><span class="quest-tracker-sr">STAGE OBJECTIVE</span><span id="stageObjectiveTitle" class="quest-tracker-title"></span><ol id="stageObjectiveList" class="quest-tracker-list"></ol><span id="stageObjectiveStep" class="quest-tracker-sr">สำรวจพื้นที่และทำภารกิจเพื่อเปิดจุดวาป</span></div>
+
+
+    <button id="npcBtn" class="npc-btn hidden">คุย</button>
+
+    <div id="merchantShop" class="merchant-shop hidden" role="dialog" aria-label="ร้านค้าพ่อค้าเร่เสบียง">
+      <div class="merchant-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
+        <div class="merchant-head"><div><b>พ่อค้าเร่เสบียง</b><small>General Merchant • Farm Hub</small></div><div class="merchant-wallet">Gold <strong id="merchantGold">300</strong></div><button id="merchantClose" aria-label="ปิดร้านค้า">✕</button></div>
+        <div class="merchant-dialog">สินค้าใช้ Gold ในเกมเท่านั้น • ผลไฟช่วยปลดล็อกสกิลถาวรผ่าน Character Manager</div>
+        <div id="merchantProducts" class="merchant-products"></div>
+        <div class="merchant-foot">ร้านค้าต้นแบบ • Gold เป็นเงินในเกม ไม่ใช่เงินจริง</div>
+      </div>
+    </div>
+
+    <section id="trainerPanel" class="trainer-panel hidden" role="dialog" aria-label="สนามฝึกมอนสเตอร์">
+      <div class="trainer-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
+        <header class="trainer-head"><div><span class="trainer-kicker">TRAINING GROUND</span><h2>ครูฝึกเรนเจอร์</h2><p>พัฒนาความสามารถของมอนสเตอร์ให้เหมาะกับสไตล์การเล่น</p></div><button id="trainerClose" aria-label="ปิดสนามฝึก">✕</button></header>
+        <div class="trainer-dialog">เลือกมอนสเตอร์และค่าสถานะที่ต้องการฝึก ระบบจะแสดง Pool, Aptitude และสภาพก่อนเริ่มทุกครั้ง</div>
+        <div id="trainerBody" class="trainer-body"></div>
+      </div>
+    </section>
+
+    <section id="evolutionPanel" class="evolution-guide-panel hidden" role="dialog" aria-label="ศูนย์วิวัฒนาการ">
+      <div class="evolution-guide-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
+        <header class="evolution-guide-head"><div><span class="evolution-kicker">EVOLUTION RESEARCH</span><h2>นักวิจัยวิวัฒนาการ</h2><p>ค้นพบร่างถัดไปโดยรักษา Gene และประวัติของมอนสเตอร์ไว้ครบถ้วน</p></div><button id="evolutionClose" aria-label="ปิดศูนย์วิวัฒนาการ">✕</button></header>
+        <div class="evolution-guide-dialog">เลือกมอนสเตอร์เพื่อดูเส้นทาง ร่างใหม่ ค่าสถานะ และเงื่อนไขก่อนยืนยัน</div>
+        <label class="evolution-select-label">มอนสเตอร์ที่ต้องการวิวัฒนาการ<select id="evolutionMonsterSelect"></select></label>
+        <div id="evolutionBody" class="evolution-guide-body"></div>
+      </div>
+    </section>
+
+    <section id="breedingPanel" class="breeding-caretaker-panel breeding-salon hidden" role="dialog" aria-label="ศูนย์เพาะพันธุ์">
+      <div class="breeding-caretaker-card">
+        <div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div>
+        <header class="breeding-caretaker-head"><div class="breeding-salon-brand"><span class="breeding-kicker">BREEDING SALON</span><h2>ผู้ดูแลเพาะพันธุ์</h2><p>จับคู่มอนสเตอร์ที่เข้ากันได้และดู Gene ที่อาจส่งต่อ</p></div><div class="breeding-salon-stats"><span id="breedingSalonAdults">พร้อมผสม 0</span><span id="breedingSalonEggs">ไข่ 0</span></div><button id="breedingClose" aria-label="ปิดศูนย์เพาะพันธุ์">✕</button></header>
+        <div class="breeding-caretaker-dialog">เลือก Parent A และ Parent B จาก Storage แล้วตรวจ Compatibility ก่อนเริ่มสร้างไข่</div>
+        <div class="breeding-preview-grid"><div id="breedingSalonParentA" class="breeding-parent-pod" data-salon-parent="parentA" role="button" tabindex="0"><span>Parent A</span><strong>มอนสเตอร์ตัวที่หนึ่ง</strong></div><div class="breeding-heart">♥</div><div id="breedingSalonParentB" class="breeding-parent-pod" data-salon-parent="parentB" role="button" tabindex="0"><span>Parent B</span><strong>มอนสเตอร์ตัวที่สอง</strong></div></div>
+        <div id="breedingSalonCompat" class="breeding-salon-compat">ยังไม่ได้เลือกคู่</div>
+        <div class="breeding-safety-list"><div>✓ ตรวจเพศและ Breeding Group</div><div>✓ ตรวจ Bond, อายุ และญาติใกล้ชิด</div><div>✓ บันทึก Parent ID และ Gene ก่อนสร้างไข่</div></div>
+        <div id="breedingSalonIncubator" class="breeding-salon-incubator" aria-label="Incubator"></div>
+        <button id="breedingOpenManager" class="breeding-open-btn" type="button" disabled>เริ่มผสมพันธุ์</button>
+      </div>
+    </section>
+
+    <section id="ranchServices" class="ranch-services hidden" aria-label="บริการผู้ดูแลฟาร์ม">
+      <div class="ranch-services-card"><div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div><header><h2>ผู้ดูแลฟาร์ม</h2><button type="button" data-ranch-close aria-label="กลับ">✕</button></header><p>จัดการคลังและบริการฟาร์ม</p><button type="button" data-ranch-service="storage">🗃️ คลังมอนสเตอร์</button><button type="button" data-ranch-service="breeding">🧬 ผสมพันธุ์</button><button type="button" data-ranch-service="heal">💚 รักษาฟรี</button></div>
+    </section>
+    <section id="ranchStoragePage" class="ranch-storage-page ranch-club hidden" aria-label="คลังมอนสเตอร์">
+      <header class="ranch-storage-head"><div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div><button type="button" data-ranch-back>← ผู้ดูแลฟาร์ม</button><div class="ranch-club-brand"><span class="ranch-club-kicker">MONSTER CLUB</span><h2>คลังมอนสเตอร์</h2></div><div class="ranch-club-stats"><span id="ranchStorageCount">Storage 0</span><span id="ranchActiveCount">Ranch Active 0/6</span></div></header>
+      <aside id="ranchStorageRoster" class="ranch-storage-roster ranch-club-carry" aria-label="มอนที่พก"></aside><aside id="ranchClubVault" class="ranch-club-vault" aria-label="มอนในคลัง"></aside><section id="ranchStoragePreview" class="ranch-storage-preview"><div class="ranch-club-stage" id="ranchClubStage"><div class="ranch-club-stage-art" id="ranchClubStageArt" aria-hidden="true"><canvas id="ranchClubPreviewCanvas" class="ranch-club-preview-canvas" aria-label="โมเดลมอนสเตอร์"></canvas><span id="ranchClubPreviewPortrait">♣</span></div><div id="ranchClubPreviewName" class="focused-name">Monster Club</div><div id="ranchClubPreviewMeta" class="ranch-club-stage-meta">ฝากมอนจาก Party เพื่อเข้าคลับ</div><div id="ranchClubPreviewHp" class="ranch-club-hp hidden" aria-hidden="true"><i id="ranchClubPreviewHpFill"></i></div><div id="ranchClubPreviewTypes" class="ranch-club-types"></div></div></section><section id="ranchStorageDetails" class="ranch-storage-details"></section>
+    </section>
+
+    <div id="monsterManager" class="manager hidden">
+      <div class="manager-card" data-character-layout="three-column">
+        <div class="manager-head">
+          <div>
+            <b>Monster Ranch & Breeding Center</b>
+            <div class="manager-sub">Party • Storage • Ranch Active • Heal • Care • Equip • Training • Breeding • Evolution</div>
+          </div>
+          <button id="closeManager">✕</button>
+        </div>
+
+        <div class="manager-note">กติกา V8.0: จับ→เลี้ยง→ฝึก→เตรียมของ→สู้→Skill→Evolution→Boss→Breeding • อาหาร 6 หมวด • CR Debug แยกแหล่งพลัง • Flare Slime อีโวล Flame Wolf/Magma Bear จาก Raising Profile</div>
+        <div id="raisingEventBanner" class="raising-event-banner hidden"></div>
+        <div id="crDebugPanel" class="cr-debug-panel">เลือกมอนแล้วกด “ดู CR” เพื่อแยกแหล่งพลัง</div>
+
+        <div class="manager-toolbar">
+          <div class="food-inventory">
+            <span>ไอเทม:</span>
+            <b>Capture Ball <span id="managerBallCount">0</span></b>
+            <b>โปรตีน <span id="foodProtein">0</span></b>
+            <b>สุขภาพ <span id="foodHealthy">0</span></b>
+            <b>ของโปรด <span id="foodFavorite">0</span></b>
+            <b>อาหารฝึก <span id="foodTraining">0</span></b>
+            <b>แร่บำรุง <span id="foodMineral">0</span></b>
+            <b>ผลไฟ <span id="foodEmber">0</span></b>
+            <b>ผลจันทร์ <span id="foodMoon">0</span></b>
+          </div>
+          <div class="toolbar-actions">
+            <button id="healAllBtn" class="secondary-btn heal-btn">Heal ฟรี</button>
+            <button id="refillBallsBtn" class="secondary-btn">รับบอลฉุกเฉินเมื่อหมด</button>
+          </div>
+        </div>
+
+        <div class="manager-tabs character-tabs">
+          <button class="manager-tab active" data-manager-tab="collection">มอน</button>
+          <button class="manager-tab" data-manager-tab="training">ฝึก</button>
+          <button class="manager-tab" data-manager-tab="skills">สกิล</button>
+          <button class="manager-tab" data-manager-tab="equipment">อุปกรณ์</button>
+          <button class="manager-tab" data-manager-tab="evolution">Evolution</button>
+          <button class="manager-tab" data-manager-tab="breeding">Breeding</button>
+        </div>
+
+        <div class="character-manager-layout manager-tab-pane active" data-tab-pane="collection">
+          <section class="character-roster manager-section" aria-label="Party และ Monster List">
+            <div class="character-section-head"><h3>Party <span id="partyCountLabel" class="section-count"></span></h3><span class="character-section-note">แตะเพื่อดู</span></div>
+            <div id="managerParty" class="character-roster-slots"></div>
+          </section>
+
+          <section class="character-preview" aria-label="Monster Preview">
+            <div class="character-preview-kicker">MONSTER PREVIEW</div>
+            <div class="character-preview-art" aria-hidden="true"><canvas id="characterPreviewCanvas" class="character-preview-canvas" aria-label="3D Monster Preview"></canvas><span id="characterPreviewPortrait">?</span></div>
+            <div id="characterPreviewName" class="character-preview-name">เลือกมอนสเตอร์</div>
+            <div id="characterPreviewMeta" class="character-preview-meta">Lv.— · EXP — · CR —</div>
+            <div id="characterPreviewTypes" class="character-preview-types">เลือก Party ด้านซ้ายเพื่อดูรายละเอียด</div>
+            <div id="characterPreviewPlace" class="character-preview-place">—</div>
+            <div id="characterPreviewGrowth" class="character-preview-growth">Bond — · Growth —</div>
+            <div class="character-preview-empty">ข้อมูลทั้งหมดจะอ่านจาก Monster Instance จริง</div>
+          </section>
+
+          <section class="character-information manager-section" aria-label="Character Information">
+            <div class="character-section-head"><h3>ข้อมูลตัวละคร</h3><span class="character-section-note">Live Data</span></div>
+            <div class="character-info-tabs" role="tablist" aria-label="ข้อมูลมอนสเตอร์">
+              <button type="button" class="character-info-tab active" data-character-tab="info">ข้อมูล</button>
+              <button type="button" class="character-info-tab" data-character-tab="skills">สกิล</button>
+              <button type="button" class="character-info-tab" data-character-tab="equipment">อุปกรณ์</button>
+              <button type="button" class="character-info-tab" data-character-tab="training">ฝึก</button>
+              <button type="button" class="character-info-tab" data-character-tab="evolution">วิวัฒนาการ</button>
+            </div>
+            <div id="characterInfoBody" class="character-info-body">
+              <div class="character-info-empty">เลือกมอนสเตอร์จากรายการเพื่อแสดง HP, Stats, CR, Growth, Skills และ Equipment</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="manager-tab-pane" data-tab-pane="training">
+          <div id="trainingPanel"></div>
+        </div>
+
+        <div class="manager-tab-pane" data-tab-pane="skills">
+          <div id="skillsPanel"></div>
+        </div>
+
+        <div class="manager-tab-pane" data-tab-pane="equipment">
+          <div id="equipmentPanel"></div>
+        </div>
+
+        <section class="evolution-panel manager-tab-pane" data-tab-pane="evolution">
+          <div class="breeding-head">
+            <div>
+              <h3>Evolution Preview</h3>
+              <div class="tiny">วิวัฒนาการย้อนกลับไม่ได้ • Preview รูปร่าง / Type / Stats / Skills / เงื่อนไขก่อนยืนยัน</div>
+            </div>
+          </div>
+          <div id="evolutionPreview" class="evolution-preview">เลือก “ดู Evolution” จากการ์ดมอนเพื่อดูเส้นทาง</div>
+        </section>
+
+        <section class="breeding-panel manager-tab-pane" data-tab-pane="breeding">
+          <div class="breeding-head">
+            <div>
+              <h3>Breeding Lab</h3>
+              <div class="tiny">ลูกพื้นฐานตามแม่/ผู้ถือไข่ • Hybrid ในอนาคตใช้ BreedingRecipe</div>
+            </div>
+            <div id="compatibilityText" class="compatibility">ยังไม่ได้เลือกคู่</div>
+          </div>
+          <div class="breed-controls custom-breed-controls">
+            <div class="parent-slot">
+              <span class="parent-label">Parent A</span>
+              <button id="parentABtn" class="parent-picker-btn">เลือกมอน</button>
+            </div>
+            <span class="breed-plus">＋</span>
+            <div class="parent-slot">
+              <span class="parent-label">Parent B</span>
+              <button id="parentBBtn" class="parent-picker-btn">เลือกมอน</button>
+            </div>
+            <button id="breedBtn" class="breed-btn">สร้างไข่</button>
+          </div>
+          <label class="skill-memory-choice" for="breedingSkillMemory">
+            <span>Skill Memory จาก Partner (ไม่บังคับ)</span>
+            <select id="breedingSkillMemory" aria-describedby="breedingSkillMemoryHint">
+              <option value="">ไม่ส่งต่อ Skill Memory</option>
+            </select>
+            <small id="breedingSkillMemoryHint">แสดงเฉพาะสกิลที่ Partner รู้จริงและผ่านกฎของสาย Stage 2 ผู้ถือไข่</small>
+          </label>
+          <div id="inheritPreview" class="inherit-preview">เลือกพ่อแม่เพื่อดูแนวโน้ม Gene ที่ส่งต่อ</div>
+          <div class="egg-title">Incubator / ไข่</div>
+          <div id="eggList" class="egg-list"></div>
+        </section>
+      </div>
+    </div>
+
+
+
+    <div id="skillItemConfirm" class="skill-item-confirm hidden" role="dialog" aria-modal="true" aria-labelledby="skillItemConfirmTitle">
+      <div class="skill-item-confirm-card">
+        <h3 id="skillItemConfirmTitle">ยืนยันเรียนสกิลถาวร</h3>
+        <div id="skillItemConfirmBody"></div>
+        <div class="skill-item-confirm-actions">
+          <button id="skillItemConfirmCancel" type="button">ยกเลิก</button>
+          <button id="skillItemConfirmAccept" type="button">ยืนยันใช้ไอเทม</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="monsterPicker" class="monster-picker hidden">
+      <div class="monster-picker-card">
+        <div class="picker-head">
+          <div>
+            <b id="pickerTitle">เลือกมอน</b>
+            <div class="tiny">แตะการ์ดเพื่อเลือก • แสดงเฉพาะมอน Adult/Mature ใน Storage</div>
+          </div>
+          <button id="closePicker" class="picker-close">✕</button>
+        </div>
+        <div id="monsterPickerList" class="monster-picker-list"></div>
+      </div>
+    </div>
+
+    <div id="eventPopup" class="event-popup hidden">
+      <div class="event-card">
+        <div class="event-icon" id="eventIcon">★</div>
+        <div class="event-title" id="eventTitle"></div>
+        <div class="event-choices" id="eventChoices"></div>
+      </div>
+    </div>
+
+    <div class="help">ซ้ายเดิน • ลากขวาหมุนกล้อง • Skill 1–4 ผู้เล่นกด • Recall ก่อนปาจับ</div>
   </div>
+
+  <script type="module" src="./startup-errors.mjs"></script>
 </body>
 </html>

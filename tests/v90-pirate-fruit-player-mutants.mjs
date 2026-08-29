@@ -3,8 +3,12 @@ import fs from 'node:fs';
 import { validateAssetDefinition, validateBundle } from '../asset-presentation/index.mjs';
 import { PIRATE_PRESENTATION_FORBIDDEN } from '../asset-presentation/providers/pirate-fruit-player.mjs';
 
+import { COMBINED_WORLDS, worldById } from '../combined-worlds-v900.mjs';
+
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const js = fs.readFileSync(new URL('../game-v900.js', import.meta.url), 'utf8');
+const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
+const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const versionedHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 const provider = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
@@ -12,7 +16,12 @@ const schema = fs.readFileSync(new URL('../asset-presentation/schema.mjs', impor
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 assert.equal(liveHtml, versionedHtml, 'mutant 0: active V8.4 entry stays byte-identical');
-assert.doesNotMatch(liveHtml, /v900\.html|game-v900/, 'mutant 0b: current game version must not point at the new world');
+assert.doesNotMatch(liveHtml, /v900\.html|game-v900|worlds-v900/, 'mutant 0b: current game version must not point at the combined channel');
+assert.match(html, /data-combined-world="pocket-monster"/, 'mutant 0c: V9 gate includes the original game');
+assert.match(html, /id="huntBtn"/, 'mutant 0d: V9 keeps the original HUD so game-v800 can boot');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810', 'mutant 0e: original game runtime is game-v800.js');
+assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
+assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /pirate-fruit-player\.mjs/, 'mutant 1: V8.4 must not import the pirate provider');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
 assert.match(js, /from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'/, 'mutant 3: new world must import the pirate player provider');
