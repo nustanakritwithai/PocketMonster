@@ -25,7 +25,7 @@ import {
 } from '../combined-worlds-v900.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-const js = fs.readFileSync(new URL('../game-v900.js', import.meta.url), 'utf8');
+const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
@@ -33,11 +33,13 @@ const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 const preloadV900 = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.meta.url), 'utf8');
 const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
+const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
+const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
-for (const file of ['game-v900.js', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -67,7 +69,7 @@ assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810');
-assert.equal(worldById('pirate-fruit').runtime, './game-v900.js?v=900');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=900');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=900');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -80,13 +82,17 @@ assert.doesNotMatch(livingJs, /vpsWrites|playerDataWrites/, 'living world must n
 assert.doesNotMatch(liveJs, /pirate-fruit-player\.mjs/, 'V8.4 live loop does not import the pirate provider');
 assert.doesNotMatch(liveJs, /character\.human\.pirate-fruit\.v1/, 'V8.4 Ranch Hub player stays on the current game version');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
-assert.match(js, /NEW_WORLD_ID = 'pirate-fruit-new-world'/, 'pirate module remains a named world inside V9');
-assert.match(js, /mergedWithV800: false/, 'pirate module records that it is not merged into live V8.4');
-assert.doesNotMatch(js, /Ranch Hub/, 'pirate module must not boot Ranch Hub itself');
-assert.match(js, /createPirateFruitPlayerProvider\(/, 'pirate world registers the pirate-fruit provider');
-assert.match(js, /assets\.registerProvider\('pirate-fruit'/, 'pirate-fruit is its own provider name');
-assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate-world player spawn is pirate-fruit');
-assert.doesNotMatch(js, /from ['"]three['"]/, 'pirate world still does not import the three npm package');
+assert.match(html, /frame-src 'self'/, 'V9 may iframe the offline Pirate Fruit client');
+assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก้อน/, 'gate describes the real offline Pirate Fruit game');
+assert.match(boot, /pirate-fruit-offline\/index\.html/, 'pirate world boots the vendored offline client');
+assert.match(boot, /iframe/, 'offline Pirate Fruit is loaded as the real client frame');
+assert.match(boot, /remote: false/, 'pirate world is the offline client');
+assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
+assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page is the real Pirate Fruit shell');
+assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
+assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
+assert.equal(pirateSource.mode, 'offline');
+assert.equal(pirateSource.remote, false);
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);

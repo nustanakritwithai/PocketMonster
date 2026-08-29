@@ -17,6 +17,10 @@ body[data-combined-world] #hud .compact-topbar{margin-top:34px}
 body[data-combined-world="pocket-monster"] .hunt-btn{top:128px}
 body[data-combined-world="pocket-monster"] .zone-travel{top:118px}
 body[data-combined-world="pocket-monster"] .message{top:168px}
+body[data-combined-world="pirate-fruit"] #hud,
+body[data-combined-world="pirate-fruit"] #versionBadge,
+body[data-combined-world="pirate-fruit"] #saveIndicator{display:none!important}
+body[data-combined-world="pirate-fruit"] #game iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#06121f}
 body[data-combined-world="pirate-fruit"] #immersiveGate,
 body[data-combined-world="living-world"] #immersiveGate,
 body[data-combined-world="pirate-fruit"] #huntBtn,

@@ -15,7 +15,7 @@ const ROOT_EXCLUDES = new Set([
   'server_save_backup.json',
   'workspace-manifest.json',
 ]);
-const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/'];
+const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/', 'pirate-fruit-offline/'];
 const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs', 'chat-runtime.mjs'];
 
 function normalize(relative) {

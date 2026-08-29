@@ -12,9 +12,9 @@ export const COMBINED_WORLDS = Object.freeze([
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
-    title: 'เกาะโจรสลัด',
-    detail: 'โลกโจรสลัด • ผู้เล่น Pirate Fruit • ยังไม่รวม combat/stats',
-    runtime: './game-v900.js?v=900',
+    title: 'เกม Pirate Fruit ออฟไลน์',
+    detail: 'เกม Pirate Fruit ทั้งก้อน โหมดออฟไลน์ • เซฟในเครื่อง • ไม่ยิงเซิร์ฟเวอร์',
+    runtime: './boot-pirate-fruit-v900.mjs?v=900',
   }),
   Object.freeze({
     id: 'living-world',

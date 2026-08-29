@@ -5,8 +5,8 @@ import path from 'node:path';
 import { buildFirebaseLauncher } from '../scripts/build-firebase-launcher.mjs';
 import { isPublicGameFile } from '../scripts/build-github-pages.mjs';
 
-assert.equal(isPublicGameFile('game-v800.js'), true);
-assert.equal(isPublicGameFile('server-sync.mjs'), true);
+assert.equal(isPublicGameFile('pirate-fruit-offline/index.html'), true);
+assert.equal(isPublicGameFile('pirate-fruit-offline/SOURCE.json'), true);
 assert.equal(isPublicGameFile('assets/catalog/monster-slimes.json'), true);
 assert.equal(isPublicGameFile('assets/textures/monsters/flame-wolf-f2/README.md'), false);
 assert.equal(isPublicGameFile('tests/server-auth.mjs'), false);
