@@ -1,5 +1,5 @@
 const SESSION_KEY = 'monsterlife.session.v1';
-const state = { config: null, token: null, after: 0, socket: null, polling: null };
+const state = { config: null, token: null, after: 0, socket: null, polling: null, worldPulse: null };
 function ensureChatStyles() {
   if (document.querySelector('#chatRuntimeStyles')) return;
   const style = document.createElement('style'); style.id = 'chatRuntimeStyles';
@@ -40,7 +40,7 @@ async function sendMessage() {
 }
 function connectSocket() {
   if (!state.token || !state.config.webSocketUrl) return;
-  try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
+  try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => { state.socket.send(JSON.stringify({ token: state.token })); const sendWorld = () => { const snapshot = window.POCKETMONSTER_WORLD_STATE?.(); if (!snapshot || state.socket?.readyState !== WebSocket.OPEN) return; state.socket.send(JSON.stringify({ type: 'world-pos', ...snapshot })); }; sendWorld(); state.worldPulse = setInterval(sendWorld, 250); }); state.socket.addEventListener('message', event => { try { const message = JSON.parse(event.data); if (message?.type === 'chat') void pullMessages(); if (message?.type === 'world-snapshot') window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload); } catch {} }); state.socket.addEventListener('close', () => { if (state.worldPulse) { clearInterval(state.worldPulse); state.worldPulse = null; } setTimeout(connectSocket, 5000); }); } catch { setTimeout(connectSocket, 5000); }
 }
 function ensureChatMarkup() {
   ensureChatStyles();
