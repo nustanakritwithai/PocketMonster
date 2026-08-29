@@ -70,6 +70,9 @@ export async function establishReadOnlyBridge(config, firebaseUser, options = {}
     return Object.freeze({ state: 'linked', profile, expiresAtUtc: session.expiresAtUtc, sessionToken: session.sessionToken });
   } catch (error) {
     if (error.code === 'IDENTITY_NOT_LINKED') return Object.freeze({ state: 'unlinked', errorCode: error.code });
-    return Object.freeze({ state: 'fallback', errorCode: error.code || 'BRIDGE_UNAVAILABLE' });
+    return Object.freeze({
+      state: config?.featureFlags?.firebaseFallback === false ? 'offline' : 'fallback',
+      errorCode: error.code || 'BRIDGE_UNAVAILABLE',
+    });
   }
 }

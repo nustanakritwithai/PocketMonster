@@ -14,7 +14,9 @@ export async function presentAuthProfileBridge(config, firebaseUser, initialBrid
       panel.dataset.state = bridge.state;
       panel.textContent = bridge.state === 'linked'
         ? `MonsterLife: ${bridge.profile?.displayName || bridge.profile?.username || 'Linked'} · ${bridge.profile?.character?.name || 'ยังไม่มีตัวละคร'}`
-        : bridge.state === 'unlinked' ? 'MonsterLife: ยังไม่ได้เชื่อมบัญชี (Firebase fallback)' : 'MonsterLife: Firebase fallback';
+        : bridge.state === 'unlinked' ? 'MonsterLife: ยังไม่ได้เชื่อมบัญชี'
+          : bridge.state === 'offline' ? 'MonsterLife: เซิร์ฟเวอร์ออนไลน์ไม่พร้อม'
+            : 'MonsterLife: Firebase fallback';
     }
   };
   render(initialBridge);
