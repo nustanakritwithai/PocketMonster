@@ -19,7 +19,7 @@ import {
   createCharacterUIController,
   getFocusedCharacterPresentation,
   persistableState,
-} from './character-ui-controller.mjs';
+} from './character-ui-controller.mjs?v=8.4.0-character-ui';
 import { BALANCE_CONFIG, BALANCE_SCHEMA_VERSION, SKILL_MASTERY } from './balance-config.mjs';
 import * as balanceFormulas from './balance-formulas.mjs';
 import { resolveWorkbookCapture, snapshotCaptureReferenceLevel } from './balance-capture.mjs';
