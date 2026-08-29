@@ -1,5 +1,4 @@
 # คำแนะนำถึง Server ก่อน merge PR 318
-
 เอกสารนี้พูดกับ World/Server เจ้าของโฮสต์ ไม่ใช่ Pocket client และไม่ใช่ Pirate Fruit combat authority
 
 อย่า merge จนกว่า Server จะยืนยันรายการด้านล่างแล้ว และอย่าเปิด write flags เพื่อให้ PR นี้ผ่าน
@@ -127,8 +126,12 @@ hp atk def spAtk spDef spd vitality combat blade ranged fruitPower mastery mana 
 ยืนยันซองเซฟ {state,playerHp,saveSchemaVersion} และ character ไม่มี hp
 ยืนยันแชท WORLD/ZONE และ world-snapshot แยกโซน รวม pirate-fruit และ living-world
 ยืนยัน online-only และพร้อมรีวิวโดยยังไม่เปิด writes
+<<<<<<< HEAD
 ```
 
 ถ้าข้อใดทำไม่ได้ ให้บล็อก merge และบอกข้อที่ขาด ห้ามเปิดธงเพื่อหลบ
 
 ยังไม่ merge รอ Server ตอบตามหัวข้อท้ายเอกสารนี้ก่อน
+=======
+ถ้าข้อใดทำไม่ได้ ให้บล็อก merge และบอกข้อที่ขาด ห้ามเปิดธงเพื่อหลบ
+>>>>>>> e5dea6bac311216e9cef69c711c746cfd3aa9494
