@@ -37,8 +37,17 @@ function mount() {
   const panel = document.createElement('section'); panel.id = 'mlChatPanel'; panel.className = 'ml-chat-panel'; panel.innerHTML = `<div class="ml-chat-head"><span>แชทโลก</span><select id="mlChatChannel" class="ml-chat-channel"><option value="WORLD">WORLD</option><option value="ZONE">ZONE</option></select></div><div id="mlChatMessages" class="ml-chat-messages"></div><form id="mlChatForm" class="ml-chat-compose"><input id="mlChatInput" maxlength="500" placeholder="พิมพ์ข้อความ..."><button type="submit">ส่ง</button></form>`; document.body.append(panel); document.querySelector('#mlChatForm').addEventListener('submit', event => { event.preventDefault(); void sendMessage(); }); document.querySelector('#mlChatChannel').addEventListener('change', () => { state.after = 0; document.querySelector('#mlChatMessages').replaceChildren(); void pullMessages(); });
 }
 async function start() {
+  const activate = () => {
+    state.token = sessionToken();
+    if (!state.token || !state.config || state.polling) return;
+    mount();
+    void pullMessages();
+    connectSocket();
+    state.polling = setInterval(() => void pullMessages(), 10000);
+  };
+  window.addEventListener('pocketmonster:auth-profile-bridge', activate, { once: true });
   state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json()); state.token = sessionToken();
-  if (!state.token) { window.addEventListener('pocketmonster:auth-profile-bridge', () => { state.token = sessionToken(); if (state.token) void start(); }, { once: true }); return; }
-  mount(); await pullMessages(); connectSocket(); state.polling = setInterval(() => void pullMessages(), 10000);
+  if (!state.token) return;
+  activate();
 }
 void start().catch(error => console.warn('Chat runtime unavailable', error));

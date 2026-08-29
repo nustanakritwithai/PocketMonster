@@ -32,7 +32,7 @@ jobs:
           MONSTERLIFE_READONLY_ORIGIN: '${{ vars.MONSTERLIFE_READONLY_ORIGIN }}'
           MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
           MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
-          MONSTERLIFE_LAUNCH_TICKET: ${{ github.event_name == 'push' || inputs.launch_ticket }}
+          MONSTERLIFE_LAUNCH_TICKET: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_ticket || false }}
           MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.sha }}'
         shell: bash
         run: |
