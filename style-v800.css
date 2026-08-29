@@ -1134,8 +1134,8 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   display:flex;
   flex-direction:column;
   width:min(320px,calc(100vw - 24px));
-  height:min(42vh,calc(100dvh - 58px - 148px));
-  max-height:calc(100dvh - 58px - 148px);
+  height:min(280px,36vh,calc(100dvh - 58px - 220px));
+  max-height:calc(100dvh - 58px - 220px);
   overflow:hidden;
   border:1px solid #334155;
   border-radius:16px;
@@ -1168,7 +1168,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .chat-channel{max-width:92px;padding:4px;border:1px solid #475569;border-radius:7px;background:#0f172a;color:#bae6fd;font-size:10px}
 @media (max-width:700px){
   .chat-toggle{top:max(8px,var(--safe-top));right:max(78px,calc(var(--safe-right) + 66px));left:auto;bottom:auto;width:48px;height:48px;z-index:15000}
-  .game-chat{top:max(58px,calc(var(--safe-top) + 50px));right:max(8px,var(--safe-right));left:auto;bottom:auto;width:min(300px,calc(100vw - 16px));height:min(46vh,calc(100dvh - 58px - 156px));max-height:calc(100dvh - 58px - 156px);z-index:15001}
+  .game-chat{top:max(58px,calc(var(--safe-top) + 50px));right:max(8px,var(--safe-right));left:auto;bottom:auto;width:min(300px,calc(100vw - 16px));height:min(260px,40vh,calc(100dvh - 58px - 168px));max-height:calc(100dvh - 58px - 168px);z-index:15001}
   .game-chat header{min-height:44px}
   .chat-form input,.chat-form button{min-height:40px}
 }

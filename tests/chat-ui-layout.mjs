@@ -15,7 +15,7 @@ assert.match(toggleRule, /left:auto/, 'chat toggle must not keep a left anchor o
 assert.match(toggleRule, /bottom:auto/, 'chat toggle must not keep a bottom anchor over movement controls');
 assert.match(panelRule, /top:max\(58px,calc\(var\(--safe-top\) \+ 50px\)\)/, 'open chat hangs from the top-right');
 assert.match(panelRule, /right:max\(10px,var\(--safe-right\)\)/, 'open chat stays on the right edge');
-assert.match(panelRule, /max-height:calc\(100dvh - 58px - 148px\)/, 'open chat must leave the bottom control band free');
+assert.match(panelRule, /max-height:calc\(100dvh - 58px - 220px\)/, 'open chat must leave the bottom skill cluster free');
 assert.doesNotMatch(toggleRule, /left:16px/, 'legacy bottom-left toggle must be gone');
 assert.doesNotMatch(panelRule, /bottom:72px/, 'legacy bottom-left panel must be gone');
 
