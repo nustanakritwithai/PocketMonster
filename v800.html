@@ -9,6 +9,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
+  <script>if (location.pathname.endsWith('/v800.html')) location.replace(new URL('./', location.href).href);</script>
   <title>Monster Life RPG Prototype V8.4.0</title>
   <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!(t&&s&&v)});history.replaceState(null,'',u.pathname);})();</script>
   <script type="module" src="./entry-preload.mjs"></script>
