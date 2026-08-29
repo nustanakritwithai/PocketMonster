@@ -26,18 +26,23 @@ export function defaultPanelForWorld(worldId) {
   return worldId === 'pocket-monster' ? THROW_CONTROL_PANEL : HUMAN_CONTROL_PANEL;
 }
 
+export function allowedPanelForWorld(worldId, panelId) {
+  if (worldId === 'pocket-monster') return THROW_CONTROL_PANEL;
+  return panelById(panelId)?.id || defaultPanelForWorld(worldId);
+}
+
 export function panelIdFromLocation(locationLike = globalThis.location, worldId = null) {
   const requested = new URL(locationLike.href).searchParams.get('panel');
-  return panelById(requested)?.id || defaultPanelForWorld(worldId);
+  return allowedPanelForWorld(worldId, requested);
 }
 
 export function combinedLocationQuery(worldId, panelId) {
-  const panel = panelById(panelId)?.id || defaultPanelForWorld(worldId);
+  const panel = allowedPanelForWorld(worldId, panelId);
   return `world=${encodeURIComponent(worldId)}&panel=${encodeURIComponent(panel)}`;
 }
 
 export function applyControlPanel(id, worldId = globalThis.document?.body?.dataset?.combinedWorld) {
-  const panel = panelById(id) || panelById(defaultPanelForWorld(worldId));
+  const panel = panelById(allowedPanelForWorld(worldId, id)) || panelById(defaultPanelForWorld(worldId));
   if (!panel || typeof document === 'undefined') return panel;
   document.body.dataset.controlPanel = panel.id;
   if (window.POCKETMONSTER_COMBINED_BOOT) {
@@ -46,6 +51,7 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
       controlPanel: panel.id,
     });
   }
+  const captureOnly = worldId === 'pocket-monster';
   window.POCKETMONSTER_CONTROL_PANEL = Object.freeze({
     id: panel.id,
     authority: panel.authority,
@@ -54,7 +60,9 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
     pocketMonsterCharacterSystem: 'pending-removal',
     keepPocketMonsterModel: true,
     animalControl: 'pocket-monster',
-    animalControlHost: worldId === 'pirate-fruit' ? 'pirate-fruit' : 'pocket-monster',
+    animalControlHost: worldId === 'living-world' ? 'pocket-monster' : 'pirate-fruit',
+    captureOnly,
+    attackPanelEnabled: !captureOnly,
   });
   const switcher = document.getElementById('controlPanelSwitcher');
   if (switcher) {
@@ -65,7 +73,9 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
   }
   const hint = document.getElementById('controlPanelHint');
   if (hint) {
-    hint.textContent = panel.detail;
+    hint.textContent = captureOnly
+      ? 'ตัวละคร Pirate Fruit ใช้แผงจับมอนสเตอร์เท่านั้น • ไม่ใช้แผงโจมตี'
+      : panel.detail;
     hint.classList.remove('hidden');
   }
   window.POCKETMONSTER_SYNC_PIRATE_CONTROLS?.();

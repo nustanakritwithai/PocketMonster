@@ -25,6 +25,7 @@ import {
 } from '../combined-worlds-v900.mjs';
 import {
   applyControlPanel,
+  allowedPanelForWorld,
   combinedLocationQuery,
   defaultPanelForWorld,
   panelIdFromLocation,
@@ -85,7 +86,7 @@ assert.match(worldsJs, /includesOriginalGame: true/, 'combined channel records t
 assert.match(worldsJs, /mergedIntoLiveV800: false/, 'combined channel is not the live V8.4 entry');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'V9 character system is Pirate Fruit');
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays Pocket Monster');
-assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch preserves the active control panel');
+assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
@@ -99,8 +100,12 @@ assert.equal(defaultPanelForWorld('living-world'), 'human');
 assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pirate-fruit' }, 'pirate-fruit'), 'human');
 assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }, 'pocket-monster'), 'throw');
 assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pirate-fruit&panel=throw' }, 'pirate-fruit'), 'throw');
+assert.equal(panelIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster&panel=human' }, 'pocket-monster'), 'throw');
+assert.equal(allowedPanelForWorld('pocket-monster', 'human'), 'throw');
+assert.equal(allowedPanelForWorld('pirate-fruit', 'throw'), 'throw');
 assert.equal(combinedLocationQuery('pirate-fruit', 'throw'), 'world=pirate-fruit&panel=throw');
 assert.equal(combinedLocationQuery('pocket-monster', 'bogus'), 'world=pocket-monster&panel=throw');
+assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-monster&panel=throw');
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /#controlPanelSwitcher/, 'V9 stylesheet positions the panel switcher');
@@ -113,7 +118,7 @@ assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThr
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #game iframe\{visibility:hidden/, 'throw panel keeps the Pirate Fruit iframe loaded but hidden');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
-assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'pirate throw keeps Pocket movement pads');
+assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'Pocket Monster world hides the Pirate Fruit attack panel');
 
 {
   const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
@@ -139,19 +144,29 @@ assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joy
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.keepPocketMonsterModel, true);
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.animalControl, 'pocket-monster');
   assert.equal(window.POCKETMONSTER_CONTROL_PANEL.animalControlHost, 'pirate-fruit');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.attackPanelEnabled, true);
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.captureOnly, false);
   assert.equal(throwBtn.current, 'page');
   assert.equal(humanBtn.current, 'false');
   assert.ok(hint.textContent.includes('ควบคุมสัตว์'), 'hint says the pirate character uses Pocket animal control');
   assert.equal(hintHidden.has('hidden'), false, 'applyControlPanel reveals the panel hint');
+  const locked = applyControlPanel('human', 'pocket-monster');
+  assert.equal(locked.id, 'throw');
+  assert.equal(document.body.dataset.controlPanel, 'throw');
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.captureOnly, true);
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.attackPanelEnabled, false);
+  assert.equal(window.POCKETMONSTER_CONTROL_PANEL.animalControlHost, 'pirate-fruit');
+  assert.ok(hint.textContent.includes('จับมอน') && hint.textContent.includes('ไม่ใช้แผงโจมตี'), 'Pocket Monster world is capture-only');
 }
 assert.match(livingJs, /presentationOnly: true/, 'living world is presentation-only');
 assert.match(livingJs, /combatAuthority: false/, 'living world is not combat authority');
 assert.doesNotMatch(livingJs, /vpsWrites|playerDataWrites/, 'living world must not open VPS write flags');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'V8.4 live loop does not statically import the pirate provider');
-assert.match(liveJs, /if\(pirateThrowWorld\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'pirate provider loads only in the pirate throw instance');
+assert.match(liveJs, /if\(piratePocketPlayer\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'pirate provider loads only when the pirate player is in the Pocket loop');
 assert.match(liveJs, /animalControl'\)==='pirate-fruit'/, 'pirate throw instance is selected by the animalControl query, not by live boot');
+assert.match(liveJs, /POCKETMONSTER_COMBINED_BOOT\?\.worldId==='pocket-monster'/, 'V9 Pocket Monster world can host the pirate player without the live query');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'live loop publishes Pocket animal-control functions');
-assert.match(liveJs, /pirateThrowWorld\s*\?\s*assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'pirate throw instance can spawn the pirate player');
+assert.match(liveJs, /piratePocketPlayer\s*\?\s*assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'V9 Pocket loop can spawn the pirate player');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
 assert.match(html, /frame-src 'self'/, 'V9 may iframe the offline Pirate Fruit client');
 assert.match(html, /เกม Pirate Fruit ออฟไลน์ทั้งก้อน/, 'gate describes the real offline Pirate Fruit game');

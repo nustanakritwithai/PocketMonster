@@ -61,6 +61,8 @@ async function bootWorld(id) {
   if (!world) return;
   document.body.dataset.combinedWorld = world.id;
   const panel = applyControlPanel(panelIdFromLocation(location, world.id), world.id);
+  const canonical = `${location.pathname}?${combinedLocationQuery(world.id, panel.id)}`;
+  if (`${location.pathname}${location.search}` !== canonical) history.replaceState(null, '', canonical);
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
     worldId: world.id,
     runtime: world.runtime,

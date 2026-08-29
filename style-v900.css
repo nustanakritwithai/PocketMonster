@@ -14,6 +14,7 @@
 #controlPanelSwitcher{top:40px}
 body[data-combined-world] #worldSwitcher,
 body[data-combined-world] #controlPanelSwitcher{display:flex}
+body[data-combined-world="pocket-monster"] #controlPanelSwitcher [data-control-panel="human"]{display:none!important}
 #worldSwitcher button,#controlPanelSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
 #worldSwitcher button[aria-current="page"],
 #controlPanelSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}

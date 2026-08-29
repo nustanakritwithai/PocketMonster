@@ -28,7 +28,7 @@ assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
-assert.match(liveJs, /if\(pirateThrowWorld\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider is gated behind pirateThrowWorld');
+assert.match(liveJs, /if\(piratePocketPlayer\)\{\s*const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider is gated behind piratePocketPlayer');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
 assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: pirate world must load the offline Pirate Fruit client');
 assert.match(boot, /remote: false/, 'mutant 4: pirate world must be the offline client');
@@ -58,6 +58,8 @@ assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'mutant 18: character 
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/capture stays Pocket Monster');
 assert.match(panelsJs, /pocketMonsterCharacterSystem: 'pending-removal'/, 'mutant 20: Pocket character system is not removed yet');
 assert.match(panelsJs, /keepPocketMonsterModel: true/, 'mutant 21: Pocket character models stay');
+assert.match(panelsJs, /worldId === 'pocket-monster'\) return THROW_CONTROL_PANEL/, 'mutant 21b: Pocket Monster world cannot open the attack panel');
+assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'mutant 21c: Pocket Monster world hides the Pirate Fruit attack button');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');

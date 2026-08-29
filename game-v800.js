@@ -236,6 +236,7 @@ function ensureDirection(v){
 
 const el=id=>document.getElementById(id);
 const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl')==='pirate-fruit';
+const piratePocketPlayer=pirateThrowWorld||window.POCKETMONSTER_COMBINED_BOOT?.worldId==='pocket-monster';
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
@@ -1588,7 +1589,7 @@ const monsterProvider=createBigheadMonsterProvider({
   basicMaterial:basicMat,
 });
 assets.registerProvider('procedural',(ctx)=>ctx.def?.kind==='monster'?monsterProvider(ctx):humanoidProvider(ctx));
-if(pirateThrowWorld){
+if(piratePocketPlayer){
   const { createPirateFruitPlayerProvider } = await import('./asset-presentation/providers/pirate-fruit-player.mjs');
   assets.registerProvider('pirate-fruit',createPirateFruitPlayerProvider({
     THREE,
@@ -1602,7 +1603,7 @@ if(pirateThrowWorld){
   }));
 }
 // ---------- Player / NPC ----------
-const playerVisual=pirateThrowWorld
+const playerVisual=piratePocketPlayer
   ? assets.spawn('character.human.pirate-fruit.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier})
   : assets.spawn('character.human.blocky-bighead.v1',{role:'player',appearanceId:'appearance.human.player-orange.v1',quality:qualityProfile.tier});
 const keeperVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'keeper',appearanceId:'appearance.human.keeper-green.v1',quality:qualityProfile.tier});
@@ -7341,7 +7342,7 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
-    hostCharacter:pirateThrowWorld?'pirate-fruit':'pocket-monster',
+    hostCharacter:piratePocketPlayer?'pirate-fruit':'pocket-monster',
     capture:captureThrow,
     summon:summonThrow,
     recall,

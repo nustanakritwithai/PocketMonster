@@ -7,7 +7,7 @@ export const COMBINED_WORLDS = Object.freeze([
     id: 'pocket-monster',
     label: 'เกมเดิม',
     title: 'Pocket Monster',
-    detail: 'โหมดปาจับมอนของ Pocket Monster • ระบบคนยังไม่ถอดในรอบนี้',
+    detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
     runtime: './game-v800.js?v=810',
   }),
   Object.freeze({
