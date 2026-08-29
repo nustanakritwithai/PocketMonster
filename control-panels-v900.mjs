@@ -75,7 +75,7 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
       void Promise.resolve(ensure()).then(() => {
         window.dispatchEvent(new Event('resize'));
       }).catch(err => {
-        console.error('Pocket animal control failed to load', err);
+        console.error('Pocket animal control failed to load', err?.message || String(err), err?.stack || '');
       });
     }
   }

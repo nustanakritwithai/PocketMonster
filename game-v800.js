@@ -91,6 +91,7 @@ import {
   isBigheadMonsterRoot,
   markRingScale,
 } from './asset-presentation/monster-mark.mjs';
+import { paintGroundGrid, paintSkyGradient } from './asset-presentation/blocky-ground.mjs';
 
 // V7.2+ Progression Integration — Balance Foundation + Raising Core engine
 const MLRPG_BALANCE = Object.freeze({
