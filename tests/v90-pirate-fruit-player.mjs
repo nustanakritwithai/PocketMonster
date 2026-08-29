@@ -16,12 +16,21 @@ import {
   createPirateFruitPlayerProvider,
 } from '../asset-presentation/providers/pirate-fruit-player.mjs';
 
-const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
+const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
+const js = fs.readFileSync(new URL('../game-v900.js', import.meta.url), 'utf8');
+const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
+const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
+const preloadV900 = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.meta.url), 'utf8');
 const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
+const checkWorld = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../game-v900.js', import.meta.url))], { encoding: 'utf8' });
+assert.equal(checkWorld.status, 0, checkWorld.stderr || 'game-v900 syntax failed');
+const checkPreload = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../entry-preload-v900.mjs', import.meta.url))], { encoding: 'utf8' });
+assert.equal(checkPreload.status, 0, checkPreload.stderr || 'entry-preload-v900 syntax failed');
 
 assert.equal(PIRATE_FRUIT_SOURCE.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(PIRATE_FRUIT_SOURCE.visual, 'client/src/art/PiratePlayerVisual.ts');
@@ -30,11 +39,22 @@ assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');
 assert.doesNotMatch(providerSrc, /fruitPower\s*[:=]|vitality\s*[:=]|blade\s*[:=]|mastery\s*[:=]/, 'provider must not copy Pirate Fruit combat stats');
-assert.match(js, /createPirateFruitPlayerProvider\(/, 'game registers the pirate-fruit provider');
+assert.equal(liveHtml.includes('game-v900.js'), false, 'active index.html must not boot the new-world runtime');
+assert.match(preload, /game-v800\.js\?v=810/, 'live preload still loads V8.4');
+assert.doesNotMatch(preload, /game-v900/, 'live preload must not import the new-world runtime');
+assert.match(preloadV900, /game-v900\.js\?v=900/, 'new-world preload loads V9.0 only');
+assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate new-world entry');
+assert.match(html, /ยังไม่รวมกับ Monster Life V8\.4|ยังไม่รวมกับเกมตอนนี้|ยังไม่รวมกับ Ranch Hub/, 'new-world page states it is not merged');
+assert.doesNotMatch(liveJs, /pirate-fruit-player\.mjs/, 'V8.4 live loop does not import the pirate provider');
+assert.doesNotMatch(liveJs, /character\.human\.pirate-fruit\.v1/, 'V8.4 Ranch Hub player stays on the current game version');
+assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'current game version still spawns blocky-bighead');
+assert.match(js, /NEW_WORLD_ID = 'pirate-fruit-new-world'/, 'V9.0 is a named new world');
+assert.match(js, /mergedWithV800: false/, 'new world records that it is not merged into V8.4');
+assert.doesNotMatch(js, /Ranch Hub/, 'new world must not boot Ranch Hub');
+assert.match(js, /createPirateFruitPlayerProvider\(/, 'new-world runtime registers the pirate-fruit provider');
 assert.match(js, /assets\.registerProvider\('pirate-fruit'/, 'pirate-fruit is its own provider name');
-assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/, 'Ranch Hub player spawn is pirate-fruit');
-assert.match(js, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'keeper'/, 'NPCs stay on blocky-bighead');
-assert.doesNotMatch(js, /from ['"]three['"]/, 'game still does not import the three npm package');
+assert.match(js, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'new-world player spawn is pirate-fruit');
+assert.doesNotMatch(js, /from ['"]three['"]/, 'new world still does not import the three npm package');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);

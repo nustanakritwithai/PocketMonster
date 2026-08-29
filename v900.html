@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://nustanakritwithai.github.io https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://157.85.96.139 wss://157.85.96.139 https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: blob:; style-src 'self' https://nustanakritwithai.github.io; font-src 'self' https://nustanakritwithai.github.io; media-src 'self' https://nustanakritwithai.github.io; worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b3a4a" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title>Pirate Fruit โลกใหม่ V9.0 • ยังไม่รวมกับ Ranch Hub</title>
+  <script type="module" src="./entry-preload-v900.mjs"></script>
+  <link rel="stylesheet" href="./style-v800.css?v=810" />
+</head>
+<body>
+  <div id="accountGate" class="account-gate">
+    <div id="loginPage" class="account-card auth-page">
+      <div class="account-logo">⚓</div><h1>Pirate Fruit โลกใหม่</h1><p>เวอร์ชันรวมแยกต่างหาก • ยังไม่รวมกับ Monster Life V8.4</p>
+      <form id="loginForm"><label>อีเมล<input id="loginEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>รหัสผ่าน<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="รหัสผ่าน" /></label><button id="loginAccountBtn" class="auth-primary" type="submit">เข้าสู่ระบบ</button></form><button id="googleLoginBtn" class="auth-google" type="button">เข้าสู่ระบบด้วย Google</button><button id="guestLoginBtn" class="auth-guest" type="button">เข้าเล่นแบบแขก</button>
+      <div id="loginStatus" class="account-status"></div><div class="auth-switch">ยังไม่มีบัญชี? <button id="showRegisterBtn" type="button">สมัครไอดีใหม่</button></div>
+    </div>
+    <div id="registerPage" class="account-card auth-page hidden">
+      <button id="backToLoginBtn" class="auth-back" type="button">← กลับหน้าเข้าสู่ระบบ</button><div class="account-logo">⚓</div><h1>สมัครไอดีใหม่</h1><p>บัญชีเดียวกันใช้เข้าโลกใหม่ได้</p>
+      <form id="registerForm"><label>อีเมล<input id="registerEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>ชื่อในเกม<input id="registerDisplayName" maxlength="30" placeholder="ชื่อที่แสดงในเกม" /></label><label>รหัสผ่าน<input id="registerPassword" type="password" autocomplete="new-password" required placeholder="อย่างน้อย 8 ตัว" /></label><label>ยืนยันรหัสผ่าน<input id="registerConfirm" type="password" autocomplete="new-password" required placeholder="กรอกรหัสผ่านอีกครั้ง" /></label><button id="registerAccountBtn" class="auth-primary register" type="submit">สร้างบัญชี</button></form>
+      <div id="registerStatus" class="account-status"></div>
+    </div>
+  </div>
+  <div id="startupStatus" class="startup-status">กำลังเปิดโลกใหม่…</div>
+  <div id="game"></div>
+  <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#0f766e;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V9.0 โลกใหม่</div>
+  <div id="hud">
+    <div class="topbar compact-topbar" role="group" aria-label="โลกใหม่ Pirate Fruit">
+      <div class="pill zone-pill"><span id="zoneLabel">เกาะโจรสลัด • โลกใหม่</span></div>
+      <a id="oldWorldLink" class="pill" href="./v800.html" style="pointer-events:auto;color:#fff;text-decoration:none">เปิดโลกเก่า V8.4</a>
+    </div>
+    <div id="message" class="message">เวอร์ชันรวม Pirate Fruit แยกจาก Ranch Hub • ยังไม่รวมกับเกมตอนนี้</div>
+    <div class="controls-left">
+      <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
+    </div>
+    <div id="cameraPad" class="camera-pad" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
+  </div>
+</body>
+</html>
