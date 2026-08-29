@@ -27,7 +27,7 @@ export function createReadOnlyRuntimeConfig(apiBaseUrl, { assetBaseUrl = '', dep
     featureFlags: {
       vpsEnabled: true, vpsReads: true, vpsWrites: false, playerDataWrites: false,
       accountMigration: false, saveMigration: false, economyMutation: false,
-      firebaseFallback: true, firebaseAuthBridge: false, accountLinking: false, profileReads: false,
+      firebaseFallback: false, firebaseAuthBridge: false, accountLinking: false, profileReads: false,
       launchTicket: launchTicket === true,
     },
   };

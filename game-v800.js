@@ -144,7 +144,10 @@ const authProfileBridge = launchSession && serverGate.state === 'healthy'
   ? Object.freeze({ state: 'linked', profile: await readMonsterLifeProfile(runtimeConfig, launchSession.sessionToken), expiresAtUtc: launchSession.expiresAtUtc, sessionToken: launchSession.sessionToken })
   : serverGate.state === 'healthy'
     ? await establishReadOnlyBridge(runtimeConfig, firebaseUser)
-    : Object.freeze({ state: 'fallback', errorCode: 'SERVER_GATE_UNAVAILABLE' });
+    : Object.freeze({
+      state: runtimeConfig.featureFlags?.firebaseFallback === false ? 'offline' : 'fallback',
+      errorCode: 'SERVER_GATE_UNAVAILABLE',
+    });
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_SERVER_SESSION_TOKEN = authProfileBridge.sessionToken || null;
   window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });

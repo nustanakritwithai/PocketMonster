@@ -36,6 +36,7 @@ try {
       import('./server-auth.mjs'),
     ]);
     const user = await requireFirebaseLogin(config);
+    document.querySelector('#accountGate')?.classList.add('hidden');
     if (status) status.textContent = 'กำลังเปิดเกมอย่างปลอดภัย…';
     let launch;
     try {
