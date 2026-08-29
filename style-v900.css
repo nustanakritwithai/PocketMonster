@@ -32,11 +32,14 @@ body[data-combined-world="pirate-fruit"][data-control-panel="throw"] .message{to
 #monsterThrowStage{position:fixed;inset:0;z-index:0;display:none;background:#0b1020}
 #monsterThrowStage canvas{display:block;width:100%;height:100%}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #monsterThrowStage{display:block}
-body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #game iframe{visibility:hidden;pointer-events:none}
-body[data-combined-world="pirate-fruit"][data-control-panel="human"] #hud,
+body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #game canvas{visibility:hidden;pointer-events:none}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .combat-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .ball-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .gold-pill,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .active-pill,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #versionBadge,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #saveIndicator{display:none!important}
-body[data-combined-world="pirate-fruit"] #game iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#06121f}
+body[data-combined-world="pirate-fruit"] #game canvas{position:absolute;inset:0;width:100%;height:100%;background:#4f9ec9}
 body[data-control-panel="human"] #huntBtn,
 body[data-control-panel="human"] #party,
 body[data-control-panel="human"] .controls-right,

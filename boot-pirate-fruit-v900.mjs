@@ -1,11 +1,9 @@
-import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs';
-
-export const PIRATE_FRUIT_OFFLINE_ENTRY = './pirate-fruit-offline/index.html';
+export const PIRATE_FRUIT_BLOCK_WORLD = './world-pirate-fruit-v900.mjs?v=900';
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
 const game = document.getElementById('game');
-if (!game) throw new Error('missing #game for Pirate Fruit offline boot');
+if (!game) throw new Error('missing #game for Pirate Fruit block world boot');
 
 let throwRuntimePromise = null;
 
@@ -26,35 +24,25 @@ export function ensurePocketAnimalControl() {
 
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_PIRATE_FRUIT = Object.freeze({
-    source: 'offline-client',
-    entry: PIRATE_FRUIT_OFFLINE_ENTRY,
+    source: 'pocket-block-world',
+    entry: PIRATE_FRUIT_BLOCK_WORLD,
     remote: false,
     mergedWithV800: false,
-    controlHud: 'circular-cluster',
+    presentationOnly: true,
+    combatAuthority: false,
     animalControlRuntime: POCKET_ANIMAL_CONTROL_RUNTIME,
   });
-  window.POCKETMONSTER_SYNC_PIRATE_CONTROLS = () => syncPirateFruitControlHud(document.getElementById('pirateFruitOfflineFrame'));
   window.POCKETMONSTER_ENSURE_THROW_RUNTIME = ensurePocketAnimalControl;
 }
 
-game.replaceChildren();
-const frame = document.createElement('iframe');
-frame.id = 'pirateFruitOfflineFrame';
-frame.title = 'Pirate Fruit ออฟไลน์';
-frame.src = new URL(PIRATE_FRUIT_OFFLINE_ENTRY, import.meta.url).href;
-frame.setAttribute('allow', 'fullscreen; gamepad; pointer-lock; autoplay');
-frame.setAttribute('allowfullscreen', '');
-frame.addEventListener('load', () => {
-  syncPirateFruitControlHud(frame);
-  if (startup && document.body?.dataset?.controlPanel !== 'throw') startup.className = 'startup-status hidden';
-});
-game.appendChild(frame);
 if (startup) {
   startup.textContent = document.body?.dataset?.controlPanel === 'throw'
     ? 'กำลังเปิดระบบควบคุมสัตว์ของ Pocket Monster…'
-    : 'กำลังเปิด Pirate Fruit เวอร์ชันออฟไลน์…';
+    : 'กำลังเปิดเกาะโจรสลัดภาษาบล็อก…';
   startup.className = 'startup-status';
 }
+
+await import('./world-pirate-fruit-v900.mjs?v=900');
 
 if (document.body?.dataset?.controlPanel === 'throw') {
   await ensurePocketAnimalControl();
