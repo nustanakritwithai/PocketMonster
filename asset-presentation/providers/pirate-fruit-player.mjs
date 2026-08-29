@@ -156,37 +156,37 @@ export function createPirateFruitPlayerProvider({
     tag(hips, 'hips', 'player:hips');
     hipsPivot.add(hips);
 
-    const coat = new THREE.Mesh(box(0.46, 0.50, 0.32), material(palette.coat, 0.82, 0.04));
+    const coat = new THREE.Mesh(box(0.40, 0.46, 0.28), material(palette.coat, 0.82, 0.04));
     tag(coat, 'coat', 'player:hull:torso');
     torsoPivot.add(coat);
 
-    const shirtPanel = new THREE.Mesh(box(0.18, 0.36, 0.04), material(palette.shirt, 0.94, 0.02));
+    const shirtPanel = new THREE.Mesh(box(0.16, 0.32, 0.04), material(palette.shirt, 0.94, 0.02));
     tag(shirtPanel, 'shirt', 'player:shirt');
-    shirtPanel.position.set(0, 0.04, -0.18);
+    shirtPanel.position.set(0, 0.04, -0.16);
     torsoPivot.add(shirtPanel);
 
-    const leftLapel = new THREE.Mesh(box(0.08, 0.40, 0.05), material(palette.trim, 0.86, 0.02));
+    const leftLapel = new THREE.Mesh(box(0.07, 0.34, 0.05), material(palette.trim, 0.86, 0.02));
     tag(leftLapel, 'lapel', 'player:lapel-left');
-    leftLapel.position.set(-0.10, 0.06, -0.19);
+    leftLapel.position.set(-0.09, 0.06, -0.17);
     torsoPivot.add(leftLapel);
-    const rightLapel = new THREE.Mesh(box(0.08, 0.40, 0.05), material(palette.trim, 0.86, 0.02));
+    const rightLapel = new THREE.Mesh(box(0.07, 0.34, 0.05), material(palette.trim, 0.86, 0.02));
     tag(rightLapel, 'lapel', 'player:lapel-right');
-    rightLapel.position.set(0.10, 0.06, -0.19);
+    rightLapel.position.set(0.09, 0.06, -0.17);
     torsoPivot.add(rightLapel);
 
-    const sash = new THREE.Mesh(box(0.48, 0.10, 0.34), material(palette.trim, 0.86, 0.02));
+    const sash = new THREE.Mesh(box(0.42, 0.10, 0.30), material(palette.trim, 0.86, 0.02));
     tag(sash, 'sash', 'player:sash');
-    sash.position.y = -0.18;
+    sash.position.y = -0.16;
     torsoPivot.add(sash);
     const buckle = new THREE.Mesh(box(0.12, 0.10, 0.05), material(palette.brass, 0.35, 0.7));
     tag(buckle, 'buckle', 'player:buckle');
-    buckle.position.set(0, -0.18, -0.20);
+    buckle.position.set(0, -0.16, -0.18);
     torsoPivot.add(buckle);
 
     for (const side of [-1, 1]) {
-      const coatTail = new THREE.Mesh(box(0.20, 0.42, 0.08), material(palette.coat, 0.82, 0.04));
+      const coatTail = new THREE.Mesh(box(0.16, 0.34, 0.06), material(palette.coat, 0.82, 0.04));
       tag(coatTail, 'coat', side < 0 ? 'player:coat-tail-left' : 'player:coat-tail-right');
-      coatTail.position.set(side * 0.14, -0.40, 0.10);
+      coatTail.position.set(side * 0.12, -0.34, 0.10);
       torsoPivot.add(coatTail);
     }
 
@@ -194,27 +194,22 @@ export function createPirateFruitPlayerProvider({
     tag(headMesh, 'head', 'player:head');
     headPivot.add(headMesh);
 
-    const hairCap = new THREE.Mesh(box(headW * 1.02, 0.14, headD * 1.02), material(palette.hair, 0.94, 0.02));
-    tag(hairCap, 'hair', 'player:hair');
-    hairCap.position.y = headH / 2 + 0.01;
-    headPivot.add(hairCap);
-
-    const bandana = new THREE.Mesh(box(headW * 1.06, 0.14, headD * 1.08), material(palette.trim, 0.86, 0.02));
+    const bandana = new THREE.Mesh(box(headW * 1.08, 0.12, headD * 1.08), material(palette.trim, 0.86, 0.02));
     tag(bandana, 'bandana', 'player:bandana');
-    bandana.position.y = headH / 2 + 0.04;
+    bandana.position.y = headH * 0.28;
     headPivot.add(bandana);
     const bandanaKnot = new THREE.Mesh(box(0.10, 0.10, 0.10), material(palette.trim, 0.86, 0.02));
     tag(bandanaKnot, 'bandana', 'player:bandana-knot');
-    bandanaKnot.position.set(-headW * 0.42, headH * 0.22, 0.06);
+    bandanaKnot.position.set(-headW * 0.52, headH * 0.18, 0.04);
     headPivot.add(bandanaKnot);
-    const bandanaTail = new THREE.Mesh(box(0.08, 0.28, 0.04), material(palette.trim, 0.86, 0.02));
+    const bandanaTail = new THREE.Mesh(box(0.08, 0.26, 0.04), material(palette.trim, 0.86, 0.02));
     tag(bandanaTail, 'bandana', 'player:bandana-tail');
-    bandanaTail.position.set(-headW * 0.46, 0.02, 0.08);
+    bandanaTail.position.set(-headW * 0.54, -0.02, 0.06);
     headPivot.add(bandanaTail);
 
-    const beard = new THREE.Mesh(box(0.28, 0.16, 0.10), material(palette.hair, 0.94, 0.02));
+    const beard = new THREE.Mesh(box(0.22, 0.10, 0.08), material(palette.hair, 0.94, 0.02));
     tag(beard, 'beard', 'player:beard');
-    beard.position.set(0, -headH * 0.28, -headD / 2 - 0.02);
+    beard.position.set(0, -headH * 0.38, -headD / 2 - 0.01);
     headPivot.add(beard);
 
     const earring = new THREE.Mesh(box(0.04, 0.08, 0.04), material(palette.brass, 0.35, 0.7));
@@ -223,10 +218,10 @@ export function createPirateFruitPlayerProvider({
     headPivot.add(earring);
 
     function makeArm(side) {
-      const upper = new THREE.Mesh(box(0.12, 0.44, 0.12), material(palette.coat, 0.82, 0.04));
+      const upper = new THREE.Mesh(box(0.10, 0.44, 0.10), material(palette.coat, 0.82, 0.04));
       tag(upper, 'arm', side < 0 ? 'player:left-arm' : 'player:right-arm');
       upper.position.set(0, -0.16, 0);
-      const cuff = new THREE.Mesh(box(0.14, 0.08, 0.14), material(palette.trim, 0.86, 0.02));
+      const cuff = new THREE.Mesh(box(0.12, 0.08, 0.12), material(palette.trim, 0.86, 0.02));
       tag(cuff, 'cuff', side < 0 ? 'player:left-cuff' : 'player:right-cuff');
       cuff.position.set(0, -0.34, 0);
       const hand = new THREE.Mesh(box(0.11, 0.11, 0.11), material(palette.skin, 0.7, 0.02));
