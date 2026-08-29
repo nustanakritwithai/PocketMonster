@@ -41,6 +41,7 @@ try {
   assert.match(launcher, /monsterlife-launch-context-request-v1/);
   assert.match(launcher, /event\.origin !== assetBase\.origin/);
   assert.match(launcher, /event\.source !== gameWindow/);
+  assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-visible/, 'launcher must bind chat UI from the GitHub Pages asset base');
   assert.match(launcher, /game-v800\.js/);
   assert.match(launcher, /if \(!config\?\.featureFlags\?\.launchTicket\)/);
   assert.match(launcher, /LAUNCH_TICKET_QA_ONLY/);
