@@ -7,34 +7,43 @@ function sessionToken() {
 }
 function api(path) { return new URL(path.replace(/^\//, ''), `${state.config.apiBaseUrl.replace(/\/$/, '')}/`).href; }
 function addMessage(message) {
-  const row = document.createElement('div'); row.className = 'ml-chat-row';
-  const name = document.createElement('b'); name.textContent = message.username || message.displayName || 'ผู้เล่น';
-  if (String(message.username || '').startsWith('aibot_')) name.className = 'ml-chat-bot';
-  const text = document.createElement('span'); text.textContent = `: ${message.message}`;
-  row.append(name, text); document.querySelector('#mlChatMessages')?.append(row);
-  const box = document.querySelector('#mlChatMessages'); if (box) box.scrollTop = box.scrollHeight;
+  const list = document.querySelector('#chatMessages'); if (!list) return;
+  list.querySelector('.chat-empty')?.remove();
+  const row = document.createElement('div'); row.className = 'chat-row';
+  const avatar = document.createElement('div'); avatar.className = 'chat-avatar'; avatar.textContent = (message.displayName || message.username || '?').trim().charAt(0).toUpperCase();
+  const content = document.createElement('div'); content.className = 'chat-content';
+  const meta = document.createElement('div'); meta.className = 'chat-meta';
+  const name = document.createElement('b'); name.textContent = message.displayName || message.username || 'ผู้เล่น';
+  const account = document.createElement('span'); account.className = 'chat-account'; account.textContent = `@${message.username || '-'}`;
+  meta.append(name, account); content.append(meta);
+  const text = document.createElement('div'); text.className = 'chat-text'; text.textContent = message.message || ''; content.append(text);
+  row.append(avatar, content); list.append(row); list.scrollTop = list.scrollHeight;
 }
 async function pullMessages() {
   if (!state.token) return;
   const channel = document.querySelector('#mlChatChannel')?.value || 'WORLD';
   const response = await fetch(api(`/api/chat/messages?after=${state.after}&channel=${channel}`), { headers: { Authorization: `Bearer ${state.token}`, Accept: 'application/json' }, cache: 'no-store' });
-  if (!response.ok) return;
+  if (!response.ok) { const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ'; return; }
   const payload = await response.json(); for (const message of payload.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
 }
 async function sendMessage() {
-  const input = document.querySelector('#mlChatInput'); const message = input?.value.trim(); if (!message || !state.token) return;
-  const channel = document.querySelector('#mlChatChannel')?.value || 'WORLD';
+  const input = document.querySelector('#chatInput'); const message = input?.value.trim(); if (!message || !state.token) return;
+  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
   const response = await fetch(api('/api/chat/send'), { method: 'POST', headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, channel }) });
-  if (response.ok && input) { input.value = ''; await pullMessages(); }
+  if (response.ok && input) { input.value = ''; await pullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
 }
 function connectSocket() {
   if (!state.token || !state.config.webSocketUrl) return;
   try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
 }
 function mount() {
-  if (document.querySelector('#mlChatPanel')) return;
-  const style = document.createElement('style'); style.textContent = `.ml-chat-panel{position:fixed;z-index:80;left:14px;bottom:14px;width:min(360px,calc(100vw - 28px));padding:10px;border:1px solid #ffffff26;border-radius:14px;background:rgba(7,14,25,.9);color:#f8fafc;backdrop-filter:blur(8px);font:12px system-ui,sans-serif}.ml-chat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-weight:800}.ml-chat-messages{height:130px;overflow:auto;padding:5px 7px;background:#020617aa;border-radius:9px}.ml-chat-row{padding:3px 0;line-height:1.35}.ml-chat-bot{color:#facc15}.ml-chat-compose{display:flex;gap:5px;margin-top:7px}.ml-chat-compose input{min-width:0;flex:1;padding:7px;border:0;border-radius:7px}.ml-chat-compose button,.ml-chat-channel{border:0;border-radius:7px;padding:7px;background:#2563eb;color:white}.ml-chat-channel{background:#334155}`; document.head.append(style);
-  const panel = document.createElement('section'); panel.id = 'mlChatPanel'; panel.className = 'ml-chat-panel'; panel.innerHTML = `<div class="ml-chat-head"><span>แชทโลก</span><select id="mlChatChannel" class="ml-chat-channel"><option value="WORLD">WORLD</option><option value="ZONE">ZONE</option></select></div><div id="mlChatMessages" class="ml-chat-messages"></div><form id="mlChatForm" class="ml-chat-compose"><input id="mlChatInput" maxlength="500" placeholder="พิมพ์ข้อความ..."><button type="submit">ส่ง</button></form>`; document.body.append(panel); document.querySelector('#mlChatForm').addEventListener('submit', event => { event.preventDefault(); void sendMessage(); }); document.querySelector('#mlChatChannel').addEventListener('change', () => { state.after = 0; document.querySelector('#mlChatMessages').replaceChildren(); void pullMessages(); });
+  const panel = document.querySelector('#gameChat'); if (!panel || panel.dataset.bound) return;
+  panel.dataset.bound = 'true';
+  const headerNote = panel.querySelector('header span'); const channel = document.createElement('select'); channel.id = 'chatChannel'; channel.className = 'chat-channel'; channel.innerHTML = '<option value="WORLD">🌍 โลก</option><option value="ZONE">📍 พื้นที่</option>'; headerNote?.after(channel);
+  document.querySelector('#chatToggleBtn')?.addEventListener('click', () => { panel.classList.toggle('hidden'); if (!panel.classList.contains('hidden')) { const unread = document.querySelector('#chatUnread'); if (unread) { unread.textContent = '0'; unread.dataset.count = '0'; } document.querySelector('#chatInput')?.focus(); } });
+  document.querySelector('#chatCloseBtn')?.addEventListener('click', () => panel.classList.add('hidden'));
+  document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); void sendMessage(); });
+  channel.addEventListener('change', () => { state.after = 0; document.querySelector('#chatMessages')?.replaceChildren(); void pullMessages(); });
 }
 async function start() {
   const activate = () => {
