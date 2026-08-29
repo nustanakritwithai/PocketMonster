@@ -46,7 +46,9 @@ async function start() {
     state.polling = setInterval(() => void pullMessages(), 10000);
   };
   window.addEventListener('pocketmonster:auth-profile-bridge', activate, { once: true });
-  state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json()); state.token = sessionToken();
+  state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json());
+  mount();
+  state.token = sessionToken();
   if (!state.token) return;
   activate();
 }
