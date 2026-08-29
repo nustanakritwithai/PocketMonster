@@ -1,9 +1,32 @@
 # Pirate Fruit + Pocket Monster + World Simulator
 ## Integration Master Plan v3.3
 
-**Status:** Architecture Baseline / Implementation Planning  
-**Architecture:** Federation of Authorities + Authoritative World/Server Computation  
-**Execution strategy:** Presentation First → Headless World Runtime → Unified CombatStats → Authoritative Server Combat → Persistence/Replay/Online  
+**Status:** Architecture Baseline / Implementation Planning
+**Architecture:** Federation of Authorities + Authoritative World/Server Computation
+**Execution strategy:** Presentation First → Headless World Runtime → Unified CombatStats → Authoritative Server Combat → Persistence/Replay/Online
+**GitHub:** PR #313 is **PR 0** in §19 (architecture baseline + contracts freeze)
+
+---
+
+## 0. Relation to this repository
+
+เอกสารนี้เป็น architecture freeze ของ **PocketMonster** (`nustanakritwithai/PocketMonster`) เท่านั้น ไม่ใช่ใบอนุญาตให้ย้าย simulation เข้า Client และไม่แทนที่แผน Goal 1/2
+
+| System | In this repo today? | Role in this plan |
+| --- | --- | --- |
+| Pocket Monster client live loop | Yes (`game-v800.js`, app `8.4.0`) | Domain owner ของ monster progression/content; ตอนนี้ยัง execute combat บน client |
+| Monster six-stat contract | Yes (`monster-stat-contract.mjs` `MONSTER_STAT_KEYS`) | Vocabulary ที่ Pocket calculator ต้องฉายเข้า Canonical CombatStats |
+| Goal 1 / Goal 2 VPS path | Yes (`docs/INTEGRATION-INVENTORY-GOAL1.md`, `docs/GOAL2-STAGING-READONLY.md`, `docs/POST-GOAL1-ROADMAP.md`) | Near-term server probe แบบ read-only; แผนนี้**ห้าม**เปิด writes, account migration หรือข้าม Goal 2 gate |
+| MonsterLifeServer | Separate repo | API host ปัจจุบันของ health / version / launch-ticket |
+| Pirate Fruit | Not in this repo | Human / Ship domain owner |
+| Living World Physics Simulator 20.9.4 | Not in this repo | Future World/Server runtime baseline |
+
+กติกาสำหรับ implementation PR ใน repository นี้:
+
+- Presentation-First (Phase A–C / PR 1–3) แสดงผลได้อย่างเดียว ห้ามให้ Client เป็น authority ของ position, stats, damage, HP, status หรือ world state
+- อย่าเปิด `vpsWrites` / `playerDataWrites` หรือ production feature flag จากงานตามแผนนี้
+- Field หลักของ Canonical CombatStats ต้องใช้ชื่อเดียวกับ Pocket: `atk`, `def`, `spAtk`, `spDef`, `spd` — ห้ามใช้ `spatk` / `spdef`
+- `hp` ใน `MONSTER_STAT_KEYS` คือค่า HP จากสูตร progression ของ Pocket; Canonical CombatStats แยกเป็น `hpMax` และ `hpCurrent` ที่ target owner เป็นคน commit
 
 ---
 
@@ -98,8 +121,8 @@ type CombatStats = {
   hpCurrent: number
   atk: number
   def: number
-  spatk: number
-  spdef: number
+  spAtk: number
+  spDef: number
   spd: number
   accuracy: number
   crit: number
@@ -149,7 +172,13 @@ Base CombatStats
 
 ห้ามสร้าง `UniversalStatCalculator`
 
-ชื่อ ATK/DEF/SPATK/SPDEF/SPD เหมือนกันไม่ได้หมายความว่าสูตรสร้างค่าต้องเหมือนกัน
+ชื่อ `atk` / `def` / `spAtk` / `spDef` / `spd` เหมือนกันไม่ได้หมายความว่าสูตรสร้างค่าต้องเหมือนกัน
+
+ใน PocketMonster วันนี้ MonsterStatCalculator อยู่ฝั่ง client (`monster-stat-contract.mjs` + formula/runtime). PR ถัดไปย้ายได้เฉพาะ **ที่ execute** ไป server โดย Pocket ยังเป็นเจ้าของสูตรและ `definitionVersion`
+
+---
+
+## 4. Base / Effective / Current Combat State
 
 ---
 
@@ -161,8 +190,8 @@ Base CombatStats
 ผลที่ derive จาก progression และ definitions ของ Domain
 
 ```text
-HPMax / ATK / DEF / SPATK / SPDEF / SPD
-Accuracy / Crit / Evasion / Resistance / Penetration
+hpMax / atk / def / spAtk / spDef / spd
+accuracy / crit / evasion / resistance / penetration
 ```
 
 ### Effective CombatStats
@@ -657,7 +686,7 @@ Living World 20.9.4 เป็นฐานที่เหมาะสำหรั
 
 แนะนำให้แยก implementation เป็น PR เล็กตาม boundary แทนการ merge ระบบทั้งหมดใน PR เดียว
 
-- **PR 0:** Architecture baseline + contracts freeze
+- **PR 0:** Architecture baseline + contracts freeze — GitHub PR #313, this document
 - **PR 1:** Map / World region presentation integration
 - **PR 2:** Unified UI/HUD + EntityView
 - **PR 3:** Mock Gateway / read-only world snapshot contracts
@@ -687,6 +716,22 @@ Acceptance Tests:
 Rollback Plan:
 Files Removed:
 Cross-domain dependencies introduced:
+```
+
+### PR 0 (this PR) filled template
+
+```text
+Scope: Documentation-only architecture freeze for federation of authorities
+Domain Owner: Shared Core (contracts freeze) + PocketMonster repo documentation
+Affected Authority Fields: none; no runtime HP/position/combat writes
+Contracts Added/Changed: Canonical CombatStats field names locked to Pocket keys
+Migration Required: no
+Determinism Risk: none (no executable change)
+Replay Fingerprint Before/After: n/a
+Acceptance Tests: document names spAtk/spDef; Goal 1/2 write gates remain closed
+Rollback Plan: revert this markdown file
+Files Removed: none
+Cross-domain dependencies introduced: none in code; Pirate Fruit and Living World 20.9.4 remain external
 ```
 
 ---
