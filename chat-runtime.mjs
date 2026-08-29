@@ -1,5 +1,11 @@
 const SESSION_KEY = 'monsterlife.session.v1';
 const state = { config: null, token: null, after: 0, socket: null, polling: null };
+function ensureChatStyles() {
+  if (document.querySelector('#chatRuntimeStyles')) return;
+  const style = document.createElement('style'); style.id = 'chatRuntimeStyles';
+  style.textContent = '.chat-toggle{z-index:15000!important;pointer-events:auto!important}.game-chat{z-index:15001!important;pointer-events:auto!important}.game-chat.hidden{display:none!important}';
+  document.head.append(style);
+}
 
 function sessionToken() {
   if (window.POCKETMONSTER_SERVER_SESSION_TOKEN) return window.POCKETMONSTER_SERVER_SESSION_TOKEN;
@@ -37,6 +43,7 @@ function connectSocket() {
   try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
 }
 function ensureChatMarkup() {
+  ensureChatStyles();
   if (document.querySelector('#gameChat')) return;
   const root = document.createElement('div');
   root.innerHTML = `<button id="chatToggleBtn" class="chat-toggle" aria-label="เปิดแชท">💬 <span id="chatUnread" data-count="0">0</span></button><section id="gameChat" class="game-chat hidden"><header><b>แชทผู้เล่น</b><span>กรุณาใช้คำสุภาพ</span><button id="chatCloseBtn" type="button">×</button></header><div id="chatMessages" class="chat-messages"><div class="chat-empty">ยังไม่มีข้อความ เริ่มทักทายกันได้เลย</div></div><div id="chatError" class="chat-error"></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="160" autocomplete="off" placeholder="พิมพ์ข้อความ…"><button type="submit">ส่ง</button></form></section>`;
