@@ -2,7 +2,7 @@ const status = document.getElementById('startupStatus');
 
 async function loadLegacyGame(config, assetBase) {
   if (status) status.textContent = 'กำลังโหลดเกม…';
-  await import(new URL(`chat-runtime.mjs?v=8.4.0-chat-f3914ae`, assetBase).href);
+  await import(new URL(`chat-runtime.mjs?v=8.4.0-chat-top-right`, assetBase).href);
   await import(new URL(`game-v800.js?v=${encodeURIComponent(config.deployedRelease || Date.now())}`, assetBase).href);
   if (status) status.remove();
 }
