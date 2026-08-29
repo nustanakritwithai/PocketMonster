@@ -126,12 +126,6 @@ hp atk def spAtk spDef spd vitality combat blade ranged fruitPower mastery mana 
 ยืนยันซองเซฟ {state,playerHp,saveSchemaVersion} และ character ไม่มี hp
 ยืนยันแชท WORLD/ZONE และ world-snapshot แยกโซน รวม pirate-fruit และ living-world
 ยืนยัน online-only และพร้อมรีวิวโดยยังไม่เปิด writes
-<<<<<<< HEAD
 ```
-
 ถ้าข้อใดทำไม่ได้ ให้บล็อก merge และบอกข้อที่ขาด ห้ามเปิดธงเพื่อหลบ
-
 ยังไม่ merge รอ Server ตอบตามหัวข้อท้ายเอกสารนี้ก่อน
-=======
-ถ้าข้อใดทำไม่ได้ ให้บล็อก merge และบอกข้อที่ขาด ห้ามเปิดธงเพื่อหลบ
->>>>>>> e5dea6bac311216e9cef69c711c746cfd3aa9494
