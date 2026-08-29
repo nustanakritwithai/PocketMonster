@@ -3,7 +3,7 @@ const state = { config: null, token: null, after: 0, socket: null, polling: null
 function ensureChatStyles() {
   if (document.querySelector('#chatRuntimeStyles')) return;
   const style = document.createElement('style'); style.id = 'chatRuntimeStyles';
-  style.textContent = '.chat-toggle{left:auto!important;bottom:auto!important;top:max(8px,var(--safe-top,8px))!important;right:max(86px,calc(var(--safe-right,8px) + 74px))!important;z-index:15000!important;pointer-events:auto!important}.game-chat{left:auto!important;bottom:auto!important;top:max(58px,calc(var(--safe-top,8px) + 50px))!important;right:max(10px,var(--safe-right,8px))!important;width:min(320px,calc(100vw - 24px))!important;height:min(42vh,calc(100dvh - 58px - 148px))!important;max-height:calc(100dvh - 58px - 148px)!important;z-index:15001!important;pointer-events:auto!important}.game-chat.hidden{display:none!important}';
+  style.textContent = '.chat-toggle{left:auto!important;bottom:auto!important;top:max(8px,var(--safe-top,8px))!important;right:max(86px,calc(var(--safe-right,8px) + 74px))!important;z-index:15000!important;pointer-events:auto!important}.game-chat{bottom:auto!important;max-height:calc(100dvh - 58px - 148px)!important;z-index:15001!important;pointer-events:auto!important}.game-chat.hidden{display:none!important}@media (orientation:landscape) and (max-height:560px){.game-chat{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min(340px,46vw)!important;max-height:calc(100dvh - 48px - 140px)!important}}';
   document.head.append(style);
 }
 

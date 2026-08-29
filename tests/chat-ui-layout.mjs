@@ -24,7 +24,9 @@ assert.match(mobile, /left:auto;bottom:auto/, 'portrait phones cannot drop chat 
 assert.doesNotMatch(css, /@media \(max-width:700px\)\{[^}]*\.chat-toggle\{[^}]*bottom:max\(10px/, 'portrait media query must not pin chat to the bottom');
 
 assert.match(chat, /left:auto!important;bottom:auto!important/, 'runtime CSS must override a cached bottom-left stylesheet');
-assert.match(chat, /right:max\(86px/, 'runtime CSS must keep the top-right dock');
+assert.match(css, /@media \(orientation:landscape\) and \(max-height:560px\)\{[^]*?\.game-chat\{[^}]*left:50%/, 'short landscape chat panel centers between joystick and skills');
+assert.match(css, /@media \(orientation:landscape\) and \(max-height:560px\)\{[^]*?transform:translateX\(-50%\)/, 'short landscape chat panel is centered');
+assert.match(chat, /@media \(orientation:landscape\) and \(max-height:560px\)\{\.game-chat\{left:50%!important/, 'runtime CSS must center the landscape panel even if stylesheet is cached');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'chat layout change must cache-bust');
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'chat stays outside #hud');
 

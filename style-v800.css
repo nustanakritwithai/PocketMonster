@@ -1145,6 +1145,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   backdrop-filter:blur(12px);
   font-family:system-ui,sans-serif;
   pointer-events:auto;
+  transform:none;
 }
 .game-chat.hidden{display:none}
 .game-chat header{display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:1px solid #334155;background:#172033}
@@ -1173,5 +1174,5 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 }
 @media (orientation:landscape) and (max-height:560px){
   .chat-toggle{top:max(8px,var(--safe-top));right:max(86px,calc(var(--safe-right) + 74px));left:auto;bottom:auto;z-index:15000}
-  .game-chat{top:max(52px,calc(var(--safe-top) + 44px));right:max(10px,var(--safe-right));left:auto;bottom:auto;width:min(280px,42vw);height:min(52dvh,calc(100dvh - 52px - 132px));max-height:calc(100dvh - 52px - 132px);z-index:15001}
+  .game-chat{top:max(48px,calc(var(--safe-top) + 40px));left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:min(340px,46vw);height:min(48dvh,calc(100dvh - 48px - 140px));max-height:calc(100dvh - 48px - 140px);z-index:15001}
 }
