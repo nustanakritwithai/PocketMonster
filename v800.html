@@ -9,10 +9,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <script>if (location.pathname.endsWith('/v800.html')) location.replace(new URL('./', location.href).href);</script>
   <title>Monster Life RPG Prototype V8.4.0</title>
   <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});history.replaceState(null,'',u.pathname);})();</script>
-  <script type="module" src="./entry-preload.mjs"></script>
+  <script type="module" src="./entry-preload.mjs?v=8.4.0-chat-visible"></script>
   <link rel="stylesheet" href="./style-v800.css?v=810" />
 </head>
 <body>
@@ -60,6 +59,14 @@
 
   <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#dc2626;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V8.4.0</div>
   <div id="saveIndicator" style="position:fixed;right:8px;top:34px;z-index:9998;background:#059669;color:#fff;padding:3px 8px;border-radius:999px;font:700 9px system-ui;pointer-events:none;opacity:0;transition:opacity .3s">บันทึกแล้ว</div>
+
+  <button id="chatToggleBtn" class="chat-toggle" aria-label="เปิดแชท">💬 <span id="chatUnread" data-count="0">0</span></button>
+  <section id="gameChat" class="game-chat hidden">
+    <header><b>แชทผู้เล่น</b><span>กรุณาใช้คำสุภาพ</span><button id="chatCloseBtn" type="button">×</button></header>
+    <div id="chatMessages" class="chat-messages"><div class="chat-empty">ยังไม่มีข้อความ เริ่มทักทายกันได้เลย</div></div>
+    <div id="chatError" class="chat-error"></div>
+    <form id="chatForm" class="chat-form"><input id="chatInput" maxlength="160" autocomplete="off" placeholder="พิมพ์ข้อความ…"><button type="submit">ส่ง</button></form>
+  </section>
 
   <div id="hud">
     <div class="topbar compact-topbar" role="group" aria-label="สถานะผู้เล่นและการออกล่า">

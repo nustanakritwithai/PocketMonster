@@ -14,7 +14,7 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
     html = html.replace(`connect-src 'self'`, `connect-src 'self' ${apiOrigin}`);
   }
   html = html
-    .replace(`src="./entry-preload.mjs"`, `src="./firebase-launcher-entry.mjs?v=${release}"`)
+    .replace(/src="\.\/entry-preload\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
     .replace(`href="./style-v800.css?v=810"`, `href="${assetBase}style-v800.css?v=${release}"`)
     .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`)
     .replace(`  <script type="module" src="./game-v800.js?v=810"></script>`, '');

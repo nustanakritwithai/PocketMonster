@@ -11,6 +11,7 @@ try {
   if (!response.ok) throw new Error(`Launcher config failed (${response.status})`);
   const config = await response.json();
   const assetBase = new URL(config.assetBaseUrl);
+  void import(new URL(`chat-runtime.mjs?v=8.4.0-chat-visible`, assetBase).href);
   if (!config?.featureFlags?.launchTicket) {
     await loadLegacyGame(config, assetBase);
   } else {

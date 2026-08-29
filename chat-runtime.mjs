@@ -1,5 +1,14 @@
 const SESSION_KEY = 'monsterlife.session.v1';
 const state = { config: null, token: null, after: 0, socket: null, polling: null };
+const CHAT_STYLE_ID = 'chatRuntimeStyles';
+
+function ensureChatStyles() {
+  if (document.getElementById(CHAT_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = CHAT_STYLE_ID;
+  style.textContent = `.chat-toggle{position:fixed;left:16px;bottom:16px;z-index:15000!important;width:54px;height:46px;pointer-events:auto}.game-chat{position:fixed;left:16px;bottom:72px;z-index:15001!important;pointer-events:auto}.game-chat.hidden{display:none!important}@media (orientation:landscape) and (max-height:560px){.chat-toggle{bottom:max(132px,calc(112px + var(--safe-bottom,0px)))}.game-chat{bottom:max(188px,calc(168px + var(--safe-bottom,0px)))}}`;
+  document.head.append(style);
+}
 
 function sessionToken() {
   if (window.POCKETMONSTER_SERVER_SESSION_TOKEN) return window.POCKETMONSTER_SERVER_SESSION_TOKEN;
@@ -21,7 +30,7 @@ function addMessage(message) {
 }
 async function pullMessages() {
   if (!state.token) return;
-  const channel = document.querySelector('#mlChatChannel')?.value || 'WORLD';
+  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
   const response = await fetch(api(`/api/chat/messages?after=${state.after}&channel=${channel}`), { headers: { Authorization: `Bearer ${state.token}`, Accept: 'application/json' }, cache: 'no-store' });
   if (!response.ok) { const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ'; return; }
   const payload = await response.json(); for (const message of payload.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
@@ -37,6 +46,7 @@ function connectSocket() {
   try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => state.socket.send(JSON.stringify({ token: state.token }))); state.socket.addEventListener('message', event => { try { if (JSON.parse(event.data)?.type === 'chat') void pullMessages(); } catch {} }); state.socket.addEventListener('close', () => setTimeout(connectSocket, 5000)); } catch { setTimeout(connectSocket, 5000); }
 }
 function ensureChatMarkup() {
+  ensureChatStyles();
   if (document.querySelector('#gameChat')) return;
   const root = document.createElement('div');
   root.innerHTML = `<button id="chatToggleBtn" class="chat-toggle" aria-label="เปิดแชท">💬 <span id="chatUnread" data-count="0">0</span></button><section id="gameChat" class="game-chat hidden"><header><b>แชทผู้เล่น</b><span>กรุณาใช้คำสุภาพ</span><button id="chatCloseBtn" type="button">×</button></header><div id="chatMessages" class="chat-messages"><div class="chat-empty">ยังไม่มีข้อความ เริ่มทักทายกันได้เลย</div></div><div id="chatError" class="chat-error"></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="160" autocomplete="off" placeholder="พิมพ์ข้อความ…"><button type="submit">ส่ง</button></form></section>`;
