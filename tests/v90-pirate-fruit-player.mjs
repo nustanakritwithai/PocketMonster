@@ -109,7 +109,8 @@ assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 boots 
 assert.doesNotMatch(worldsJs, /worldGate\?\.classList\.remove\('hidden'\)/, 'V9 no longer waits on the 3-world picker before the first world');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'V9 character system is Pirate Fruit');
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays Pocket Monster');
-assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
+assert.match(worldsJs, /location\.assign\(combinedWorldLocation\(world\.id, panel\)\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
+assert.match(worldsJs, /query\.set\('shellRevision', shellRevision\)/, 'hosted world routes preserve the parent scene revision lease');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');

@@ -31,12 +31,21 @@ function currentPanel(worldId) {
   return document.body.dataset.controlPanel || panelIdFromLocation(location, worldId);
 }
 
+function combinedWorldLocation(worldId, panelId) {
+  const query = new URLSearchParams(combinedLocationQuery(worldId, panelId));
+  if (window.POCKETMONSTER_SCENE_EMBEDDED === true) {
+    const shellRevision = new URL(location.href).searchParams.get('shellRevision');
+    if (shellRevision !== null) query.set('shellRevision', shellRevision);
+  }
+  return `${location.pathname}?${query}`;
+}
+
 function selectWorld(id, panelOverride = null) {
   const world = worldById(id);
   if (!world) return;
   const panel = panelOverride || currentPanel(world.id);
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
-  location.assign(`${location.pathname}?${combinedLocationQuery(world.id, panel)}`);
+  location.assign(combinedWorldLocation(world.id, panel));
 }
 
 function handlePocketMonsterWorldWarp(event) {
@@ -56,7 +65,7 @@ async function bootWorld(id) {
   if (!world) return;
   document.body.dataset.combinedWorld = world.id;
   const panel = applyControlPanel(panelIdFromLocation(location, world.id), world.id);
-  const canonical = `${location.pathname}?${combinedLocationQuery(world.id, panel.id)}`;
+  const canonical = combinedWorldLocation(world.id, panel.id);
   if (`${location.pathname}${location.search}` !== canonical) history.replaceState(null, '', canonical);
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
     worldId: world.id,
