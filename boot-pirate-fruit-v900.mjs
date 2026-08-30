@@ -1,4 +1,4 @@
-import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs';
+import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs?v=901';
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
@@ -46,8 +46,12 @@ function bindPocketMonsterLink() {
   const button = document.getElementById('pocketWorldWarpBtn');
   if (button && link) {
     button.hidden = false;
+    button.removeAttribute('hidden');
+    button.classList.add('is-visible');
     button.textContent = `วาปเข้า${link.label}`;
     button.onclick = () => assignCombinedWorld(link.to);
+    button.textContent = 'เข้าสู่โลก Pocket Monster • จับและเลี้ยงมอนสเตอร์';
+    button.setAttribute('aria-label', 'เข้าสู่โลก Pocket Monster');
   }
   const zoneLabel = document.getElementById('zoneLabel');
   if (zoneLabel) zoneLabel.textContent = 'Pirate Fruit';
