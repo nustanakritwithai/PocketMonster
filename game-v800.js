@@ -4,7 +4,7 @@ import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState, resetMonsterAIState, resolveWildMonsterAI, settleWildAIIntent } from './wild-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
-import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=1';
+import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=2';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
@@ -3116,9 +3116,18 @@ function renderEquipment(targetPanel=null){
 }
 let immersiveStarted=true;
 let sceneRuntimeActive=true;
-function setSceneRuntimeActive(active){
+function setSceneRuntimeActive(active,reason=active?'scene-mount':'scene-unmount'){
   sceneRuntimeActive=active===true;
-  if(!sceneRuntimeActive) mobileDualPointerInput?.reset?.();
+  mobileDualPointerInput?.reset?.(reason);
+  joyEnd();
+  endCam();
+  for(const code of Object.keys(keys))keys[code]=false;
+  if(sceneRuntimeActive){
+    requestAnimationFrame(()=>{
+      try{window.focus();}catch{}
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
   return sceneRuntimeActive;
 }
 function startGameInteraction(){
