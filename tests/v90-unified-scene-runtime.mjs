@@ -85,6 +85,9 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     sceneBootLeaves: [],
     webSocketConstructs: 0,
   };
+  const sceneQuery = new URLSearchParams({ world, panel });
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '3');
+  const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
     manifestValid: true,
@@ -116,6 +119,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     generation: 1,
     worldId: world,
     panel,
+    sceneHref: initialSceneHref,
   });
   let childWindow = null;
 
@@ -135,6 +139,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
       reportSceneBoot(receivedWindow, lease, outcome) {
         assert.equal(receivedWindow, childWindow);
         assert.equal(lease, sceneLease);
+        if (childWindow.location.href !== lease.sceneHref) return false;
         metrics.sceneBootReports.push(outcome);
         metrics.timeline.push(`scene:report:${outcome?.status || 'invalid'}`);
         return true;
@@ -159,10 +164,10 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
 
   const childEvents = new EventTarget();
   const location = {
-    href: `https://game.example/scene-v900.html?world=${world}&panel=${panel}`,
+    href: initialSceneHref,
     origin: 'https://game.example',
     pathname: '/scene-v900.html',
-    search: `?world=${world}&panel=${panel}`,
+    search: `?${sceneQuery}`,
     assign() { assert.fail('child scene boot must not navigate its browsing context'); },
   };
   childWindow = {
@@ -442,6 +447,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '3', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);
