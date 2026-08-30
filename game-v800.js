@@ -3838,7 +3838,7 @@ function switchZone(zone,silent=false){
   syncHubCompanion();
   renderZoneUI();
   renderStarterJourney();
-  if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • กด “ออกล่า” เพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
+  if(!silent)msg(zone==='hub'?`${selectedInstance()?displayName(selectedInstance())+' เดินเป็นคู่หูใน Ranch • ':''}Ranch เป็น Safe Zone • เดินไปที่ประตูวาปสีทองเพื่อไปจับมอน`:cfg.sceneStatus==='blockout'?`${cfg.label} • Scene blockout พร้อมสำรวจ • ยังไม่มี Wild Monster`: `${safetyBalls?'Keeper Starter Kit: Capture Ball +5 • ':''}${cfg.label} • Wild ${livingWilds().length} ตัว • ปาเรียกมอนก่อนสู้`);
   saveGame(false);
   lastSwitchParts={ground:Number(groundMs.toFixed(2)),populate:Number(populateMs.toFixed(2)),flush:Number(flushMs.toFixed(2)),spawn:Number(spawnMs.toFixed(2)),save:Number((performance.now()-mark).toFixed(2))};
   lastSwitchZoneMs=performance.now()-switchStarted;
@@ -6913,7 +6913,7 @@ function updateWarpPrompt(dt){
   }
   if(nearbyWarp)closeWarpPrompt();
 }
-function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
+function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
 // ---------- Save migration ----------
@@ -7271,7 +7271,6 @@ el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');dismissedWarpId=near
 el('bossChallengeAccept').onclick=()=>{playSFX('sfx_ui_click');startBossChallenge();};
 el('bossChallengeDecline').onclick=()=>{playSFX('sfx_ui_click');declineNearbyBossChallenge();};
 el('bossRetreatBtn').onclick=()=>{playSFX('sfx_ui_click');exitBossChallenge();};
-el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;

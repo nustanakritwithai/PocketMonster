@@ -58,7 +58,6 @@ export function measureShortHeightLayout(doc = globalThis.document, win = global
   const party = snapshotElement(doc, '#party');
   const reason = snapshotElement(doc, '#actionReason');
   const topbar = snapshotElement(doc, '#hud .topbar');
-  const hunt = snapshotElement(doc, '#huntBtn');
   const actions = ACTION_SELECTORS.map(selector => snapshotElement(doc, selector));
   const skills = actions.slice(0, 4);
   const targetSkillIntersections = positiveIntersections(target, skills);
@@ -66,7 +65,6 @@ export function measureShortHeightLayout(doc = globalThis.document, win = global
   const partyActionIntersections = positiveIntersections(party, actions);
   const reasonPartyArea = intersectionArea(reason, party);
   const topbarTargetArea = intersectionArea(topbar, target);
-  const huntTargetArea = intersectionArea(hunt, target);
   const actionMinimums = actions.map(action => Object.freeze({ selector: action.selector, width: action.width, height: action.height }));
   const visualViewport = win.visualViewport;
   const overflowX = Math.max(0, doc.documentElement.scrollWidth - win.innerWidth);
@@ -78,7 +76,6 @@ export function measureShortHeightLayout(doc = globalThis.document, win = global
   if (partyActionIntersections.length) violations.push('party-action-overlap');
   if (reasonPartyArea > 0) violations.push('reason-party-overlap');
   if (topbarTargetArea > 0) violations.push('topbar-target-overlap');
-  if (huntTargetArea > 0) violations.push('hunt-target-overlap');
   if (actionMinimums.some(action => action.width < 48 || action.height < 48)) violations.push('action-under-48px');
   if (overflowX > 1 || overflowY > 1) violations.push('document-overflow');
   return Object.freeze({
@@ -90,13 +87,12 @@ export function measureShortHeightLayout(doc = globalThis.document, win = global
       dpr: win.devicePixelRatio,
       fullscreen: Boolean(doc.fullscreenElement),
     }),
-    rects: Object.freeze({ target, party, reason, topbar, hunt, actions: Object.freeze(actions) }),
+    rects: Object.freeze({ target, party, reason, topbar, actions: Object.freeze(actions) }),
     targetSkillIntersections: Object.freeze(targetSkillIntersections),
     targetActionIntersections: Object.freeze(targetActionIntersections),
     partyActionIntersections: Object.freeze(partyActionIntersections),
     reasonPartyArea,
     topbarTargetArea,
-    huntTargetArea,
     actionMinimums: Object.freeze(actionMinimums),
     overflow: Object.freeze({ x: overflowX, y: overflowY }),
     violations: Object.freeze(violations),

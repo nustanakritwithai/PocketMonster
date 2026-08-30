@@ -39,8 +39,10 @@ assert.doesNotMatch(js,/warpPromptCancel[\s\S]{0,120}warpPromptCooldown=\.35/,'C
 const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');
 assert.match(warpBeacon,/boxGeometry\(\.18,1\.8,\.18\)/,'Warp point has a visible vertical light beam');
-assert.match(js,/state\.currentZone==='hub'\?msg\('เดินไปที่ประตูวาปสีทอง/,'Hunt button guides players to the in-scene warp instead of the route-less legacy zone');
-assert.match(js,/hunt\.textContent='ประตูวาป → Grass Meadow'/,'Hub action label names the warp destination instead of promising a direct Hunt teleport');
+assert.doesNotMatch(html,/id="huntBtn"|class="[^"]*\bhunt-btn\b/,'HUD hunt/warp shortcut button is gone');
+assert.doesNotMatch(js,/el\('huntBtn'\)|id="huntBtn"|hunt\.textContent=/,'Runtime no longer wires a HUD hunt/warp shortcut');
+assert.doesNotMatch(js,/switchZone\(state\.currentZone==='hub'\?'grassland':'hub'\)/,'Hub travel stays in-scene instead of a route-less Hunt teleport');
+assert.match(js,/เดินไปที่ประตูวาปสีทองเพื่อไปจับมอน/,'Hub copy points players at the in-scene golden warp');
 assert.match(js,/warpSpawnOverride=route\.spawn/,'Warp selects the destination spawn point');
 assert.match(js,/ต้องเดินทางผ่านจุดวาปในฉากตามเส้นทาง/,'Stage Select no longer directly loads active stages');
 assert.doesNotMatch(html,/data-zone="grass-meadow"/,'Stage zone menu no longer directly warps to Set 1');
