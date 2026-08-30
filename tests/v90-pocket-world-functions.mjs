@@ -52,7 +52,7 @@ assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
 assert.match(livingJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Living World returns directly to Pirate Fruit');
 assert.match(boot, /source === 'pirate-fruit-living-portal'/, 'Pirate iframe bridge accepts the physical Living World portal');
-assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"|id="pocketWorldWarpBtn"/, 'V9 exposes no clickable world travel controls');
+assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"|id="pocketWorldWarpBtn"|id="controlPanelSwitcher"/, 'V9 exposes no clickable world or panel travel controls');
 assert.match(liveJs, /pirate-fruit-world-return-portal/, 'Ranch Hub ships a visible in-world return portal');
 assert.match(liveJs, /group\.position\.set\(-8,0,3\)/, 'return portal stays at the approved Ranch Hub coordinate');
 assert.match(liveJs, /state\.currentZone==='hub'/, 'return portal is active only inside Ranch Hub');

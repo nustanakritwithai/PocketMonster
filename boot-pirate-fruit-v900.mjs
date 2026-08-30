@@ -1,7 +1,7 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=903', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=904', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=813&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
@@ -30,7 +30,9 @@ function mountPirateOffline() {
   const frame = document.createElement('iframe');
   frame.id = 'pirateFruitFrame';
   frame.title = 'Pirate Fruit';
-  frame.src = PIRATE_FRUIT_OFFLINE_ENTRY;
+  const frameUrl = new URL(PIRATE_FRUIT_OFFLINE_ENTRY);
+  frameUrl.searchParams.set('parentOrigin', location.origin);
+  frame.src = frameUrl.href;
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
   return frame;
@@ -41,8 +43,9 @@ function assignCombinedWorld(worldId) {
 }
 
 function bindPocketMonsterLink(frame) {
+  const frameOrigin = new URL(frame.src).origin;
   window.addEventListener('message', event => {
-    if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+    if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
     const message = event.data;
     if (message?.type !== 'pocketmonster:world-warp-v1') return;
     const pocketPortal = message.world === 'pocket-monster' && message.panel === 'throw' && message.source === 'pirate-fruit-portal';

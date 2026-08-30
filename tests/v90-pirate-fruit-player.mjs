@@ -73,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=813/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=905/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=906/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -89,7 +89,7 @@ assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=813');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=903');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=904');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -114,11 +114,9 @@ assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selec
 assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'combined channel loads Pocket chat for every world');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
-assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
-assert.match(html, /data-control-panel="human"/, 'switcher includes the Pirate Fruit human panel');
-assert.match(html, /data-control-panel="throw"/, 'switcher includes the Pocket throw panel');
+assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');
 assert.match(html, /id="monsterThrowStage"/, 'V9 has a dedicated Pocket animal-control stage for pirate throw');
-assert.match(liveHtml, /id="controlPanelSwitcher"/, 'live V9 includes the control-panel switcher');
+assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel=/, 'live V9 exposes no clickable human/throw switcher');
 assert.match(liveHtml, /id="monsterThrowStage"/, 'live V9 includes the Pocket throw stage');
 assert.equal(defaultPanelForWorld('pocket-monster'), 'throw');
 assert.equal(defaultPanelForWorld('pirate-fruit'), 'human');
@@ -134,7 +132,7 @@ assert.equal(combinedLocationQuery('pocket-monster', 'bogus'), 'world=pocket-mon
 assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-monster&panel=throw');
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
-assert.match(cssV900, /#controlPanelSwitcher/, 'V9 stylesheet positions the panel switcher');
+assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'V9 stylesheet defensively hides stale panel switchers');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root\.tc-desktop::before/, 'control HUD overlay targets the desktop rectangular tray');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is removed');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px !important; bottom: 82px !important/, 'jump sits in the prototype circular cluster, not a desktop row');
@@ -147,7 +145,7 @@ assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] \.message/,
 assert.doesNotMatch(cssV900, /\.combined-world-warp|#worldSwitcher/, 'clickable world warp controls have no live CSS');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
-assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'Pocket Monster world hides the Pirate Fruit attack panel');
+assert.doesNotMatch(cssV900, /body\[data-combined-world\][^\n]*#controlPanelSwitcher\{display:flex/, 'V9 never reveals the removed panel switcher');
 
 {
   const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };
@@ -216,12 +214,9 @@ assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
-assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'real pirate world exposes the Pocket Monster world link');
-assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'warp button loads Pocket Monster');
-assert.match(boot, /button\.removeAttribute\('hidden'\)/, 'Pocket Monster portal is explicitly revealed after Pirate Fruit boots');
-assert.match(cssV900, /z-index:16020/, 'Pocket Monster portal stays above the Pirate Fruit iframe and chat overlays');
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
-assert.match(boot, /event\.origin !== location\.origin/, 'parent accepts portal messages only from the live game origin');
+assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
+assert.match(boot, /event\.origin !== frameOrigin/, 'parent accepts portal messages only from the mounted Pirate Fruit origin');
 assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
@@ -242,6 +237,7 @@ assert.equal(pirateSource.integrations.pocketMonsterPortal.combatAuthority, fals
 assert.deepEqual(pirateSource.integrations.pocketMonsterPortal.position, { x: 7, z: 15 });
 assert.match(pirateBundle, /pocketmonster:world-warp-v1/, 'Pirate Fruit bundle emits the Pocket Monster portal event');
 assert.match(pirateBundle, /pocket-monster-world-portal/, 'Pirate Fruit bundle contains the in-world portal object');
+assert.match(pirateBundle, /new URLSearchParams\(window\.location\.search\)\.get\("parentOrigin"\)\|\|window\.location\.origin/, 'Pirate portals target the hosting parent origin');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);
