@@ -761,6 +761,45 @@ function makePad(x,z,halfSize,color,opacity=.2){
 const ranchCenter=new THREE.Vector3(7,0,3);
 const ranchPad=makePad(7,3,3.4,0x22c55e,.42);
 const breedingPad=makePad(5.2,8.2,1.6,0xec4899,.15);
+function makePirateFruitReturnPortal(){
+  const group=new THREE.Group();
+  group.name='pirate-fruit-world-return-portal';
+  group.userData.presentationOnly=true;
+  group.userData.combatAuthority=false;
+  group.userData.destination='pirate-fruit';
+  const pedestal=new THREE.Mesh(new THREE.CylinderGeometry(1.28,1.5,.28,24),new THREE.MeshStandardMaterial({color:0x713f12,metalness:.18,roughness:.62}));
+  pedestal.position.y=.14;pedestal.receiveShadow=true;group.add(pedestal);
+  const outer=new THREE.Mesh(new THREE.TorusGeometry(1.12,.13,12,48),new THREE.MeshStandardMaterial({color:0xfb923c,emissive:0xea580c,emissiveIntensity:1.3,metalness:.28,roughness:.3}));
+  outer.position.y=1.72;outer.castShadow=true;group.add(outer);
+  const inner=new THREE.Mesh(new THREE.TorusGeometry(.88,.045,8,40),new THREE.MeshBasicMaterial({color:0x38bdf8,transparent:true,opacity:.9}));
+  inner.position.y=1.72;group.add(inner);
+  const core=new THREE.Mesh(new THREE.CircleGeometry(.82,40),new THREE.MeshBasicMaterial({color:0x0ea5e9,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+  core.position.set(0,1.72,-.02);group.add(core);
+  const light=new THREE.PointLight(0xfb923c,2.2,7,2);light.position.set(0,1.8,.35);group.add(light);
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
+  const ctx=canvas.getContext('2d');
+  if(ctx){ctx.fillStyle='rgba(7,18,34,.86)';ctx.roundRect(8,8,496,112,24);ctx.fill();ctx.strokeStyle='#fb923c';ctx.lineWidth=6;ctx.stroke();ctx.fillStyle='#fff7ed';ctx.font='700 34px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('กลับ Pirate Fruit',256,64);}
+  const labelTexture=new THREE.CanvasTexture(canvas);labelTexture.colorSpace=THREE.SRGBColorSpace;
+  const label=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTexture,transparent:true,depthWrite:false}));
+  label.position.set(0,3.35,0);label.scale.set(4.2,1.05,1);group.add(label);
+  group.position.set(-8,0,3);group.visible=false;scene.add(group);
+  return Object.freeze({group,outer,inner,core,light});
+}
+const pirateFruitReturnPortal=makePirateFruitReturnPortal();
+let pirateFruitReturnPortalBusy=false;
+function updatePirateFruitReturnPortal(dt){
+  const active=typeof window!=='undefined'&&window.POCKETMONSTER_COMBINED_BOOT?.worldId==='pocket-monster'&&state.currentZone==='hub';
+  pirateFruitReturnPortal.group.visible=active;
+  if(!active){pirateFruitReturnPortalBusy=false;return;}
+  pirateFruitReturnPortal.outer.rotation.z+=dt*.42;
+  pirateFruitReturnPortal.inner.rotation.z-=dt*.7;
+  const pulse=.5+.5*Math.sin(performance.now()*.0032);
+  pirateFruitReturnPortal.core.material.opacity=.2+pulse*.2;
+  pirateFruitReturnPortal.light.intensity=1.7+pulse*1.1;
+  if(pirateFruitReturnPortalBusy||distXZ(player.position,pirateFruitReturnPortal.group.position)>2.25)return;
+  pirateFruitReturnPortalBusy=true;
+  window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1',{detail:Object.freeze({type:'pocketmonster:world-warp-v1',world:'pirate-fruit',panel:'human',source:'pocket-monster-ranch-portal'})}));
+}
 const incubator=new THREE.Group();
 const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
 const eggVisual=new THREE.Mesh(boxGeometry(.5,.65,.45),new THREE.MeshStandardMaterial({color:0xfde68a,emissive:0x7c2d12,emissiveIntensity:.15})); eggVisual.scale.y=1.28; eggVisual.position.y=.72; eggVisual.castShadow=true; incubator.add(eggVisual);
@@ -7317,6 +7356,7 @@ function loop(now){
     updateWorldStream();
     preflightWildEncounterBoundaries();
     updateWarpPrompt(dt);
+    updatePirateFruitReturnPortal(dt);
     updateBossChallengePrompt();
     updateCamera(dt);
     updateWorldLabels(dt);

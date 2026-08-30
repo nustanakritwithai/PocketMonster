@@ -6,7 +6,7 @@ import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
-export const LIVING_WORLD_VERSION = '9.0.0-living-world';
+export const LIVING_WORLD_VERSION = '9.0.1-living-world-portal';
 export const LIVING_WORLD_ID = 'living-world';
 export const LIVING_WORLD_LABEL = 'โลกกลาง • World Layer';
 
@@ -129,6 +129,85 @@ const lintel = new THREE.Mesh(boxGeometry(4.0, 0.38, 0.5), mat(0x5a5362, .86, .0
 lintel.position.set(0, 3.28, -3.2);
 arch.add(pillarL, pillarR, lintel);
 scene.add(arch);
+
+function createPirateFruitPortal() {
+  const group = new THREE.Group();
+  group.name = 'living-world-pirate-fruit-portal';
+  group.userData.presentationOnly = true;
+  group.userData.combatAuthority = false;
+  group.userData.destination = 'pirate-fruit';
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.34, .12, 12, 48),
+    new THREE.MeshBasicMaterial({ color: 0xfb923c, toneMapped: false }),
+  );
+  ring.position.y = 1.64;
+  group.add(ring);
+  const inner = new THREE.Mesh(
+    new THREE.TorusGeometry(1.08, .045, 8, 40),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, toneMapped: false }),
+  );
+  inner.position.set(0, 1.64, .03);
+  group.add(inner);
+  const core = new THREE.Mesh(
+    new THREE.CircleGeometry(1.13, 48),
+    new THREE.MeshBasicMaterial({ color: 0x9a3412, transparent: true, opacity: .3, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
+  );
+  core.position.set(0, 1.64, .06);
+  group.add(core);
+  const light = new THREE.PointLight(0xfb923c, 2.5, 10, 2);
+  light.position.set(0, 1.7, .45);
+  group.add(light);
+  const canvas = document.createElement('canvas');
+  canvas.width = 640; canvas.height = 144;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.fillStyle = 'rgba(20,9,5,.88)';
+    context.strokeStyle = '#fb923c';
+    context.lineWidth = 7;
+    context.beginPath();
+    context.roundRect(7, 7, 626, 130, 34);
+    context.fill(); context.stroke();
+    context.fillStyle = '#fff7ed';
+    context.font = '800 42px sans-serif';
+    context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText('PIRATE FRUIT', 320, 58);
+    context.fillStyle = '#7dd3fc';
+    context.font = '700 25px sans-serif';
+    context.fillText('เดินเข้าประตูเพื่อกลับ', 320, 105);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+  label.position.set(0, 3.45, 0); label.scale.set(5.2, 1.17, 1); label.renderOrder = 100;
+  group.add(label);
+  group.position.set(0, 0, -3.18);
+  scene.add(group);
+  return Object.freeze({ group, ring, inner, core, light });
+}
+const pirateFruitPortal = createPirateFruitPortal();
+let pirateFruitPortalElapsed = 0;
+let pirateFruitPortalWasInside = false;
+
+function updatePirateFruitPortal(dt) {
+  pirateFruitPortalElapsed += Math.min(dt, .1);
+  pirateFruitPortal.ring.rotation.z = pirateFruitPortalElapsed * .48;
+  pirateFruitPortal.inner.rotation.z = -pirateFruitPortalElapsed * .72;
+  const pulse = .5 + .5 * Math.sin(pirateFruitPortalElapsed * 3.2);
+  pirateFruitPortal.core.material.opacity = .22 + pulse * .18;
+  pirateFruitPortal.light.intensity = 1.8 + pulse * 1.2;
+  const dx = player.position.x - pirateFruitPortal.group.position.x;
+  const dz = player.position.z - pirateFruitPortal.group.position.z;
+  const inside = dx * dx + dz * dz <= 1.8 * 1.8;
+  if (inside && !pirateFruitPortalWasInside) {
+    window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', { detail: Object.freeze({
+      type: 'pocketmonster:world-warp-v1',
+      world: 'pirate-fruit',
+      panel: 'human',
+      source: 'living-world-pirate-portal',
+    }) }));
+  }
+  pirateFruitPortalWasInside = inside;
+}
 
 for (const x of [-3.4, 3.4]) {
   const post = new THREE.Mesh(boxGeometry(0.18, 1.6, 0.18), mat(0x3f3a46, .9, .04));
@@ -267,6 +346,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   updatePlayer(dt);
+  updatePirateFruitPortal(dt);
   updateCamera(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

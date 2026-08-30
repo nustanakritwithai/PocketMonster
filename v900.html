@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-  <script type="module" src="./entry-preload-v900.mjs?v=902"></script>
+  <script type="module" src="./entry-preload-v900.mjs?v=903"></script>
   <link rel="stylesheet" href="./style-v800.css?v=810" />
   <link rel="stylesheet" href="./style-v900.css?v=901" />
 </head>
@@ -28,27 +28,10 @@
       <div id="registerStatus" class="account-status"></div>
     </div>
   </div>
-  <div id="worldGate" class="hidden" aria-label="เลือกโลกใน V9.0">
-    <div class="world-gate-card">
-      <h1>V9.0 รวม 3 โลก</h1>
-      <p>เริ่มที่โลก Pirate Fruit จริง • วาปเชื่อมเข้าเกมเดิม ไม่ใช้ด่านเกาะบล็อก</p>
-      <div class="world-gate-grid">
-        <button type="button" class="world-gate-btn" data-combined-world="pocket-monster"><b>เกมเดิม</b><small>โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี</small></button>
-        <button type="button" class="world-gate-btn" data-combined-world="pirate-fruit"><b>Pirate Fruit</b><small>โลก Pirate Fruit จริงจากไคลเอนต์ offline • วาปเชื่อมเข้าเกมเดิม</small></button>
-        <button type="button" class="world-gate-btn" data-combined-world="living-world"><b>โลกกลาง</b><small>World Layer • พรีเซนต์เท่านั้น ยังไม่เป็น authority</small></button>
-      </div>
-    </div>
-  </div>
-  <nav id="worldSwitcher" hidden aria-label="สลับโลกใน V9.0">
-    <button type="button" data-combined-world="pocket-monster">เกมเดิม</button>
-    <button type="button" data-combined-world="pirate-fruit">Pirate Fruit</button>
-    <button type="button" data-combined-world="living-world">โลกกลาง</button>
-  </nav>
   <nav id="controlPanelSwitcher" hidden aria-label="สลับแผงบังคับ">
     <button type="button" data-control-panel="human">คน</button>
     <button type="button" data-control-panel="throw">ปา</button>
   </nav>
-  <button id="pocketWorldWarpBtn" class="combined-world-warp" type="button" hidden>วาปเข้าเกมเดิม • Pocket Monster</button>
   <div id="controlPanelHint" class="control-panel-hint hidden" aria-live="polite"></div>
   <div id="monsterLifeProfilePanel" class="monsterlife-profile-panel" hidden aria-live="polite"></div>
   <dialog id="monsterLifeLinkDialog" class="monsterlife-link-dialog">

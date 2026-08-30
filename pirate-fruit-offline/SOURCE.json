@@ -15,6 +15,15 @@
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "pocket-monster",
       "panel": "throw"
+    },
+    "livingWorldPortal": {
+      "contract": "presentation-only",
+      "combatAuthority": false,
+      "position": { "x": -7, "z": 15 },
+      "triggerRadius": 2.25,
+      "messageType": "pocketmonster:world-warp-v1",
+      "destination": "living-world",
+      "panel": "human"
     }
   }
 }
