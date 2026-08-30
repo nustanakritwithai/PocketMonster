@@ -18,11 +18,13 @@ const output = fs.mkdtempSync(path.join(os.tmpdir(), 'pocketmonster-launcher-'))
 try {
   buildFirebaseLauncher({ root: path.resolve('.'), output });
   const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
-  assert.match(html, /entry-preload-v900\.mjs/);
+  assert.match(html, /firebase-launcher-entry\.mjs/, 'Firebase remains the V8.4 login and launch-ticket entry');
   assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v800\.css/);
   assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v900\.css/);
-  assert.doesNotMatch(html, /firebase-launcher-entry\.mjs/);
-  assert.equal(fs.existsSync(path.join(output, 'firebase-launcher-entry.mjs')), false);
+  assert.doesNotMatch(html, /entry-preload-v900\.mjs/, 'Firebase launcher must redirect into the GitHub V9 entry instead of booting V9 locally');
+  assert.equal(fs.existsSync(path.join(output, 'firebase-launcher-entry.mjs')), true);
+  assert.equal(fs.existsSync(path.join(output, 'firebase-auth-ui.mjs')), true);
+  assert.equal(fs.existsSync(path.join(output, 'server-auth.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'runtime-config.json')), true);
   const runtimeConfig = JSON.parse(fs.readFileSync(path.resolve('runtime-config.json'), 'utf8'));
   assert.equal(fs.existsSync(path.join(output, 'entry-preload-v900.mjs')), false);

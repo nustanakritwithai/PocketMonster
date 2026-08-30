@@ -1,13 +1,12 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=901';
 import {
   applyControlPanel,
   combinedLocationQuery,
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 
-const runtimeConfig = await loadRuntimeConfig();
+const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_RUNTIME_CONFIG = runtimeConfig;
   window.POCKETMONSTER_COMBINED = Object.freeze({
@@ -22,7 +21,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-await requireFirebaseLogin(runtimeConfig);
 await import('./chat-runtime.mjs?v=8.4.0-chat-top-right');
 
 const worldGate = document.getElementById('worldGate');
