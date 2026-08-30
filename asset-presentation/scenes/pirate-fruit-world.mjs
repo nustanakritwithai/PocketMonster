@@ -208,7 +208,7 @@ function makePortal(THREE, box, material, parent, spec) {
 }
 
 function makePortalLabel(THREE, spec) {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
   const canvas = document.createElement('canvas');
   canvas.width = 640;
   canvas.height = 144;
