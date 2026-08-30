@@ -387,6 +387,29 @@ const ball = named('capture-ball')[0];
 assert.ok(ball.position.z < 0, 'held ball sits on the front / -Z side');
 
 const { headPivot, torsoPivot, rightHandAnchor } = player.rig.pivots;
+assert.deepEqual(
+  [
+    player.rig.pivots.hipsPivot,
+    torsoPivot,
+    headPivot,
+    player.rig.pivots.leftArmRoot,
+    player.rig.pivots.rightArmRoot,
+    player.rig.pivots.leftLegRoot,
+    player.rig.pivots.rightLegRoot,
+  ].map(pivot => pivot.name),
+  [
+    'pocket-rig:hips',
+    'pocket-rig:torso',
+    'pocket-rig:head',
+    'pocket-rig:left-arm',
+    'pocket-rig:right-arm',
+    'pocket-rig:left-leg',
+    'pocket-rig:right-leg',
+  ],
+  'major target pivots expose stable retargeting names',
+);
+assert.equal(player.rig.pivots.rightHandPivot, rightHandAnchor, 'right hand exposes a stable pivot alias');
+assert.equal(player.rig.pivots.leftLowerLegPivot, player.rig.pivots.leftLegRoot, 'left lower leg exposes a stable pivot alias');
 assert.equal(headPivot.parent, torsoPivot.parent, 'head and torso are siblings — no double transform');
 assert.equal(headPivot.position.y, 1.44);
 assert.equal(player.rig.pivots.leftArmRoot.position.y, 1.02);
@@ -403,11 +426,94 @@ assert.ok(hitText.y > throwOrigin.y, 'hitText sits above the throwing hand');
 player.play('hurt', { duration: 0.24 });
 player.update(0.12, { moving: false });
 assert.ok(torsoPivot.rotation.x !== 0, 'hurt pose tilts the torso');
+player.update(0.12, { locomotion: 'idle' });
+assert.ok(Math.abs(torsoPivot.rotation.x) < 1e-12, 'hurt flinch returns to rest when its pose completes');
 player.play('throw', { duration: 0.34 });
 player.update(0, { moving: false });
 assert.equal(torsoPivot.rotation.x, 0, 'animator resets rest before the next action overlay');
+player.play('attack-melee', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.notEqual(torsoPivot.rotation.y, 0, 'melee attack twists the torso');
+assert.notEqual(player.rig.pivots.rightArmRoot.rotation.z, 0, 'melee attack drives a right-arm slash arc');
+player.play('attack-ranged', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.ok(player.rig.pivots.rightArmRoot.rotation.x < -0.5, 'ranged attack raises the right arm to aim forward');
+assert.notEqual(player.rig.pivots.rightArmRoot.position.z, -0.02, 'ranged attack adds visible recoil at the shoulder');
+assert.equal(torsoPivot.rotation.y > 0, true, 'ranged aim braces the torso opposite the melee twist');
+player.play('skill', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.ok(player.rig.pivots.rightArmRoot.rotation.x < -0.5, 'skill retains a strong right-arm cast or punch');
+assert.notEqual(player.rig.pivots.leftArmRoot.rotation.z, 0, 'skill has a distinct two-arm casting silhouette');
+const skillPose = {
+  torsoX: torsoPivot.rotation.x,
+  leftArmZ: player.rig.pivots.leftArmRoot.rotation.z,
+  rightArmX: player.rig.pivots.rightArmRoot.rotation.x,
+};
+player.update(0, { locomotion: 'idle' });
+assert.deepEqual({
+  torsoX: torsoPivot.rotation.x,
+  leftArmZ: player.rig.pivots.leftArmRoot.rotation.z,
+  rightArmX: player.rig.pivots.rightArmRoot.rotation.x,
+}, skillPose, 'reapplying the same frame starts from rest and does not accumulate pose drift');
 player.update(0.05, { moving: true });
-assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'walk pose swings the legs');
+assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'moving:true remains a backward-compatible walk');
+player.update(0.05, { locomotion: 'walk' });
+assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'explicit walk locomotion swings the legs');
+player.update(0, { locomotion: 'idle' });
+assert.equal(player.rig.pivots.leftLegRoot.rotation.x, 0, 'explicit idle locomotion resets the leg pose');
+player.update(0.05, { locomotion: 'idle', moving: true });
+assert.equal(player.rig.pivots.leftLegRoot.rotation.x, 0, 'explicit idle locomotion overrides the legacy moving flag');
+
+const walkPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+const runPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+walkPlayer.update(0.05, { locomotion: 'walk' });
+runPlayer.update(0.05, { locomotion: 'run' });
+assert.ok(
+  Math.abs(runPlayer.rig.pivots.leftLegRoot.rotation.x) > Math.abs(walkPlayer.rig.pivots.leftLegRoot.rotation.x),
+  'run advances faster and swings the legs farther than walk',
+);
+assert.ok(
+  Math.abs(runPlayer.rig.pivots.leftArmRoot.rotation.x) > Math.abs(walkPlayer.rig.pivots.leftArmRoot.rotation.x),
+  'run swings the arms farther than walk',
+);
+walkPlayer.dispose();
+runPlayer.dispose();
+
+const deadPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+deadPlayer.play('dead');
+deadPlayer.update(0.1, { locomotion: 'run' });
+assert.notEqual(deadPlayer.rig.pivots.torsoPivot.rotation.z, 0, 'dead pose presents a collapsed torso');
+assert.equal(
+  deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+  deadPlayer.rig.pivots.rightLegRoot.rotation.x,
+  'dead pose suppresses alternating locomotion leg swing',
+);
+const collapsed = {
+  torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+  hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+  leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+};
+deadPlayer.play('attack-melee', { duration: 0.2 });
+deadPlayer.update(1, { locomotion: 'run' });
+assert.deepEqual({
+  torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+  hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+  leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+}, collapsed, 'dead is highest priority and holds a stable collapsed pose');
+for (const forcedAction of ['skill', 'hurt', 'attack-melee']) {
+  deadPlayer.play(forcedAction, { force: true, duration: 0.2 });
+  deadPlayer.update(0.1, { locomotion: 'idle' });
+  assert.deepEqual({
+    torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+    hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+    leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+  }, collapsed, `forced ${forcedAction} cannot recover a dead handle`);
+}
+deadPlayer.play('idle', { force: true });
+deadPlayer.update(0, { locomotion: 'idle' });
+assert.equal(deadPlayer.rig.pivots.torsoPivot.rotation.z, 0, 'forced idle recovers a reused handle from dead');
+assert.equal(deadPlayer.rig.pivots.hipsPivot.position.y, 0.60, 'forced idle restores the hips rest pose');
+deadPlayer.dispose();
 
 player.setAppearance('appearance.human.player-orange.v1');
 assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');

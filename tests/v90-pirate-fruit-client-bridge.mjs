@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import {
   PIRATE_FRUIT_CLIENT_BRIDGE,
   PIRATE_FRUIT_MONSTER_VISUALS,
+  applyPirateFruitActionTransition,
   classifyPirateFruitNode,
   hidePirateFruitOriginalMeshes,
   hookPirateFruitRenderer,
   orientPirateFruitVisual,
+  pirateFruitActionSignalFromCombat,
   pirateFruitKindForNode,
   pocketMonsterIdFor,
   resolvePirateVisualHost,
@@ -44,6 +46,122 @@ assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.visual, 'pocket-asset-engine');
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.presentationOnly, true);
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.combatAuthority, false);
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.createsStage, false);
+
+const idleCombat = { combatState: 'idle', controller: { hp: 100 } };
+assert.equal(pirateFruitActionSignalFromCombat(idleCombat), null, 'idle combat has no presentation action');
+
+const meleeSwing = {
+  combatState: 'attack-1',
+  controller: { hp: 100 },
+  swing: { comboIndex: 1, timer: 0.18, duration: 0.42 },
+  loadout: { state: { activeSet: 'sword', equippedWeaponKind: 'cutlass' } },
+};
+const meleeSnapshot = structuredClone(meleeSwing);
+const meleeSignal = pirateFruitActionSignalFromCombat(meleeSwing);
+assert.equal(meleeSignal.action, 'attack-melee');
+assert.equal(meleeSignal.token, meleeSwing.swing, 'a live swing object is the stable attack token');
+assert.equal(meleeSignal.duration, 0.42);
+assert.deepEqual(meleeSwing, meleeSnapshot, 'normalization does not mutate combat');
+assert.equal(
+  pirateFruitActionSignalFromCombat({
+    combatState: 'attack-ranged',
+    controller: { hp: 100 },
+    swing: { comboIndex: 0, timer: 0.1 },
+    loadout: { state: { activeSet: 'primary', equippedWeaponKind: 'flintlock-gun' } },
+  }).action,
+  'attack-ranged',
+  'only clearly ranged equipment selects the ranged Pocket attack',
+);
+assert.equal(
+  pirateFruitActionSignalFromCombat({ combatState: 'attack-2', controller: { hp: 100 }, swing: null }).action,
+  'attack-melee',
+  'attack states default to melee without clearly ranged equipment',
+);
+
+const pendingCast = { skillId: 'fireball', targetId: 'crab-1' };
+const casting = {
+  combatState: 'casting',
+  controller: { hp: 100 },
+  pendingCast,
+  skillVisualElapsed: 0.25,
+  skillVisualDuration: 0.9,
+};
+const castSignal = pirateFruitActionSignalFromCombat(casting);
+assert.equal(castSignal.action, 'skill');
+assert.equal(castSignal.token, pendingCast, 'cast token does not include continuously changing elapsed time');
+assert.equal(castSignal.duration, 0.9);
+casting.skillVisualElapsed = 0.5;
+assert.equal(pirateFruitActionSignalFromCombat(casting).token, castSignal.token, 'cast token remains stable while elapsed changes');
+
+const hurtOverAttack = pirateFruitActionSignalFromCombat({
+  combatState: 'attack-1',
+  controller: { hp: 10 },
+  swing: { comboIndex: 1 },
+  damageReactionSerial: 7,
+  timeSinceDamaged: 0.12,
+});
+assert.equal(hurtOverAttack.action, 'hurt', 'hurt outranks attack');
+assert.match(String(hurtOverAttack.token), /7/, 'hurt token includes the damage serial');
+assert.equal(
+  pirateFruitActionSignalFromCombat({
+    combatState: 'casting',
+    controller: { hp: 0 },
+    pendingCast: { skillId: 'fireball' },
+    damageReactionSerial: 8,
+    timeSinceDamaged: 0.1,
+  }).action,
+  'dead',
+  'dead outranks hurt and skill',
+);
+assert.equal(
+  pirateFruitActionSignalFromCombat({ combatState: 'dead', controller: { hp: 100 } }).dead,
+  true,
+  'dead combat state normalizes the explicit dead flag',
+);
+
+function actionCalls(previousAction, sample) {
+  const calls = [];
+  const handle = { play: (...args) => calls.push(args) };
+  applyPirateFruitActionTransition(handle, previousAction, sample);
+  return calls;
+}
+
+assert.deepEqual(
+  actionCalls('dead', { action: 'skill', actionId: 'cast:2', duration: 0.9 }),
+  [
+    ['idle', { force: true }],
+    ['skill', { duration: 0.9 }],
+  ],
+  'dead-to-skill force-idles before playing the new action',
+);
+for (const [action, actionId, duration] of [
+  ['hurt', 'hurt:8', 0.3],
+  ['attack-melee', 'swing:4', 0.45],
+]) {
+  assert.deepEqual(
+    actionCalls('dead', { action, actionId, duration }),
+    [
+      ['idle', { force: true }],
+      [action, { duration }],
+    ],
+    `direct dead-to-${action} recovery unlocks the provider before playback`,
+  );
+}
+assert.deepEqual(
+  actionCalls('dead', { action: null, actionId: null, duration: 0 }),
+  [['idle', { force: true }]],
+  'dead-to-null only force-idles',
+);
+assert.deepEqual(
+  actionCalls('skill', { action: 'skill', actionId: null, duration: 0.9 }),
+  [],
+  'a repeated action with a null action id does not replay',
+);
+assert.deepEqual(
+  actionCalls('dead', { action: 'dead', actionId: null, duration: 1 }),
+  [],
+  'a repeated dead sample neither unlocks nor replays',
+);
 assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
 assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
@@ -59,6 +177,20 @@ assert.match(bridgeSrc, /character\.human\.pirate-fruit\.v1/, 'local player uses
 assert.match(bridgeSrc, /character\.human\.blocky-bighead\.v1/, 'other people use the Pocket bighead visual');
 assert.match(bridgeSrc, /paintGroundGrid/, 'bridge paints Pocket ground on existing terrain');
 assert.match(bridgeSrc, /paintSkyGradient/, 'bridge paints Pocket sky on the existing scene');
+assert.match(bridgeSrc, /createPirateFruitActionTracker/, 'bridge imports and creates the live action adapter');
+assert.match(bridgeSrc, /createPirateFruitRigRetargeter/, 'bridge imports and creates source-bone retargeting');
+assert.match(bridgeSrc, /createPirateFruitRigRetargeter\(host, handle\.rig\)/, 'local player retargets from the real host into the Pocket rig');
+assert.match(bridgeSrc, /userData:\s*\{\s*pocketActionSignal:\s*signal\s*\}/, 'action adapter samples an ephemeral presentation host');
+assert.doesNotMatch(bridgeSrc, /host\.userData\.pocketActionSignal\s*=/, 'bridge never writes action signals onto the real host');
+assert.match(
+  bridgeSrc,
+  /applyPirateFruitActionTransition\(item\.handle,\s*item\.lastAction,\s*sample\)/,
+  'the live update routes sampled edges through dead-safe playback',
+);
+assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*sample\.locomotion\s*\}\)/, 'adapter locomotion drives Pocket updates');
+assert.match(bridgeSrc, /rigRetargeter\.update\(\)/, 'source bones are applied after the generic Pocket update');
+assert.match(bridgeSrc, /rigRetargeted:/, 'diagnostics report retargeted visuals');
+assert.match(bridgeSrc, /actionDriven:/, 'diagnostics report action-driven visuals');
 assert.doesNotMatch(boot, /buildPirateFruitWorld|pirate-fruit-world\.mjs/, 'pirate boot does not mount a Pocket-built island');
 assert.match(boot, /id = 'pirateFruitFrame'/, 'real Pirate Fruit client stays in the iframe');
 assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not add a Pocket pirate stage runtime');

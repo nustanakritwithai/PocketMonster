@@ -151,6 +151,13 @@ export function createPirateFruitPlayerProvider({
     const rightArmRoot = new THREE.Group(); rightArmRoot.position.set(POCKET_HUMANOID.arm.x, POCKET_HUMANOID.arm.y, POCKET_HUMANOID.arm.z); visualRoot.add(rightArmRoot);
     const leftLegRoot = new THREE.Group(); leftLegRoot.position.set(-POCKET_HUMANOID.leg.x, POCKET_HUMANOID.leg.y, POCKET_HUMANOID.leg.z); visualRoot.add(leftLegRoot);
     const rightLegRoot = new THREE.Group(); rightLegRoot.position.set(POCKET_HUMANOID.leg.x, POCKET_HUMANOID.leg.y, POCKET_HUMANOID.leg.z); visualRoot.add(rightLegRoot);
+    hipsPivot.name = 'pocket-rig:hips';
+    torsoPivot.name = 'pocket-rig:torso';
+    headPivot.name = 'pocket-rig:head';
+    leftArmRoot.name = 'pocket-rig:left-arm';
+    rightArmRoot.name = 'pocket-rig:right-arm';
+    leftLegRoot.name = 'pocket-rig:left-leg';
+    rightLegRoot.name = 'pocket-rig:right-leg';
 
     const hips = new THREE.Mesh(box(0.38, 0.22, 0.28), material(palette.pants, 0.8, 0.04));
     tag(hips, 'hips', 'player:hips');
@@ -262,7 +269,17 @@ export function createPirateFruitPlayerProvider({
 
     const rig = {
       rest,
-      pivots: { hipsPivot, torsoPivot, headPivot, leftArmRoot, rightArmRoot, leftLegRoot, rightLegRoot, rightHandAnchor },
+      pivots: {
+        hipsPivot, torsoPivot, headPivot, leftArmRoot, rightArmRoot, leftLegRoot, rightLegRoot, rightHandAnchor,
+        leftForearmPivot: leftArmRoot,
+        rightForearmPivot: rightArmRoot,
+        leftHandPivot: leftArmRoot,
+        rightHandPivot: rightHandAnchor,
+        leftLowerLegPivot: leftLegRoot,
+        rightLowerLegPivot: rightLegRoot,
+        leftFootPivot: leftLeg.boot,
+        rightFootPivot: rightLeg.boot,
+      },
       metrics: { headY, head: [headW, headH, headD], height: def.metrics?.height ?? POCKET_HUMANOID.height },
     };
     root.userData.animRig = rig;
@@ -308,29 +325,72 @@ export function createPirateFruitPlayerProvider({
       root,
       rig,
       play(name, options = {}) {
+        if (action === 'dead' && name !== 'dead' && !(name === 'idle' && options.force === true)) return handle;
         action = name || 'idle';
         actionDuration = options.duration ?? GAMEPLAY_LOCKS.throwDuration;
-        actionTimer = actionDuration;
+        actionTimer = action === 'dead' ? Infinity : actionDuration;
         return handle;
       },
       update(dt, visualState = {}) {
         applyRest(rest);
-        const moving = !!visualState.moving;
-        phase += dt * (moving ? 9.5 : 2.8);
-        if (actionTimer > 0) actionTimer = Math.max(0, actionTimer - dt);
-        else action = 'idle';
+        const locomotion = visualState.locomotion === 'idle'
+          || visualState.locomotion === 'walk'
+          || visualState.locomotion === 'run'
+          ? visualState.locomotion
+          : visualState.moving ? 'walk' : 'idle';
+        const dead = action === 'dead';
+        const moving = !dead && locomotion !== 'idle';
+        const phaseSpeed = locomotion === 'run' ? 13.5 : moving ? 9.5 : 2.8;
+        phase += dt * phaseSpeed;
+        if (!dead && actionTimer > 0) actionTimer = Math.max(0, actionTimer - dt);
+        else if (!dead) action = 'idle';
         const walk = Math.sin(phase);
         if (moving) {
+          const legSwing = locomotion === 'run' ? 0.62 : 0.45;
+          const armSwing = locomotion === 'run' ? 0.38 : 0.25;
           torsoPivot.position.y = POCKET_HUMANOID.torsoY + Math.abs(walk) * 0.03;
           headPivot.rotation.z = -walk * 0.03;
-          leftLegRoot.rotation.x = -walk * 0.45;
-          rightLegRoot.rotation.x = walk * 0.45;
-          leftArmRoot.rotation.x = walk * 0.25;
-          rightArmRoot.rotation.x = -walk * 0.25;
+          leftLegRoot.rotation.x = -walk * legSwing;
+          rightLegRoot.rotation.x = walk * legSwing;
+          leftArmRoot.rotation.x = walk * armSwing;
+          rightArmRoot.rotation.x = -walk * armSwing;
         } else {
           headPivot.position.y = headY + Math.sin(phase * 0.5) * 0.006;
         }
-        if (action === 'throw' || action === 'skill') {
+        if (action === 'dead') {
+          hipsPivot.position.y = 0.28;
+          hipsPivot.rotation.z = -0.42;
+          torsoPivot.position.y = 0.52;
+          torsoPivot.rotation.x = 0.18;
+          torsoPivot.rotation.z = -1.05;
+          headPivot.position.y = 0.48;
+          headPivot.rotation.z = -0.72;
+          leftArmRoot.rotation.z = 0.62;
+          rightArmRoot.rotation.z = -0.48;
+          leftLegRoot.rotation.x = 0.18;
+          rightLegRoot.rotation.x = 0.18;
+        } else if (action === 'attack-melee') {
+          const u = 1 - actionTimer / actionDuration;
+          const slash = Math.sin(Math.min(1, u) * Math.PI);
+          torsoPivot.rotation.y = -0.28 * slash;
+          rightArmRoot.rotation.x = -0.72 * slash;
+          rightArmRoot.rotation.z = -1.05 * slash;
+        } else if (action === 'attack-ranged') {
+          const u = Math.min(1, 1 - actionTimer / actionDuration);
+          const recoil = Math.sin(u * Math.PI);
+          torsoPivot.rotation.y = 0.12 * recoil;
+          rightArmRoot.rotation.x = -1.12 * recoil;
+          rightArmRoot.rotation.z = -0.08 * recoil;
+          rightArmRoot.position.z = POCKET_HUMANOID.arm.z + 0.08 * recoil;
+        } else if (action === 'skill') {
+          const u = 1 - actionTimer / actionDuration;
+          const cast = Math.sin(Math.min(1, u) * Math.PI);
+          torsoPivot.rotation.x = -0.08 * cast;
+          leftArmRoot.rotation.x = -0.42 * cast;
+          leftArmRoot.rotation.z = 0.38 * cast;
+          rightArmRoot.rotation.x = -0.95 * cast;
+          rightArmRoot.rotation.z = -0.28 * cast;
+        } else if (action === 'throw') {
           const u = 1 - actionTimer / actionDuration;
           const punch = Math.sin(Math.min(1, u) * Math.PI);
           rightArmRoot.rotation.x = -0.85 * punch;
