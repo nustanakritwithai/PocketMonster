@@ -66,11 +66,13 @@ function element(tag, id = '') {
 }
 
 const sceneWindowEvents = new EventTarget();
+let sceneFocusCount = 0;
 const sceneWindow = {
   location: { href: 'about:blank' },
   CustomEvent: globalThis.CustomEvent,
   addEventListener: sceneWindowEvents.addEventListener.bind(sceneWindowEvents),
   dispatchEvent: sceneWindowEvents.dispatchEvent.bind(sceneWindowEvents),
+  focus() { sceneFocusCount += 1; },
 };
 const frameListeners = new Map();
 const sceneFrame = element('iframe', 'onlineWorldSceneFrame');
@@ -113,6 +115,11 @@ globalThis.document = {
     if (tag === 'select') node.value = 'WORLD';
     return node;
   },
+};
+let fullscreenRequestCount = 0;
+document.documentElement.requestFullscreen = async () => {
+  fullscreenRequestCount += 1;
+  document.fullscreenElement = document.documentElement;
 };
 
 window.POCKETMONSTER_RUNTIME_CONFIG = Object.freeze({
@@ -195,6 +202,9 @@ window.addEventListener('pocketmonster:online-scene-error', () => { errorEvents 
 assert.equal(frameNode, sceneFrame);
 assert.equal(FakeWebSocket.instances.length, 1);
 assert.equal(onlineShell.diagnostics().chat.socketCreates, 1);
+assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
+assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
+assert.equal(fullscreenRequestCount, 1, 'persistent shell requests fullscreen once and reuses it across scene swaps');
 
 function installScenePose(zone) {
   const snapshots = [];
@@ -219,6 +229,7 @@ sceneFrame.emitLoad();
 assert.equal(shellStatusNode.classList.contains('hidden'), false, 'iframe load alone cannot claim runtime readiness');
 assert.equal(onlineShell.diagnostics().sceneReadyCount, 0);
 reportSceneReady(activeLease);
+assert.equal(sceneFocusCount, 1, 'ready scene receives input focus');
 assert.equal(shellStatusNode.classList.contains('hidden'), true);
 assert.equal(readyEvents, 1);
 assert.equal(onlineShell.reportSceneBoot(sceneWindow, activeLease, { status: 'ready' }), false, 'duplicate reports are rejected');
@@ -240,6 +251,7 @@ for (const [world, panel, zone] of [
   sceneFrame.emitLoad();
   assert.equal(shellStatusNode.classList.contains('hidden'), false, 'new document load waits for its own ready report');
   reportSceneReady(activeLease);
+  assert.equal(sceneFocusCount, onlineShell.diagnostics().sceneReadyCount, 'each new ready scene regains input focus');
   assert.equal(onlineShell.diagnostics().activeWorld, world);
   assert.equal(window.POCKETMONSTER_WORLD_STATE().zone, zone);
   assert.equal(onlineShell.bootId, bootId, 'top-level shell identity survives scene navigation');

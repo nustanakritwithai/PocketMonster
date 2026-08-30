@@ -11,6 +11,7 @@ assert.equal(
 const read = relative => fs.readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8');
 const actualSources = new Map([
   ['/scene-entry-v900.mjs', read('scene-entry-v900.mjs')],
+  ['/persistent-fullscreen-v900.mjs', read('persistent-fullscreen-v900.mjs')],
   ['/worlds-v900.mjs', read('worlds-v900.mjs')],
   ['/online-world-bridge-v900.mjs', read('online-world-bridge-v900.mjs')],
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
@@ -21,7 +22,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=908',
+    runtime: './boot-pirate-fruit-v900.mjs?v=909',
   }),
   Object.freeze({
     world: 'pocket-monster',

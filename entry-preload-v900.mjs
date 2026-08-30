@@ -43,4 +43,4 @@ await applyPendingPatch();
 document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
-await import('./online-world-shell-v900.mjs?v=3');
+await import('./online-world-shell-v900.mjs?v=4');
