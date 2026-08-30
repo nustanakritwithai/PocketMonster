@@ -13,6 +13,7 @@ const actualSources = new Map([
   ['/scene-entry-v900.mjs', read('scene-entry-v900.mjs')],
   ['/persistent-fullscreen-v900.mjs', read('persistent-fullscreen-v900.mjs')],
   ['/worlds-v900.mjs', read('worlds-v900.mjs')],
+  ['/scene-route-controller-v900.mjs', read('scene-route-controller-v900.mjs')],
   ['/online-world-bridge-v900.mjs', read('online-world-bridge-v900.mjs')],
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
 ]);

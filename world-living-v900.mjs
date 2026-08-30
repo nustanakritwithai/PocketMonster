@@ -11,6 +11,7 @@ export const LIVING_WORLD_ID = 'living-world';
 export const LIVING_WORLD_LABEL = 'โลกกลาง • World Layer';
 
 const startup = document.getElementById('startupStatus');
+let sceneRuntimeActive = true;
 function startupText(text, cls = '') {
   if (startup) {
     startup.textContent = text;
@@ -199,7 +200,9 @@ function updatePirateFruitPortal(dt) {
   const dz = player.position.z - pirateFruitPortal.group.position.z;
   const inside = dx * dx + dz * dz <= 1.8 * 1.8;
   if (inside && !pirateFruitPortalWasInside) {
-    location.assign(`${location.pathname}?world=pirate-fruit&panel=human`);
+    window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {
+      detail: { type: 'pocketmonster:world-warp-v1', world: 'pirate-fruit', panel: 'human', source: 'living-world-pirate-portal' },
+    }));
   }
   pirateFruitPortalWasInside = inside;
 }
@@ -338,6 +341,7 @@ const message = document.getElementById('message');
 if (message) message.textContent = 'ชั้นโลกกลางใน V9.0 • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP';
 let last = performance.now();
 function frame(now) {
+  if (!sceneRuntimeActive) { requestAnimationFrame(frame); return; }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   updatePlayer(dt);
@@ -347,3 +351,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
+  mount:()=>{sceneRuntimeActive=true;return true;},
+  unmount:()=>{sceneRuntimeActive=false;return true;},
+  diagnostics:()=>Object.freeze({active:sceneRuntimeActive}),
+});

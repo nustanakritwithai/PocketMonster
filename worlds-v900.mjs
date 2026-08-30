@@ -5,6 +5,7 @@ import {
   combinedLocationQuery,
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
+import { createSceneRouteController } from './scene-route-controller-v900.mjs';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
@@ -40,22 +41,57 @@ function combinedWorldLocation(worldId, panelId) {
   return `${location.pathname}?${query}`;
 }
 
-function selectWorld(id, panelOverride = null) {
+const routeController = createSceneRouteController({ initialRoute: resolveCombinedWorld() });
+const savedWorldGameNodes = new Map();
+const runtimeLifecycles = new Map();
+let activeRuntimeId = null;
+
+for (const world of COMBINED_WORLDS) {
+  routeController.register(world.id, {
+    async mount() {
+      if (!runtimeLifecycles.has(world.id)) {
+        await import(world.runtime);
+        runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
+      }
+      const game = document.getElementById('game');
+      const saved = savedWorldGameNodes.get(world.id);
+      if (saved && game) game.replaceChildren(...saved);
+      runtimeLifecycles.get(world.id)?.mount?.();
+      activeRuntimeId = world.id;
+    },
+    async unmount() { runtimeLifecycles.get(world.id)?.unmount?.(); },
+  });
+}
+
+async function switchWorldInDocument(id, panelOverride = null) {
   const world = worldById(id);
   if (!world) return;
   const panel = panelOverride || currentPanel(world.id);
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
-  location.assign(combinedWorldLocation(world.id, panel));
+  window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
+    worldId: world.id,
+    runtime: world.runtime,
+    includesOriginalGame: world.id === 'pocket-monster',
+    controlPanel: panel,
+  });
+  const game = document.getElementById('game');
+  if (activeRuntimeId && game) savedWorldGameNodes.set(activeRuntimeId, [...game.childNodes]);
+  const switched = await routeController.switchTo(world.id, { panel });
+  if (!switched) return;
+  document.body.dataset.combinedWorld = world.id;
+  document.body.dataset.controlPanel = panel;
+  history.replaceState(null, '', combinedWorldLocation(world.id, panel));
 }
 
 function handlePocketMonsterWorldWarp(event) {
   const warp = event?.detail;
   if (warp?.type !== 'pocketmonster:world-warp-v1') return;
   const currentWorld = document.body.dataset.combinedWorld;
+  const pirateReturn = currentWorld === 'pirate-fruit' && (warp.world === 'pocket-monster' || warp.world === 'living-world');
   const ranchReturn = currentWorld === 'pocket-monster' && warp.world === 'pirate-fruit' && warp.panel === 'human' && warp.source === 'pocket-monster-ranch-portal';
   const livingReturn = currentWorld === 'living-world' && warp.world === 'pirate-fruit' && warp.panel === 'human' && warp.source === 'living-world-pirate-portal';
-  if (!ranchReturn && !livingReturn) return;
-  selectWorld(warp.world, warp.panel);
+  if (!ranchReturn && !livingReturn && !pirateReturn) return;
+  switchWorldInDocument(warp.world, warp.panel);
 }
 
 window.addEventListener('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp);
@@ -78,6 +114,7 @@ async function bootWorld(id) {
     startup.className = 'startup-status';
   }
   await import(world.runtime);
+  activeRuntimeId = world.id;
 }
 
 await bootWorld(resolveCombinedWorld());
