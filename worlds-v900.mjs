@@ -66,7 +66,7 @@ for (const world of COMBINED_WORLDS) {
 async function switchWorldInDocument(id, panelOverride = null) {
   const world = worldById(id);
   if (!world) return;
-  const panel = panelOverride || currentPanel(world.id);
+  const panel = applyControlPanel(panelOverride || currentPanel(world.id), world.id).id;
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
     worldId: world.id,
@@ -74,12 +74,12 @@ async function switchWorldInDocument(id, panelOverride = null) {
     includesOriginalGame: world.id === 'pocket-monster',
     controlPanel: panel,
   });
+  document.body.dataset.combinedWorld = world.id;
+  document.body.dataset.controlPanel = panel;
   const game = document.getElementById('game');
   if (activeRuntimeId && game) savedWorldGameNodes.set(activeRuntimeId, [...game.childNodes]);
   const switched = await routeController.switchTo(world.id, { panel });
   if (!switched) return;
-  document.body.dataset.combinedWorld = world.id;
-  document.body.dataset.controlPanel = panel;
   history.replaceState(null, '', combinedWorldLocation(world.id, panel));
 }
 
