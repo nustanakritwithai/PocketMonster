@@ -106,6 +106,6 @@ assert.equal('POCKETMONSTER_LAUNCH_SESSION' in globalThis, false);
 assert.doesNotMatch(html, /src="\.\/game-v800\.js/, 'HTML must not boot the game independently');
 const preload = fs.readFileSync(new URL('entry-preload.mjs', root), 'utf8');
 assert.match(preload, /await prepareLaunch/);
-assert.match(preload, /await import\('\.\/game-v800\.js\?v=813'\)/, 'preload must import game only after launch gate');
+assert.match(preload, /await import\('\.\/game-v800\.js\?v=814'\)/, 'preload must import game only after launch gate');
 
 console.log('Launch-ticket client bootstrap contract: PASS');

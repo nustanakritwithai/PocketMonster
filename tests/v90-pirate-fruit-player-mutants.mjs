@@ -19,17 +19,17 @@ const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
-assert.equal(liveHtml, versionedHtml, 'mutant 0: active V8.4 entry stays byte-identical');
-assert.doesNotMatch(liveHtml, /v900\.html|game-v900|worlds-v900|pirate-fruit-offline/, 'mutant 0b: current game version must not point at the combined channel');
-assert.match(html, /data-combined-world="pocket-monster"/, 'mutant 0c: V9 gate includes the original game');
+assert.equal(liveHtml, html, 'mutant 0: active entry stays byte-identical with v900.html');
+assert.notEqual(liveHtml, versionedHtml, 'mutant 0b: legacy v800.html stays isolated from the active V9 entry');
+assert.doesNotMatch(html, /data-combined-world=/, 'mutant 0c: V9 does not hard-code a world before routing');
 assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts in the real Pirate Fruit world');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'mutant 0c2b: Pocket-block pirate island stage is deleted');
 assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit', 'mutant 0c3: missing ?world= resolves to pirate-fruit');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
-assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'mutant 0c5: real pirate world links into Pocket Monster');
-assert.match(html, /id="huntBtn"/, 'mutant 0d: V9 keeps the original HUD so game-v800 can boot');
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=900', 'mutant 0e2: pirate world still boots through the pirate boot module');
+assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
+assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814', 'mutant 0e: original game runtime is game-v800.js');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=906', 'mutant 0e2: pirate world still boots through the pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
@@ -64,7 +64,8 @@ assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open 
 assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must be the offline build');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'mutant 16: V9 ships no clickable control-panel switcher');
 assert.match(html, /id="monsterThrowStage"/, 'mutant 16b: V9 has the pirate throw Pocket stage');
-assert.doesNotMatch(liveHtml, /controlPanelSwitcher|data-control-panel|monsterThrowStage/, 'mutant 17: live index.html must not gain V9 control panels');
+assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel=/, 'mutant 17: live V9 exposes no clickable control-panel switcher');
+assert.match(liveHtml, /id="monsterThrowStage"/, 'mutant 17b: live V9 retains the Pocket throw stage');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'mutant 18: character authority stays Pirate Fruit');
 assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/capture stays Pocket Monster');
 assert.match(panelsJs, /pocketMonsterCharacterSystem: 'removed'/, 'mutant 20: Pocket character system is removed');
@@ -75,7 +76,7 @@ assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'mutant 23c: pirate throw keeps hunt for wild animal control');
-assert.match(boot, /game-v800\.js\?v=810&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
+assert.match(boot, /game-v800\.js\?v=814&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop publishes animal-control functions');
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');

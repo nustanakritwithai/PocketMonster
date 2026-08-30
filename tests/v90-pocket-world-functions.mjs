@@ -27,7 +27,7 @@ assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hu
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=813/, 'live preload binds chat before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=814/, 'legacy preload binds chat before game overlays');
 assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
 assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
@@ -58,7 +58,7 @@ assert.match(liveJs, /group\.position\.set\(-8,0,3\)/, 'return portal stays at t
 assert.match(liveJs, /state\.currentZone==='hub'/, 'return portal is active only inside Ranch Hub');
 assert.match(liveJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Ranch return portal navigates directly to Pirate Fruit');
 assert.match(worldsJs, /window\.addEventListener\('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp\)/, 'V9 router binds the local return portal event');
-assert.match(worldsJs, /selectWorld\('pirate-fruit', 'human'\)/, 'return portal opens Pirate Fruit with human controls');
+assert.match(worldsJs, /selectWorld\(warp\.world, warp\.panel\)/, 'validated return portals preserve their Pirate Fruit human destination');
 assert.doesNotMatch(liveJs.match(/function updatePirateFruitReturnPortal\(dt\)\{[\s\S]*?\n\}/)?.[0]||'', /saveGame|vpsWrites|playerDataWrites/, 'return portal does not write save or enable server writes');
 assert.match(helper, /remoteWorldPlayers/, 'presence overlay tracks remote markers');
 assert.doesNotMatch(helper, /vpsWrites|playerDataWrites/, 'presence helper must not open write flags');
