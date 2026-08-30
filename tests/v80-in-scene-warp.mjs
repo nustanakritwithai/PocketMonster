@@ -29,6 +29,8 @@ assert.doesNotMatch(css,/\.warp-prompt/,'Walk-through portals ship no prompt CSS
 assert.doesNotMatch(html,/id="warpPrompt"|id="huntBtn"/,'Walk-through portals ship no clickable warp tab');
 assert.match(js,/function updateWalkThroughWarp\(dt\)/,'Player movement owns portal proximity');
 assert.match(js,/nearbyWarp=found;\s*startWarp\(found\)/,'Entering a portal starts travel immediately');
+assert.match(js,/warpArrivalNeedsExit=true/,'Destination portal waits until the player leaves its radius before rearming');
+assert.match(js,/if\(warpArrivalNeedsExit\)\{if\(!found\)warpArrivalNeedsExit=false;return;\}/,'Arrival guard clears only after leaving the destination portal');
 assert.doesNotMatch(js,/nextWarpPromptState\(|renderWarpPrompt\(|warpPromptAction|warpPromptCancel/,'Live travel has no confirmation flow');
 const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');

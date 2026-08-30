@@ -9,4 +9,4 @@ await applyPendingPatch();
 document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
-await import('./worlds-v900.mjs?v=904');
+await import('./worlds-v900.mjs?v=905');

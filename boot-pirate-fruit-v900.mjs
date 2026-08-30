@@ -2,7 +2,7 @@ import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v9
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=903', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=813&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
 const game = document.getElementById('game');
@@ -15,7 +15,7 @@ export function ensurePocketAnimalControl() {
     return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
   }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=810&animalControl=pirate-fruit').then(() => {
+    throwRuntimePromise = import('./game-v800.js?v=813&animalControl=pirate-fruit').then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
