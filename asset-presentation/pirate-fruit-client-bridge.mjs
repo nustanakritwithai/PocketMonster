@@ -3,6 +3,8 @@ import { createAssetEngine } from './engine.mjs';
 import { GROUND_REPEAT, paintGroundGrid, paintSkyGradient } from './blocky-ground.mjs';
 import { createBigheadProvider } from './providers/procedural-bighead.mjs';
 import { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';
+import { createPirateFruitActionTracker } from './pirate-fruit-action-adapter.mjs';
+import { createPirateFruitRigRetargeter } from './pirate-fruit-rig-retarget.mjs';
 
 /** Overlay Pocket visuals on the real Pirate Fruit client. Does not replace the world. */
 export const PIRATE_FRUIT_CLIENT_BRIDGE = Object.freeze({
@@ -117,6 +119,67 @@ export function resolvePirateVisualHost(node) {
 export function pocketMonsterIdFor(name = '') {
   const raw = String(name).replace(/^monster:/, '');
   return PIRATE_FRUIT_MONSTER_VISUALS[raw] || 'monster.slime.normalooze.bighead.v1';
+}
+
+function positiveDuration(value, fallback) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function isClearlyRangedLoadout(loadout) {
+  const state = loadout?.state;
+  const values = [state?.activeSet, state?.equippedWeaponKind, state?.equippedFightingStyleId];
+  return values.some(value => /(?:^|[-_\s])(gun|ranged|pistol|rifle|musket|flintlock|bow|crossbow)(?:$|[-_\s])/i.test(String(value || '')));
+}
+
+/** Normalize live Pirate Fruit combat state without mutating its runtime owner. */
+export function pirateFruitActionSignalFromCombat(combat) {
+  if (!combat || typeof combat !== 'object') return null;
+  const combatState = String(combat.combatState || '');
+
+  if (combatState === 'dead' || (Number.isFinite(combat.controller?.hp) && combat.controller.hp <= 0)) {
+    return { dead: true, action: 'dead', token: 'dead', duration: 1 };
+  }
+
+  if (
+    Number.isFinite(combat.damageReactionSerial)
+    && combat.damageReactionSerial > 0
+    && Number.isFinite(combat.timeSinceDamaged)
+    && combat.timeSinceDamaged < 0.3
+  ) {
+    return { action: 'hurt', token: `hurt:${combat.damageReactionSerial}`, duration: 0.3 };
+  }
+
+  if (combatState === 'casting' || combat.pendingCast) {
+    return {
+      action: 'skill',
+      token: combat.pendingCast || 'casting',
+      duration: positiveDuration(combat.skillVisualDuration, 0.8),
+    };
+  }
+
+  if (/^attack/.test(combatState) || combat.swing) {
+    const swing = combat.swing;
+    return {
+      action: isClearlyRangedLoadout(combat.loadout) ? 'attack-ranged' : 'attack-melee',
+      token: swing || combatState,
+      duration: positiveDuration(
+        swing?.duration ?? swing?.totalDuration ?? swing?.attackDuration ?? swing?.timer,
+        0.45,
+      ),
+    };
+  }
+
+  return null;
+}
+
+/** Apply one sampled action edge while safely unlocking a dead visual. */
+export function applyPirateFruitActionTransition(handle, previousAction, sample) {
+  if (previousAction === 'dead' && sample?.action !== 'dead') {
+    handle?.play?.('idle', { force: true });
+  }
+  if (sample?.actionId != null && sample?.action != null) {
+    handle?.play?.(sample.action, { duration: sample.duration });
+  }
 }
 
 function srcOf(value) {
@@ -296,7 +359,18 @@ export async function installPirateFruitPocketPresentation({
     host.add(handle.root);
     hidePirateFruitOriginalMeshes(host, new Set([handle.root]));
     attached.add(host);
-    visuals.push({ host, handle, kind, lastX: host.position.x, lastZ: host.position.z });
+    const actionTracker = kind === 'player' ? createPirateFruitActionTracker() : null;
+    const rigRetargeter = kind === 'player' ? createPirateFruitRigRetargeter(host, handle.rig) : null;
+    visuals.push({
+      host,
+      handle,
+      kind,
+      actionTracker,
+      rigRetargeter,
+      lastAction: null,
+      lastX: host.position.x,
+      lastZ: host.position.z,
+    });
     return handle;
   }
 
@@ -381,10 +455,30 @@ export async function installPirateFruitPocketPresentation({
     for (const item of visuals) {
       const dx = item.host.position.x - item.lastX;
       const dz = item.host.position.z - item.lastZ;
-      const moving = (dx * dx + dz * dz) > 0.00002;
+      const distanceSq = dx * dx + dz * dz;
+      const moving = distanceSq > 0.00002;
       item.lastX = item.host.position.x;
       item.lastZ = item.host.position.z;
-      item.handle.update?.(dt, { moving });
+      if (!item.actionTracker) {
+        item.handle.update?.(dt, { moving });
+        continue;
+      }
+
+      const combat = globalThis.__combat;
+      const liveSpeed = combat?.controller?.moveState?.speed;
+      const speed = Number.isFinite(liveSpeed) && liveSpeed >= 0
+        ? liveSpeed
+        : (dt > 0 ? Math.sqrt(distanceSq) / dt : 0);
+      const signal = pirateFruitActionSignalFromCombat(combat);
+      const sample = item.actionTracker.sample(
+        { userData: { pocketActionSignal: signal } },
+        now,
+        { distanceSq, speed },
+      );
+      applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
+      item.lastAction = sample.action;
+      item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
+      item.rigRetargeter.update();
     }
   }
 
@@ -395,6 +489,8 @@ export async function installPirateFruitPocketPresentation({
     diagnostics: () => ({
       ...PIRATE_FRUIT_CLIENT_BRIDGE,
       attached: visuals.length,
+      rigRetargeted: visuals.filter(item => item.rigRetargeter).length,
+      actionDriven: visuals.filter(item => item.actionTracker).length,
       providers: assets.diagnostics().providers,
     }),
   };
