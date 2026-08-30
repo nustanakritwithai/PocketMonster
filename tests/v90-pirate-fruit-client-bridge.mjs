@@ -7,8 +7,13 @@ import {
   PIRATE_FRUIT_CLIENT_BRIDGE,
   PIRATE_FRUIT_MONSTER_VISUALS,
   classifyPirateFruitNode,
+  hidePirateFruitOriginalMeshes,
   hookPirateFruitRenderer,
+  orientPirateFruitVisual,
+  pirateFruitKindForNode,
   pocketMonsterIdFor,
+  resolvePirateVisualHost,
+  shouldPreservePirateSubtree,
   threeFromPirateFruitVendor,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
@@ -84,6 +89,9 @@ assert.equal(classifyPirateFruitNode('boat:skiff'), 'boat');
 assert.equal(classifyPirateFruitNode('PF_ISLAND_STARTER_DETAILS'), 'prop');
 assert.equal(classifyPirateFruitNode('pocket-monster-world-portal'), 'skip');
 assert.equal(classifyPirateFruitNode('effect:slash'), 'skip');
+assert.equal(classifyPirateFruitNode('player-rig:right-arm'), 'skip');
+assert.equal(classifyPirateFruitNode('rig:root'), 'skip');
+assert.equal(classifyPirateFruitNode('socket:right-palm'), 'skip');
 assert.equal(pocketMonsterIdFor('monster:crab'), 'monster.slime.aquapuff.bighead.v1');
 assert.equal(pocketMonsterIdFor('monster:unknown-raider'), 'monster.slime.normalooze.bighead.v1');
 for (const id of Object.values(PIRATE_FRUIT_MONSTER_VISUALS)) {
@@ -101,11 +109,48 @@ assert.equal(typeof kit.CanvasTexture, 'function');
 const group = new kit.Group();
 group.name = 'player:pirate-v1';
 assert.equal(classifyPirateFruitNode(group.name), 'player');
+const playerFacingVisual = new kit.Group();
+orientPirateFruitVisual(playerFacingVisual, 'player');
+assert.equal(playerFacingVisual.rotation.y, Math.PI, 'player overlay converts Pocket -Z front to Pirate Fruit +Z front');
+const monsterFacingVisual = new kit.Group();
+orientPirateFruitVisual(monsterFacingVisual, 'monster');
+assert.equal(monsterFacingVisual.rotation.y, 0, 'non-player overlays keep their existing facing contract');
 const box = new kit.BoxGeometry(1, 1, 1);
 const mat = new kit.MeshStandardMaterial({ color: 0x17364b });
 const mesh = new kit.Mesh(box, mat);
 assert.equal(mesh.isMesh, true);
 assert.equal(typeof kit.Object3D.prototype.updateMatrixWorld, 'function');
+
+const scene = kit.Scene ? new kit.Scene() : new kit.Group();
+scene.isScene = true;
+const npcHost = new kit.Group();
+const npcRig = new kit.Group();
+npcRig.name = 'rig:root';
+const npcBody = new kit.Mesh(box, mat.clone());
+npcBody.name = 'rig:body:batched';
+npcRig.add(npcBody);
+const npcHull = new kit.Mesh(box, mat.clone());
+npcHull.name = 'character:hull';
+npcRig.add(npcHull);
+const npcLabel = new kit.Group();
+npcLabel.name = 'hp-label';
+npcHost.add(npcRig, npcLabel);
+scene.add(npcHost);
+assert.equal(pirateFruitKindForNode(npcHost), 'npc', 'unnamed top-level rig host is an NPC');
+assert.equal(resolvePirateVisualHost(npcHull), npcHost, 'hull resolves to the whole NPC host');
+assert.equal(resolvePirateVisualHost(npcRig), npcHost, 'rig node resolves to the whole NPC host');
+assert.equal(shouldPreservePirateSubtree(npcLabel), true, 'HP labels stay owned by Pirate Fruit');
+
+const equipment = new kit.Group();
+equipment.name = 'equipment:sword';
+const equipmentMesh = new kit.Mesh(box, mat.clone());
+equipment.add(equipmentMesh);
+npcHost.add(equipment);
+hidePirateFruitOriginalMeshes(npcHost);
+assert.equal(npcBody.visible, false, 'original NPC body silhouette is hidden');
+assert.equal(npcHull.visible, false, 'legacy hull silhouette is hidden');
+assert.equal(equipmentMesh.visible, true, 'equipment subtree stays visible');
+assert.equal(npcLabel.visible, true, 'HP label stays visible');
 
 const hook = hookPirateFruitRenderer(vendor);
 assert.equal(hook.hooked, true);

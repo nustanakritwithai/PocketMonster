@@ -69,11 +69,49 @@ export function classifyPirateFruitNode(name = '') {
     || id.startsWith('equipment:')
     || id.startsWith('attachment:')
     || id.startsWith('skill-')
+    || id.startsWith('player-rig:')
+    || id.startsWith('rig:')
+    || id.startsWith('socket:')
     || (id.startsWith('player:') && id !== 'player:pirate-v1' && id !== 'player:gameplay-root')
     || /portal|water|ocean|wake|foam|wave/i.test(id)
   ) return 'skip';
   if (id.startsWith('PF_ISLAND_') || id.startsWith('PF_STATIC_BATCH_')) return 'prop';
   return 'other';
+}
+
+function hasNamedDescendant(root, name, maxDepth = 4) {
+  const queue = [[root, 0]];
+  while (queue.length) {
+    const [node, depth] = queue.shift();
+    if (node !== root && node?.name === name) return true;
+    if (depth >= maxDepth) continue;
+    for (const child of node?.children || []) queue.push([child, depth + 1]);
+  }
+  return false;
+}
+
+/** Classify a live node, including unnamed top-level NPC hosts in the Vite client. */
+export function pirateFruitKindForNode(node) {
+  const named = classifyPirateFruitNode(node?.name);
+  if (named !== 'other') return named;
+  const topLevel = node?.parent?.isScene || node?.parent?.type === 'Scene';
+  if (topLevel && !node?.name && hasNamedDescendant(node, 'rig:root')) return 'npc';
+  return 'other';
+}
+
+/** Resolve a mesh/rig node to the whole entity root used by the overlay. */
+export function resolvePirateVisualHost(node) {
+  let current = node;
+  let top = node;
+  while (current) {
+    const kind = pirateFruitKindForNode(current);
+    const legacyHull = current?.name === 'character:hull';
+    if (!legacyHull && (kind === 'player' || kind === 'remote' || kind === 'npc' || kind === 'monster')) return current;
+    top = current;
+    if (current.parent?.isScene || current.parent?.type === 'Scene') break;
+    current = current.parent;
+  }
+  return pirateFruitKindForNode(top) === 'npc' ? top : null;
 }
 
 export function pocketMonsterIdFor(name = '') {
@@ -141,18 +179,32 @@ function canvasTexFromRgba(THREE, img, { nearest = true } = {}) {
   return tex;
 }
 
-function hideOriginalMeshes(root, keep = new Set()) {
-  root.traverse(node => {
-    if (keep.has(node) || node.userData?.pocketVisual) return;
-    if (node === root) {
-      if (node.isMesh && node.material) {
-        node.material = node.material.clone?.() || node.material;
-        if (node.material) node.material.visible = false;
-      }
-      return;
+export function shouldPreservePirateSubtree(node) {
+  const id = String(node?.name || '');
+  return !!node?.isSprite
+    || /^(effect:|equipment:|attachment:|skill-|socket:)/.test(id)
+    || /(?:^|[-_:])(hp|health)(?:$|[-_:])/i.test(id)
+    || /portal|water|ocean|wake|foam|wave/i.test(id);
+}
+
+function hiddenMaterial(material) {
+  if (Array.isArray(material)) return material.map(entry => hiddenMaterial(entry));
+  const next = material?.clone?.() || material;
+  if (next) next.visible = false;
+  return next;
+}
+
+export function hidePirateFruitOriginalMeshes(root, keep = new Set()) {
+  function hide(node, isRoot = false) {
+    if (!node || keep.has(node) || node.userData?.pocketVisual) return;
+    if (!isRoot && shouldPreservePirateSubtree(node)) return;
+    if (node.isMesh) {
+      if (isRoot) node.material = hiddenMaterial(node.material);
+      else node.visible = false;
     }
-    if (node.isMesh) node.visible = false;
-  });
+    for (const child of node.children || []) hide(child, false);
+  }
+  hide(root, true);
 }
 
 function appearanceFor(id) {
@@ -171,6 +223,12 @@ function propColor(name, mesh) {
   if (id.includes('wood') || id.includes('dock') || id.includes('crate') || id.includes('boat') || id.includes('plank')) return 0x8b5a2b;
   const hex = mesh.material?.color?.getHex?.();
   return Number.isFinite(hex) ? hex : 0x78716c;
+}
+
+/** Convert Pocket's -Z player front to Pirate Fruit's +Z facing convention. */
+export function orientPirateFruitVisual(root, kind) {
+  if (kind === 'player' && root?.rotation) root.rotation.y = Math.PI;
+  return root;
 }
 
 export async function installPirateFruitPocketPresentation({
@@ -234,8 +292,9 @@ export async function installPirateFruitPocketPresentation({
     handle.root.userData.presentationOnly = true;
     handle.root.userData.combatAuthority = false;
     handle.root.userData.pocketKind = kind;
+    orientPirateFruitVisual(handle.root, kind);
     host.add(handle.root);
-    hideOriginalMeshes(host, new Set([handle.root]));
+    hidePirateFruitOriginalMeshes(host, new Set([handle.root]));
     attached.add(host);
     visuals.push({ host, handle, kind, lastX: host.position.x, lastZ: host.position.z });
     return handle;
@@ -277,7 +336,7 @@ export async function installPirateFruitPocketPresentation({
 
   function visit(root) {
     if (!root || root.userData?.pocketVisual) return;
-    const kind = classifyPirateFruitNode(root.name);
+    const kind = pirateFruitKindForNode(root);
     if (kind === 'player' && root.name === 'player:pirate-v1' && !attached.has(root)) {
       attachVisual(root, assets.spawn('character.human.pirate-fruit.v1', {
         role: 'player',
@@ -347,14 +406,19 @@ export function hookPirateFruitRenderer(vendor) {
   if (original.__pocketPirateBridge) return original.__pocketPirateBridge;
   let session = null;
   let pending = null;
+  function publishBridgeState() {
+    if (!session || typeof window === 'undefined') return;
+    window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE = Object.freeze({
+      ...session.diagnostics(),
+      updatedAt: Date.now(),
+    });
+  }
   function ensureSession() {
     if (pending || session) return;
     pending = installPirateFruitPocketPresentation({ THREE: kit, vendor })
       .then(next => {
         session = next;
-        if (typeof window !== 'undefined') {
-          window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE = Object.freeze(next.diagnostics());
-        }
+        publishBridgeState();
       })
       .catch(err => {
         pending = null;
@@ -364,7 +428,10 @@ export function hookPirateFruitRenderer(vendor) {
   function updateMatrixWorld(force) {
     if (this?.isScene) {
       ensureSession();
-      session?.update(this);
+      if (session) {
+        session.update(this);
+        publishBridgeState();
+      }
     }
     return original.call(this, force);
   }
