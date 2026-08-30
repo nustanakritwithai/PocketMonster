@@ -18,7 +18,7 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
     html = html
       .replace(/src="\.\/entry-preload-v900\.mjs(?:\?[^\"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
       .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
-      .replace(`href="./style-v900.css?v=901"`, `href="${assetBase}style-v900.css?v=${release}"`)
+      .replace(/href="\.\/style-v900\.css(?:\?[^\"]*)?"/, `href="${assetBase}style-v900.css?v=${release}"`)
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`);
   } else {
     html = html
