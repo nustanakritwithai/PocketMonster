@@ -43,7 +43,7 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=913/, 'active HTML cache-busts the persistent-shell entry');
-assert.match(indexHtml, /style-v900\.css\?v=908/, 'active HTML cache-busts CSP-compatible shell layout');
+assert.match(indexHtml, /style-v900\.css\?v=909/, 'active HTML cache-busts the merged Pirate presentation and persistent shell layout');
 assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=3'\)/, 'top-level authenticates once before starting the shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');

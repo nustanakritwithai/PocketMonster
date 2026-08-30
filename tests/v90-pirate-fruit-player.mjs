@@ -34,7 +34,7 @@ import {
   defaultPanelForWorld,
   panelIdFromLocation,
 } from '../control-panels-v900.mjs';
-import { PIRATE_FRUIT_CONTROL_HUD_CSS } from '../pirate-fruit-control-hud-v900.mjs';
+import { PIRATE_FRUIT_CONTROL_HUD_CSS, PIRATE_FRUIT_ORIGINAL_HUD, syncPirateFruitControlHud } from '../pirate-fruit-control-hud-v900.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
@@ -57,7 +57,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'online-world-bridge-v900.mjs', 'online-world-shell-v900.mjs', 'scene-entry-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.mjs', 'entry-preload-v900.mjs', 'online-world-bridge-v900.mjs', 'online-world-shell-v900.mjs', 'scene-entry-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -134,10 +134,24 @@ assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'V9 stylesheet defensively hides stale panel switchers');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root\.tc-desktop::before/, 'control HUD overlay targets the desktop rectangular tray');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is removed');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px !important; bottom: 82px !important/, 'jump sits in the prototype circular cluster, not a desktop row');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: none !important; \}/, 'desktop keyboard rectangle is not the control HUD');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="original"/, 'control HUD lock keeps the vendored Pirate Fruit HUD');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: block; \}/, 'original keyboard help rectangle stays visible');
+assert.doesNotMatch(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is not removed');
+assert.doesNotMatch(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px/, 'human panel does not restyle the original desktop row into a circular cluster');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-control-panel="throw"[\s\S]*\.tc-btn/, 'throw panel can hide Pirate Fruit combat buttons');
+assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, true, 'HUD lock is the original Pirate Fruit chrome');
+{
+  const headChildren = [];
+  const doc = {
+    head: { appendChild(node) { headChildren.push(node); } },
+    documentElement: { dataset: {} },
+    getElementById() { return null; },
+    createElement() { return { id: '', textContent: '' }; },
+  };
+  assert.equal(syncPirateFruitControlHud({ contentDocument: doc }), true);
+  assert.equal(doc.documentElement.dataset.pirateHud, 'original');
+  assert.equal(headChildren[0].textContent.includes('display: block'), true);
+}
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
 assert.match(cssV900, /#pirateFruitFrame\{position:absolute;inset:0/, 'offline Pirate Fruit frame fills the game stage');
@@ -230,9 +244,23 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline client loads the Pocket visual hook before the Vite bundle');
+assert.ok(
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('src="./assets/index-'),
+  'Pocket visual hook evaluates before the real Pirate Fruit bundle',
+);
+assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene is gone');
+assert.match(boot, /visual: 'pocket-asset-engine'/, 'pirate boot records Pocket presentation overlays');
+assert.match(boot, /ui: 'pirate-fruit-original'/, 'pirate boot forces the original Pirate Fruit HUD');
+assert.match(boot, /syncPirateFruitControlHud/, 'pirate boot applies the original HUD lock to the iframe');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] #hud/, 'human pirate panel hides the Pocket parent HUD');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
+assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
+assert.equal(pirateSource.pocketPresentation.createsStage, false);
+assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
+assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-original');
 assert.equal(pirateSource.commit, 'fa71c41fa50edba67609d90ae2d5418455817c00');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');
@@ -360,6 +388,29 @@ const ball = named('capture-ball')[0];
 assert.ok(ball.position.z < 0, 'held ball sits on the front / -Z side');
 
 const { headPivot, torsoPivot, rightHandAnchor } = player.rig.pivots;
+assert.deepEqual(
+  [
+    player.rig.pivots.hipsPivot,
+    torsoPivot,
+    headPivot,
+    player.rig.pivots.leftArmRoot,
+    player.rig.pivots.rightArmRoot,
+    player.rig.pivots.leftLegRoot,
+    player.rig.pivots.rightLegRoot,
+  ].map(pivot => pivot.name),
+  [
+    'pocket-rig:hips',
+    'pocket-rig:torso',
+    'pocket-rig:head',
+    'pocket-rig:left-arm',
+    'pocket-rig:right-arm',
+    'pocket-rig:left-leg',
+    'pocket-rig:right-leg',
+  ],
+  'major target pivots expose stable retargeting names',
+);
+assert.equal(player.rig.pivots.rightHandPivot, rightHandAnchor, 'right hand exposes a stable pivot alias');
+assert.equal(player.rig.pivots.leftLowerLegPivot, player.rig.pivots.leftLegRoot, 'left lower leg exposes a stable pivot alias');
 assert.equal(headPivot.parent, torsoPivot.parent, 'head and torso are siblings — no double transform');
 assert.equal(headPivot.position.y, 1.44);
 assert.equal(player.rig.pivots.leftArmRoot.position.y, 1.02);
@@ -376,11 +427,94 @@ assert.ok(hitText.y > throwOrigin.y, 'hitText sits above the throwing hand');
 player.play('hurt', { duration: 0.24 });
 player.update(0.12, { moving: false });
 assert.ok(torsoPivot.rotation.x !== 0, 'hurt pose tilts the torso');
+player.update(0.12, { locomotion: 'idle' });
+assert.ok(Math.abs(torsoPivot.rotation.x) < 1e-12, 'hurt flinch returns to rest when its pose completes');
 player.play('throw', { duration: 0.34 });
 player.update(0, { moving: false });
 assert.equal(torsoPivot.rotation.x, 0, 'animator resets rest before the next action overlay');
+player.play('attack-melee', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.notEqual(torsoPivot.rotation.y, 0, 'melee attack twists the torso');
+assert.notEqual(player.rig.pivots.rightArmRoot.rotation.z, 0, 'melee attack drives a right-arm slash arc');
+player.play('attack-ranged', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.ok(player.rig.pivots.rightArmRoot.rotation.x < -0.5, 'ranged attack raises the right arm to aim forward');
+assert.notEqual(player.rig.pivots.rightArmRoot.position.z, -0.02, 'ranged attack adds visible recoil at the shoulder');
+assert.equal(torsoPivot.rotation.y > 0, true, 'ranged aim braces the torso opposite the melee twist');
+player.play('skill', { duration: 0.4 });
+player.update(0.2, { locomotion: 'idle' });
+assert.ok(player.rig.pivots.rightArmRoot.rotation.x < -0.5, 'skill retains a strong right-arm cast or punch');
+assert.notEqual(player.rig.pivots.leftArmRoot.rotation.z, 0, 'skill has a distinct two-arm casting silhouette');
+const skillPose = {
+  torsoX: torsoPivot.rotation.x,
+  leftArmZ: player.rig.pivots.leftArmRoot.rotation.z,
+  rightArmX: player.rig.pivots.rightArmRoot.rotation.x,
+};
+player.update(0, { locomotion: 'idle' });
+assert.deepEqual({
+  torsoX: torsoPivot.rotation.x,
+  leftArmZ: player.rig.pivots.leftArmRoot.rotation.z,
+  rightArmX: player.rig.pivots.rightArmRoot.rotation.x,
+}, skillPose, 'reapplying the same frame starts from rest and does not accumulate pose drift');
 player.update(0.05, { moving: true });
-assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'walk pose swings the legs');
+assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'moving:true remains a backward-compatible walk');
+player.update(0.05, { locomotion: 'walk' });
+assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'explicit walk locomotion swings the legs');
+player.update(0, { locomotion: 'idle' });
+assert.equal(player.rig.pivots.leftLegRoot.rotation.x, 0, 'explicit idle locomotion resets the leg pose');
+player.update(0.05, { locomotion: 'idle', moving: true });
+assert.equal(player.rig.pivots.leftLegRoot.rotation.x, 0, 'explicit idle locomotion overrides the legacy moving flag');
+
+const walkPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+const runPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+walkPlayer.update(0.05, { locomotion: 'walk' });
+runPlayer.update(0.05, { locomotion: 'run' });
+assert.ok(
+  Math.abs(runPlayer.rig.pivots.leftLegRoot.rotation.x) > Math.abs(walkPlayer.rig.pivots.leftLegRoot.rotation.x),
+  'run advances faster and swings the legs farther than walk',
+);
+assert.ok(
+  Math.abs(runPlayer.rig.pivots.leftArmRoot.rotation.x) > Math.abs(walkPlayer.rig.pivots.leftArmRoot.rotation.x),
+  'run swings the arms farther than walk',
+);
+walkPlayer.dispose();
+runPlayer.dispose();
+
+const deadPlayer = engine.spawn(PIRATE_FRUIT_PLAYER_ID, { role: 'player', appearanceId: 'appearance.human.player-orange.v1' });
+deadPlayer.play('dead');
+deadPlayer.update(0.1, { locomotion: 'run' });
+assert.notEqual(deadPlayer.rig.pivots.torsoPivot.rotation.z, 0, 'dead pose presents a collapsed torso');
+assert.equal(
+  deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+  deadPlayer.rig.pivots.rightLegRoot.rotation.x,
+  'dead pose suppresses alternating locomotion leg swing',
+);
+const collapsed = {
+  torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+  hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+  leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+};
+deadPlayer.play('attack-melee', { duration: 0.2 });
+deadPlayer.update(1, { locomotion: 'run' });
+assert.deepEqual({
+  torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+  hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+  leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+}, collapsed, 'dead is highest priority and holds a stable collapsed pose');
+for (const forcedAction of ['skill', 'hurt', 'attack-melee']) {
+  deadPlayer.play(forcedAction, { force: true, duration: 0.2 });
+  deadPlayer.update(0.1, { locomotion: 'idle' });
+  assert.deepEqual({
+    torsoZ: deadPlayer.rig.pivots.torsoPivot.rotation.z,
+    hipsY: deadPlayer.rig.pivots.hipsPivot.position.y,
+    leftLegX: deadPlayer.rig.pivots.leftLegRoot.rotation.x,
+  }, collapsed, `forced ${forcedAction} cannot recover a dead handle`);
+}
+deadPlayer.play('idle', { force: true });
+deadPlayer.update(0, { locomotion: 'idle' });
+assert.equal(deadPlayer.rig.pivots.torsoPivot.rotation.z, 0, 'forced idle recovers a reused handle from dead');
+assert.equal(deadPlayer.rig.pivots.hipsPivot.position.y, 0.60, 'forced idle restores the hips rest pose');
+deadPlayer.dispose();
 
 player.setAppearance('appearance.human.player-orange.v1');
 assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');
