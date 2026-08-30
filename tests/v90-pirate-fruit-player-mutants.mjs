@@ -29,7 +29,7 @@ assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=906', 'mutant 0e2: pirate world still boots through the pirate boot module');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=907', 'mutant 0e2: pirate world still boots through the pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
@@ -82,6 +82,8 @@ assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
 assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
 assert.match(boot, /visual: 'pocket-asset-engine'/, 'mutant 24b: pirate boot overlays Pocket visuals on the real client');
+assert.match(boot, /ui: 'pirate-fruit-original'/, 'mutant 24b2: pirate boot keeps the original Pirate Fruit HUD');
+assert.doesNotMatch(fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8'), /content: none !important/, 'mutant 24b3: original desktop tray is not stripped');
 assert.equal(pirateSource.pocketPresentation?.createsStage, false, 'mutant 24c: Pocket presentation does not create a new hunt stage');
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'mutant 24d: Pocket-built pirate island scene stays deleted');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');

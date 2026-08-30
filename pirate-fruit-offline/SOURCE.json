@@ -12,6 +12,7 @@
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",
+    "ui": "pirate-fruit-original",
     "presentationOnly": true,
     "combatAuthority": false,
     "createsStage": false

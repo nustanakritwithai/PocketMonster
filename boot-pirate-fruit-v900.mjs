@@ -1,4 +1,5 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
+import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=907', import.meta.url).href;
@@ -63,6 +64,7 @@ if (typeof window !== 'undefined') {
   window.POCKETMONSTER_PIRATE_FRUIT = Object.freeze({
     source: 'pirate-fruit-offline',
     visual: 'pocket-asset-engine',
+    ui: 'pirate-fruit-original',
     entry: PIRATE_FRUIT_OFFLINE_ENTRY,
     remote: false,
     mergedWithV800: false,
@@ -71,6 +73,7 @@ if (typeof window !== 'undefined') {
     animalControlRuntime: POCKET_ANIMAL_CONTROL_RUNTIME,
   });
   window.POCKETMONSTER_ENSURE_THROW_RUNTIME = ensurePocketAnimalControl;
+  window.POCKETMONSTER_SYNC_PIRATE_CONTROLS = () => syncPirateFruitControlHud(document.getElementById('pirateFruitFrame'));
   publishWorldState({
     getZone: () => 'pirate-fruit',
     getPosition: () => ({ x: 0, z: 0 }),
@@ -88,6 +91,16 @@ if (startup) {
 
 const pirateFrame = mountPirateOffline();
 bindPocketMonsterLink(pirateFrame);
+pirateFrame.addEventListener('load', () => {
+  syncPirateFruitControlHud(pirateFrame);
+  let tries = 0;
+  const retry = setInterval(() => {
+    syncPirateFruitControlHud(pirateFrame);
+    tries += 1;
+    if (tries >= 20) clearInterval(retry);
+  }, 400);
+});
+syncPirateFruitControlHud(pirateFrame);
 if (startup) {
   startup.textContent = 'เข้าโลก Pirate Fruit แล้ว';
   startup.className = 'startup-status ok';
