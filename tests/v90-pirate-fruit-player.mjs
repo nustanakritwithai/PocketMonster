@@ -73,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=814/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=908/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=909/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -89,7 +89,7 @@ assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=906');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=907');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -232,7 +232,13 @@ assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses 
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
-assert.equal(pirateSource.commit, '4df5721de8bdb20c28e53b6a8c933616e132c96d');
+assert.equal(pirateSource.commit, 'fa71c41fa50edba67609d90ae2d5418455817c00');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.persistentWrites, false);
+assert.equal(pirateSource.integrations.pocketMonsterPresence.collision, false);
+assert.equal(pirateSource.integrations.pocketMonsterPresence.combatAuthority, false);
 assert.equal(pirateSource.integrations.pocketMonsterPortal.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPortal.combatAuthority, false);
 assert.deepEqual(pirateSource.integrations.pocketMonsterPortal.position, { x: 7, z: 15 });
@@ -246,6 +252,8 @@ assert.match(pirateBundle, /observedOutside/, 'Pirate portals stay disarmed unti
 assert.match(pirateBundle, /safeArrival:Object\.freeze\(\{x:7,z:11\.5,heading:0\}\)/, 'Pocket portal restores stale saves to its safe approach point');
 assert.match(pirateBundle, /safeArrival:Object\.freeze\(\{x:-7,z:11\.5,heading:0\}\)/, 'Living portal restores stale saves to its safe approach point');
 assert.match(pirateBundle, /new URLSearchParams\(window\.location\.search\)\.get\("parentOrigin"\)\|\|window\.location\.origin/, 'Pirate portals target the hosting parent origin');
+assert.match(pirateBundle, /pocketmonster:pirate-presence-v1/, 'Pirate iframe publishes its real local pose to the parent');
+assert.match(pirateBundle, /pocketmonster:pirate-presence-snapshot-v1/, 'Pirate iframe consumes sanitized parent snapshots');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);
