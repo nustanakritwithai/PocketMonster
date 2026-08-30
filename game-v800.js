@@ -3140,10 +3140,15 @@ function requestImmersiveMode(e){
 function syncOrientationLock(){
   const portrait=window.innerHeight>window.innerWidth;
   const gate=el('immersiveGate'), rotate=el('rotateNotice');
+  // The authenticated online shell owns fullscreen/orientation across scene
+  // swaps.  An embedded child must never re-open the standalone rotate gate
+  // after a warp, otherwise the old scene's enforcement UI can remain visible
+  // while the new scene is already interactive.
+  const embeddedOnlineScene=window.POCKETMONSTER_SCENE_EMBEDDED===true;
   // V7.0.2: startup overlays must never block gameplay.
   if(gate){ gate.classList.add('hidden'); gate.style.display='none'; gate.style.pointerEvents='none'; }
   if(rotate){
-    rotate.classList.toggle('hidden',!portrait);
+    rotate.classList.toggle('hidden',embeddedOnlineScene||!portrait);
     rotate.style.pointerEvents='none';
   }
 }
