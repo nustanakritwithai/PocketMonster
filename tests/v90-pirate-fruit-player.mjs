@@ -108,7 +108,7 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays 
 assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
-assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'combined channel loads Pocket chat for every world');
+assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-world-presence-live/, 'combined channel loads Pocket chat for every world');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
 assert.match(html, /data-control-panel="human"/, 'switcher includes the Pirate Fruit human panel');

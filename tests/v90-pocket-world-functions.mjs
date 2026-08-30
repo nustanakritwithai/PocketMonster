@@ -17,7 +17,7 @@ const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url)
 const launcher = fs.readFileSync(new URL('../firebase-launcher-entry.mjs', import.meta.url), 'utf8');
 const helper = fs.readFileSync(new URL('../world-presence-v800.mjs', import.meta.url), 'utf8');
 
-for (const file of ['world-presence-v800.mjs', 'chat-runtime.mjs']) {
+for (const file of ['world-presence-v800.mjs', 'world-presence-protocol.mjs', 'chat-runtime.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -26,17 +26,22 @@ assert.equal(liveHtml, versionedHtml, 'live V8.4 entries stay byte-identical aft
 assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hud">'), 'live chat toggle stays outside #hud');
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=810/, 'live preload binds chat before game overlays');
-assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
-assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-world-presence-live/, 'live preload cache-busts the top-right chat');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-world-presence-live[\s\S]*game-v800\.js\?v=810/, 'live preload binds chat before game overlays');
+assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-world-presence-live/, 'Firebase launcher mounts chat before the game');
+assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-world-presence-live'\)/, 'V9 combined channel loads chat for every world');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
 assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'real pirate world assigns Pocket Monster through the world link');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
 assert.match(chat, /type: 'world-pos'/, 'chat socket publishes world position for shared-zone presence');
 assert.match(chat, /type === 'world-snapshot'/, 'chat socket dispatches remote player snapshots');
+assert.match(chat, /type === 'chat'/, 'chat socket still pulls messages on chat frames');
+assert.match(chat, /buildWorldPosFrame/, 'chat sends only the finite world-pos contract');
+assert.match(chat, /worldSnapshotPayload/, 'chat reads snapshot payload only, never root players');
 assert.match(chat, /POCKETMONSTER_WORLD_STATE/, 'chat reads the local world snapshot');
 assert.match(chat, /POCKETMONSTER_WORLD_PRESENCE/, 'chat forwards presence to the overlay');
+assert.match(liveJs, /POCKETMONSTER_SELF_PRESENCE_ID/, 'Pocket Monster skips drawing the local player');
+assert.doesNotMatch(chat, /vpsWrites|playerDataWrites/, 'chat runtime must not open write flags');
 assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'animal-control overlay does not steal world presence from the real pirate world');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
 assert.match(liveJs, /window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{zone:state\.currentZone,x:player\.position\.x,z:player\.position\.z,dir:player\.rotation\.y\}\)/, 'Pocket Monster publishes zone position');
@@ -102,6 +107,15 @@ assert.doesNotMatch(chat, /vpsWrites|playerDataWrites/, 'chat runtime must not o
     assert.equal(marker.textContent, 'ผู้เล่นทดสอบ');
     window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'hub', players: [{ id: 'p2', x: 0, z: 0, name: 'คนละโซน' }] });
     assert.equal(created.filter(node => node.className === 'remote-world-player' && !node.removed).length, 1);
+    window.POCKETMONSTER_SELF_PRESENCE_ID = 'p1';
+    window.POCKETMONSTER_WORLD_PRESENCE({
+      zone: 'pirate-fruit',
+      players: [{ id: 'p1', x: 2, z: 3, name: 'ตัวเอง' }, { id: 'p3', x: 4, z: 5, name: 'คนอื่น' }],
+    });
+    const live = created.filter(node => node.className === 'remote-world-player' && !node.removed);
+    assert.equal(live.length, 1);
+    assert.equal(live[0].textContent, 'คนอื่น');
+    delete window.POCKETMONSTER_SELF_PRESENCE_ID;
   } finally {
     dispose();
   }

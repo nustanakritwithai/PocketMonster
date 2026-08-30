@@ -1,4 +1,6 @@
-export function installWorldPresence({ THREE, getCamera, getZone } = {}) {
+import { isRemoteWorldPlayer, selfPresenceId } from './world-presence-protocol.mjs';
+
+export function installWorldPresence({ THREE, getCamera, getZone, getSelfId } = {}) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return () => {};
   if (typeof window.POCKETMONSTER_WORLD_PRESENCE === 'function') return () => {};
   const remoteWorldPlayers = new Map();
@@ -11,9 +13,10 @@ export function installWorldPresence({ THREE, getCamera, getZone } = {}) {
   }
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
     if (!payload || payload.zone !== getZone?.()) return;
+    const selfId = getSelfId?.() ?? selfPresenceId(window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile, window.POCKETMONSTER_SELF_PRESENCE_ID);
     const seen = new Set();
     for (const item of payload.players || []) {
-      if (!item?.id || !Number.isFinite(item.x) || !Number.isFinite(item.z)) continue;
+      if (!isRemoteWorldPlayer(item, selfId)) continue;
       seen.add(item.id);
       let marker = remoteWorldPlayers.get(item.id);
       if (!marker) {
@@ -71,7 +74,11 @@ export function installWorldPresence({ THREE, getCamera, getZone } = {}) {
 export function publishWorldState({ getZone, getPosition, getDir } = {}) {
   if (typeof window === 'undefined') return;
   window.POCKETMONSTER_WORLD_STATE = () => {
-    const pos = getPosition?.() || { x: 0, z: 0 };
-    return { zone: getZone?.(), x: pos.x, z: pos.z, dir: getDir?.() || 0 };
+    const pos = getPosition?.();
+    if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return null;
+    const zone = getZone?.();
+    const dir = Number(getDir?.());
+    if (typeof zone !== 'string' || !zone || !Number.isFinite(dir)) return null;
+    return { zone, x: pos.x, z: pos.z, dir };
   };
 }

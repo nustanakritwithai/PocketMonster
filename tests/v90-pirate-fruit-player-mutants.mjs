@@ -82,7 +82,7 @@ assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live i
 assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
 assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
-assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');
+assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-world-presence-live/, 'mutant 27: V9 loads Pocket chat in every combined world');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
 assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
 {

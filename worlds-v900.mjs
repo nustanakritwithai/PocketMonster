@@ -23,7 +23,7 @@ if (typeof window !== 'undefined') {
 }
 
 await requireFirebaseLogin(runtimeConfig);
-await import('./chat-runtime.mjs?v=8.4.0-chat-top-right');
+await import('./chat-runtime.mjs?v=8.4.0-world-presence-live');
 
 const worldGate = document.getElementById('worldGate');
 const switcher = document.getElementById('worldSwitcher');

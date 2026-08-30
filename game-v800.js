@@ -151,6 +151,7 @@ const authProfileBridge = launchSession && serverGate.state === 'healthy'
 if (typeof window !== 'undefined') {
   window.POCKETMONSTER_SERVER_SESSION_TOKEN = authProfileBridge.sessionToken || null;
   window.POCKETMONSTER_AUTH_PROFILE_BRIDGE = Object.freeze({ state: authProfileBridge.state, errorCode: authProfileBridge.errorCode, profile: authProfileBridge.profile });
+  window.POCKETMONSTER_SELF_PRESENCE_ID = authProfileBridge.profile?.id || authProfileBridge.profile?.accountId || authProfileBridge.profile?.username || null;
   document.documentElement.dataset.authProfileBridge = authProfileBridge.state;
   window.dispatchEvent(new CustomEvent('pocketmonster:auth-profile-bridge', { detail: window.POCKETMONSTER_AUTH_PROFILE_BRIDGE }));
 }
@@ -2474,9 +2475,10 @@ Object.assign(remoteWorldLayer.style,{position:'fixed',inset:'0',zIndex:'14000',
 document.body.append(remoteWorldLayer);
 window.POCKETMONSTER_WORLD_PRESENCE=payload=>{
   if(!payload||payload.zone!==state.currentZone)return;
+  const selfId=window.POCKETMONSTER_SELF_PRESENCE_ID||window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile?.id||window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile?.accountId||window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile?.username;
   const seen=new Set();
   for(const item of payload.players||[]){
-    if(!item?.id||!Number.isFinite(item.x)||!Number.isFinite(item.z))continue;
+    if(!item?.id||!Number.isFinite(item.x)||!Number.isFinite(item.z)||(selfId!=null&&selfId!==''&&String(item.id)===String(selfId)))continue;
     seen.add(item.id); let marker=remoteWorldPlayers.get(item.id);
     if(!marker){marker=document.createElement('div');marker.className='remote-world-player';Object.assign(marker.style,{position:'absolute',transform:'translate(-50%,-100%)',padding:'3px 7px',border:'1px solid #67e8f9',borderRadius:'999px',background:'#082f49e8',color:'#e0f2fe',font:'700 11px system-ui',whiteSpace:'nowrap',textShadow:'0 1px 2px #000'});remoteWorldLayer.append(marker);remoteWorldPlayers.set(item.id,marker);}
     marker.textContent=item.name||'ผู้เล่นออนไลน์'; marker.dataset.x=item.x; marker.dataset.z=item.z;
