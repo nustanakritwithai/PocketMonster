@@ -35,14 +35,6 @@ import {
   panelIdFromLocation,
 } from '../control-panels-v900.mjs';
 import { PIRATE_FRUIT_CONTROL_HUD_CSS } from '../pirate-fruit-control-hud-v900.mjs';
-import {
-  PIRATE_FRUIT_GROUND_TYPE,
-  PIRATE_FRUIT_PORTALS,
-  PIRATE_FRUIT_SCENE_CHARACTERS,
-  PIRATE_FRUIT_SCENE_MONSTERS,
-  PIRATE_FRUIT_ZONE,
-  buildPirateFruitWorld,
-} from '../asset-presentation/scenes/pirate-fruit-world.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
@@ -64,7 +56,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs', 'asset-presentation/scenes/pirate-fruit-world.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -81,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=814/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=907/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=908/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -147,8 +139,8 @@ assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86p
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: none !important; \}/, 'desktop keyboard rectangle is not the control HUD');
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
-assert.doesNotMatch(cssV900, /#pirateFruitFrame/, 'V9 no longer styles an offline Pirate Fruit iframe');
-assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] #joystick/, 'human pirate panel keeps Pocket movement pads');
+assert.match(cssV900, /#pirateFruitFrame\{position:absolute;inset:0/, 'offline Pirate Fruit frame fills the game stage');
+assert.match(cssV900, /throw"\] #pirateFruitFrame\{visibility:hidden/, 'throw panel hides the real Pirate Fruit frame');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] \.message/, 'human pirate panel hides leftover Pocket stage message chrome');
 assert.doesNotMatch(cssV900, /\.combined-world-warp|#worldSwitcher/, 'clickable world warp controls have no live CSS');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
@@ -209,66 +201,61 @@ assert.match(liveJs, /new THREE\.Vector3\(0,1\.36,0\)/, 'camera looks at the pir
 assert.match(liveJs, /hostCharacter:'pirate-fruit'/, 'animal control is hosted on the pirate player');
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'Pocket character server APIs are hosted on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'live loop rebinds Pocket character server functions onto pirate');
-assert.match(html, /เริ่มที่โลก Pirate Fruit จริง แล้ววาปเชื่อมเข้าเกมเดิม/, 'gate still starts in the pirate-fruit world');
-assert.match(boot, /createAssetEngine/, 'pirate world boots the Pocket asset engine');
-assert.match(boot, /buildPirateFruitWorld/, 'pirate world mounts the Pocket blocky scene');
-assert.match(boot, /source: 'pocket-asset-engine'/, 'pirate world is presented by the Pocket asset engine');
-assert.match(boot, /artReference: PIRATE_FRUIT_OFFLINE_ENTRY/, 'offline client remains art reference only');
-assert.doesNotMatch(boot, /pirateFruitFrame|createElement\('iframe'\)/, 'pirate world does not mount the Vite iframe');
+assert.match(html, /เริ่มที่โลก Pirate Fruit จริง/, 'gate describes the real Pirate Fruit client');
+assert.match(boot, /pirate-fruit-offline\/index\.html/, 'pirate world boots the vendored Pirate Fruit client');
+assert.match(boot, /source: 'pirate-fruit-offline'/, 'pirate world is the real offline Pirate Fruit client');
+assert.match(boot, /id = 'pirateFruitFrame'/, 'pirate world mounts the offline client in a frame');
 assert.match(boot, /remote: false/, 'pirate world is local, not a remote Pirate Fruit host');
-assert.match(boot, /presentationOnly: true/, 'pirate scene is presentation-only for Pocket combat');
-assert.match(boot, /combatAuthority: false/, 'pirate scene is not Pocket combat authority');
+assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
+assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
 assert.match(boot, /game-v800\.js\?v=814&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
 assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes the top status bar');
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
-assert.match(boot, /source === 'pirate-fruit-portal'/, 'Pocket Monster portal keeps the approved source token');
-assert.match(boot, /source === 'pirate-fruit-living-portal'/, 'Living World portal keeps the approved source token');
-assert.match(boot, /assignCombinedWorld\(portal\.userData\.destination\)/, 'in-scene portals assign only their validated destination');
+assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
+assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
+assert.match(boot, /event\.origin !== frameOrigin/, 'parent accepts portal messages only from the mounted Pirate Fruit origin');
+assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
-assert.doesNotMatch(boot, /world-pirate-fruit-v900|PIRATE_BLOCK_WORLD/, 'deleted Pocket-block island stage filename stays gone');
-assert.doesNotMatch(boot, /paintGroundGrid/, 'ground paint stays in the shared scene module, not the boot file');
+assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
 {
   const serverGate = fs.readFileSync(new URL('../docs/v9-334-server-gate-response.md', import.meta.url), 'utf8');
-  assert.match(serverGate, /presentationOnly=true/, 'Server gate response records pirate presentation-only');
+  assert.match(serverGate, /presentationOnly=true/, 'Server gate response records the pirate iframe as presentation-only');
   assert.match(serverGate, /combatAuthority=false/, 'Server gate response keeps Pirate Fruit combat off Server');
   assert.match(serverGate, /vpsWrites=false/, 'Server gate response keeps write flags closed');
   assert.doesNotMatch(serverGate, /vpsWrites=true|playerDataWrites=true|firebaseFallback=true/, 'Server gate response must not ask Server to open writes');
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline client loads the Pocket visual hook before the Vite bundle');
+assert.ok(
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('src="./assets/index-'),
+  'Pocket visual hook evaluates before the real Pirate Fruit bundle',
+);
+assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene is gone');
+assert.match(boot, /visual: 'pocket-asset-engine'/, 'pirate boot records Pocket presentation overlays');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
+assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
+assert.equal(pirateSource.pocketPresentation.createsStage, false);
+assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
+assert.equal(pirateSource.commit, '4df5721de8bdb20c28e53b6a8c933616e132c96d');
 assert.equal(pirateSource.integrations.pocketMonsterPortal.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPortal.combatAuthority, false);
 assert.deepEqual(pirateSource.integrations.pocketMonsterPortal.position, { x: 7, z: 15 });
+assert.deepEqual(pirateSource.integrations.pocketMonsterPortal.safeArrival, { x: 7, z: 11.5, heading: 0 });
+assert.equal(pirateSource.integrations.pocketMonsterPortal.arrivalLock, 'exit-before-rearm');
+assert.deepEqual(pirateSource.integrations.livingWorldPortal.safeArrival, { x: -7, z: 11.5, heading: 0 });
+assert.equal(pirateSource.integrations.livingWorldPortal.arrivalLock, 'exit-before-rearm');
 assert.match(pirateBundle, /pocketmonster:world-warp-v1/, 'Pirate Fruit bundle emits the Pocket Monster portal event');
 assert.match(pirateBundle, /pocket-monster-world-portal/, 'Pirate Fruit bundle contains the in-world portal object');
+assert.match(pirateBundle, /observedOutside/, 'Pirate portals stay disarmed until the player leaves the trigger');
+assert.match(pirateBundle, /safeArrival:Object\.freeze\(\{x:7,z:11\.5,heading:0\}\)/, 'Pocket portal restores stale saves to its safe approach point');
+assert.match(pirateBundle, /safeArrival:Object\.freeze\(\{x:-7,z:11\.5,heading:0\}\)/, 'Living portal restores stale saves to its safe approach point');
 assert.match(pirateBundle, /new URLSearchParams\(window\.location\.search\)\.get\("parentOrigin"\)\|\|window\.location\.origin/, 'Pirate portals target the hosting parent origin');
-assert.equal(PIRATE_FRUIT_ZONE, 'pirate-fruit');
-assert.equal(PIRATE_FRUIT_GROUND_TYPE, 'pirate');
-assert.deepEqual(PIRATE_FRUIT_PORTALS.pocketMonster, {
-  name: 'pocket-monster-world-portal',
-  world: 'pocket-monster',
-  panel: 'throw',
-  source: 'pirate-fruit-portal',
-  x: pirateSource.integrations.pocketMonsterPortal.position.x,
-  z: pirateSource.integrations.pocketMonsterPortal.position.z,
-  triggerRadius: pirateSource.integrations.pocketMonsterPortal.triggerRadius,
-  accent: 0x38bdf8,
-  label: 'เกมเดิม • Pocket Monster',
-});
-assert.equal(PIRATE_FRUIT_PORTALS.livingWorld.x, pirateSource.integrations.livingWorldPortal.position.x);
-assert.equal(PIRATE_FRUIT_PORTALS.livingWorld.z, pirateSource.integrations.livingWorldPortal.position.z);
-assert.ok(PIRATE_FRUIT_SCENE_CHARACTERS.every(npc => npc.id === 'character.human.blocky-bighead.v1'), 'scene people use the Pocket character catalog');
-assert.ok(PIRATE_FRUIT_SCENE_CHARACTERS.some(npc => npc.role === 'keeper'), 'keeper remains a Pocket bighead');
-assert.ok(PIRATE_FRUIT_SCENE_MONSTERS.every(monster => /^monster\.[a-z0-9_]+\.[a-z0-9_]+\.bighead\.v1$/.test(monster.id)), 'scene monsters are Pocket bigheads');
-assert.match(boot, /assets\.spawn\('character\.human\.pirate-fruit\.v1'/, 'local player is the pirate character');
-assert.match(boot, /assets\.spawn\('character\.human\.blocky-bighead\.v1'/, 'other people spawn from the Pocket catalog');
-assert.match(boot, /PIRATE_FRUIT_SCENE_MONSTERS/, 'scene monsters stay on the Pocket catalog path');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);
@@ -399,40 +386,5 @@ assert.ok(player.rig.pivots.leftLegRoot.rotation.x !== 0, 'walk pose swings the 
 player.setAppearance('appearance.human.player-orange.v1');
 assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');
 player.dispose();
-
-class SceneNode extends Node {
-  constructor() {
-    super();
-    this.receiveShadow = false;
-  }
-}
-const sceneTHREE = {
-  Group: SceneNode,
-  Mesh: class extends SceneNode {
-    constructor(geo, mat) { super(); this.geometry = geo; this.material = mat; }
-  },
-  PlaneGeometry: class { constructor(w, h) { this.type = 'plane'; this.w = w; this.h = h; } },
-  MeshStandardMaterial: class { constructor(opts) { Object.assign(this, opts); } },
-};
-const built = buildPirateFruitWorld({
-  THREE: sceneTHREE,
-  box: (w, h, d) => ({ type: 'box', w, h, d }),
-  material: color => ({ color }),
-});
-function collectNames(node, acc = []) {
-  if (node.name) acc.push(node.name);
-  for (const child of node.children || []) collectNames(child, acc);
-  return acc;
-}
-const names = collectNames(built.root);
-assert.ok(names.includes('pirate-fruit:ground'), 'scene has blocky ground');
-assert.ok(names.includes('pirate-fruit:dock'), 'scene keeps the dock');
-assert.ok(names.some(name => name === 'pirate-fruit:wood' || name.startsWith('pirate-fruit:wood')), 'scene keeps wood props');
-assert.ok(names.includes('pirate-fruit:rock'), 'scene keeps rocks');
-assert.ok(names.includes('pirate-fruit:fence'), 'scene keeps fences');
-assert.ok(names.includes('pirate-fruit:lantern'), 'scene keeps lights');
-assert.ok(names.includes('pocket-monster-world-portal'), 'Pocket Monster portal is in the scene');
-assert.ok(names.includes('living-world-pirate-fruit-portal'), 'Living World portal is in the scene');
-assert.ok(names.every(name => !/capsule|sphere|torus/i.test(name)), 'scene names stay in Pocket box language');
 
 console.log('V9.0 pirate-fruit player presentation: PASS');

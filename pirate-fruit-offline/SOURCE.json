@@ -1,17 +1,29 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
   "ref": "claude/blox-fruits-three-js-roadmap-1f2f5u",
-  "commit": "bde2dbf4c5f746fb06c91e0f6d1d5eec8a1a6631",
+  "commit": "4df5721de8bdb20c28e53b6a8c933616e132c96d",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Vendored Pirate Fruit client kept as art and license reference. V9 presents the same pirate-fruit world through the Pocket asset engine. Local save only. Do not treat this Vite bundle as the live renderer.",
+  "note": "Playable Pirate Fruit client built from merged PR 143 with remote/server flags off. Local save only. Vendored as the V9 presentation world. Pocket overlays asset-engine visuals only; it does not replace this client.",
+  "pocketPresentation": {
+    "visual": "pocket-asset-engine",
+    "hook": "./pocket-presentation.mjs",
+    "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
+    "player": "character.human.pirate-fruit.v1",
+    "people": "character.human.blocky-bighead.v1",
+    "presentationOnly": true,
+    "combatAuthority": false,
+    "createsStage": false
+  },
   "integrations": {
     "pocketMonsterPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,
       "position": { "x": 7, "z": 15 },
       "triggerRadius": 2.25,
+      "safeArrival": { "x": 7, "z": 11.5, "heading": 0 },
+      "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "pocket-monster",
       "panel": "throw"
@@ -21,6 +33,8 @@
       "combatAuthority": false,
       "position": { "x": -7, "z": 15 },
       "triggerRadius": 2.25,
+      "safeArrival": { "x": -7, "z": 11.5, "heading": 0 },
+      "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "living-world",
       "panel": "human"
