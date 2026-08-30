@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=913';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=914';
 import {
   applyControlPanel,
   combinedLocationQuery,
@@ -114,6 +114,7 @@ async function bootWorld(id) {
     startup.className = 'startup-status';
   }
   await import(world.runtime);
+  runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
   activeRuntimeId = world.id;
 }
 

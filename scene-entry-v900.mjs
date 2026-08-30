@@ -159,7 +159,7 @@ try {
   window.POCKETMONSTER_SCENE_EMBEDDED = true;
 
   bootStage = 'template';
-  const templateUrl = new URL('./v900.html?v=911', import.meta.url);
+  const templateUrl = new URL('./v900.html?v=912', import.meta.url);
   const templateResponse = await fetch(templateUrl, { cache: 'no-store', signal: sceneLifetime.signal });
   requireLiveScene();
   if (!templateResponse.ok) throw new Error(`โหลดโครงฉาก V9 ไม่สำเร็จ (${templateResponse.status})`);
@@ -179,7 +179,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=913');
+  await import('./worlds-v900.mjs?v=914');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
