@@ -3156,7 +3156,7 @@ function ensureStarter(){
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0,summonRuntimeEpoch=0,wildPopulationRecoveryPending=false;const wilds=[],projectiles=[],wildRespawnTimers=new Set();let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
 let bossChallengeSession=createBossChallengeSession(),nearbyBossChallengeId=null;
-let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null;
+let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null,warpArrivalNeedsExit=false;
 characterUI=createCharacterUIController({
   getState:()=>state,
   getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
@@ -6887,12 +6887,14 @@ function startWarp(route=nearbyWarp){
   const moved=switchZone(route.to,false);
   warpSpawnOverride=null;
   warpBusy=false;warpPromptCooldown=1.2;saveGame(false);
+  if(moved)warpArrivalNeedsExit=true;
   if(!moved)msg('เดินทางผ่านประตูวาปไม่สำเร็จ');
 }
 function updateWalkThroughWarp(dt){
   warpPromptCooldown=Math.max(0,warpPromptCooldown-dt);
-  if(warpBusy||warpPromptCooldown>0){return;}
   const found=nearestRoute(routesFrom(state.currentZone),player.position,3.2).route;
+  if(warpArrivalNeedsExit){if(!found)warpArrivalNeedsExit=false;return;}
+  if(warpBusy||warpPromptCooldown>0){return;}
   if(!found){nearbyWarp=null;return;}
   if(nearbyWarp?.id===found.id)return;
   nearbyWarp=found;

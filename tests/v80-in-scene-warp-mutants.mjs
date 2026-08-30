@@ -12,6 +12,8 @@ function assertWalkThroughWarpContract(candidateGame, candidateRoutes) {
   assert.match(beacon, /boxGeometry\(\.18,1\.8,\.18\)/);
   assert.match(candidateGame, /function updateWalkThroughWarp\(dt\)/);
   assert.match(candidateGame, /nearbyWarp=found;\s*startWarp\(found\)/);
+  assert.match(candidateGame, /warpArrivalNeedsExit=true/);
+  assert.match(candidateGame, /if\(warpArrivalNeedsExit\)\{if\(!found\)warpArrivalNeedsExit=false;return;\}/);
   assert.doesNotMatch(candidateGame, /warpPromptAction|warpPromptCancel|renderWarpPrompt\(|huntBtn/);
 }
 
@@ -23,6 +25,7 @@ const mutants = [
   ['shrink portal back to invisible marker', game.replace('TorusGeometry(.82,.07,8,28)', 'TorusGeometry(.34,.025,6,20)'), routes],
   ['remove vertical light beam', game.replace('boxGeometry(.18,1.8,.18)', 'boxGeometry(.18,.18,.18)'), routes],
   ['stop walk-through activation', game.replace(/nearbyWarp=found;\r?\n  startWarp\(found\);/, 'nearbyWarp=found;'), routes],
+  ['remove arrival exit guard', game.replace('if(moved)warpArrivalNeedsExit=true;', ''), routes],
   ['restore clickable prompt', game + '\nwarpPromptAction;\nhuntBtn;', routes],
 ];
 

@@ -149,8 +149,8 @@ const applySkillEnd = js.indexOf('\nfunction skillFailureMessage(', applySkillSt
 const applySkillSrc = js.slice(applySkillStart, applySkillEnd);
 assert.ok(applySkillSrc.includes('let res=null'), 'accepted compatibility executor hoists res for mastery EXP');
 assert.ok(!applySkillSrc.includes('const res=monsterDamage'), 'accepted executor must not shadow the mastery result');
-assert.ok(html.includes('entry-preload.mjs') && preload.includes("await import('./game-v800.js?v=810')"), 'active authenticated preload loads the v800 runtime');
-assert.ok(html.includes('style-v800.css?v=810'), 'active HTML loads the v800 stylesheet');
+assert.ok(html.includes('entry-preload-v900.mjs') && preload.includes("await import('./game-v800.js?v=813')"), 'authenticated legacy preload loads the current v800 runtime');
+assert.ok(html.includes('style-v800.css?v=813'), 'active HTML loads the current v800 stylesheet');
 assert.ok(html.includes('id="raisingEventBanner"'), 'raising event banner is in the manager');
 assert.ok(html.includes('id="crDebugPanel"'), 'CR debug panel is in the manager');
 assert.ok(js.includes("scrollIntoView({block:'nearest'"), 'ดู CR must scroll the debug panel into view');

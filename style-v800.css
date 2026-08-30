@@ -14,7 +14,7 @@
 @media(max-height:560px){.message{display:none}.target-card{top:54px}.controls-left{bottom:42px}.controls-right{bottom:35px}.party{bottom:4px}.npc-btn{bottom:72px}.manager-card{max-height:95vh}}
 
 /* V6 Ring 0 + Ring 1 */
-.zone-travel{position:absolute;z-index:9;top:80px;left:8px;display:flex;flex-direction:column;gap:2px;pointer-events:auto}.zone-travel button{border:1px solid #ffffff22;background:rgba(15,23,42,.82);color:#fff;border-radius:6px;padding:3px 5px;font-size:8px;font-weight:700;line-height:1}
+.zone-travel{display:none!important}.zone-travel button{border:1px solid #ffffff22;background:rgba(15,23,42,.82);color:#fff;border-radius:6px;padding:3px 5px;font-size:8px;font-weight:700;line-height:1}
 .zone-dropdown{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .zone-dropdown.hidden{display:none!important}
 .zone-dropdown button{font-size:9px;padding:5px 8px;text-align:left}
@@ -68,7 +68,7 @@
 }
 
 /* V6.5 Mobile Game UI Pass */
-.compact-topbar{right:auto;max-width:calc(100vw - 20px);flex-wrap:nowrap}.compact-topbar .pill{white-space:nowrap}.compact-topbar .active-pill{max-width:190px;overflow:hidden;text-overflow:ellipsis}.icon-btn{min-width:42px;text-align:center;font-size:17px;line-height:1}
+.compact-topbar{display:none!important}.compact-topbar .pill{white-space:nowrap}.compact-topbar .active-pill{max-width:190px;overflow:hidden;text-overflow:ellipsis}.icon-btn{min-width:42px;text-align:center;font-size:17px;line-height:1}
 .ball-pill.warning{border-color:#f59e0b;background:rgba(120,53,15,.82);box-shadow:0 0 0 2px #f59e0b22 inset}.combat-pill{border-color:#60a5fa55}
 .utility-menu{position:absolute;z-index:30;top:58px;right:12px;pointer-events:auto;width:min(280px,72vw);background:rgba(9,15,28,.94);border:1px solid #ffffff22;border-radius:16px;padding:10px;box-shadow:0 14px 46px #0008;backdrop-filter:blur(12px)}.utility-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}.utility-stats div{display:flex;justify-content:space-between;gap:8px;background:#111827;border-radius:9px;padding:7px 8px;font-size:10px}.utility-btn{width:100%;border:0;border-radius:10px;padding:9px 10px;margin-top:6px;background:#334155;color:#fff;font-weight:900}.utility-btn.danger{background:#4c1d25}
 .zone-travel{top:80px}.zone-travel button{padding:6px 9px!important;font-size:10px!important}.hunt-btn{top:82px;font-size:11px;padding:8px 14px}
