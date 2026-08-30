@@ -9,6 +9,7 @@ export const SKY_STOPS = Object.freeze({
   0x72c7ef: Object.freeze({ top: 0x72c7ef, mid: null, bottom: 0xbfefff }),
   0x68d2f5: Object.freeze({ top: 0x68d2f5, mid: null, bottom: 0xc8eeff }),
   0x334155: Object.freeze({ top: 0x1a1a2e, mid: 0x1e293b, bottom: 0x334155 }),
+  0x4f9ec9: Object.freeze({ top: 0x4f9ec9, mid: null, bottom: 0xb8e4f7 }),
 });
 
 export const STAGE_GROUND_PROFILES = Object.freeze({
@@ -117,7 +118,7 @@ export function paintGroundGrid(zoneColor, zoneType = 'grass') {
   strokeGrid(img, GROUND_GRID, 1, 0.14);
   strokeGrid(img, GROUND_COARSE, 2, 0.24);
   const stageProfile = Object.prototype.hasOwnProperty.call(STAGE_GROUND_PROFILES, zoneType) ? STAGE_GROUND_PROFILES[zoneType] : null;
-  const legacySeedSalt = zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : zoneType === 'factory' ? 0x5fac7001 : 0x9a55;
+  const legacySeedSalt = zoneType === 'cave' ? 0xca7e0001 : zoneType === 'frozen' ? 0xf20ce001 : zoneType === 'rocky' ? 0xca700001 : zoneType === 'ruins' ? 0x5ca70001 : zoneType === 'marsh' ? 0x5aa70001 : zoneType === 'shrine' ? 0x5a170001 : zoneType === 'woods' ? 0x5a0d0001 : zoneType === 'city' ? 0x5c170001 : zoneType === 'factory' ? 0x5fac7001 : zoneType === 'pirate' ? 0xb1a70001 : 0x9a55;
   const seed = ((Number(zoneColor) >>> 0) ^ (stageProfile ? stageProfile.seedSalt : legacySeedSalt)) >>> 0;
   scatter(img, 40, 2, 2, [255, 255, 255], 0.05, seed);
   if (stageProfile) {
@@ -140,6 +141,9 @@ export function paintGroundGrid(zoneColor, zoneType = 'grass') {
     scatter(img, 34, 2, 2, [34, 211, 238], 0.14, seed ^ 0x99999999);
   } else if (zoneType === 'factory') {
     scatter(img, 34, 2, 2, [148, 163, 184], 0.15, seed ^ 0xaaaaaaaa);
+  } else if (zoneType === 'pirate') {
+    scatter(img, 36, 3, 2, [120, 53, 15], 0.16, seed ^ 0xb1a7e001);
+    scatter(img, 18, 2, 3, [125, 38, 50], 0.12, seed ^ 0xb1a7e012);
   } else {
     scatter(img, 30, 2, 4, [0, 100, 0], 0.08, seed ^ 0x22222222);
   }

@@ -34,7 +34,7 @@ import {
   defaultPanelForWorld,
   panelIdFromLocation,
 } from '../control-panels-v900.mjs';
-import { PIRATE_FRUIT_CONTROL_HUD_CSS } from '../pirate-fruit-control-hud-v900.mjs';
+import { PIRATE_FRUIT_CONTROL_HUD_CSS, PIRATE_FRUIT_ORIGINAL_HUD, syncPirateFruitControlHud } from '../pirate-fruit-control-hud-v900.mjs';
 
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
@@ -56,7 +56,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.mjs', 'entry-preload-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -133,10 +133,24 @@ assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'V9 stylesheet defensively hides stale panel switchers');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root\.tc-desktop::before/, 'control HUD overlay targets the desktop rectangular tray');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is removed');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px !important; bottom: 82px !important/, 'jump sits in the prototype circular cluster, not a desktop row');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: none !important; \}/, 'desktop keyboard rectangle is not the control HUD');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="original"/, 'control HUD lock keeps the vendored Pirate Fruit HUD');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.hud-help \{ display: block; \}/, 'original keyboard help rectangle stays visible');
+assert.doesNotMatch(PIRATE_FRUIT_CONTROL_HUD_CSS, /content: none !important/, 'desktop control tray is not removed');
+assert.doesNotMatch(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-desktop \.tc-jump \{ right: 86px/, 'human panel does not restyle the original desktop row into a circular cluster');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-control-panel="throw"[\s\S]*\.tc-btn/, 'throw panel can hide Pirate Fruit combat buttons');
+assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, true, 'HUD lock is the original Pirate Fruit chrome');
+{
+  const headChildren = [];
+  const doc = {
+    head: { appendChild(node) { headChildren.push(node); } },
+    documentElement: { dataset: {} },
+    getElementById() { return null; },
+    createElement() { return { id: '', textContent: '' }; },
+  };
+  assert.equal(syncPirateFruitControlHud({ contentDocument: doc }), true);
+  assert.equal(doc.documentElement.dataset.pirateHud, 'original');
+  assert.equal(headChildren[0].textContent.includes('display: block'), true);
+}
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
 assert.match(cssV900, /#pirateFruitFrame\{position:absolute;inset:0/, 'offline Pirate Fruit frame fills the game stage');
@@ -229,9 +243,23 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline client loads the Pocket visual hook before the Vite bundle');
+assert.ok(
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('src="./assets/index-'),
+  'Pocket visual hook evaluates before the real Pirate Fruit bundle',
+);
+assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene is gone');
+assert.match(boot, /visual: 'pocket-asset-engine'/, 'pirate boot records Pocket presentation overlays');
+assert.match(boot, /ui: 'pirate-fruit-original'/, 'pirate boot forces the original Pirate Fruit HUD');
+assert.match(boot, /syncPirateFruitControlHud/, 'pirate boot applies the original HUD lock to the iframe');
+assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] #hud/, 'human pirate panel hides the Pocket parent HUD');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
+assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
+assert.equal(pirateSource.pocketPresentation.createsStage, false);
+assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
+assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-original');
 assert.equal(pirateSource.commit, 'fa71c41fa50edba67609d90ae2d5418455817c00');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');

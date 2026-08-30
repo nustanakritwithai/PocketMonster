@@ -46,7 +46,7 @@ export const COMBINED_WORLDS = Object.freeze([
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
     title: 'Pirate Fruit',
-    detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • วาปเชื่อมเข้าเกมเดิม',
+    detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • Pocket วาดภาพทับ • วาปเชื่อมเข้าเกมเดิม',
     runtime: './boot-pirate-fruit-v900.mjs?v=908',
   }),
   Object.freeze({

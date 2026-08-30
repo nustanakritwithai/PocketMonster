@@ -87,6 +87,11 @@ assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop pu
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
 assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
+assert.match(boot, /visual: 'pocket-asset-engine'/, 'mutant 24b: pirate boot overlays Pocket visuals on the real client');
+assert.match(boot, /ui: 'pirate-fruit-original'/, 'mutant 24b2: pirate boot keeps the original Pirate Fruit HUD');
+assert.doesNotMatch(fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8'), /content: none !important/, 'mutant 24b3: original desktop tray is not stripped');
+assert.equal(pirateSource.pocketPresentation?.createsStage, false, 'mutant 24c: Pocket presentation does not create a new hunt stage');
+assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'mutant 24d: Pocket-built pirate island scene stays deleted');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
 assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
 assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status/, 'mutant 27: V9 loads the presence-aware Pocket chat in every combined world');
