@@ -58,6 +58,159 @@ assert.equal(shortSha.reason, 'release-unverified');
 const nonHexSha = await healthVersionGate(config, { correlationId: 'goal1-test', fetchImpl: fetchPair({ status: 'ready' }, { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: { ...release, commitSha: `g${'0'.repeat(39)}` } }) });
 assert.equal(nonHexSha.state, 'incompatible');
 assert.equal(nonHexSha.reason, 'release-unverified');
+
+const originalSetTimeout = globalThis.setTimeout;
+const originalClearTimeout = globalThis.clearTimeout;
+const pendingTimers = new Set();
+const externalSignal = {
+  aborted: false,
+  listeners: new Set(),
+  addEventListener(type, listener) {
+    if (type === 'abort') this.listeners.add(listener);
+  },
+  removeEventListener(type, listener) {
+    if (type === 'abort') this.listeners.delete(listener);
+  },
+};
+globalThis.setTimeout = (callback, delay, ...args) => {
+  let timer;
+  timer = originalSetTimeout(() => {
+    pendingTimers.delete(timer);
+    callback(...args);
+  }, delay);
+  pendingTimers.add(timer);
+  return timer;
+};
+globalThis.clearTimeout = timer => {
+  pendingTimers.delete(timer);
+  return originalClearTimeout(timer);
+};
+try {
+  const timerSafe = await healthVersionGate(config, {
+    correlationId: 'goal1-test',
+    fetchImpl: fetchPair(
+      { status: 'ready', maintenance: false, apiVersion: '1.1' },
+      { apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release },
+    ),
+    signal: externalSignal,
+    timeoutMs: 60_000,
+  });
+  assert.equal(timerSafe.state, 'healthy');
+  assert.equal(pendingTimers.size, 0, 'server gate must clear every timeout after a settled request');
+  assert.equal(externalSignal.listeners.size, 0, 'server gate must detach the caller abort listener after settling');
+} finally {
+  for (const timer of pendingTimers) originalClearTimeout(timer);
+  globalThis.setTimeout = originalSetTimeout;
+  globalThis.clearTimeout = originalClearTimeout;
+}
+
+const preAbortedController = new AbortController();
+preAbortedController.abort();
+let preAbortedFetchCalls = 0;
+const preAborted = await healthVersionGate(config, {
+  correlationId: 'goal1-test',
+  signal: preAbortedController.signal,
+  fetchImpl: async () => {
+    preAbortedFetchCalls += 1;
+    return reply({});
+  },
+});
+assert.equal(preAborted.state, 'offline');
+assert.equal(preAborted.reason, 'timeout');
+assert.equal(preAbortedFetchCalls, 0, 'a pre-aborted gate must not start a network request');
+
+const synchronousAbortController = new AbortController();
+const unhandledRejections = [];
+const captureUnhandled = reason => unhandledRejections.push(reason);
+process.on('unhandledRejection', captureUnhandled);
+try {
+  const synchronousAbort = await healthVersionGate(config, {
+    correlationId: 'goal1-test',
+    signal: synchronousAbortController.signal,
+    fetchImpl() {
+      synchronousAbortController.abort();
+      throw new Error('synchronous fetch failure');
+    },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(synchronousAbort.state, 'offline');
+  assert.equal(synchronousAbort.reason, 'timeout');
+  assert.equal(unhandledRejections.length, 0, 'abort/fetch races must not leave an unhandled rejection');
+} finally {
+  process.off('unhandledRejection', captureUnhandled);
+}
+
+let siblingRequestAborted = false;
+const siblingFailure = await healthVersionGate(config, {
+  correlationId: 'goal1-test',
+  fetchImpl(url, options) {
+    if (url.endsWith('/api/health')) return Promise.reject(new Error('health request failed'));
+    return new Promise((resolve, reject) => {
+      const rejectOnAbort = () => {
+        siblingRequestAborted = true;
+        const error = new Error('version request aborted');
+        error.name = 'AbortError';
+        reject(error);
+      };
+      if (options.signal.aborted) rejectOnAbort();
+      else options.signal.addEventListener('abort', rejectOnAbort, { once: true });
+    });
+  },
+});
+assert.equal(siblingFailure.state, 'invalid');
+assert.equal(siblingFailure.reason, 'request-failed');
+assert.equal(siblingRequestAborted, true, 'a failed contract request must abort its still-pending sibling');
+
+const malformedUrlRejections = [];
+const captureMalformedUrlRejection = reason => malformedUrlRejections.push(reason);
+let malformedUrlFetchCalls = 0;
+process.on('unhandledRejection', captureMalformedUrlRejection);
+try {
+  const malformedUrl = await healthVersionGate({ ...config, versionPath: 'http://[' }, {
+    correlationId: 'goal1-test',
+    fetchImpl: async () => {
+      malformedUrlFetchCalls += 1;
+      return reply({});
+    },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(malformedUrl.state, 'invalid');
+  assert.equal(malformedUrl.reason, 'request-failed');
+  assert.equal(malformedUrlFetchCalls, 0, 'invalid contract URLs must fail before starting either request');
+  assert.equal(malformedUrlRejections.length, 0, 'URL construction failure must not leave an unhandled request rejection');
+} finally {
+  process.off('unhandledRejection', captureMalformedUrlRejection);
+}
+
+const bodyReadDeadline = await Promise.race([
+  healthVersionGate(config, {
+    correlationId: 'goal1-test',
+    timeoutMs: 5,
+    fetchImpl: async url => url.endsWith('/api/health')
+      ? { ...reply({}), json: () => new Promise(() => {}) }
+      : reply({ apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }),
+  }),
+  new Promise(resolve => setTimeout(() => resolve({ state: 'test-deadline-exceeded' }), 100)),
+]);
+assert.equal(bodyReadDeadline.state, 'offline', 'response body reads must remain inside the server gate timeout');
+assert.equal(bodyReadDeadline.reason, 'timeout');
+
+const abortedBody = await healthVersionGate(config, {
+  correlationId: 'goal1-test',
+  fetchImpl: async url => url.endsWith('/api/health')
+    ? {
+        ...reply({}),
+        async json() {
+          const error = new Error('body read aborted');
+          error.name = 'AbortError';
+          throw error;
+        },
+      }
+    : reply({ apiVersion: '1.1', minimumClientVersion: '8.3.0', saveSchemaVersion: 1, deployedRelease: release }),
+});
+assert.equal(abortedBody.state, 'offline');
+assert.equal(abortedBody.reason, 'timeout');
+
 const offline = await healthVersionGate(config, { timeoutMs: 1, fetchImpl: async () => { await new Promise((resolve) => setTimeout(resolve, 10)); return reply({}); } });
 assert.equal(offline.state, 'offline');
 assert.equal(healthy.allowPlayerDataWrites, false);

@@ -26,7 +26,9 @@ try {
   assert.equal(fs.existsSync(path.join(output, 'firebase-auth-ui.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'server-auth.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'runtime-config.json')), true);
-  const runtimeConfig = JSON.parse(fs.readFileSync(path.resolve('runtime-config.json'), 'utf8'));
+  const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
+  assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'Firebase live launcher cannot boot a legacy local game');
+  for (const flag of ['vpsWrites', 'playerDataWrites', 'firebaseFallback']) assert.equal(runtimeConfig.featureFlags[flag], false);
   assert.equal(fs.existsSync(path.join(output, 'entry-preload-v900.mjs')), false);
   assert.match(html, /form-action 'self'/, 'launcher forms must be handled on the same origin');
   assert.match(html, new RegExp(`connect-src[^;]*${new URL(runtimeConfig.apiBaseUrl).origin.replaceAll('.', '\\.')}`), 'launcher CSP must allow its configured API origin');

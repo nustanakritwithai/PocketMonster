@@ -8,6 +8,7 @@ import { COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldByI
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
+const shellJs = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const cssV900 = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
@@ -89,7 +90,7 @@ assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live i
 assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
 assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
-assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status/, 'mutant 27: V9 loads the presence-aware Pocket chat in every combined world');
+assert.match(shellJs, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'mutant 27: persistent V9 shell loads one presence-aware Pocket chat transport');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
 assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
 assert.match(pirateBundle, /pocketmonster:pirate-presence-v1/, 'mutant 28a: vendored Pirate reports the real local pose');

@@ -2,6 +2,84 @@ import { runtimeWritePolicy } from './runtime-config.mjs';
 
 export const SERVER_GATE_STATES = Object.freeze(['disabled', 'healthy', 'maintenance', 'offline', 'incompatible', 'invalid']);
 
+const ONLINE_WORLD_SHELL_KIND = 'monsterlife-online-world-shell-v1';
+const EMBEDDED_RUNTIME_KEYS = Object.freeze([
+  'configVersion',
+  'environment',
+  'apiBaseUrl',
+  'webSocketUrl',
+  'apiVersion',
+  'minimumClientVersion',
+  'healthPath',
+  'versionPath',
+  'saveSchemaVersion',
+  'manifestValid',
+]);
+const EMBEDDED_FLAG_KEYS = Object.freeze([
+  'vpsEnabled',
+  'vpsReads',
+  'vpsWrites',
+  'playerDataWrites',
+  'firebaseFallback',
+  'launchTicket',
+]);
+const DISABLED_EMBEDDED_WRITE_POLICY = Object.freeze({
+  playerDataWrites: false,
+  accountMigration: false,
+  saveMigration: false,
+  economyMutation: false,
+  enabled: false,
+});
+const INVALID_EMBEDDED_SERVER_GATE = Object.freeze({
+  state: 'invalid',
+  reason: 'embedded-server-gate-unavailable',
+  correlationId: '',
+  latencyMs: 0,
+  allowFirebaseFallback: false,
+  allowPlayerDataWrites: false,
+  writePolicy: DISABLED_EMBEDDED_WRITE_POLICY,
+});
+
+function sameEmbeddedRuntimeContract(config, parentConfig) {
+  if (!config || !parentConfig) return false;
+  for (const key of EMBEDDED_RUNTIME_KEYS) {
+    if (!Object.is(config[key], parentConfig[key])) return false;
+  }
+  for (const key of EMBEDDED_FLAG_KEYS) {
+    if (!Object.is(config.featureFlags?.[key], parentConfig.featureFlags?.[key])) return false;
+  }
+  return true;
+}
+
+function inheritedEmbeddedServerGate(config) {
+  const child = globalThis.window;
+  if (child?.POCKETMONSTER_SCENE_EMBEDDED !== true) return null;
+  try {
+    const parent = child.parent;
+    const parentConfig = parent?.POCKETMONSTER_RUNTIME_CONFIG;
+    const parentGate = parent?.POCKETMONSTER_SERVER_GATE;
+    const exactHostedScene = parent
+      && parent !== child
+      && child.location?.origin === parent.location?.origin
+      && parent.POCKETMONSTER_ONLINE_SHELL?.kind === ONLINE_WORLD_SHELL_KIND;
+    const exactCapabilities = child.POCKETMONSTER_LAUNCH_SESSION === parent?.POCKETMONSTER_LAUNCH_SESSION
+      && child.POCKETMONSTER_RUNTIME_CONFIG === parentConfig
+      && child.__POCKETMONSTER_RUNTIME_MANIFEST__ === parentConfig
+      && child.POCKETMONSTER_SERVER_GATE === parentGate;
+    const healthyReadOnlyGate = Object.isFrozen(parentGate)
+      && parentGate?.state === 'healthy'
+      && parentGate.allowFirebaseFallback === false
+      && parentGate.allowPlayerDataWrites === false
+      && parentGate.writePolicy?.enabled === false;
+    if (exactHostedScene && exactCapabilities && healthyReadOnlyGate && sameEmbeddedRuntimeContract(config, parentConfig)) {
+      return parentGate;
+    }
+  } catch {
+    // Embedded scenes are never allowed to recover by contacting another Server.
+  }
+  return INVALID_EMBEDDED_SERVER_GATE;
+}
+
 function defaultClock() {
   return globalThis.performance?.now?.() ?? Date.now();
 }
@@ -97,26 +175,56 @@ function compatible(server, config) {
 }
 
 async function readJson(response) {
-  try { return await response.json(); } catch { return null; }
+  try { return await response.json(); } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    return null;
+  }
 }
 
 export async function requestServerContract(config, { fetchImpl = globalThis.fetch, signal, timeoutMs = 5000, correlationId = `pm-${Date.now().toString(36)}` } = {}) {
   if (!config?.featureFlags?.vpsEnabled || !config?.featureFlags?.vpsReads) return { state: 'disabled', reason: 'vps-read-disabled', correlationId };
   if (typeof fetchImpl !== 'function') return { state: 'offline', reason: 'fetch-unavailable', correlationId };
+  if (signal?.aborted) return { state: 'offline', reason: 'timeout', correlationId };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
+  let rejectAbort;
+  const abortPromise = new Promise((_, reject) => { rejectAbort = reject; });
+  const createAbortError = message => {
+    const error = new Error(message);
+    error.name = 'AbortError';
+    return error;
+  };
+  const abortRequest = message => {
+    controller.abort();
+    rejectAbort(createAbortError(message));
+  };
+  const timer = setTimeout(() => abortRequest('request timeout'), timeoutMs);
+  const callerAbort = () => abortRequest('request aborted');
+  if (signal?.aborted) callerAbort();
+  else signal?.addEventListener?.('abort', callerAbort, { once: true });
   const headers = { Accept: 'application/json', 'X-Request-Id': correlationId, 'X-Game-Version': '8.4.0' };
   try {
-    const requests = Promise.all([
-      fetchImpl(joinUrl(config.apiBaseUrl, config.healthPath), { method: 'GET', headers, signal: controller.signal, cache: 'no-store' }),
-      fetchImpl(joinUrl(config.apiBaseUrl, config.versionPath), { method: 'GET', headers, signal: controller.signal, cache: 'no-store' }),
+    const guardedFetch = url => Promise.resolve().then(() => {
+      if (controller.signal.aborted) throw createAbortError('request aborted');
+      return fetchImpl(url, { method: 'GET', headers, signal: controller.signal, cache: 'no-store' });
+    });
+    const healthUrl = joinUrl(config.apiBaseUrl, config.healthPath);
+    const versionUrl = joinUrl(config.apiBaseUrl, config.versionPath);
+    const contractRequest = Promise.all([
+      guardedFetch(healthUrl),
+      guardedFetch(versionUrl),
+    ]).then(async ([healthResponse, versionResponse]) => {
+      const [healthPayload, versionPayload] = await Promise.all([readJson(healthResponse), readJson(versionResponse)]);
+      return { healthResponse, versionResponse, healthPayload, versionPayload };
+    });
+    const {
+      healthResponse,
+      versionResponse,
+      healthPayload,
+      versionPayload,
+    } = await Promise.race([
+      contractRequest,
+      abortPromise,
     ]);
-    const [healthResponse, versionResponse] = await Promise.race([
-      requests,
-      new Promise((_, reject) => setTimeout(() => { const error = new Error('request timeout'); error.name = 'AbortError'; reject(error); }, timeoutMs)),
-    ]);
-    const [healthPayload, versionPayload] = await Promise.all([readJson(healthResponse), readJson(versionResponse)]);
     const health = normalizePayload(healthPayload);
     const version = normalizePayload(versionPayload);
     if (!health || !version || !['ready', 'not_ready'].includes(health.status) || !version.apiVersion) {
@@ -134,10 +242,16 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
     return { state: 'healthy', server, correlationId };
   } catch (error) {
     return { state: error?.name === 'AbortError' ? 'offline' : 'invalid', reason: error?.name === 'AbortError' ? 'timeout' : 'request-failed', correlationId };
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+    if (!controller.signal.aborted) controller.abort();
+    signal?.removeEventListener?.('abort', callerAbort);
+  }
 }
 
 export async function healthVersionGate(config, options = {}) {
+  const inheritedGate = inheritedEmbeddedServerGate(config);
+  if (inheritedGate) return inheritedGate;
   const clock = typeof options.clock === 'function' ? options.clock : defaultClock;
   const startedAt = clock();
   const result = await requestServerContract(config, options);

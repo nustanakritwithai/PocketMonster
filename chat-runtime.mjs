@@ -1,5 +1,41 @@
+import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
+
+const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
+const existingRuntime = window[CHAT_RUNTIME_SLOT];
+if (existingRuntime) {
+  window.POCKETMONSTER_CHAT_RUNTIME = existingRuntime;
+  existingRuntime.mount();
+} else {
 const SESSION_KEY = 'monsterlife.session.v1';
-const state = { config: null, token: null, after: 0, socket: null, polling: null, worldPulse: null, worldConnected: false };
+const MAX_SOCKET_MESSAGE_LENGTH = 262_144;
+const TERMINAL_SESSION_REJECTIONS = new Set([
+  'AUTHENTICATION_REQUIRED',
+  'INVALID_SESSION',
+  'SESSION_EXPIRED',
+  'SESSION_INVALID',
+  'SESSION_REQUIRED',
+  'SESSION_REVOKED',
+]);
+const state = {
+  config: null,
+  token: null,
+  after: 0,
+  socket: null,
+  polling: null,
+  worldPulse: null,
+  reconnectTimer: null,
+  worldConnected: false,
+  stopped: false,
+  paused: false,
+  stopReason: null,
+  lifecycleGeneration: 0,
+  chatViewGeneration: 0,
+  pullInFlight: false,
+  pullQueued: false,
+  restAbortController: new AbortController(),
+  socketCreates: 0,
+  socketGeneration: 0,
+};
 function setWorldConnected(connected) {
   const next = connected === true;
   if (state.worldConnected === next && window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === next) return;
@@ -15,8 +51,62 @@ function ensureChatStyles() {
 }
 
 function sessionToken() {
-  if (window.POCKETMONSTER_SERVER_SESSION_TOKEN) return window.POCKETMONSTER_SERVER_SESSION_TOKEN;
-  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.sessionToken || null; } catch { return null; }
+  try {
+    const launchSession = window.POCKETMONSTER_LAUNCH_SESSION;
+    if (launchSession) {
+      return isActiveLaunchSession(launchSession) ? launchSession.sessionToken : null;
+    }
+    const session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+    if (session) {
+      return isActiveLaunchSession(session) ? session.sessionToken : null;
+    }
+  } catch { return null; }
+  return window.POCKETMONSTER_SERVER_SESSION_TOKEN || null;
+}
+function invalidateSession(reason = 'session-expired') {
+  if (state.stopped) return;
+  stop(reason);
+  try { window.POCKETMONSTER_ONLINE_SHELL?.endSession?.(reason); } catch {}
+}
+function activeRequestContext() {
+  if (state.stopped || state.paused || !state.token) return null;
+  if (sessionToken() !== state.token) {
+    invalidateSession('session-expired');
+    return null;
+  }
+  return Object.freeze({ token: state.token, generation: state.lifecycleGeneration });
+}
+function requestIsCurrent(context) {
+  return Boolean(context)
+    && !state.stopped
+    && !state.paused
+    && context.token === state.token
+    && context.generation === state.lifecycleGeneration
+    && sessionToken() === context.token;
+}
+function normalizeRejectionCode(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+function isExplicitSessionRejection(payload) {
+  if (typeof payload === 'string') return TERMINAL_SESSION_REJECTIONS.has(normalizeRejectionCode(payload));
+  if (!payload || typeof payload !== 'object') return false;
+  const candidates = [payload.errorCode, payload.code, payload.reason];
+  if (payload.error && typeof payload.error === 'object') {
+    candidates.push(payload.error.errorCode, payload.error.code, payload.error.reason);
+  }
+  return candidates.some(value => TERMINAL_SESSION_REJECTIONS.has(normalizeRejectionCode(value)));
+}
+async function readResponsePayload(response) {
+  try { return await response.json(); } catch { return null; }
+}
+function currentChatChannel() {
+  return document.querySelector('#chatChannel')?.value === 'ZONE' ? 'ZONE' : 'WORLD';
+}
+function pullRequestIsCurrent(context) {
+  return requestIsCurrent(context)
+    && context.viewGeneration === state.chatViewGeneration
+    && context.channel === currentChatChannel();
 }
 function api(path) { return new URL(path.replace(/^\//, ''), `${state.config.apiBaseUrl.replace(/\/$/, '')}/`).href; }
 function addMessage(message) {
@@ -32,60 +122,195 @@ function addMessage(message) {
   const text = document.createElement('div'); text.className = 'chat-text'; text.textContent = message.message || ''; content.append(text);
   row.append(avatar, content); list.append(row); list.scrollTop = list.scrollHeight;
 }
-async function pullMessages() {
-  if (!state.token) return;
-  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
-  const response = await fetch(api(`/api/chat/messages?after=${state.after}&channel=${channel}`), { headers: { Authorization: `Bearer ${state.token}`, Accept: 'application/json' }, cache: 'no-store' });
+async function pullMessagesOnce() {
+  const sessionContext = activeRequestContext();
+  if (!sessionContext) return;
+  const context = Object.freeze({
+    ...sessionContext,
+    channel: currentChatChannel(),
+    viewGeneration: state.chatViewGeneration,
+    after: state.after,
+  });
+  const response = await fetch(api(`/api/chat/messages?after=${context.after}&channel=${context.channel}`), { headers: { Authorization: `Bearer ${context.token}`, Accept: 'application/json' }, cache: 'no-store', signal: state.restAbortController.signal });
+  if (!pullRequestIsCurrent(context)) return;
+  const payload = await readResponsePayload(response);
+  if (!pullRequestIsCurrent(context)) return;
+  if (response.status === 401 || isExplicitSessionRejection(payload)) { invalidateSession('session-rejected'); return; }
   if (!response.ok) { const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ'; return; }
-  const payload = await response.json(); for (const message of payload.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
+  for (const message of payload?.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
+}
+async function drainPullMessages() {
+  if (state.pullInFlight) return;
+  state.pullInFlight = true;
+  try {
+    while (state.pullQueued && !state.stopped && !state.paused) {
+      state.pullQueued = false;
+      try { await pullMessagesOnce(); } catch {}
+    }
+  } finally {
+    state.pullInFlight = false;
+    if (state.pullQueued && !state.stopped && !state.paused) safelyPullMessages();
+  }
 }
 async function sendMessage() {
-  const input = document.querySelector('#chatInput'); const message = input?.value.trim(); if (!message || !state.token) return;
+  const input = document.querySelector('#chatInput'); const message = input?.value.trim();
+  const context = activeRequestContext();
+  if (!message || !context) return;
   const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
-  const response = await fetch(api('/api/chat/send'), { method: 'POST', headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, channel }) });
-  if (response.ok && input) { input.value = ''; await pullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
+  const response = await fetch(api('/api/chat/send'), { method: 'POST', headers: { Authorization: `Bearer ${context.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, channel }), signal: state.restAbortController.signal });
+  if (!requestIsCurrent(context)) return;
+  const payload = await readResponsePayload(response);
+  if (!requestIsCurrent(context)) return;
+  if (response.status === 401 || isExplicitSessionRejection(payload)) { invalidateSession('session-rejected'); return; }
+  if (response.ok && input) { input.value = ''; safelyPullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
+}
+function safelyPullMessages() {
+  if (state.stopped || state.paused || !state.token) return;
+  state.pullQueued = true;
+  if (!state.pullInFlight) void drainPullMessages();
+}
+function abortRestRequests() {
+  if (!state.restAbortController.signal.aborted) state.restAbortController.abort();
+}
+function renewRestRequests() {
+  if (state.restAbortController.signal.aborted) state.restAbortController = new AbortController();
+}
+function clearTransportTimers() {
+  if (state.polling) clearInterval(state.polling);
+  if (state.worldPulse) clearInterval(state.worldPulse);
+  if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+  state.polling = null;
+  state.worldPulse = null;
+  state.reconnectTimer = null;
+}
+function closeTransport(reason) {
+  clearTransportTimers();
+  const socket = state.socket;
+  try {
+    if (socket?.readyState === WebSocket.CLOSED) state.socket = null;
+    else if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, reason);
+  } catch {}
+  setWorldConnected(false);
+}
+function ensurePolling() {
+  if (!state.polling && !state.stopped && !state.paused) {
+    state.polling = setInterval(safelyPullMessages, 10000);
+  }
 }
 function connectSocket() {
-  if (!state.token || !state.config.webSocketUrl) {
+  if (state.stopped || state.paused || !state.config?.webSocketUrl) {
     setWorldConnected(false);
     return;
   }
+  const context = activeRequestContext();
+  if (!context) {
+    setWorldConnected(false);
+    return;
+  }
+  if (state.socket && state.socket.readyState !== WebSocket.CLOSED) return;
+  if (state.socket?.readyState === WebSocket.CLOSED) state.socket = null;
   try {
     setWorldConnected(false);
-    state.socket = new WebSocket(state.config.webSocketUrl);
-    state.socket.addEventListener('open', () => {
-      state.socket.send(JSON.stringify({ token: state.token }));
+    if (state.reconnectTimer) {
+      clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = null;
+    }
+    const socket = new WebSocket(state.config.webSocketUrl);
+    state.socket = socket;
+    state.socketCreates += 1;
+    state.socketGeneration += 1;
+    socket.addEventListener('open', () => {
+      if (state.socket !== socket || state.stopped || state.paused) return;
+      const openContext = activeRequestContext();
+      if (!openContext) return;
+      socket.send(JSON.stringify({ token: openContext.token }));
       const sendWorld = () => {
+        if (!activeRequestContext()) return;
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
-        if (!snapshot || state.socket?.readyState !== WebSocket.OPEN) return;
-        state.socket.send(JSON.stringify({ type: 'world-pos', ...snapshot }));
+        if (!snapshot || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(JSON.stringify({ type: 'world-pos', ...snapshot }));
       };
       sendWorld();
+      if (state.worldPulse) clearInterval(state.worldPulse);
       state.worldPulse = setInterval(sendWorld, 250);
     });
-    state.socket.addEventListener('message', event => {
+    socket.addEventListener('message', event => {
+      if (state.socket !== socket || state.stopped || state.paused) return;
+      if (typeof event.data !== 'string' || event.data.length > MAX_SOCKET_MESSAGE_LENGTH) return;
       try {
         const message = JSON.parse(event.data);
-        if (message?.type === 'chat') void pullMessages();
+        if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
-          setWorldConnected(true);
-          window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload);
+          const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload);
+          if (accepted !== false) setWorldConnected(true);
         }
       } catch {}
     });
-    state.socket.addEventListener('error', () => setWorldConnected(false));
-    state.socket.addEventListener('close', () => {
+    socket.addEventListener('error', () => {
+      if (state.socket === socket) setWorldConnected(false);
+    });
+    socket.addEventListener('close', event => {
+      if (state.socket !== socket) return;
+      state.socket = null;
       setWorldConnected(false);
       if (state.worldPulse) {
         clearInterval(state.worldPulse);
         state.worldPulse = null;
       }
-      setTimeout(connectSocket, 5000);
+      if (event?.code === 1008 && isExplicitSessionRejection(event.reason)) {
+        invalidateSession('session-rejected');
+        return;
+      }
+      scheduleReconnect();
     });
   } catch {
     setWorldConnected(false);
-    setTimeout(connectSocket, 5000);
+    scheduleReconnect();
   }
+}
+function scheduleReconnect() {
+  if (state.stopped || state.paused || state.reconnectTimer || !activeRequestContext()) return;
+  if (state.socket && state.socket.readyState !== WebSocket.CLOSED) return;
+  state.reconnectTimer = setTimeout(() => {
+    state.reconnectTimer = null;
+    connectSocket();
+  }, 5000);
+}
+function suspend() {
+  if (state.stopped || state.paused) return;
+  state.paused = true;
+  state.lifecycleGeneration += 1;
+  state.pullQueued = false;
+  abortRestRequests();
+  closeTransport('page hidden');
+}
+function resume() {
+  if (state.stopped || !state.paused) return;
+  state.paused = false;
+  state.lifecycleGeneration += 1;
+  const currentToken = sessionToken();
+  if (!state.token) state.token = currentToken;
+  if (!state.token || currentToken !== state.token) {
+    invalidateSession('session-expired');
+    return;
+  }
+  renewRestRequests();
+  ensurePolling();
+  safelyPullMessages();
+  connectSocket();
+}
+function stop(reason = 'session-ended') {
+  if (state.stopped) return;
+  state.stopped = true;
+  state.paused = false;
+  state.stopReason = String(reason || 'session-ended');
+  state.lifecycleGeneration += 1;
+  state.chatViewGeneration += 1;
+  state.pullQueued = false;
+  abortRestRequests();
+  state.token = null;
+  state.after = 0;
+  closeTransport('session ended');
 }
 function ensureChatMarkup() {
   ensureChatStyles();
@@ -101,23 +326,61 @@ function mount() {
   const headerNote = panel.querySelector('header span'); const channel = document.createElement('select'); channel.id = 'chatChannel'; channel.className = 'chat-channel'; channel.innerHTML = '<option value="WORLD">🌍 โลก</option><option value="ZONE">📍 พื้นที่</option>'; headerNote?.after(channel);
   document.querySelector('#chatToggleBtn')?.addEventListener('click', () => { panel.classList.toggle('hidden'); if (!panel.classList.contains('hidden')) { const unread = document.querySelector('#chatUnread'); if (unread) { unread.textContent = '0'; unread.dataset.count = '0'; } document.querySelector('#chatInput')?.focus(); } });
   document.querySelector('#chatCloseBtn')?.addEventListener('click', () => panel.classList.add('hidden'));
-  document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); void sendMessage(); });
-  channel.addEventListener('change', () => { state.after = 0; document.querySelector('#chatMessages')?.replaceChildren(); void pullMessages(); });
+  document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); void sendMessage().catch(() => {}); });
+  channel.addEventListener('change', () => {
+    state.chatViewGeneration += 1;
+    state.after = 0;
+    document.querySelector('#chatMessages')?.replaceChildren();
+    safelyPullMessages();
+  });
 }
 async function start() {
   mount();
   const activate = () => {
-    state.token = sessionToken();
-    if (!state.token || !state.config || state.polling) return;
-    void pullMessages();
+    if (state.stopped || state.paused || !state.config) return;
+    const currentToken = sessionToken();
+    if (!currentToken) return;
+    if (state.token && state.token !== currentToken) {
+      invalidateSession('session-changed');
+      return;
+    }
+    state.token = currentToken;
+    ensurePolling();
+    safelyPullMessages();
     connectSocket();
-    state.polling = setInterval(() => void pullMessages(), 10000);
   };
-  window.addEventListener('pocketmonster:auth-profile-bridge', activate, { once: true });
-  state.config = await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json());
+  window.addEventListener('pocketmonster:auth-profile-bridge', activate);
+  state.config = window.POCKETMONSTER_RUNTIME_CONFIG
+    || await fetch('./runtime-config.json', { cache: 'no-store' }).then(response => response.json());
   mount();
-  state.token = sessionToken();
-  if (!state.token) return;
+  if (state.stopped || state.paused) return;
   activate();
 }
+const runtime = Object.freeze({
+  mount,
+  stop,
+  diagnostics: () => Object.freeze({
+    socketCreates: state.socketCreates,
+    socketGeneration: state.socketGeneration,
+    socketReadyState: state.socket?.readyState ?? null,
+    pollingActive: Boolean(state.polling),
+    worldPulseActive: Boolean(state.worldPulse),
+    reconnectPending: Boolean(state.reconnectTimer),
+    worldConnected: state.worldConnected,
+    stopped: state.stopped,
+    paused: state.paused,
+    stopReason: state.stopReason,
+    hasToken: Boolean(state.token),
+    lifecycleGeneration: state.lifecycleGeneration,
+    chatViewGeneration: state.chatViewGeneration,
+    pullInFlight: state.pullInFlight,
+    pullQueued: state.pullQueued,
+  }),
+});
+Object.defineProperty(window, CHAT_RUNTIME_SLOT, { value: runtime });
+window.POCKETMONSTER_CHAT_RUNTIME = runtime;
+window.addEventListener('pocketmonster:session-ended', () => stop('session-ended'));
+window.addEventListener('pagehide', suspend);
+window.addEventListener('pageshow', resume);
 void start().catch(error => console.warn('Chat runtime unavailable', error));
+}

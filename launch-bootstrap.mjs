@@ -2,6 +2,25 @@ const SESSION_KEY = 'monsterlife.session.v1';
 const FIREBASE_LAUNCHER = 'https://pocketmonster-game.web.app/';
 const FIREBASE_LAUNCHER_ORIGIN = new URL(FIREBASE_LAUNCHER).origin;
 
+export function isActiveLaunchSession(session, now = Date.now()) {
+  const expiresAt = Date.parse(session?.expiresAtUtc);
+  return typeof session?.sessionToken === 'string'
+    && session.sessionToken.length > 0
+    && Number.isFinite(expiresAt)
+    && expiresAt > now;
+}
+
+export function requireActiveOnlineLaunchSession(config, session, now = Date.now()) {
+  if (config?.manifestValid !== true || config?.featureFlags?.launchTicket !== true || !isActiveLaunchSession(session, now)) {
+    throw Object.assign(new Error('An active Monster Life online session is required'), { code: 'ONLINE_SESSION_REQUIRED' });
+  }
+  return session;
+}
+
+export function returnToFirebaseLauncher(locationLike = globalThis.location) {
+  locationLike?.replace?.(FIREBASE_LAUNCHER);
+}
+
 function apiUrl(config, path) {
   if (!config?.apiBaseUrl) throw new Error('Monster Life API is not configured');
   return new URL(path.replace(/^\//, ''), `${config.apiBaseUrl.replace(/\/$/, '')}/`).href;
@@ -54,8 +73,7 @@ export async function recoverLaunchContext(launch, { windowLike = globalThis.win
 export function readLaunchSession(storage = globalThis.sessionStorage, now = Date.now()) {
   try {
     const value = JSON.parse(storage.getItem(SESSION_KEY) || 'null');
-    const expiresAt = Date.parse(value?.expiresAtUtc);
-    if (!value?.sessionToken || !Number.isFinite(expiresAt) || expiresAt <= now) { storage.removeItem(SESSION_KEY); return null; }
+    if (!isActiveLaunchSession(value, now)) { storage.removeItem(SESSION_KEY); return null; }
     return Object.freeze(value);
   } catch { storage.removeItem(SESSION_KEY); return null; }
 }
@@ -63,6 +81,10 @@ export function readLaunchSession(storage = globalThis.sessionStorage, now = Dat
 export function clearLaunchSession(storage = globalThis.sessionStorage) {
   storage?.removeItem?.(SESSION_KEY);
   try { delete globalThis.POCKETMONSTER_LAUNCH_SESSION; } catch { globalThis.POCKETMONSTER_LAUNCH_SESSION = undefined; }
+  try { delete globalThis.POCKETMONSTER_SERVER_SESSION_TOKEN; } catch { globalThis.POCKETMONSTER_SERVER_SESSION_TOKEN = undefined; }
+  try { delete globalThis.POCKETMONSTER_SERVER_GATE; } catch { globalThis.POCKETMONSTER_SERVER_GATE = undefined; }
+  try { delete globalThis.POCKETMONSTER_SERVER_GATE_OBSERVATION; } catch { globalThis.POCKETMONSTER_SERVER_GATE_OBSERVATION = undefined; }
+  try { globalThis.dispatchEvent?.(new Event('pocketmonster:session-ended')); } catch {}
 }
 
 export async function redeemLaunchTicket(config, launch, { fetchImpl = globalThis.fetch, storage = globalThis.sessionStorage } = {}) {
@@ -84,6 +106,9 @@ export async function redeemLaunchTicket(config, launch, { fetchImpl = globalThi
   const payload = await response?.json().catch(() => ({})) || {};
   if (!response?.ok || !payload.sessionToken) throw Object.assign(new Error(payload.message || 'Launch ticket redemption failed'), { code: payload.errorCode || 'REDEEM_FAILED' });
   const session = Object.freeze({ sessionToken: payload.sessionToken, expiresAtUtc: payload.expiresAtUtc, account: payload.account });
+  if (!isActiveLaunchSession(session)) {
+    throw Object.assign(new Error('Launch ticket returned an invalid or expired Monster Life session'), { code: 'INVALID_SESSION' });
+  }
   storage.setItem(SESSION_KEY, JSON.stringify(session));
   return session;
 }
@@ -97,7 +122,7 @@ export async function prepareLaunch(config, launch = globalThis.__POCKETMONSTER_
     clearLaunchSession(storage);
     session = await redeemLaunchTicket(config, launch, { storage, fetchImpl });
   } else session = readLaunchSession(storage);
-  if (!session) { locationLike.replace(FIREBASE_LAUNCHER); return Object.freeze({ state: 'redirecting' }); }
+  if (!session) { returnToFirebaseLauncher(locationLike); return Object.freeze({ state: 'redirecting' }); }
   globalThis.POCKETMONSTER_LAUNCH_SESSION = session;
   return Object.freeze({ state: 'authenticated', session });
 }

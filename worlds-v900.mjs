@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=910';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=911';
 import {
   applyControlPanel,
   combinedLocationQuery,
@@ -21,7 +21,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-await import('./chat-runtime.mjs?v=8.4.0-pirate-presence-status');
+if (window.POCKETMONSTER_SCENE_EMBEDDED !== true) {
+  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-2');
+}
 
 const startup = document.getElementById('startupStatus');
 

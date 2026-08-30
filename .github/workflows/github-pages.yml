@@ -5,12 +5,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      launch_ticket:
-        description: Enable launch-ticket bootstrap for authenticated Production users
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -18,15 +12,19 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
+  group: pocketmonster-production-release
   cancel-in-progress: false
 
 jobs:
   deploy:
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
+      MONSTERLIFE_EXPECTED_API_BASE_URL: 'https://157.85.96.139'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,21 +32,27 @@ jobs:
           node-version: 22
       - name: Generate GitHub Pages runtime configuration
         env:
-          MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
           MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
           MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
-          # Compatibility contract: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_ticket || false }}
-          MONSTERLIFE_LAUNCH_TICKET: ${{ github.event_name == 'push' || inputs.launch_ticket }}
+          MONSTERLIFE_LAUNCH_TICKET: 'true'
           MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.sha }}'
         run: node scripts/write-deployment-runtime-config.mjs
+      - name: Verify Monster Life backend before Pages deployment
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ github.sha }}'
+        run: node scripts/verify-live-v9-deployment.mjs backend
       - name: Verify hosting architecture
         run: |
           node tests/check-active-syntax.mjs
           node tests/deployment-runtime-config.mjs
           node tests/production-launch-workflows.mjs
           node tests/hosting-architecture.mjs
+          node tests/v90-deployment-gates.mjs
+          npm run test:v90:pirate-player
       - name: Build public game artifact
         run: node scripts/build-github-pages.mjs
+      - name: Verify unified-world artifact
+        run: node tests/v90-unified-pages-artifact.mjs
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -56,3 +60,15 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify deployed GitHub Pages release
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ github.sha }}'
+          MONSTERLIFE_DEPLOYMENT_BASE_URL: '${{ steps.deployment.outputs.page_url }}'
+        run: node scripts/verify-live-v9-deployment.mjs pages
+
+  deploy-firebase:
+    needs: deploy
+    uses: ./.github/workflows/firebase-hosting-merge.yml
+    with:
+      release_sha: ${{ github.sha }}
+    secrets: inherit
