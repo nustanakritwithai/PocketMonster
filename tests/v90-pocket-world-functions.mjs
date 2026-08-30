@@ -29,7 +29,7 @@ assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat pan
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=814/, 'legacy preload binds chat before game overlays');
 assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
-assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
+assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status'\)/, 'V9 combined channel loads the presence-aware chat for every world');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'real pirate portals assign only their validated destination');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
