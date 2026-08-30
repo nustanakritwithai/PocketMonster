@@ -36,7 +36,7 @@ assert.match(liveJs, /function haltLiveGameEntry/, 'live stops entering the game
 assert.match(liveJs, /firebaseFallback===false/, 'live halt requires firebaseFallback to stay closed');
 assert.match(liveJs, /serverGate\.state!=='healthy'/, 'unhealthy Server gate blocks live entry');
 assert.match(liveJs, /authProfileBridge\.state==='offline'\|\|authProfileBridge\.state==='fallback'/, 'offline/fallback bridge blocks live entry');
-assert.match(liveJs, /else \{state\.currentZone='hub';switchZone\('hub',true);\}/, 'after login live enters the pirate home immediately instead of a saved Ranch/hunt zone');
+assert.match(liveJs, /else \{state\.currentZone='hub';switchZone\('hub',true\);\}/, 'after login live enters the pirate home immediately instead of a saved Ranch/hunt zone');
 assert.match(liveJs, /window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{zone:LIVE_PRESENCE_ZONE,x:player\.position\.x,z:player\.position\.z,dir:player\.rotation\.y\}\)/, 'world-pos always uses pirate-fruit');
 assert.match(liveJs, /if\(!payload\|\|payload\.zone!==LIVE_PRESENCE_ZONE\)return/, 'presence drops snapshots whose zone is not pirate-fruit');
 assert.match(liveJs, /if\(!item\?\.id\|\|!Number\.isFinite\(item\.x\)\|\|!Number\.isFinite\(item\.z\)\)continue/, 'presence drops non-finite x/z');
@@ -64,7 +64,8 @@ assert.match(chat, /type === 'world-snapshot'/, 'chat still receives world-snaps
 assert.match(chat, /type === 'chat'/, 'chat frames stay on the same socket');
 assert.doesNotMatch(chat, /vpsWrites|playerDataWrites/, 'chat must not open write flags');
 
-assert.match(v900, /pirate-fruit-offline/, 'V9 combined page is left in place');
+assert.match(v900, /entry-preload-v900\.mjs/, 'V9 combined page is left in place');
+assert.match(v900, /ยังไม่รวมเข้าเกม live V8\.4/, 'V9 is not moved onto the live 8.4 entry');
 assert.match(worlds, /mergedIntoLiveV800: false/, 'V9 is not moved onto live');
 assert.match(boot, /pirateFruitFrame/, 'V9 pirate boot is not rewritten');
 
