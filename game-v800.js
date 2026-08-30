@@ -6,7 +6,7 @@ import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mj
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
-import { nearestRoute, nextWarpPromptState, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
+import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
@@ -798,7 +798,7 @@ function updatePirateFruitReturnPortal(dt){
   pirateFruitReturnPortal.light.intensity=1.7+pulse*1.1;
   if(pirateFruitReturnPortalBusy||distXZ(player.position,pirateFruitReturnPortal.group.position)>2.25)return;
   pirateFruitReturnPortalBusy=true;
-  window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1',{detail:Object.freeze({type:'pocketmonster:world-warp-v1',world:'pirate-fruit',panel:'human',source:'pocket-monster-ranch-portal'})}));
+  location.assign(`${location.pathname}?world=pirate-fruit&panel=human`);
 }
 const incubator=new THREE.Group();
 const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
@@ -3156,7 +3156,7 @@ function ensureStarter(){
 // ---------- World zones / wild encounters ----------
 let nextId=1,zoneGeneration=0,summonRuntimeEpoch=0,wildPopulationRecoveryPending=false;const wilds=[],projectiles=[],wildRespawnTimers=new Set();let activeSummon=null;let pendingSummon=null;let summonCooldownUntil=0;let stageRunStartedAt=0;
 let bossChallengeSession=createBossChallengeSession(),nearbyBossChallengeId=null;
-let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null,dismissedWarpId=null;
+let nearbyWarp=null,warpBusy=false,warpPromptCooldown=0,warpSpawnOverride=null;
 characterUI=createCharacterUIController({
   getState:()=>state,
   getActiveSummonId:()=>activeSummon?.inst?.instanceId||pendingSummon?.instanceId||null,
@@ -6877,43 +6877,28 @@ function warpLockText(availability){
   }
   return 'เส้นทางนี้ยังล็อกอยู่';
 }
-function renderWarpPrompt(){
-  const panel=el('warpPrompt');
-  if(!panel)return;
-  if(!nearbyWarp){panel.classList.add('hidden');return;}
-  const availability=warpAvailability(state.stageProgress,nearbyWarp,stageUnlockReason);
-  const title=el('warpPromptTitle'),detail=el('warpPromptDetail'),action=el('warpPromptAction');
-  if(title)title.textContent=`ไป ${nearbyWarp.label}`;
-  if(detail)detail.textContent=availability.ok?'เดินทางไปพื้นที่ถัดไปได้ทันที':warpLockText(availability);
-  if(action){action.disabled=!availability.ok||warpBusy;action.textContent=availability.ok?'เดินทาง':'ยังล็อกอยู่';}
-  panel.classList.remove('hidden');
-}
-function closeWarpPrompt(){nearbyWarp=null;el('warpPrompt')?.classList.add('hidden');}
 function startWarp(route=nearbyWarp){
   if(warpBusy||!route)return;
   const availability=warpAvailability(state.stageProgress,route,stageUnlockReason);
-  if(!availability.ok){msg(warpLockText(availability));renderWarpPrompt();return;}
+  if(!availability.ok){msg(warpLockText(availability));warpPromptCooldown=1;return;}
   if(activeSummon?.target&&!activeSummon.target.dead||pendingSummon){msg('จบการต่อสู้หรือ Recall มอนก่อนเดินทาง');return;}
-  warpBusy=true;closeWarpPrompt();playSFX('sfx_ui_click');
+  warpBusy=true;nearbyWarp=null;playSFX('sfx_ui_click');
   warpSpawnOverride=route.spawn;
   const moved=switchZone(route.to,false);
   warpSpawnOverride=null;
   warpBusy=false;warpPromptCooldown=1.2;saveGame(false);
-  if(!moved)renderWarpPrompt();
+  if(!moved)msg('เดินทางผ่านประตูวาปไม่สำเร็จ');
 }
-function updateWarpPrompt(dt){
+function updateWalkThroughWarp(dt){
   warpPromptCooldown=Math.max(0,warpPromptCooldown-dt);
   if(warpBusy||warpPromptCooldown>0){return;}
   const found=nearestRoute(routesFrom(state.currentZone),player.position,3.2).route;
-  const next=nextWarpPromptState({foundId:found?.id||null,dismissedId:dismissedWarpId});
-  dismissedWarpId=next.dismissedId;
-  if(next.open){
-    if(nearbyWarp?.id!==next.nearbyId){nearbyWarp=found;renderWarpPrompt();}
-    return;
-  }
-  if(nearbyWarp)closeWarpPrompt();
+  if(!found){nearbyWarp=null;return;}
+  if(nearbyWarp?.id===found.id)return;
+  nearbyWarp=found;
+  startWarp(found);
 }
-function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
+function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
 // ---------- Save migration ----------
@@ -7266,12 +7251,9 @@ el('volumeSlider').oninput=(e)=>{const v=parseFloat(e.target.value)/100;setVolum
 el('resetBtn').onclick=()=>{playSFX('sfx_ui_click');for(const k of [saveKey,oldV5Key,oldV4Key,'monster-capture-summon-proto-v1'])localStorage.removeItem(k);location.reload();};
 el('stageRewardClose').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
 el('stageRewardDone').onclick=()=>{playSFX('sfx_ui_click');closeStageReward();};
-el('warpPromptAction').onclick=()=>startWarp();
-el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');dismissedWarpId=nearbyWarp?.id||null;closeWarpPrompt();};
 el('bossChallengeAccept').onclick=()=>{playSFX('sfx_ui_click');startBossChallenge();};
 el('bossChallengeDecline').onclick=()=>{playSFX('sfx_ui_click');declineNearbyBossChallenge();};
 el('bossRetreatBtn').onclick=()=>{playSFX('sfx_ui_click');exitBossChallenge();};
-el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;
@@ -7355,7 +7337,7 @@ function loop(now){
     quarantineInvalidWildActors();
     updateWorldStream();
     preflightWildEncounterBoundaries();
-    updateWarpPrompt(dt);
+    updateWalkThroughWarp(dt);
     updatePirateFruitReturnPortal(dt);
     updateBossChallengePrompt();
     updateCamera(dt);

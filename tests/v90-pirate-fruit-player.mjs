@@ -73,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=810/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=903/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=904/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -81,16 +81,16 @@ assert.match(html, /u\.searchParams\.delete\('ticket'\);u\.searchParams\.delete\
 assert.match(html, /history\.replaceState\(null,''\,u\.pathname\+u\.search\)/, 'launch scrubber preserves V9 world and panel query parameters');
 assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"/, 'world picker and clickable world tabs are removed');
 assert.match(html, /id="joystick"/, 'original game HUD is present so Ranch Hub can boot');
-assert.match(html, /id="huntBtn"/, 'original hunt button is present in V9');
+assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'V9 has no clickable hunt or warp confirmation tab');
 assert.match(html, /V9[^<]*live entry/, 'combined V9 channel is the live entry');
 assert.match(html, /เริ่มที่โลก Pirate Fruit จริง แล้ววาปเชื่อมเข้าเกมเดิม/, 'login copy says V9 starts in the real Pirate Fruit world');
 assert.doesNotMatch(html, /id="pocketWorldWarpBtn"|data-combined-world=/, 'V9 world travel is portal-only');
 assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=811');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=812');
 assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=903');
-assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=901');
+assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
 assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit');

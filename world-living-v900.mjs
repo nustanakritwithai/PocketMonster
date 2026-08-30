@@ -199,12 +199,7 @@ function updatePirateFruitPortal(dt) {
   const dz = player.position.z - pirateFruitPortal.group.position.z;
   const inside = dx * dx + dz * dz <= 1.8 * 1.8;
   if (inside && !pirateFruitPortalWasInside) {
-    window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', { detail: Object.freeze({
-      type: 'pocketmonster:world-warp-v1',
-      world: 'pirate-fruit',
-      panel: 'human',
-      source: 'living-world-pirate-portal',
-    }) }));
+    location.assign(`${location.pathname}?world=pirate-fruit&panel=human`);
   }
   pirateFruitPortalWasInside = inside;
 }
