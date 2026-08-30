@@ -5,5 +5,16 @@
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client, built with remote/server flags off. Local save only. Not merged into live V8.4."
+  "note": "Playable Pirate Fruit client, built with remote/server flags off. Local save only. Vendored as the V9 presentation world.",
+  "integrations": {
+    "pocketMonsterPortal": {
+      "contract": "presentation-only",
+      "combatAuthority": false,
+      "position": { "x": 7, "z": 15 },
+      "triggerRadius": 2.25,
+      "messageType": "pocketmonster:world-warp-v1",
+      "destination": "pocket-monster",
+      "panel": "throw"
+    }
+  }
 }

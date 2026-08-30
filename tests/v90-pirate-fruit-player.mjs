@@ -48,6 +48,9 @@ const preloadV900 = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.
 const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
+const pirateBundleRef = pirateOfflineHtml.match(/src="\.\/(assets\/index-[^"]+\.js)"/)?.[1];
+assert.ok(pirateBundleRef, 'offline Pirate Fruit entry declares its main bundle');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/' + pirateBundleRef, import.meta.url), 'utf8');
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
@@ -70,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=810/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=901/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=902/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -88,7 +91,7 @@ assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=810');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=901');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=902');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=900');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -217,6 +220,9 @@ assert.match(boot, /combinedWorldLinksFrom\('pirate-fruit'\)/, 'real pirate worl
 assert.match(boot, /assignCombinedWorld\(link\.to\)/, 'warp button loads Pocket Monster');
 assert.match(boot, /button\.removeAttribute\('hidden'\)/, 'Pocket Monster portal is explicitly revealed after Pirate Fruit boots');
 assert.match(cssV900, /z-index:16020/, 'Pocket Monster portal stays above the Pirate Fruit iframe and chat overlays');
+assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
+assert.match(boot, /event\.origin !== location\.origin/, 'parent accepts portal messages only from the live game origin');
+assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
 {
@@ -231,6 +237,11 @@ assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses 
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
+assert.equal(pirateSource.integrations.pocketMonsterPortal.contract, 'presentation-only');
+assert.equal(pirateSource.integrations.pocketMonsterPortal.combatAuthority, false);
+assert.deepEqual(pirateSource.integrations.pocketMonsterPortal.position, { x: 7, z: 15 });
+assert.match(pirateBundle, /pocketmonster:world-warp-v1/, 'Pirate Fruit bundle emits the Pocket Monster portal event');
+assert.match(pirateBundle, /pocket-monster-world-portal/, 'Pirate Fruit bundle contains the in-world portal object');
 
 assert.deepEqual(validateBundle(bundle), []);
 const pirate = bundle.assets.find(a => a.id === PIRATE_FRUIT_PLAYER_ID);
