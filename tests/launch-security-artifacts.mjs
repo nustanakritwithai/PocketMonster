@@ -7,6 +7,7 @@ const read = path => fs.readFileSync(new URL(path, root), 'utf8');
 const bootstrap = read('launch-bootstrap.mjs');
 const preload = read('entry-preload.mjs');
 const preloadV900 = read('entry-preload-v900.mjs');
+const sceneEntryV900 = read('scene-entry-v900.mjs');
 const pagesBuilder = read('scripts/build-github-pages.mjs');
 const launcherBuilder = read('scripts/build-firebase-launcher.mjs');
 
@@ -27,13 +28,14 @@ for (const name of ['index.html', 'v800.html']) {
 }
 
 assert.match(preload, /await prepareLaunch[\s\S]*await import\('\.\/game-v800\.js/, 'game import must occur after launch authentication');
-assert.match(preloadV900, /await prepareLaunch[\s\S]*await import\('\.\/worlds-v900\.mjs/, 'V9 world import must occur after launch authentication');
+assert.match(preloadV900, /await prepareLaunch[\s\S]*await import\('\.\/online-world-shell-v900\.mjs/, 'V9 online shell must start only after launch authentication');
+assert.doesNotMatch(sceneEntryV900, /prepareLaunch|redeemLaunchTicket|entry-preload|chat-runtime|new WebSocket/, 'hosted scenes must not create another launch or transport runtime');
 assert.match(bootstrap, /url\.searchParams\.has\('ticket'\)/, 'query-string ticket attempts must fail closed');
 assert.match(bootstrap, /launch\.invalid\) clearLaunchSession/, 'malformed handoffs must clear copied tab state');
 assert.match(bootstrap, /else if \(launch\.ticket\)[\s\S]*clearLaunchSession[\s\S]*redeemLaunchTicket/, 'fresh tickets must supersede stale sessions');
 assert.match(bootstrap, /event\.origin !== FIREBASE_LAUNCHER_ORIGIN \|\| event\.source !== opener/, 'mobile context recovery must verify exact launcher origin and opener');
 assert.doesNotMatch(bootstrap, /localStorage/, 'session tokens must not use persistent storage');
-assert.doesNotMatch(`${bootstrap}\n${preload}\n${preloadV900}`, /serviceWorker\.register/, 'launch assets must not enter a service-worker cache');
+assert.doesNotMatch(`${bootstrap}\n${preload}\n${preloadV900}\n${sceneEntryV900}`, /serviceWorker\.register/, 'launch assets must not enter a service-worker cache');
 assert.match(pagesBuilder, /launch-bootstrap\.mjs/, 'GitHub Pages build must include the launch bootstrap');
 assert.match(pagesBuilder, /entry-preload\.mjs/, 'GitHub Pages build must include the gated entry module');
 assert.match(launcherBuilder, /firebase-launcher-entry\.mjs/, 'Firebase launcher build must include its secure entry module');

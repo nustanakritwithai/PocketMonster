@@ -1,16 +1,15 @@
 name: Deploy PocketMonster to Firebase Hosting
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      launch_ticket:
-        description: Enable launch-ticket bootstrap for authenticated Production users
+      release_sha:
+        description: Exact GitHub Pages release commit
         required: true
-        type: boolean
-        default: false
+        type: string
+    secrets:
+      FIREBASE_SERVICE_ACCOUNT_POCKETMONSTER_GAME:
+        required: true
 
 permissions:
   contents: read
@@ -18,31 +17,48 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
+      MONSTERLIFE_EXPECTED_API_BASE_URL: 'https://157.85.96.139'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Verify matching GitHub Pages release
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ env.RELEASE_SHA }}'
+          MONSTERLIFE_DEPLOYMENT_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+        run: node scripts/verify-live-v9-deployment.mjs pages
+
       - name: Generate read-only launcher configuration
         env:
-          MONSTERLIFE_READONLY_ORIGIN: '${{ vars.MONSTERLIFE_READONLY_ORIGIN }}'
           MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
           MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
-          # Compatibility contract: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_ticket || false }}
-          MONSTERLIFE_LAUNCH_TICKET: ${{ github.event_name == 'push' || inputs.launch_ticket }}
-          MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.sha }}'
+          MONSTERLIFE_LAUNCH_TICKET: 'true'
+          MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ env.RELEASE_SHA }}'
         shell: bash
         run: |
           test -n "$MONSTERLIFE_READONLY_ORIGIN"
           node scripts/write-deployment-runtime-config.mjs
           node tests/deployment-runtime-config.mjs
           node tests/production-launch-workflows.mjs
+          node tests/v90-deployment-gates.mjs
+          npm run test:v90:pirate-player
           node scripts/build-firebase-launcher.mjs
           node tests/hosting-architecture.mjs
+
+      - name: Verify Monster Life backend before Firebase deployment
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ env.RELEASE_SHA }}'
+        run: node scripts/verify-live-v9-deployment.mjs backend
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -51,3 +67,16 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_POCKETMONSTER_GAME }}'
           projectId: pocketmonster-game
           channelId: live
+
+      - name: Verify deployed Firebase launcher
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ env.RELEASE_SHA }}'
+          MONSTERLIFE_DEPLOYMENT_BASE_URL: 'https://pocketmonster-game.web.app/'
+          MONSTERLIFE_EXPECTED_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+        run: node scripts/verify-live-v9-deployment.mjs firebase
+
+      - name: Re-verify Pages release after Firebase deployment
+        env:
+          MONSTERLIFE_EXPECTED_SHA: '${{ env.RELEASE_SHA }}'
+          MONSTERLIFE_DEPLOYMENT_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+        run: node scripts/verify-live-v9-deployment.mjs pages
