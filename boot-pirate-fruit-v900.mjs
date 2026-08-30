@@ -9,7 +9,7 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=907', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=908', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=814&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
@@ -61,6 +61,7 @@ function bindPocketMonsterLink(frame) {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), frameOrigin);
   };
   frame.addEventListener('load', () => {
+    try { frame.contentWindow?.focus?.(); } catch {}
     forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
   });
   window.addEventListener('pocketmonster:world-socket-status', event => {

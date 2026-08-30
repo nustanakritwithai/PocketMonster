@@ -57,7 +57,7 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
 assert.equal(check.status, 0, check.stderr || 'pirate-fruit-player syntax failed');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
-for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.mjs', 'entry-preload-v900.mjs', 'online-world-bridge-v900.mjs', 'online-world-shell-v900.mjs', 'scene-entry-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
+for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.mjs', 'entry-preload-v900.mjs', 'online-world-bridge-v900.mjs', 'online-world-shell-v900.mjs', 'persistent-fullscreen-v900.mjs', 'scene-entry-v900.mjs', 'worlds-v900.mjs', 'combined-worlds-v900.mjs', 'world-living-v900.mjs', 'control-panels-v900.mjs', 'pirate-player-server.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
@@ -74,7 +74,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=814/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=3/, 'V9 preload boots the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=4/, 'V9 preload boots the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -90,7 +90,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=908');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=909');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -114,6 +114,8 @@ assert.match(worldsJs, /query\.set\('shellRevision', shellRevision\)/, 'hosted w
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');
+assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persistent shell owns fullscreen across scene swaps');
+assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=1/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');

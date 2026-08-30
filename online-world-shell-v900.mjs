@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=911';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=912';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -27,6 +27,8 @@ let sceneBootGeneration = 0;
 let sceneBootState = 'loading';
 let sceneReadyCount = 0;
 let sceneErrorCount = 0;
+let sceneFocusCount = 0;
+let fullscreenRequestCount = 0;
 let activeSceneLease = null;
 let sessionEnding = false;
 let sessionEndReason = null;
@@ -100,6 +102,28 @@ function invalidateSceneBoot({ showLoading = false, message } = {}) {
 
 function sceneWindowIsCurrent(sceneWindow) {
   try { return sceneWindow === sceneFrame.contentWindow; } catch { return false; }
+}
+
+function persistentFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function requestPersistentFullscreen(options) {
+  if (sessionEnding) {
+    return Promise.reject(Object.assign(new Error('Online session has ended'), { code: 'ONLINE_SESSION_ENDED' }));
+  }
+  if (persistentFullscreenElement()) return Promise.resolve(true);
+  const root = document.documentElement;
+  const request = root?.requestFullscreen || root?.webkitRequestFullscreen;
+  if (typeof request !== 'function') {
+    return Promise.reject(Object.assign(new Error('Fullscreen is unavailable'), { code: 'FULLSCREEN_UNAVAILABLE' }));
+  }
+  fullscreenRequestCount += 1;
+  try {
+    return Promise.resolve(request.call(root, options)).then(() => true);
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }
 
 function readRegisteredScene(sceneWindow, sceneHref) {
@@ -236,6 +260,12 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
     shellStatus.classList.remove('error');
     shellStatus.classList.add('hidden');
     syncShellRouteFromScene();
+    try {
+      if (typeof sceneWindow.focus === 'function') {
+        sceneWindow.focus();
+        sceneFocusCount += 1;
+      }
+    } catch {}
     const detail = Object.freeze({
       worldId: activeWorld,
       panel: activePanel,
@@ -329,6 +359,7 @@ const publicShell = Object.freeze({
   reportSceneBoot,
   leaveSceneBoot,
   navigate,
+  requestFullscreen: requestPersistentFullscreen,
   endSession,
   diagnostics: () => Object.freeze({
     bootId: shellBootId,
@@ -339,6 +370,9 @@ const publicShell = Object.freeze({
     sceneBootState,
     sceneReadyCount,
     sceneErrorCount,
+    sceneFocusCount,
+    fullscreenActive: Boolean(persistentFullscreenElement()),
+    fullscreenRequestCount,
     hasActiveSceneLease: Boolean(activeSceneLease),
     sessionActive: isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
     sessionEnding,

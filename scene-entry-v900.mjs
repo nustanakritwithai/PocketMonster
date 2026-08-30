@@ -1,3 +1,4 @@
+import './persistent-fullscreen-v900.mjs?v=1';
 import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
@@ -173,7 +174,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=911');
+  await import('./worlds-v900.mjs?v=912');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
