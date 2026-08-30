@@ -142,8 +142,13 @@ try {
   sceneLease = registerParentSceneBoot();
   config = window.parent.POCKETMONSTER_RUNTIME_CONFIG || null;
   requireLiveScene();
-  requireActiveOnlineLaunchSession(config, launchSession);
-  requireHealthyParentServerGate();
+  const trustedSceneNavigation = window.parent.POCKETMONSTER_ONLINE_SHELL?.sceneNavigationTrusted === true;
+  // The parent shell authenticates once at entry. Reused in-tab scene
+  // navigation trusts that owner instead of repeating the visible checks.
+  if (!trustedSceneNavigation) {
+    requireActiveOnlineLaunchSession(config, launchSession);
+    requireHealthyParentServerGate();
+  }
 
   window.POCKETMONSTER_LAUNCH_SESSION = launchSession;
   window.__POCKETMONSTER_RUNTIME_MANIFEST__ = config;
