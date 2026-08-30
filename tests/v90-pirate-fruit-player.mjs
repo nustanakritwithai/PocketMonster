@@ -73,7 +73,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=814/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /worlds-v900\.mjs\?v=909/, 'V9.0 preload boots the 3-world orchestrator after login');
+assert.match(preloadV900, /worlds-v900\.mjs\?v=910/, 'V9.0 preload boots the 3-world orchestrator after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -89,7 +89,7 @@ assert.equal(COMBINED_VERSION, '9.0.0-combined');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=907');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=908');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -111,7 +111,7 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays 
 assert.match(worldsJs, /combinedLocationQuery\(world\.id, panel\)/, 'world switch keeps the panel except Pocket Monster stays capture-only');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
-assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'combined channel loads Pocket chat for every world');
+assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status/, 'combined channel loads the presence-aware Pocket chat for every world');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');

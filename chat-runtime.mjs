@@ -1,5 +1,12 @@
 const SESSION_KEY = 'monsterlife.session.v1';
-const state = { config: null, token: null, after: 0, socket: null, polling: null, worldPulse: null };
+const state = { config: null, token: null, after: 0, socket: null, polling: null, worldPulse: null, worldConnected: false };
+function setWorldConnected(connected) {
+  const next = connected === true;
+  if (state.worldConnected === next && window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === next) return;
+  state.worldConnected = next;
+  window.POCKETMONSTER_WORLD_SOCKET_CONNECTED = next;
+  window.dispatchEvent(new CustomEvent('pocketmonster:world-socket-status', { detail: { connected: next } }));
+}
 function ensureChatStyles() {
   if (document.querySelector('#chatRuntimeStyles')) return;
   const style = document.createElement('style'); style.id = 'chatRuntimeStyles';
@@ -39,8 +46,46 @@ async function sendMessage() {
   if (response.ok && input) { input.value = ''; await pullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
 }
 function connectSocket() {
-  if (!state.token || !state.config.webSocketUrl) return;
-  try { state.socket = new WebSocket(state.config.webSocketUrl); state.socket.addEventListener('open', () => { state.socket.send(JSON.stringify({ token: state.token })); const sendWorld = () => { const snapshot = window.POCKETMONSTER_WORLD_STATE?.(); if (!snapshot || state.socket?.readyState !== WebSocket.OPEN) return; state.socket.send(JSON.stringify({ type: 'world-pos', ...snapshot })); }; sendWorld(); state.worldPulse = setInterval(sendWorld, 250); }); state.socket.addEventListener('message', event => { try { const message = JSON.parse(event.data); if (message?.type === 'chat') void pullMessages(); if (message?.type === 'world-snapshot') window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload); } catch {} }); state.socket.addEventListener('close', () => { if (state.worldPulse) { clearInterval(state.worldPulse); state.worldPulse = null; } setTimeout(connectSocket, 5000); }); } catch { setTimeout(connectSocket, 5000); }
+  if (!state.token || !state.config.webSocketUrl) {
+    setWorldConnected(false);
+    return;
+  }
+  try {
+    setWorldConnected(false);
+    state.socket = new WebSocket(state.config.webSocketUrl);
+    state.socket.addEventListener('open', () => {
+      state.socket.send(JSON.stringify({ token: state.token }));
+      const sendWorld = () => {
+        const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
+        if (!snapshot || state.socket?.readyState !== WebSocket.OPEN) return;
+        state.socket.send(JSON.stringify({ type: 'world-pos', ...snapshot }));
+      };
+      sendWorld();
+      state.worldPulse = setInterval(sendWorld, 250);
+    });
+    state.socket.addEventListener('message', event => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message?.type === 'chat') void pullMessages();
+        if (message?.type === 'world-snapshot') {
+          setWorldConnected(true);
+          window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload);
+        }
+      } catch {}
+    });
+    state.socket.addEventListener('error', () => setWorldConnected(false));
+    state.socket.addEventListener('close', () => {
+      setWorldConnected(false);
+      if (state.worldPulse) {
+        clearInterval(state.worldPulse);
+        state.worldPulse = null;
+      }
+      setTimeout(connectSocket, 5000);
+    });
+  } catch {
+    setWorldConnected(false);
+    setTimeout(connectSocket, 5000);
+  }
 }
 function ensureChatMarkup() {
   ensureChatStyles();

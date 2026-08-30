@@ -2,12 +2,13 @@ import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v9
 import { publishWorldState } from './world-presence-v800.mjs';
 import {
   PIRATE_PRESENCE_ZONE,
+  createPiratePresenceStatusMessage,
   createPirateSnapshotMessage,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
-} from './pirate-presence-bridge-v900.mjs?v=1';
+} from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=906', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=907', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=814&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
@@ -55,6 +56,15 @@ function bindPocketMonsterLink(frame) {
   const forwardPresence = snapshot => {
     frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), frameOrigin);
   };
+  const forwardPresenceStatus = connected => {
+    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), frameOrigin);
+  };
+  frame.addEventListener('load', () => {
+    forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
+  });
+  window.addEventListener('pocketmonster:world-socket-status', event => {
+    forwardPresenceStatus(event.detail?.connected === true);
+  });
   publishWorldState({
     getZone: () => 'pirate-fruit',
     getPosition: () => piratePose,
@@ -64,6 +74,7 @@ function bindPocketMonsterLink(frame) {
     const snapshot = sanitizePirateWorldSnapshot(payload);
     if (!snapshot) return;
     latestPresenceSnapshot = snapshot;
+    forwardPresenceStatus(true);
     forwardPresence(snapshot);
   };
   window.addEventListener('message', event => {

@@ -1,6 +1,7 @@
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
 export const PIRATE_LOCAL_PRESENCE_MESSAGE = 'pocketmonster:pirate-presence-v1';
 export const PIRATE_PRESENCE_SNAPSHOT_MESSAGE = 'pocketmonster:pirate-presence-snapshot-v1';
+export const PIRATE_PRESENCE_STATUS_MESSAGE = 'pocketmonster:pirate-presence-status-v1';
 
 const MAX_REMOTE_PLAYERS = 100;
 const MAX_PLAYER_ID_LENGTH = 80;
@@ -57,5 +58,13 @@ export function createPirateSnapshotMessage(snapshot) {
   return Object.freeze({
     type: PIRATE_PRESENCE_SNAPSHOT_MESSAGE,
     payload: snapshot,
+  });
+}
+
+export function createPiratePresenceStatusMessage(connected) {
+  return Object.freeze({
+    type: PIRATE_PRESENCE_STATUS_MESSAGE,
+    zone: PIRATE_PRESENCE_ZONE,
+    connected: connected === true,
   });
 }
