@@ -1,8 +1,8 @@
-import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs?v=901';
+import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs?v=902';
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=902', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
@@ -41,7 +41,13 @@ function assignCombinedWorld(worldId) {
   location.assign(`${location.pathname}?${combinedLocationQuery(worldId, defaultPanelForWorld(worldId))}`);
 }
 
-function bindPocketMonsterLink() {
+function bindPocketMonsterLink(frame) {
+  window.addEventListener('message', event => {
+    if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+    const message = event.data;
+    if (message?.type !== 'pocketmonster:world-warp-v1' || message.world !== 'pocket-monster') return;
+    assignCombinedWorld('pocket-monster');
+  });
   const link = combinedWorldLinksFrom('pirate-fruit')[0];
   const button = document.getElementById('pocketWorldWarpBtn');
   if (button && link) {
@@ -85,8 +91,8 @@ if (startup) {
   startup.className = 'startup-status';
 }
 
-mountPirateOffline();
-bindPocketMonsterLink();
+const pirateFrame = mountPirateOffline();
+bindPocketMonsterLink(pirateFrame);
 if (startup) {
   startup.textContent = 'เข้าโลก Pirate Fruit แล้ว';
   startup.className = 'startup-status ok';
