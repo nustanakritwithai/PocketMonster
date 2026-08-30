@@ -32,6 +32,7 @@ assert.match(js,/nearbyWarp=found;\s*startWarp\(found\)/,'Entering a portal star
 assert.match(js,/warpArrivalNeedsExit=true/,'Destination portal waits until the player leaves its radius before rearming');
 assert.match(js,/if\(warpArrivalNeedsExit\)\{if\(!found\)warpArrivalNeedsExit=false;return;\}/,'Arrival guard clears only after leaving the destination portal');
 assert.doesNotMatch(js,/nextWarpPromptState\(|renderWarpPrompt\(|warpPromptAction|warpPromptCancel/,'Live travel has no confirmation flow');
+assert.doesNotMatch(js,/closeWarpPrompt\(|dismissedWarpId/,'Zone changes do not reference removed warp prompt state');
 const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');
 assert.match(warpBeacon,/boxGeometry\(\.18,1\.8,\.18\)/,'Warp point has a visible vertical light beam');
