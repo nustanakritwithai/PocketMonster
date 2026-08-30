@@ -355,6 +355,8 @@ const publicShell = Object.freeze({
   presenceMode: 'read-only',
   oneSession: true,
   oneSocket: true,
+  // Child scenes may trust this authenticated shell during in-tab navigation.
+  sceneNavigationTrusted: true,
   registerSceneBoot,
   reportSceneBoot,
   leaveSceneBoot,
