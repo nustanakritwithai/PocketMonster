@@ -799,7 +799,9 @@ function updatePirateFruitReturnPortal(dt){
   pirateFruitReturnPortal.light.intensity=1.7+pulse*1.1;
   if(pirateFruitReturnPortalBusy||distXZ(player.position,pirateFruitReturnPortal.group.position)>2.25)return;
   pirateFruitReturnPortalBusy=true;
-  location.assign(`${location.pathname}?world=pirate-fruit&panel=human`);
+  window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {
+    detail: { type: 'pocketmonster:world-warp-v1', world: 'pirate-fruit', panel: 'human', source: 'pocket-monster-ranch-portal' },
+  }));
 }
 const incubator=new THREE.Group();
 const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);

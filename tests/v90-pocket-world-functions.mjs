@@ -64,7 +64,7 @@ assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"|id="pocketWorldWarp
 assert.match(liveJs, /pirate-fruit-world-return-portal/, 'Ranch Hub ships a visible in-world return portal');
 assert.match(liveJs, /group\.position\.set\(-8,0,3\)/, 'return portal stays at the approved Ranch Hub coordinate');
 assert.match(liveJs, /state\.currentZone==='hub'/, 'return portal is active only inside Ranch Hub');
-assert.match(liveJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Ranch return portal navigates directly to Pirate Fruit');
+assert.match(liveJs, /pocketmonster:world-warp-v1/, 'Ranch return portal routes to Pirate Fruit in-document');
 assert.match(worldsJs, /window\.addEventListener\('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp\)/, 'V9 router binds the local return portal event');
 assert.match(worldsJs, /switchWorldInDocument\(warp\.world, warp\.panel\)/, 'validated return portals preserve their Pirate Fruit human destination');
 assert.doesNotMatch(liveJs.match(/function updatePirateFruitReturnPortal\(dt\)\{[\s\S]*?\n\}/)?.[0]||'', /saveGame|vpsWrites|playerDataWrites/, 'return portal does not write save or enable server writes');
