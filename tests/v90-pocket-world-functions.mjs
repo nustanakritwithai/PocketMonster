@@ -12,7 +12,7 @@ const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.met
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const liveHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const versionedHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
+const versionedHtml = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 const launcher = fs.readFileSync(new URL('../firebase-launcher-entry.mjs', import.meta.url), 'utf8');
 const helper = fs.readFileSync(new URL('../world-presence-v800.mjs', import.meta.url), 'utf8');
@@ -22,7 +22,7 @@ for (const file of ['world-presence-v800.mjs', 'chat-runtime.mjs']) {
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
 
-assert.equal(liveHtml, versionedHtml, 'live V8.4 entries stay byte-identical after chat markup');
+assert.equal(liveHtml, versionedHtml, 'live index.html stays byte-identical with the V9 entry');
 assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hud">'), 'live chat toggle stays outside #hud');
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');

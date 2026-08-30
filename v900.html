@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="referrer" content="no-referrer" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://nustanakritwithai.github.io https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://157.85.96.139 wss://157.85.96.139 https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: blob:; style-src 'self' https://nustanakritwithai.github.io; font-src 'self' https://nustanakritwithai.github.io; media-src 'self' https://nustanakritwithai.github.io; worker-src 'self' blob:; frame-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-4MVY3XUiG3LGZ6ySDdDgZPoqCh/L1Fi9UiNfGR1wxfA=' https://nustanakritwithai.github.io https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://157.85.96.139 wss://157.85.96.139 https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: blob:; style-src 'self' https://nustanakritwithai.github.io; font-src 'self' https://nustanakritwithai.github.io; media-src 'self' https://nustanakritwithai.github.io; worker-src 'self' blob:; frame-src 'self' https://nustanakritwithai.github.io; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0f766e" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
+<script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
   <script type="module" src="./entry-preload-v900.mjs"></script>
   <link rel="stylesheet" href="./style-v800.css?v=810" />
   <link rel="stylesheet" href="./style-v900.css?v=900" />
@@ -17,7 +18,7 @@
 <body>
   <div id="accountGate" class="account-gate">
     <div id="loginPage" class="account-card auth-page">
-      <div class="account-logo">🐾</div><h1>Monster Life RPG V9.0</h1><p>เวอร์ชันรวม 3 โลก • เริ่มที่โลก Pirate Fruit จริง แล้ววาปเชื่อมเข้าเกมเดิม • ยังไม่รวมเข้าเกม live V8.4</p>
+      <div class="account-logo">🐾</div><h1>Monster Life RPG V9.0</h1><p>เวอร์ชันรวม 3 โลก • เริ่มที่โลก Pirate Fruit จริง แล้ววาปเชื่อมเข้าเกมเดิม • V9 เป็น live entry หลัก</p>
       <form id="loginForm"><label>อีเมล<input id="loginEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>รหัสผ่าน<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="รหัสผ่าน" /></label><button id="loginAccountBtn" class="auth-primary" type="submit">เข้าสู่ระบบ</button></form><button id="googleLoginBtn" class="auth-google" type="button">เข้าสู่ระบบด้วย Google</button><button id="guestLoginBtn" class="auth-guest" type="button">เข้าเล่นแบบแขก</button>
       <div id="loginStatus" class="account-status"></div><div class="auth-switch">ยังไม่มีบัญชี? <button id="showRegisterBtn" type="button">สมัครไอดีใหม่</button></div>
     </div>

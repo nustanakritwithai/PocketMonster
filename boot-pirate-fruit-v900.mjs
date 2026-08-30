@@ -2,7 +2,7 @@ import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs';
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = './pirate-fruit-offline/index.html';
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
