@@ -23,12 +23,12 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=911',
+    runtime: './boot-pirate-fruit-v900.mjs?v=912',
   }),
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=817',
+    runtime: './game-v800.js?v=818',
   }),
   Object.freeze({
     world: 'living-world',
@@ -88,7 +88,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     webSocketConstructs: 0,
   };
   const sceneQuery = new URLSearchParams({ world, panel });
-  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '6');
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '7');
   const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
@@ -308,6 +308,9 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     }
     if (pathname === '/control-panels-v900.mjs') {
       return makeSynthetic(resolvedUrl, {
+        allowedPanelForWorld(worldId, panelId) {
+          return worldId === 'pocket-monster' ? 'throw' : panelId || 'human';
+        },
         applyControlPanel(id) {
           body.dataset.controlPanel = id;
           metrics.timeline.push(`panel:${id}`);
@@ -449,7 +452,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
-  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '6', 'hosted route normalization preserves the exact scene lease URL');
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '7', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);
