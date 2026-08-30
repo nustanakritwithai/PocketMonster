@@ -3802,8 +3802,6 @@ function switchZone(zone,silent=false){
   closeBossChallengeUi({clearSession:true});
   clearSkillFields();
   clearSkillSwarms();
-  closeWarpPrompt();
-  dismissedWarpId=null;
   closeStageSelect();
   closeStageReward();
   el('monsterManager').classList.add('hidden');
