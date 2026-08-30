@@ -107,7 +107,8 @@ if (typeof window !== 'undefined') window.MLRPG_BALANCE = MLRPG_BALANCE;
 console.info(`Monster Life RPG V8.4.0 • PocketMonster latest progression live loop v${BALANCE_SCHEMA_VERSION} loaded`);
 
 const startup = document.getElementById('startupStatus');
-function startupText(text, cls=''){ if(startup){ startup.textContent=text; startup.className='startup-status '+cls; } }
+const sceneRuntimePrewarming=window.POCKETMONSTER_SCENE_PREWARM===true;
+function startupText(text, cls=''){ if(startup&&!sceneRuntimePrewarming){ startup.textContent=text; startup.className='startup-status '+cls; } }
 
 async function loadThree(){
   const urls=[
@@ -251,7 +252,7 @@ const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl'
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
-function gameMount(){return (pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
+function gameMount(){return window.POCKETMONSTER_SCENE_MOUNT_TARGET||(pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
 const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
 const rand=a=>a[Math.floor(Math.random()*a.length)];
 const nowMs=()=>Date.now();
@@ -3115,7 +3116,7 @@ function renderEquipment(targetPanel=null){
   panel.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>{toggleStarterEquip(inst.instanceId,b.dataset.equip);renderEquipment();});
 }
 let immersiveStarted=true;
-let sceneRuntimeActive=true;
+let sceneRuntimeActive=!sceneRuntimePrewarming;
 function setSceneRuntimeActive(active,reason=active?'scene-mount':'scene-unmount'){
   sceneRuntimeActive=active===true;
   mobileDualPointerInput?.reset?.(reason);

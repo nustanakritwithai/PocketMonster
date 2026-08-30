@@ -1,6 +1,7 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=915';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=916';
 import {
+  allowedPanelForWorld,
   applyControlPanel,
   combinedLocationQuery,
   panelIdFromLocation,
@@ -44,11 +45,39 @@ function combinedWorldLocation(worldId, panelId) {
 const routeController = createSceneRouteController({ initialRoute: resolveCombinedWorld() });
 const savedWorldGameNodes = new Map();
 const runtimeLifecycles = new Map();
+const runtimePreparations = new Map();
 let activeRuntimeId = null;
+
+function preparePocketRuntime(world) {
+  if (world?.id !== 'pocket-monster' || runtimeLifecycles.has(world.id)) return Promise.resolve(true);
+  if (runtimePreparations.has(world.id)) return runtimePreparations.get(world.id);
+  const preparation = (async () => {
+    const mountTarget = document.createElement('div');
+    mountTarget.hidden = true;
+    window.POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget;
+    window.POCKETMONSTER_SCENE_PREWARM = true;
+    try {
+      await import(world.runtime);
+      const lifecycle = window.POCKETMONSTER_SCENE_LIFECYCLE || null;
+      if (!lifecycle) throw new Error('Pocket runtime did not register its scene lifecycle');
+      lifecycle.unmount?.();
+      runtimeLifecycles.set(world.id, lifecycle);
+      savedWorldGameNodes.set(world.id, [...mountTarget.childNodes]);
+      return true;
+    } finally {
+      if (window.POCKETMONSTER_SCENE_MOUNT_TARGET === mountTarget) delete window.POCKETMONSTER_SCENE_MOUNT_TARGET;
+      delete window.POCKETMONSTER_SCENE_PREWARM;
+    }
+  })();
+  runtimePreparations.set(world.id, preparation);
+  preparation.catch(() => runtimePreparations.delete(world.id));
+  return preparation;
+}
 
 for (const world of COMBINED_WORLDS) {
   routeController.register(world.id, {
     async mount() {
+      if (world.id === 'pocket-monster') await preparePocketRuntime(world);
       const game = document.getElementById('game');
       const saved = savedWorldGameNodes.get(world.id);
       if (saved && game) game.replaceChildren(...saved);
@@ -67,8 +96,10 @@ for (const world of COMBINED_WORLDS) {
 async function switchWorldInDocument(id, panelOverride = null) {
   const world = worldById(id);
   if (!world) return;
-  const panel = applyControlPanel(panelOverride || currentPanel(world.id), world.id).id;
+  const panelId = allowedPanelForWorld(world.id, panelOverride || currentPanel(world.id));
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
+  if (world.id === 'pocket-monster') await preparePocketRuntime(world);
+  const panel = applyControlPanel(panelId, world.id).id;
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
     worldId: world.id,
     runtime: world.runtime,
@@ -120,3 +151,14 @@ async function bootWorld(id) {
 }
 
 await bootWorld(resolveCombinedWorld());
+
+if (document.body.dataset.combinedWorld === 'pirate-fruit') {
+  const prewarm = () => {
+    if (document.body.dataset.combinedWorld !== 'pirate-fruit') return;
+    preparePocketRuntime(worldById('pocket-monster')).catch(err => {
+      console.warn('Pocket runtime prewarm failed; warp will retry', err);
+    });
+  };
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(prewarm, { timeout: 1200 });
+  else if (typeof window.setTimeout === 'function') window.setTimeout(prewarm, 0);
+}

@@ -45,9 +45,9 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=918/, 'active HTML cache-busts the persistent-shell entry');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=919/, 'active HTML cache-busts the persistent-shell entry');
 assert.match(indexHtml, /style-v900\.css\?v=909/, 'active HTML cache-busts the merged Pirate presentation and persistent shell layout');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=8'\)/, 'top-level authenticates once before starting the shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=9'\)/, 'top-level authenticates once before starting the shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -55,7 +55,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=8')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=9')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -99,8 +99,8 @@ assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child log
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(sceneEntry, /worlds-v900\.mjs\?v=916/, 'hosted scene boots the existing three-world router');
-const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=916')");
+assert.match(sceneEntry, /worlds-v900\.mjs\?v=917/, 'hosted scene boots the existing three-world router');
+const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=917')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');
 assert.doesNotMatch(sceneEntry, /prepareLaunch|redeemLaunchTicket|chat-runtime|new WebSocket|sessionStorage/, 'scene entry cannot redeem, persist, or create another transport');
