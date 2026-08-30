@@ -6,6 +6,12 @@
   "remote": false,
   "viteBase": "./",
   "note": "Playable Pirate Fruit client built from merged PR 143 with remote/server flags off. Local save only. Vendored as the V9 presentation world. Pocket overlays asset-engine visuals only; it does not replace this client.",
+  "islandMap": {
+    "matchesLiveOnline": true,
+    "liveOrigin": "https://pirate-fruit-u555.onrender.com",
+    "presenceUsesIframePose": false,
+    "pocketServerHostsIslandCatalog": false
+  },
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",

@@ -1,4 +1,5 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
+import { parkedPirateFruitPresencePose } from './pirate-fruit-island-map-v900.mjs';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
@@ -76,7 +77,7 @@ if (typeof window !== 'undefined') {
   window.POCKETMONSTER_SYNC_PIRATE_CONTROLS = () => syncPirateFruitControlHud(document.getElementById('pirateFruitFrame'));
   publishWorldState({
     getZone: () => 'pirate-fruit',
-    getPosition: () => ({ x: 0, z: 0 }),
+    getPosition: () => parkedPirateFruitPresencePose(),
     getDir: () => 0,
   });
   installWorldPresence({ getZone: () => 'pirate-fruit' });
