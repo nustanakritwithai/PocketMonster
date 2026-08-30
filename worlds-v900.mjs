@@ -49,13 +49,14 @@ let activeRuntimeId = null;
 for (const world of COMBINED_WORLDS) {
   routeController.register(world.id, {
     async mount() {
+      const game = document.getElementById('game');
+      const saved = savedWorldGameNodes.get(world.id);
+      if (saved && game) game.replaceChildren(...saved);
+      else if (game) game.replaceChildren();
       if (!runtimeLifecycles.has(world.id)) {
         await import(world.runtime);
         runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
       }
-      const game = document.getElementById('game');
-      const saved = savedWorldGameNodes.get(world.id);
-      if (saved && game) game.replaceChildren(...saved);
       runtimeLifecycles.get(world.id)?.mount?.();
       activeRuntimeId = world.id;
     },

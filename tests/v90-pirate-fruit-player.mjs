@@ -74,7 +74,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=815/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=6/, 'V9 preload boots the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=7/, 'V9 preload boots the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -112,6 +112,7 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'V9 throw/capture stays 
 assert.match(worldsJs, /switchWorldInDocument\(id, panelOverride = null\)/, 'world switching uses the in-document route controller');
 assert.match(worldsJs, /query\.set\('shellRevision', shellRevision\)/, 'hosted world routes preserve the parent scene revision lease');
 assert.match(worldsJs, /runtimeLifecycles\.set\(world\.id, window\.POCKETMONSTER_SCENE_LIFECYCLE \|\| null\);[\s\S]*activeRuntimeId = world\.id;/, 'initial scene lifecycle is retained before any in-document route switch');
+assert.match(worldsJs, /if \(saved && game\) game\.replaceChildren\(\.\.\.saved\);\s*else if \(game\) game\.replaceChildren\(\);[\s\S]*await import\(world\.runtime\)/, 'a first visit clears the previous world DOM before importing the next runtime');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');
