@@ -5,7 +5,7 @@
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client, built with remote/server flags off. Local save only. Vendored as the V9 presentation world.",
+  "note": "Vendored Pirate Fruit client kept as art and license reference. V9 presents the same pirate-fruit world through the Pocket asset engine. Local save only. Do not treat this Vite bundle as the live renderer.",
   "integrations": {
     "pocketMonsterPortal": {
       "contract": "presentation-only",

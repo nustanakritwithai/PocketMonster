@@ -31,7 +31,7 @@ assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v8
 assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
 assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-chat-top-right'\)/, 'V9 combined channel loads chat for every world');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
-assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'real pirate portals assign only their validated destination');
+assert.match(boot, /assignCombinedWorld\(portal\.userData\.destination\)/, 'real pirate portals assign only their validated destination');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
 assert.match(chat, /type: 'world-pos'/, 'chat socket publishes world position for shared-zone presence');
 assert.match(chat, /type === 'world-snapshot'/, 'chat socket dispatches remote player snapshots');
@@ -51,7 +51,7 @@ assert.match(livingJs, /from '\.\/world-presence-v800\.mjs'/, 'living world uses
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
 assert.match(livingJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Living World returns directly to Pirate Fruit');
-assert.match(boot, /source === 'pirate-fruit-living-portal'/, 'Pirate iframe bridge accepts the physical Living World portal');
+assert.match(boot, /source === 'pirate-fruit-living-portal'/, 'Pirate scene accepts the physical Living World portal');
 assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"|id="pocketWorldWarpBtn"|id="controlPanelSwitcher"/, 'V9 exposes no clickable world or panel travel controls');
 assert.match(liveJs, /pirate-fruit-world-return-portal/, 'Ranch Hub ships a visible in-world return portal');
 assert.match(liveJs, /group\.position\.set\(-8,0,3\)/, 'return portal stays at the approved Ranch Hub coordinate');
