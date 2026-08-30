@@ -1,15 +1,16 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "claude/blox-fruits-three-js-roadmap-1f2f5u",
-  "commit": "4df5721de8bdb20c28e53b6a8c933616e132c96d",
+  "ref": "codex/v9-pirate-presence-readonly",
+  "commit": "fa71c41fa50edba67609d90ae2d5418455817c00",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client built from merged PR 143 with remote/server flags off. Local save only. Vendored as the V9 presentation world. Pocket overlays asset-engine visuals only; it does not replace this client.",
+  "note": "Playable Pirate Fruit client built from the arrival-lock source plus the read-only Pocket Monster parent-presence bridge. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral world presence only, while Pocket overlays asset-engine visuals without replacing the client.",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",
-    "presenceUsesIframePose": false,
+    "sourceCommit": "4df5721de8bdb20c28e53b6a8c933616e132c96d",
+    "presenceUsesIframePose": true,
     "pocketServerHostsIslandCatalog": false
   },
   "pocketPresentation": {
@@ -24,6 +25,16 @@
     "createsStage": false
   },
   "integrations": {
+    "pocketMonsterPresence": {
+      "contract": "presentation-only",
+      "zone": "pirate-fruit",
+      "transport": "existing-parent-chat-websocket",
+      "localMessageType": "pocketmonster:pirate-presence-v1",
+      "snapshotMessageType": "pocketmonster:pirate-presence-snapshot-v1",
+      "persistentWrites": false,
+      "collision": false,
+      "combatAuthority": false
+    },
     "pocketMonsterPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,

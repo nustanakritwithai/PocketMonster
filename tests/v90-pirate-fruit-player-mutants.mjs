@@ -16,6 +16,10 @@ const versionedHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 
 const provider = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('../asset-presentation/schema.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
+const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
+const pirateEntry = pirateOfflineHtml.match(/src="\.\/assets\/(index-[^"]+\.js)"/)?.[1];
+assert.ok(pirateEntry, 'mutant setup: vendored Pirate entry must exist');
+const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/assets/${pirateEntry}`, import.meta.url), 'utf8');
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
@@ -29,7 +33,7 @@ assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=814', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=907', 'mutant 0e2: pirate world still boots through the pirate boot module');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=908', 'mutant 0e2: pirate world still boots through the pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
@@ -62,6 +66,8 @@ for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
 assert.match(provider, /setFromMatrixPosition/, 'mutant 13: worldPos scratch must implement Three.js Vector3.setFromMatrixPosition');
 assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open VPS write flags for this pirate boot');
 assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must be the offline build');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket', 'mutant 15b: Pirate presence shares the authenticated parent socket');
+assert.equal(pirateSource.integrations.pocketMonsterPresence.persistentWrites, false, 'mutant 15c: Pirate presence never enables persistent writes');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'mutant 16: V9 ships no clickable control-panel switcher');
 assert.match(html, /id="monsterThrowStage"/, 'mutant 16b: V9 has the pirate throw Pocket stage');
 assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel=/, 'mutant 17: live V9 exposes no clickable control-panel switcher');
@@ -88,9 +94,11 @@ assert.equal(pirateSource.pocketPresentation?.createsStage, false, 'mutant 24c: 
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'mutant 24d: Pocket-built pirate island scene stays deleted');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
 assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
-assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'mutant 27: V9 loads Pocket chat in every combined world');
+assert.match(worldsJs, /chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status/, 'mutant 27: V9 loads the presence-aware Pocket chat in every combined world');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
 assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
+assert.match(pirateBundle, /pocketmonster:pirate-presence-v1/, 'mutant 28a: vendored Pirate reports the real local pose');
+assert.match(pirateBundle, /pocketmonster:pirate-presence-snapshot-v1/, 'mutant 28aa: vendored Pirate renders remote snapshots');
 {
   const serverGate = fs.readFileSync(new URL('../docs/v9-334-server-gate-response.md', import.meta.url), 'utf8');
   assert.match(serverGate, /combatAuthority=false/, 'mutant 28b: Server gate response keeps the iframe off combat authority');

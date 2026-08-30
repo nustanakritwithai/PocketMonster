@@ -31,7 +31,7 @@
     "test:v82:skill-effects:e4": "node tests/v82-skill-effect-e4.mjs && node tests/v82-skill-effect-e4-live-wiring.mjs && node tests/v82-skill-effect-e4-mutants.mjs",
     "test:v82:skill-effects:e5": "node tests/v82-skill-effect-e5.mjs && node tests/v82-skill-effect-e5-live-wiring.mjs && node tests/v82-skill-effect-e5-mutants.mjs",
     "test:v82:skill-items": "node tests/v82-skill-items.mjs && node tests/v82-skill-items-mutants.mjs && node tests/v82-skill-items-runtime.mjs && node tests/v82-character-ui-skill-items.mjs",
-    "test:v90:pirate-player": "node tests/v90-pirate-fruit-player.mjs && node tests/v90-pirate-fruit-player-mutants.mjs && node tests/v90-pirate-fruit-client-bridge.mjs && node tests/v90-pirate-fruit-island-map.mjs && node tests/v90-pirate-player-server.mjs && node tests/v90-pirate-player-server-mutants.mjs && node tests/v90-pocket-world-functions.mjs",
+    "test:v90:pirate-player": "node tests/v90-pirate-fruit-player.mjs && node tests/v90-pirate-fruit-player-mutants.mjs && node tests/v90-pirate-fruit-client-bridge.mjs && node tests/v90-pirate-fruit-island-map.mjs && node tests/v90-pirate-player-server.mjs && node tests/v90-pirate-player-server-mutants.mjs && node tests/v90-pocket-world-functions.mjs && node tests/v90-pirate-presence-readonly.mjs",
     "test:v83:monster-stats:m0": "node tests/v83-monster-stat-contract.mjs && node tests/v83-monster-stat-contract-mutants.mjs",
     "test:v83:monster-stats:m1": "node tests/v81-species-adapter.mjs && node tests/v83-monster-stat-catalog.mjs && node tests/v83-monster-stat-catalog-mutants.mjs",
     "test:v83:monster-stats:m2": "node tests/v83-monster-stat-formula.mjs && node tests/v83-monster-stat-formula-mutants.mjs",
@@ -55,4 +55,3 @@
   },
   "description": "Monster Life RPG V8.4.0 - PocketMonster latest progression, combat, ranch, skills, evolution and breeding"
 }
-

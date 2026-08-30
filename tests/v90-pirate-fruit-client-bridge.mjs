@@ -61,15 +61,16 @@ assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-wo
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
 assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline HTML loads the Pocket hook');
-assert.match(pirateOfflineHtml, /src="\.\/assets\/index-CpjvNXV8\.js"/, 'offline HTML still boots the real Vite client');
+const pirateBundleRef = pirateOfflineHtml.match(/src="\.\/(assets\/index-[^"]+\.js)"/)?.[1];
+assert.ok(pirateBundleRef, 'offline HTML still boots the real Vite client');
 assert.ok(
-  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('index-CpjvNXV8.js'),
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf(`src="./${pirateBundleRef}"`),
   'Pocket hook is listed before the Pirate Fruit bundle',
 );
 assert.match(hookSrc, /vendor-three-Bv6LZXUZ\.js/, 'hook shares the Pirate Fruit vendor Three instance');
 assert.match(hookSrc, /hookPirateFruitRenderer/, 'hook installs the Pocket overlay before the client renders');
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-CpjvNXV8.js', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/${pirateBundleRef}`, import.meta.url), 'utf8');
 assert.match(pirateBundle, /pocketmonster:world-warp-v1/, 'real Pirate Fruit bundle is unchanged enough to keep portals');
 assert.doesNotMatch(bridgeSrc, /index-CpjvNXV8/, 'bridge does not rewrite the minified Vite client');
 

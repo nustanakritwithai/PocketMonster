@@ -4,8 +4,8 @@ export const PIRATE_FRUIT_LIVE_ORIGIN = 'https://pirate-fruit-u555.onrender.com'
 export const PIRATE_FRUIT_MAP_SOURCE_COMMIT = '4df5721de8bdb20c28e53b6a8c933616e132c96d';
 export const PIRATE_FRUIT_PRESENCE_ZONE = 'pirate-fruit';
 
-/** Flip to true when WORLD_STATE uses the iframe island pose instead of origin. */
-export const PIRATE_FRUIT_PRESENCE_USES_IFRAME_POSE = false;
+/** WORLD_STATE now follows the sanitized pose published by the mounted iframe. */
+export const PIRATE_FRUIT_PRESENCE_USES_IFRAME_POSE = true;
 
 export const PIRATE_FRUIT_ISLAND_LAYOUT_OFFSETS = Object.freeze({
   'starter-island': Object.freeze({ x: 0, z: 0 }),

@@ -71,7 +71,11 @@ export function installWorldPresence({ THREE, getCamera, getZone } = {}) {
 export function publishWorldState({ getZone, getPosition, getDir } = {}) {
   if (typeof window === 'undefined') return;
   window.POCKETMONSTER_WORLD_STATE = () => {
-    const pos = getPosition?.() || { x: 0, z: 0 };
-    return { zone: getZone?.(), x: pos.x, z: pos.z, dir: getDir?.() || 0 };
+    const zone = getZone?.();
+    const pos = getPosition?.();
+    const dir = getDir?.();
+    if (!zone || !pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return null;
+    if (dir !== undefined && !Number.isFinite(dir)) return null;
+    return { zone, x: pos.x, z: pos.z, dir: dir ?? 0 };
   };
 }

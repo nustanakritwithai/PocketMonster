@@ -1,7 +1,13 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
-import { parkedPirateFruitPresencePose } from './pirate-fruit-island-map-v900.mjs';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs';
-import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
+import { publishWorldState } from './world-presence-v800.mjs';
+import {
+  PIRATE_PRESENCE_ZONE,
+  createPiratePresenceStatusMessage,
+  createPirateSnapshotMessage,
+  sanitizePirateLocalPresence,
+  sanitizePirateWorldSnapshot,
+} from './pirate-presence-bridge-v900.mjs?v=2';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=907', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=814&animalControl=pirate-fruit';
@@ -46,9 +52,41 @@ function assignCombinedWorld(worldId) {
 
 function bindPocketMonsterLink(frame) {
   const frameOrigin = new URL(frame.src).origin;
+  let piratePose = null;
+  let latestPresenceSnapshot = null;
+  const forwardPresence = snapshot => {
+    frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), frameOrigin);
+  };
+  const forwardPresenceStatus = connected => {
+    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), frameOrigin);
+  };
+  frame.addEventListener('load', () => {
+    forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
+  });
+  window.addEventListener('pocketmonster:world-socket-status', event => {
+    forwardPresenceStatus(event.detail?.connected === true);
+  });
+  publishWorldState({
+    getZone: () => 'pirate-fruit',
+    getPosition: () => piratePose,
+    getDir: () => piratePose?.dir,
+  });
+  window.POCKETMONSTER_WORLD_PRESENCE = payload => {
+    const snapshot = sanitizePirateWorldSnapshot(payload);
+    if (!snapshot) return;
+    latestPresenceSnapshot = snapshot;
+    forwardPresenceStatus(true);
+    forwardPresence(snapshot);
+  };
   window.addEventListener('message', event => {
     if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
     const message = event.data;
+    const nextPose = sanitizePirateLocalPresence(message);
+    if (nextPose) {
+      piratePose = nextPose;
+      if (latestPresenceSnapshot) forwardPresence(latestPresenceSnapshot);
+      return;
+    }
     if (message?.type !== 'pocketmonster:world-warp-v1') return;
     const pocketPortal = message.world === 'pocket-monster' && message.panel === 'throw' && message.source === 'pirate-fruit-portal';
     const livingPortal = message.world === 'living-world' && message.panel === 'human' && message.source === 'pirate-fruit-living-portal';
@@ -75,12 +113,6 @@ if (typeof window !== 'undefined') {
   });
   window.POCKETMONSTER_ENSURE_THROW_RUNTIME = ensurePocketAnimalControl;
   window.POCKETMONSTER_SYNC_PIRATE_CONTROLS = () => syncPirateFruitControlHud(document.getElementById('pirateFruitFrame'));
-  publishWorldState({
-    getZone: () => 'pirate-fruit',
-    getPosition: () => parkedPirateFruitPresencePose(),
-    getDir: () => 0,
-  });
-  installWorldPresence({ getZone: () => 'pirate-fruit' });
 }
 
 if (startup) {
