@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'active V9 HTML parity remains exact');
 assert.match(html,/id="stageObjective"/,'Stage objective / quest tracker HUD exists');
 assert.match(html,/id="stageObjectiveStep"/,'Objective step label exists');
 assert.match(html,/id="stageObjectiveList"/,'Quest tracker lists stage steps');

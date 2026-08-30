@@ -4074,7 +4074,7 @@ function completeStageClear(stageId,{recovered=false}={}){
   }
   state.stageProgress=next;
   try{saveGame(false);}catch{}
-  runBestEffortCombatPresentation(()=>{renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});});
+  runBestEffortCombatPresentation(()=>{renderStageSelect();renderStageReward({definition,first,rewards,elapsed});});
   const goldText=first&&currencyRewards.gold?` +${currencyRewards.gold} Gold`:'';
   return first?` • รางวัลครั้งแรก +${Object.entries(rewards).map(([key,value])=>`${key} ${value}`).join(' +')}${goldText}`:' • เคลียร์ด่านแล้ว';
 }

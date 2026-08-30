@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const game = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const mirrorHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
+const mirrorHtml = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
 
 function extractFunction(source, name) {
@@ -18,7 +18,7 @@ function extractFunction(source, name) {
   assert.fail(`unclosed function ${name}`);
 }
 
-assert.equal(html, mirrorHtml, 'active and mirror HTML entries remain byte-identical');
+assert.equal(html, mirrorHtml, 'active and declared V9 HTML entries remain byte-identical');
 assert.match(html, /id="skillItemConfirm"[^>]*role="dialog"[^>]*aria-modal="true"/);
 assert.match(html, /id="skillItemConfirmCancel"/);
 assert.match(html, /id="skillItemConfirmAccept"/);

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+import { stageRewards } from '../stage-catalog.mjs';
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'active V9 HTML parity remains exact');
 const storm=js.match(/["']storm-field["']\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
 assert.match(storm,/primaryTypes:\['Electric'\]/,'Storm Field primary type is Electric');
 assert.match(storm,/secondaryTypes:\['Flying','Steel'\]/,'Storm Field secondary types are explicit');
@@ -14,6 +15,6 @@ assert.match(storm,/eliteSpawn:/,'Storm Field Elite pool exists');
 assert.match(storm,/bossSpawn:/,'Storm Field Boss pool exists');
 assert.match(storm,/progressionBossSpeciesId:'voltkit'/,'Storm Field Boss progression is explicit');
 assert.match(js,/zone==='storm-field'\?'storm'/,'Storm Field has a distinct ground profile');
-assert.match(js,/stageId==='storm-field'\?\{captureBalls:5,trainingChow:2,mineralBite:1\}/,'Storm Field reward profile is explicit');
+assert.deepEqual(stageRewards('storm-field'),{captureBalls:5,trainingChow:2,mineralBite:1},'Storm Field reward profile is explicit in the stage catalog');
 assert.match(css,/stage-reward/,'Stage reward presentation remains available');
 console.log('V8 Storm Field: PASS');

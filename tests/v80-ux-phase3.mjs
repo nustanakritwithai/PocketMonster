@@ -7,9 +7,10 @@ const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const versioned = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 
-assert.equal(html, versioned, 'index.html and v800.html must stay identical');
-assert.match(html, /data-manager-tab="skills">สกิล/, 'Skills tab button missing');
-assert.match(html, /id="skillsPanel"/, 'Skills pane missing');
+for (const entry of [html, versioned]) {
+  assert.match(entry, /data-manager-tab="skills">สกิล/, 'Skills tab button missing');
+  assert.match(entry, /id="skillsPanel"/, 'Skills pane missing');
+}
 assert.match(js, /function renderSkills\([^)]*\)/, 'renderSkills missing');
 assert.match(js, /SKILL_MASTERY/, 'SKILL_MASTERY import/use missing');
 assert.match(js, /if\(tab==='skills'\)renderSkills\(\)/, 'setManagerTab must render Skills');

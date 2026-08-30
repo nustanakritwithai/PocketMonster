@@ -3,11 +3,13 @@ import fs from 'node:fs';
 
 const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const v800=fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8');
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
-assert.match(html,/id="accountGate"/,'Login gate exists');
-assert.match(html,/id="loginPage" class="account-card auth-page"/,'Login uses the account card');
-assert.match(html,/id="guestLoginBtn"/,'Guest login stays available');
+for (const entry of [html,v800]) {
+  assert.match(entry,/id="accountGate"/,'Login gate exists');
+  assert.match(entry,/id="loginPage" class="account-card auth-page"/,'Login uses the account card');
+  assert.match(entry,/id="guestLoginBtn"/,'Guest login stays available');
+}
 assert.match(css,/@media \(orientation:landscape\) and \(max-height:520px\)/,'Short landscape login uses a height-based compact pass');
 const pass=css.match(/@media \(orientation:landscape\) and \(max-height:520px\)\{([\s\S]*?)\n\}/)?.[1]||'';
 assert.ok(pass,'short landscape login block is required');

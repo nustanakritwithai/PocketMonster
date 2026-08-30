@@ -6,9 +6,6 @@ import { createAssetEngine } from '../asset-presentation/engine.mjs';
 import { createBigheadProvider } from '../asset-presentation/providers/procedural-bighead.mjs';
 
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
-const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const versioned = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
-assert.equal(html, versioned, 'active entry stays byte-identical');
 assert.match(js, /new THREE\.Vector3\(0,1\.36,0\)/, 'camera look target follows the pirate player at y+1.36');
 assert.match(js, /distXZ\(player\.position,npc\.position\)<3\.4/);
 assert.match(js, /duration:\.55/, 'projectile duration stays 0.55');

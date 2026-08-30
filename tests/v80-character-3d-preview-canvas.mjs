@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const html=readFileSync('index.html','utf8');
-const v800=readFileSync('v800.html','utf8');
+const v900=readFileSync('v900.html','utf8');
 const css=readFileSync('style-v800.css','utf8');
 
-assert.equal(html,v800,'active HTML entries must remain byte-identical');
+assert.equal(html,v900,'active V9 HTML entries must remain byte-identical');
 assert.match(html,/<canvas id="characterPreviewCanvas" class="character-preview-canvas"[^>]*>/,'3D preview canvas must receive its styled touch-surface class');
 assert.match(css,/\.character-preview-canvas\{[^}]*width:100%[^}]*height:100%[^}]*touch-action:none/,'preview canvas must fill its stage and own touch gestures');
 

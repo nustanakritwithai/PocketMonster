@@ -7,9 +7,10 @@ const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const versioned = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 
-assert.equal(html, versioned, 'index.html and v800.html must stay identical');
-assert.match(html, /data-manager-tab="equipment">อุปกรณ์/, 'Equipment tab button missing');
-assert.match(html, /id="equipmentPanel"/, 'Equipment pane missing');
+for (const entry of [html, versioned]) {
+  assert.match(entry, /data-manager-tab="equipment">อุปกรณ์/, 'Equipment tab button missing');
+  assert.match(entry, /id="equipmentPanel"/, 'Equipment pane missing');
+}
 assert.match(js, /function renderEquipment\([^)]*\)/, 'renderEquipment missing');
 assert.match(js, /if\(tab==='equipment'\)renderEquipment\(\)/, 'setManagerTab must render Equipment');
 assert.match(js, /Power Budget/, 'equipment budget readout missing');

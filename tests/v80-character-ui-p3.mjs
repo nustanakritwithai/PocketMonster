@@ -61,7 +61,7 @@ function makeGame({
   return { state, controller };
 }
 
-assert.equal(ASSET_REVISION, '810', 'Phase 3 must not bump the live asset revision');
+assert.equal(ASSET_REVISION, '813', 'Phase 3 remains compatible with the reviewed live asset revision');
 assert.equal(SAVE_SCHEMA_VERSION, 15, 'Phase 3 remains compatible with the current save schema');
 
 const entryHtml = html.slice(html.indexOf('id="characterAccessEntry"'), html.indexOf('controls-left'));

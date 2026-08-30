@@ -46,7 +46,7 @@ assert.deepEqual(retreatBossChallenge(active,'boss-1'),declined,'exit ends comba
 
 const game=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-const versionedHtml=fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8');
+const versionedHtml=fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 const spawnZone=game.match(/function spawnZone\(zone\)\{[\s\S]*?\n\}/)?.[0]??'';
 const exitBossChallengeSource=functionSource(game,'exitBossChallenge');
@@ -76,12 +76,12 @@ assert.ok(exitBossChallengeSource.indexOf('abortCaptureSequence(boss)')
   < exitBossChallengeSource.indexOf('retreatBossChallenge('),
 'Boss exit cancels an in-flight capture before resetting encounter state');
 assert.match(game,/shouldResetEncounter\(resetRequest\)[\s\S]*?exitBossChallenge\(resetCause\)/,'Boss boundary exit preserves its exact cause without forced pursuit');
-assert.match(game,/updateWarpPrompt\(dt\);\s*updateBossChallengePrompt\(\);/,'prompt is live in the frame loop');
+assert.match(game,/updateWalkThroughWarp\(dt\);[\s\S]*?updateBossChallengePrompt\(\);/,'Boss prompt remains live alongside walk-through portal updates');
 assert.match(game,/เลือกเข้าสู้เมื่อพร้อม/,'objective text communicates optional timing');
 assert.match(html,/id="bossChallengeAccept"[\s\S]*?>เข้าสู้</);
 assert.match(html,/id="bossChallengeDecline"[\s\S]*?>ออก \/ ยังไม่สู้</);
 assert.match(html,/id="bossRetreatBtn"[\s\S]*?>ออกจากไฟต์ BOSS</);
-assert.equal(versionedHtml,html,'both active HTML entry points expose identical Boss choices');
+assert.equal(versionedHtml,html,'active and declared V9 HTML entries expose identical Boss choices');
 assert.match(css,/\.boss-challenge-actions button,\.boss-retreat-btn\{min-height:var\(--touch-min\)/,'Boss choices meet touch target policy');
 
 function runAbortProbe({sequence=false,mismatch=false}={}){

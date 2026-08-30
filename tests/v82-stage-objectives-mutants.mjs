@@ -55,7 +55,8 @@ function assertRuntimeContract(game,html,css=fs.readFileSync(new URL('../style-v
   assert.match(game,/defeatWild[\s\S]*?retireWild\(w\);\s*ensureProgressionEncounter\(w\.zone\)/);
   assert.match(game,/availability\.requires===state\.currentZone[\s\S]*?stageObjectiveText\(currentStageObjective\(\)\)/);
   const completeStageClear=game.match(/function completeStageClear\(stageId,\{recovered=false\}=\{\}\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(completeStageClear,/state\.stageProgress=next;\s*try\{saveGame\(false\);\}catch\{\}[\s\S]*?runBestEffortCombatPresentation\(\(\)=>\{renderStageSelect\(\);renderWarpPrompt\(\);renderStageReward/);
+  assert.match(completeStageClear,/state\.stageProgress=next;\s*try\{saveGame\(false\);\}catch\{\}[\s\S]*?runBestEffortCombatPresentation\(\(\)=>\{renderStageSelect\(\);renderStageReward/);
+  assert.doesNotMatch(completeStageClear,/renderWarpPrompt/);
   assert.match(game,/function reconcilePendingStageClear\(zone,objective\)[\s\S]*?completeStageClear:stageId=>completeStageClear\(stageId,\{recovered:true\}\)[\s\S]*?currentStageObjective\(zone\)/);
   assert.match(game,/function spawnZone\(zone\)[\s\S]*?objective=reconcilePendingStageClear\(zone,objective\)/);
   assert.match(game,/if\(w\.boss\)markBossProgress\(w,'defeated',false\)/);
@@ -97,7 +98,8 @@ const runtimeMutants=[
   ['schedule a duplicate captured progression Elite',gameSource.replace('if(!replacesProgressionElite)respawnWild(w,wildRespawnDelay(w));','respawnWild(w,wildRespawnDelay(w));'),htmlSource],
   ['require reload after Elite',gameSource.replace('ensureProgressionEncounter(w.zone);','void w.zone;'),htmlSource],
   ['restore generic warp lock text',gameSource.replace("if(availability.requires===state.currentZone)return stageObjectiveText(currentStageObjective());",''),htmlSource],
-  ['leave an open warp prompt locked after Boss clear',gameSource.replace('runBestEffortCombatPresentation(()=>{renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});});','runBestEffortCombatPresentation(()=>{renderStageSelect();renderStageReward({definition,first,rewards,elapsed});});'),htmlSource],
+  ['skip stage and reward refresh after Boss clear',gameSource.replace('runBestEffortCombatPresentation(()=>{renderStageSelect();renderStageReward({definition,first,rewards,elapsed});});','runBestEffortCombatPresentation(()=>{});'),htmlSource],
+  ['restore the removed warp prompt call after Boss clear',gameSource.replace('renderStageSelect();renderStageReward({definition,first,rewards,elapsed});','renderStageSelect();renderWarpPrompt();renderStageReward({definition,first,rewards,elapsed});'),htmlSource],
   ['leave interrupted Boss clear unreconciled',gameSource.replace('  objective=reconcilePendingStageClear(zone,objective);','  void objective;'),htmlSource],
   ['persist half-completed Boss defeat',gameSource.replace("markBossProgress(w,'defeated',false)","markBossProgress(w,'defeated')"),htmlSource],
   ['defer canonical stage-clear persistence',gameSource.replace('  state.stageProgress=next;\n  try{saveGame(false);}catch{}','  state.stageProgress=next;'),htmlSource],

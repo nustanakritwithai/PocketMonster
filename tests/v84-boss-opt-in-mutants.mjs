@@ -4,7 +4,7 @@ import fs from 'node:fs';
 const moduleSource=fs.readFileSync(new URL('../boss-challenge.mjs',import.meta.url),'utf8');
 const gameSource=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const htmlSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-const versionedHtmlSource=fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8');
+const versionedHtmlSource=fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8');
 
 async function loadModule(source,label){
   return import(`data:text/javascript;base64,${Buffer.from(`${source}\n//# sourceURL=${label}`).toString('base64')}`);
@@ -74,7 +74,7 @@ function assertRuntime(game,html=htmlSource){
 
 await assertPolicy(moduleSource);
 assertRuntime(gameSource);
-assert.equal(versionedHtmlSource,htmlSource,'active HTML entries remain identical');
+assert.equal(versionedHtmlSource,htmlSource,'active and declared V9 HTML entries remain identical');
 
 const policyMutants=[
   ['auto-authorize every Boss',"return validBossId(bossId) && session?.activeBossId === bossId;","return validBossId(bossId);"],

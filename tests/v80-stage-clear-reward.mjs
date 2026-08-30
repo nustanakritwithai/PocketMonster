@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'active V9 HTML parity remains exact');
 assert.match(html,/id="stageReward"/,'Stage reward sheet exists');
 assert.match(html,/id="stageRewardList"/,'Reward list mount exists');
 assert.match(css,/\.stage-reward-card/,'Reward sheet has mobile-safe presentation');

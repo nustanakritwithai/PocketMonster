@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: atmosphere ASSET_REVISION stays 810');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: atmosphere ASSET_REVISION stays at the reviewed baseline');
 
 const lighting = extractFn('setZoneLighting');
 const ground = extractFn('setZoneGround');

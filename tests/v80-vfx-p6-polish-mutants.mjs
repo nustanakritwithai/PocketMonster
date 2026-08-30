@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: polish ASSET_REVISION stays 810');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: polish ASSET_REVISION stays at the reviewed baseline');
 
 assert.match(js, /function fxParticleCount/, 'mutant 3: particle count must scale with power');
 assert.match(extractFn('fxParticleCount'), /Math\.min\(16,/, 'mutant 4: count must cap at 16 so the pool cannot blow');

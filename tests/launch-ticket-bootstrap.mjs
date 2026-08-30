@@ -104,8 +104,11 @@ assert.equal(storage.has('monsterlife.session.v1'), false);
 assert.equal('POCKETMONSTER_LAUNCH_SESSION' in globalThis, false);
 
 assert.doesNotMatch(html, /src="\.\/game-v800\.js/, 'HTML must not boot the game independently');
+assert.match(html, /entry-preload-v900\.mjs\?v=911/, 'active V9 entry must cache-bust the updated preload chain');
+const legacyHtml = fs.readFileSync(new URL('v800.html', root), 'utf8');
+assert.match(legacyHtml, /entry-preload\.mjs\?v=815/, 'legacy V8 entry must cache-bust the updated game preload');
 const preload = fs.readFileSync(new URL('entry-preload.mjs', root), 'utf8');
 assert.match(preload, /await prepareLaunch/);
-assert.match(preload, /await import\('\.\/game-v800\.js\?v=814'\)/, 'preload must import game only after launch gate');
+assert.match(preload, /await import\('\.\/game-v800\.js\?v=815'\)/, 'preload must import game only after launch gate');
 
 console.log('Launch-ticket client bootstrap contract: PASS');

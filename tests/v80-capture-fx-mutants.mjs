@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: capture FX does not bump ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: capture FX does not bump ASSET_REVISION');
 assert.match(extractFn('spawnCaptureResultEffect'), /0xef4444/, 'mutant 3: fail VFX must stay red');
 assert.match(extractFn('finishCaptureFail'), /spawnCaptureResultEffect/, 'mutant 4: fail path must spawn result VFX');
 assert.match(extractFn('startCaptureSequence'), /visible=false/, 'mutant 5: wild stays hidden in the ball');

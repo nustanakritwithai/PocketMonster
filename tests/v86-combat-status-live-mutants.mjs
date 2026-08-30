@@ -139,6 +139,7 @@ function assertLive(source) {
   let boundaryCalls = 0;
   let applyCalls = 0;
   const bindings = {
+    pirateThrowPanelPaused: () => false,
     activeSummon: actor,
     MANUAL_SKILL_SLOTS: Object.freeze(['s1']),
     canonicalCombatSkills: () => Object.freeze([Object.freeze({ skillId: 'SK_TEST', name: 'Test Skill' })]),
