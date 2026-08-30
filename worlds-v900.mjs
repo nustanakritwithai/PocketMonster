@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=905';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=906';
 import {
   applyControlPanel,
   combinedLocationQuery,
@@ -23,7 +23,6 @@ if (typeof window !== 'undefined') {
 
 await import('./chat-runtime.mjs?v=8.4.0-chat-top-right');
 
-const panelSwitcher = document.getElementById('controlPanelSwitcher');
 const startup = document.getElementById('startupStatus');
 
 function currentPanel(worldId) {
@@ -50,14 +49,6 @@ function handlePocketMonsterWorldWarp(event) {
 
 window.addEventListener('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp);
 
-function selectPanel(id) {
-  const worldId = document.body.dataset.combinedWorld;
-  if (!worldId) return;
-  const panel = applyControlPanel(id, worldId);
-  const url = `${location.pathname}?${combinedLocationQuery(worldId, panel.id)}`;
-  history.replaceState(null, '', url);
-}
-
 async function bootWorld(id) {
   const world = worldById(id);
   if (!world) return;
@@ -77,9 +68,5 @@ async function bootWorld(id) {
   }
   await import(world.runtime);
 }
-
-panelSwitcher?.querySelectorAll('[data-control-panel]').forEach(button => {
-  button.addEventListener('click', () => selectPanel(button.dataset.controlPanel));
-});
 
 await bootWorld(resolveCombinedWorld());

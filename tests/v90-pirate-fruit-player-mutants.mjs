@@ -62,7 +62,7 @@ for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
 assert.match(provider, /setFromMatrixPosition/, 'mutant 13: worldPos scratch must implement Three.js Vector3.setFromMatrixPosition');
 assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open VPS write flags for this pirate boot');
 assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must be the offline build');
-assert.match(html, /id="controlPanelSwitcher"/, 'mutant 16: V9 ships the control-panel switcher');
+assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'mutant 16: V9 ships no clickable control-panel switcher');
 assert.match(html, /id="monsterThrowStage"/, 'mutant 16b: V9 has the pirate throw Pocket stage');
 assert.doesNotMatch(liveHtml, /controlPanelSwitcher|data-control-panel|monsterThrowStage/, 'mutant 17: live index.html must not gain V9 control panels');
 assert.match(worldsJs, /characterSystem: 'pirate-fruit'/, 'mutant 18: character authority stays Pirate Fruit');
@@ -70,7 +70,7 @@ assert.match(worldsJs, /throwSystem: 'pocket-monster'/, 'mutant 19: throw/captur
 assert.match(panelsJs, /pocketMonsterCharacterSystem: 'removed'/, 'mutant 20: Pocket character system is removed');
 assert.match(panelsJs, /keepPocketMonsterModel: false/, 'mutant 21: Pocket character models are no longer kept as the player');
 assert.match(panelsJs, /worldId === 'pocket-monster'\) return THROW_CONTROL_PANEL/, 'mutant 21b: Pocket Monster world cannot open the attack panel');
-assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'mutant 21c: Pocket Monster world hides the Pirate Fruit attack button');
+assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'mutant 21c: stale control-panel switchers stay hidden');
 assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human panel hides throw HUD');
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');
