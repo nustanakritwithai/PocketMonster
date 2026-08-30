@@ -156,6 +156,31 @@ if (typeof window !== 'undefined') {
 }
 await presentAuthProfileBridge(runtimeConfig, firebaseUser, authProfileBridge);
 await mountServerEconomy(runtimeConfig, authProfileBridge);
+const LIVE_PRESENCE_ZONE='pirate-fruit';
+function haltLiveGameEntry(reason){
+  const detail=reason||'เซิร์ฟเวอร์ไม่พร้อม • หยุดเข้าเกม';
+  startupText(detail,'error');
+  if(typeof document!=='undefined'){
+    document.documentElement.dataset.liveEntry='blocked';
+    document.documentElement.dataset.liveWorld=LIVE_PRESENCE_ZONE;
+  }
+  if(typeof window!=='undefined'){
+    window.POCKETMONSTER_LIVE_ENTRY=Object.freeze({ok:false,zone:LIVE_PRESENCE_ZONE,runtime:'pirate-fruit',monsterModule:true,offlineFrame:false,reason:detail,serverGate:serverGate.state,bridge:authProfileBridge.state});
+  }
+  throw new Error(detail);
+}
+const serverRequired=runtimeConfig.featureFlags?.vpsEnabled===true&&runtimeConfig.featureFlags?.vpsReads===true&&runtimeConfig.featureFlags?.firebaseFallback===false;
+if(serverRequired&&serverGate.state!=='healthy'){
+  haltLiveGameEntry(serverGate.state==='maintenance'?'เซิร์ฟเวอร์ปิดปรับปรุง • หยุดเข้าเกม':'เซิร์ฟเวอร์ออฟไลน์ • หยุดเข้าเกม');
+}
+if(serverRequired&&(authProfileBridge.state==='offline'||authProfileBridge.state==='fallback')){
+  haltLiveGameEntry('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ • หยุดเข้าเกม');
+}
+if(typeof window!=='undefined'){
+  window.POCKETMONSTER_LIVE_ENTRY=Object.freeze({ok:true,zone:LIVE_PRESENCE_ZONE,runtime:'pirate-fruit',monsterModule:true,offlineFrame:false,combatAuthority:false});
+  document.documentElement.dataset.liveEntry='pirate-fruit';
+  document.documentElement.dataset.liveWorld=LIVE_PRESENCE_ZONE;
+}
 const serverPlayerDataActive=canUseServerPlayerData(runtimeConfig,serverGate,authProfileBridge);
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_PLAYER_DATA_MODE=serverPlayerDataActive?'server':'firebase';
@@ -2466,14 +2491,14 @@ function clearTransientEffects(){
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
-window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
+window.POCKETMONSTER_WORLD_STATE=()=>({zone:LIVE_PRESENCE_ZONE,x:player.position.x,z:player.position.z,dir:player.rotation.y});
 const remoteWorldPlayers=new Map();
 const remoteWorldLayer=document.createElement('div');
 remoteWorldLayer.id='remoteWorldPlayers';
 Object.assign(remoteWorldLayer.style,{position:'fixed',inset:'0',zIndex:'14000',pointerEvents:'none'});
 document.body.append(remoteWorldLayer);
 window.POCKETMONSTER_WORLD_PRESENCE=payload=>{
-  if(!payload||payload.zone!==state.currentZone)return;
+  if(!payload||payload.zone!==LIVE_PRESENCE_ZONE)return;
   const seen=new Set();
   for(const item of payload.players||[]){
     if(!item?.id||!Number.isFinite(item.x)||!Number.isFinite(item.z))continue;
@@ -6497,7 +6522,7 @@ function renderHUD(){
   document.querySelector('.ball-pill')?.classList.toggle('warning',balls<=2);
   setTextIfChanged(el('playerExp'),Math.floor(state.exp));
   setTextIfChanged(el('ranchCount'),`${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`);
-  setTextIfChanged(el('zoneLabel'),ZONES[state.currentZone]?.label||state.currentZone);
+  setTextIfChanged(el('zoneLabel'),(!pirateThrowWorld&&state.currentZone==='hub')?'Pirate Fruit':(ZONES[state.currentZone]?.label||state.currentZone));
   const wildCount=el('wildCount');
   setTextIfChanged(wildCount,state.currentZone==='hub'?'0':livingWilds().length);
   renderCombatStatusList(el('ownedStatusStrip'),activeSummon?.statusState,{limit:4});
@@ -6874,7 +6899,7 @@ function updateWarpPrompt(dt){
   }
   if(nearbyWarp)closeWarpPrompt();
 }
-function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Ranch';hunt.classList.add('return');}}document.body.dataset.zone=state.currentZone;renderStageSelect();renderHUD();}
+function renderZoneUI(){document.querySelectorAll('[data-zone]').forEach(button=>button.classList.toggle('active',button.dataset.zone===state.currentZone));const hunt=el('huntBtn');if(hunt){if(state.currentZone==='hub'){hunt.textContent='ประตูวาป → Grass Meadow';hunt.classList.remove('return');}else{hunt.textContent='← กลับ Pirate Fruit';hunt.classList.add('return');}}document.body.dataset.zone=pirateThrowWorld?state.currentZone:LIVE_PRESENCE_ZONE;if(!pirateThrowWorld)document.body.dataset.homeZone=LIVE_PRESENCE_ZONE;renderStageSelect();renderHUD();}
 function renderAll(){renderHUD();renderParty();updateTarget();renderZoneUI();}
 
 // ---------- Save migration ----------
@@ -7250,11 +7275,18 @@ function ensureWildPopulation(dt){
 function updatePlayer(dt){if(pirateThrowPanelPaused()){playerData.invuln=Math.max(0,playerData.invuln-dt);playerVisual.update(dt,{moving:false});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});return;}playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=5.15,heightLift=.95,lookAhead=2.05,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+heightLift,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));if(!updateCamera.ready){camera.position.copy(desired);updateCamera.ready=true;}else camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.36,0)).add(f.clone().multiplyScalar(lookAhead));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
-loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
+loadGame();ensureStarter();
+if(pirateThrowWorld){const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);}
+else {state.currentZone='hub';switchZone('hub',true);}
+renderAll();saveGame(false);
 function reloadWorldFromLoadedState(){
-  const loadedZone=state.currentZone;
+  if(pirateThrowWorld){
+    const loadedZone=state.currentZone;
+    state.currentZone='hub';
+    return switchZone(loadedZone,true)||switchZone('hub',true);
+  }
   state.currentZone='hub';
-  return switchZone(loadedZone,true)||switchZone('hub',true);
+  return switchZone('hub',true);
 }
 async function flushRemoteSaveUntilSettled(){
   do{
@@ -7398,6 +7430,7 @@ if(typeof window!=='undefined'){
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',
+    hostWorld:'pirate-fruit',
     playerCharacterServer:'pirate-fruit',
     capture:captureThrow,
     summon:summonThrow,
