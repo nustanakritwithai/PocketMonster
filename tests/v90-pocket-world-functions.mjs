@@ -29,7 +29,9 @@ assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hu
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=814/, 'legacy preload binds chat before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=815/, 'legacy preload binds chat before game overlays');
+assert.match(liveJs, /bindMobileDualPointerInput\(/, 'Pocket movement and camera use the shared dual-pointer lifecycle');
+assert.match(liveJs, /onJoystickStart:[\s\S]*onCameraStart:/, 'joystick and camera keep independent pointer channels');
 assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
 assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
 assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');

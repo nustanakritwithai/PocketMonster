@@ -4,6 +4,7 @@ import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState, resetMonsterAIState, resolveWildMonsterAI, settleWildAIIntent } from './wild-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
+import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=1';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
@@ -3849,11 +3850,8 @@ let cameraYaw=0,cameraPitch=.48;
 cameraPitch=.28;
 const cameraPad=el('cameraPad');
 let camDrag={active:false,pid:null,x:0,y:0};
-cameraPad.addEventListener('pointerdown',e=>{camDrag.active=true;camDrag.pid=e.pointerId;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraPad.setPointerCapture?.(e.pointerId);});
-cameraPad.addEventListener('pointermove',e=>{if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);});
-function endCam(e){if(e.pointerId!==camDrag.pid)return;camDrag.active=false;camDrag.pid=null;}
-cameraPad.addEventListener('pointerup',endCam);
-cameraPad.addEventListener('pointercancel',endCam);
+function moveCameraPointer(e){if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);}
+function endCam(){camDrag.active=false;camDrag.pid=null;}
 const keys={};
 addEventListener('pointerdown',()=>initAudio(),{once:true});
 addEventListener('keydown',()=>initAudio(),{once:true});
@@ -3864,8 +3862,20 @@ const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.4.0 boot: #joystick n
 const stick=el('stick'); if(!stick) throw new Error('V8.4.0 boot: #stick not found');
 
 function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
-joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyPoint(e);});joyEl.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.pid)joyPoint(e);});
-function joyEnd(e){if(e.pointerId!==joy.pid)return;joy.active=false;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}joyEl.addEventListener('pointerup',joyEnd);joyEl.addEventListener('pointercancel',joyEnd);
+function joyEnd(){joy.active=false;joy.pid=null;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}
+const mobileDualPointerInput=bindMobileDualPointerInput({
+  windowLike:window,
+  documentLike:document,
+  joystickElement:joyEl,
+  cameraElement:cameraPad,
+  onJoystickStart:e=>{joy.active=true;joy.pid=e.pointerId;joyPoint(e);},
+  onJoystickMove:joyPoint,
+  onJoystickEnd:joyEnd,
+  onCameraStart:e=>{camDrag.active=true;camDrag.pid=e.pointerId;camDrag.x=e.clientX;camDrag.y=e.clientY;},
+  onCameraMove:moveCameraPointer,
+  onCameraEnd:endCam,
+});
+window.POCKETMONSTER_MOBILE_INPUT=mobileDualPointerInput;
 function forward(){return new THREE.Vector3(-Math.sin(cameraYaw),0,-Math.cos(cameraYaw)).normalize();}
 function cameraRight(){const f=forward();return new THREE.Vector3(-f.z,0,f.x).normalize();}
 function worldToScreen(pos,output=null,vectorScratch=null){

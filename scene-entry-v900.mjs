@@ -174,7 +174,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=912');
+  await import('./worlds-v900.mjs?v=913');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
