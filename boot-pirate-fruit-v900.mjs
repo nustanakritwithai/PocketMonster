@@ -17,6 +17,7 @@ const game = document.getElementById('game');
 if (!game) throw new Error('missing #game for Pirate Fruit boot');
 
 let throwRuntimePromise = null;
+let pirateRuntimeActive = true;
 
 export function ensurePocketAnimalControl() {
   if (typeof window !== 'undefined' && window.POCKETMONSTER_ANIMAL_CONTROL) {
@@ -47,7 +48,9 @@ function mountPirateOffline() {
 }
 
 function assignCombinedWorld(worldId) {
-  location.assign(`${location.pathname}?${combinedLocationQuery(worldId, defaultPanelForWorld(worldId))}`);
+  window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {
+    detail: { type: 'pocketmonster:world-warp-v1', world: worldId, panel: defaultPanelForWorld(worldId), source: 'pirate-fruit-portal' },
+  }));
 }
 
 function bindPocketMonsterLink(frame) {
@@ -80,6 +83,7 @@ function bindPocketMonsterLink(frame) {
     forwardPresence(snapshot);
   };
   window.addEventListener('message', event => {
+    if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
     const message = event.data;
     const nextPose = sanitizePirateLocalPresence(message);
@@ -125,6 +129,11 @@ if (startup) {
 
 const pirateFrame = mountPirateOffline();
 bindPocketMonsterLink(pirateFrame);
+window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
+  mount:()=>{pirateRuntimeActive=true;return true;},
+  unmount:()=>{pirateRuntimeActive=false;return true;},
+  diagnostics:()=>Object.freeze({active:pirateRuntimeActive}),
+});
 pirateFrame.addEventListener('load', () => {
   syncPirateFruitControlHud(pirateFrame);
   let tries = 0;

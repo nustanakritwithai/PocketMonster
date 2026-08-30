@@ -3113,6 +3113,12 @@ function renderEquipment(targetPanel=null){
   panel.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>{toggleStarterEquip(inst.instanceId,b.dataset.equip);renderEquipment();});
 }
 let immersiveStarted=true;
+let sceneRuntimeActive=true;
+function setSceneRuntimeActive(active){
+  sceneRuntimeActive=active===true;
+  if(!sceneRuntimeActive) mobileDualPointerInput?.reset?.();
+  return sceneRuntimeActive;
+}
 function startGameInteraction(){
   immersiveStarted=true;
   const gate=el('immersiveGate');
@@ -7337,6 +7343,7 @@ void syncCloudSave();
 let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 const wildFrameSnapshot=[];
 function loop(now){
+  if(!sceneRuntimeActive){requestAnimationFrame(loop);return;}
   try{
     const frameMs=now-last;
     const dt=Math.min(.033,frameMs/1000);
@@ -7432,6 +7439,7 @@ function loop(now){
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 if(typeof window!=='undefined'){
+  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>setSceneRuntimeActive(false),diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',
