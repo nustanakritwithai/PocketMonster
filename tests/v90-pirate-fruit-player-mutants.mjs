@@ -33,8 +33,8 @@ assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), '
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=815', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=909', 'mutant 0e2: pirate world still boots through the pirate boot module');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=816', 'mutant 0e: original game runtime is game-v800.js');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=910', 'mutant 0e2: pirate world still boots through the pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
@@ -83,7 +83,7 @@ assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'mutant 23c: pirate throw keeps hunt for wild animal control');
-assert.match(boot, /game-v800\.js\?v=815&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
+assert.match(boot, /game-v800\.js\?v=816&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop publishes animal-control functions');
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
