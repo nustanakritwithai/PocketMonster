@@ -9,7 +9,12 @@ class FakeTarget extends EventTarget {
   constructor() {
     super();
     this.style = {};
+    this.capturedPointers = new Set();
   }
+
+  setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
+  hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
+  releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); }
 }
 
 function pointerEvent(type, pointerId, x, y) {
@@ -57,6 +62,8 @@ assert.deepEqual(input.diagnostics(), {
   cameraPointerId: 22,
   resetCount: 0,
 });
+assert.deepEqual([...joystick.capturedPointers], [11]);
+assert.deepEqual([...camera.capturedPointers], [22], 'each control surface captures only its own pointer');
 
 windowLike.dispatchEvent(pointerEvent('pointermove', 11, 28, 31));
 windowLike.dispatchEvent(pointerEvent('pointermove', 22, 206, 84));
@@ -72,6 +79,8 @@ assert.equal(input.diagnostics().joystickPointerId, null);
 assert.equal(input.diagnostics().cameraPointerId, 22, 'ending joystick cannot cancel camera drag');
 windowLike.dispatchEvent(pointerEvent('pointercancel', 22, 206, 84));
 assert.equal(input.diagnostics().cameraPointerId, null);
+assert.equal(joystick.capturedPointers.size, 0);
+assert.equal(camera.capturedPointers.size, 0);
 
 joystick.dispatchEvent(pointerEvent('pointerdown', 33, 40, 50));
 camera.dispatchEvent(pointerEvent('pointerdown', 44, 240, 90));
@@ -87,6 +96,7 @@ documentLike.visibilityState = 'hidden';
 documentLike.dispatchEvent(new Event('visibilitychange'));
 assert.equal(input.diagnostics().joystickPointerId, null);
 assert.equal(input.diagnostics().resetCount, 2);
+assert.equal(joystick.capturedPointers.size, 0, 'scene reset releases stale joystick capture');
 
 input.dispose();
 joystick.dispatchEvent(pointerEvent('pointerdown', 66, 40, 50));

@@ -35,11 +35,23 @@ export function bindMobileDualPointerInput({
     if (event?.cancelable) event.preventDefault();
   };
 
+  const capturePointer = (element, pointerId) => {
+    try { element.setPointerCapture?.(pointerId); } catch {}
+  };
+
+  const releasePointer = (element, pointerId) => {
+    if (pointerId === null) return;
+    try {
+      if (element.hasPointerCapture?.(pointerId) !== false) element.releasePointerCapture?.(pointerId);
+    } catch {}
+  };
+
   const startJoystick = event => {
     const pointerId = validPointerId(event?.pointerId);
     if (disposed || pointerId === null || joystickPointerId !== null || pointerId === cameraPointerId) return;
     preventGesture(event);
     joystickPointerId = pointerId;
+    capturePointer(joystickElement, pointerId);
     onJoystickStart(event);
   };
 
@@ -48,6 +60,7 @@ export function bindMobileDualPointerInput({
     if (disposed || pointerId === null || cameraPointerId !== null || pointerId === joystickPointerId) return;
     preventGesture(event);
     cameraPointerId = pointerId;
+    capturePointer(cameraElement, pointerId);
     onCameraStart(event);
   };
 
@@ -66,11 +79,13 @@ export function bindMobileDualPointerInput({
     if (disposed) return;
     if (event?.pointerId === joystickPointerId) {
       preventGesture(event);
+      releasePointer(joystickElement, joystickPointerId);
       joystickPointerId = null;
       onJoystickEnd(reason);
     }
     if (event?.pointerId === cameraPointerId) {
       preventGesture(event);
+      releasePointer(cameraElement, cameraPointerId);
       cameraPointerId = null;
       onCameraEnd(reason);
     }
@@ -80,6 +95,8 @@ export function bindMobileDualPointerInput({
     if (disposed) return false;
     const hadJoystick = joystickPointerId !== null;
     const hadCamera = cameraPointerId !== null;
+    releasePointer(joystickElement, joystickPointerId);
+    releasePointer(cameraElement, cameraPointerId);
     joystickPointerId = null;
     cameraPointerId = null;
     if (hadJoystick) onJoystickEnd(reason);
