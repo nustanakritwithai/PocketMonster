@@ -11,6 +11,27 @@ export const COMBINED_WORLD_LINKS = Object.freeze([
     label: 'เกมเดิม • Pocket Monster',
     kind: 'world-link',
   }),
+  Object.freeze({
+    id: 'pocket-monster-to-pirate',
+    from: 'pocket-monster',
+    to: 'pirate-fruit',
+    label: 'Pirate Fruit',
+    kind: 'world-link',
+  }),
+  Object.freeze({
+    id: 'pirate-to-living-world',
+    from: 'pirate-fruit',
+    to: 'living-world',
+    label: 'Living World',
+    kind: 'world-link',
+  }),
+  Object.freeze({
+    id: 'living-world-to-pirate',
+    from: 'living-world',
+    to: 'pirate-fruit',
+    label: 'Pirate Fruit',
+    kind: 'world-link',
+  }),
 ]);
 
 export const COMBINED_WORLDS = Object.freeze([
@@ -19,21 +40,21 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'เกมเดิม',
     title: 'Pocket Monster',
     detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
-    runtime: './game-v800.js?v=810',
+    runtime: './game-v800.js?v=811',
   }),
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
     title: 'Pirate Fruit',
     detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • วาปเชื่อมเข้าเกมเดิม',
-    runtime: './boot-pirate-fruit-v900.mjs?v=902',
+    runtime: './boot-pirate-fruit-v900.mjs?v=903',
   }),
   Object.freeze({
     id: 'living-world',
     label: 'โลกกลาง',
     title: 'World Layer',
     detail: 'ชั้นโลกกลาง (World) • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP',
-    runtime: './world-living-v900.mjs?v=900',
+    runtime: './world-living-v900.mjs?v=901',
   }),
 ]);
 

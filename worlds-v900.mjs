@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=902';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=903';
 import {
   applyControlPanel,
   combinedLocationQuery,
@@ -23,30 +23,32 @@ if (typeof window !== 'undefined') {
 
 await import('./chat-runtime.mjs?v=8.4.0-chat-top-right');
 
-const worldGate = document.getElementById('worldGate');
-const switcher = document.getElementById('worldSwitcher');
 const panelSwitcher = document.getElementById('controlPanelSwitcher');
 const startup = document.getElementById('startupStatus');
-
-function setSwitcher(activeId) {
-  if (!switcher) return;
-  switcher.hidden = false;
-  for (const button of switcher.querySelectorAll('[data-combined-world]')) {
-    button.setAttribute('aria-current', button.dataset.combinedWorld === activeId ? 'page' : 'false');
-  }
-}
 
 function currentPanel(worldId) {
   return document.body.dataset.controlPanel || panelIdFromLocation(location, worldId);
 }
 
-function selectWorld(id) {
+function selectWorld(id, panelOverride = null) {
   const world = worldById(id);
   if (!world) return;
-  const panel = currentPanel(world.id);
+  const panel = panelOverride || currentPanel(world.id);
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
   location.assign(`${location.pathname}?${combinedLocationQuery(world.id, panel)}`);
 }
+
+function handlePocketMonsterWorldWarp(event) {
+  const warp = event?.detail;
+  if (warp?.type !== 'pocketmonster:world-warp-v1') return;
+  const currentWorld = document.body.dataset.combinedWorld;
+  const ranchReturn = currentWorld === 'pocket-monster' && warp.world === 'pirate-fruit' && warp.panel === 'human' && warp.source === 'pocket-monster-ranch-portal';
+  const livingReturn = currentWorld === 'living-world' && warp.world === 'pirate-fruit' && warp.panel === 'human' && warp.source === 'living-world-pirate-portal';
+  if (!ranchReturn && !livingReturn) return;
+  selectWorld(warp.world, warp.panel);
+}
+
+window.addEventListener('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp);
 
 function selectPanel(id) {
   const worldId = document.body.dataset.combinedWorld;
@@ -69,8 +71,6 @@ async function bootWorld(id) {
     includesOriginalGame: world.id === 'pocket-monster',
     controlPanel: panel.id,
   });
-  worldGate?.classList.add('hidden');
-  setSwitcher(world.id);
   if (startup) {
     startup.textContent = world.id === 'pocket-monster' ? 'กำลังเปิดเกมเดิมใน V9.0…' : `กำลังเปิด${world.label}…`;
     startup.className = 'startup-status';
@@ -78,12 +78,6 @@ async function bootWorld(id) {
   await import(world.runtime);
 }
 
-worldGate?.querySelectorAll('[data-combined-world]').forEach(button => {
-  button.addEventListener('click', () => selectWorld(button.dataset.combinedWorld));
-});
-switcher?.querySelectorAll('[data-combined-world]').forEach(button => {
-  button.addEventListener('click', () => selectWorld(button.dataset.combinedWorld));
-});
 panelSwitcher?.querySelectorAll('[data-control-panel]').forEach(button => {
   button.addEventListener('click', () => selectPanel(button.dataset.controlPanel));
 });

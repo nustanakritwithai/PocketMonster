@@ -23,7 +23,7 @@ assert.match(activeHtml, /<title>[^<]*V9(?:\.0)?[^<]*<\/title>/);
 assert.match(activeHtml, /entry-preload-v900\.mjs/);
 assert.match(activeEntry, /prepareLaunch/);
 assert.match(activeEntry, /applyPendingPatch/);
-assert.match(activeEntry, /worlds-v900\.mjs\?v=902/);
+assert.match(activeEntry, /worlds-v900\.mjs\?v=903/);
 assert.ok(activeJs.includes(`Monster Life RPG V${APP_VERSION}`));
 assert.ok(!activeHtml.includes('game.js'));
 assert.ok(!activeHtml.includes('game-v705.js'));

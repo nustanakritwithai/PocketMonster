@@ -1,8 +1,7 @@
-import { combinedWorldLinksFrom } from './combined-worlds-v900.mjs?v=902';
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=902', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=903', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=810&animalControl=pirate-fruit';
 
 const startup = document.getElementById('startupStatus');
@@ -45,24 +44,16 @@ function bindPocketMonsterLink(frame) {
   window.addEventListener('message', event => {
     if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
     const message = event.data;
-    if (message?.type !== 'pocketmonster:world-warp-v1' || message.world !== 'pocket-monster') return;
-    assignCombinedWorld('pocket-monster');
+    if (message?.type !== 'pocketmonster:world-warp-v1') return;
+    const pocketPortal = message.world === 'pocket-monster' && message.panel === 'throw' && message.source === 'pirate-fruit-portal';
+    const livingPortal = message.world === 'living-world' && message.panel === 'human' && message.source === 'pirate-fruit-living-portal';
+    if (!pocketPortal && !livingPortal) return;
+    assignCombinedWorld(message.world);
   });
-  const link = combinedWorldLinksFrom('pirate-fruit')[0];
-  const button = document.getElementById('pocketWorldWarpBtn');
-  if (button && link) {
-    button.hidden = false;
-    button.removeAttribute('hidden');
-    button.classList.add('is-visible');
-    button.textContent = `วาปเข้า${link.label}`;
-    button.onclick = () => assignCombinedWorld(link.to);
-    button.textContent = 'เข้าสู่โลก Pocket Monster • จับและเลี้ยงมอนสเตอร์';
-    button.setAttribute('aria-label', 'เข้าสู่โลก Pocket Monster');
-  }
   const zoneLabel = document.getElementById('zoneLabel');
   if (zoneLabel) zoneLabel.textContent = 'Pirate Fruit';
   const message = document.getElementById('message');
-  if (message) message.textContent = 'โลก Pirate Fruit จริง • กดวาปเพื่อเข้าเกมเดิม';
+  if (message) message.textContent = 'โลก Pirate Fruit จริง • เดินเข้าประตูในโลกเพื่อเดินทาง';
 }
 
 if (typeof window !== 'undefined') {
