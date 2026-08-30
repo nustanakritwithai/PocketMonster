@@ -26,7 +26,7 @@ const mutants=[
   ['remove legacy zone validation',game,routes.replace("['hub','grassland',...Object.keys(STAGE_BY_ID)]","['hub',...Object.keys(STAGE_BY_ID)]")],
   ['shrink portal back to invisible marker',game.replace('TorusGeometry(.82,.07,8,28)','TorusGeometry(.34,.025,6,20)'),routes],
   ['remove vertical light beam',game.replace('boxGeometry(.18,1.8,.18)','boxGeometry(.18,.18,.18)'),routes],
-  ['restore route-less Hunt shortcut',game.replace("state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub')","switchZone(state.currentZone==='hub'?'grassland':'hub')"),routes],
+  ['restore route-less Hunt shortcut',game.replace("state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Pirate Fruit เพื่อเข้าสู่ Grass Meadow'):switchZone('hub')","switchZone(state.currentZone==='hub'?'grassland':'hub')"),routes],
   ['restore misleading Hunt label',game.replace("hunt.textContent='ประตูวาป → Grass Meadow'","hunt.textContent='ออกล่า → ทุ่ง • Wild 6'"),routes],
   ['drop dismiss-until-leave helper',game,routes.replace('function nextWarpPromptState','function unusedWarpPromptState')],
   ['stop using dismiss-until-leave in the live loop',game.replace('nextWarpPromptState({foundId:found?.id||null,dismissedId:dismissedWarpId})','({nearbyId:found?.id||null,dismissedId:null,open:!!found})'),routes],

@@ -5347,7 +5347,7 @@ function executeWildAiIntent(w,decision,canEngage,frameTargetKey,frameRuntime=nu
     playerData.hp-=playerDmg;playerData.invuln=.5;
     impact.copy(player.position);impact.y+=1;
     runBestEffortCombatPresentation(()=>{spawnElementalFX(incomingType,impact,'impact',0.65);spawnDamageNumber(playerDmg,playerHitText(),{type:wildTypes(w)[0]});triggerCameraShake(w.boss?.17:.1,w.boss?.22:.15);playerVisual.play('hurt',{duration:.24});spawnBurst(impact,0xef4444,{count:8,life:.22,size:.04,gravity:1});});
-    if(playerData.hp<=0){playerData.hp=playerData.maxHp;msg('ผู้เล่นหมด HP • กลับ Ranch Hub');switchZone('hub',true);}
+    if(playerData.hp<=0){playerData.hp=playerData.maxHp;msg('ผู้เล่นหมด HP • กลับ Pirate Fruit');switchZone('hub',true);}
     runBestEffortCombatPresentation(()=>renderHUD());
   }else if(target.kind==='player')runBestEffortCombatPresentation(()=>spawnElementalFX(incomingType,impact,'impact',0.65));
   return true;
@@ -6863,13 +6863,17 @@ function warpLockText(availability){
   }
   return 'เส้นทางนี้ยังล็อกอยู่';
 }
+function liveWarpLabel(route){
+  if(!pirateThrowWorld&&route?.to==='hub')return 'Pirate Fruit';
+  return route?.label||route?.to||'';
+}
 function renderWarpPrompt(){
   const panel=el('warpPrompt');
   if(!panel)return;
   if(!nearbyWarp){panel.classList.add('hidden');return;}
   const availability=warpAvailability(state.stageProgress,nearbyWarp,stageUnlockReason);
   const title=el('warpPromptTitle'),detail=el('warpPromptDetail'),action=el('warpPromptAction');
-  if(title)title.textContent=`ไป ${nearbyWarp.label}`;
+  if(title)title.textContent=`ไป ${liveWarpLabel(nearbyWarp)}`;
   if(detail)detail.textContent=availability.ok?'เดินทางไปพื้นที่ถัดไปได้ทันที':warpLockText(availability);
   if(action){action.disabled=!availability.ok||warpBusy;action.textContent=availability.ok?'เดินทาง':'ยังล็อกอยู่';}
   panel.classList.remove('hidden');
@@ -7257,7 +7261,7 @@ el('warpPromptCancel').onclick=()=>{playSFX('sfx_ui_click');dismissedWarpId=near
 el('bossChallengeAccept').onclick=()=>{playSFX('sfx_ui_click');startBossChallenge();};
 el('bossChallengeDecline').onclick=()=>{playSFX('sfx_ui_click');declineNearbyBossChallenge();};
 el('bossRetreatBtn').onclick=()=>{playSFX('sfx_ui_click');exitBossChallenge();};
-el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Ranch เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
+el('huntBtn').onclick=()=>{playSFX('sfx_ui_click');state.currentZone==='hub'?msg('เดินไปที่ประตูวาปสีทองด้านหน้าของ Pirate Fruit เพื่อเข้าสู่ Grass Meadow'):switchZone('hub');};
 
 // ---------- Wild population safety ----------
 let wildEmptyTimer=0;

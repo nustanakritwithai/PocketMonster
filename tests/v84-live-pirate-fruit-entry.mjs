@@ -68,5 +68,11 @@ assert.match(v900, /entry-preload-v900\.mjs/, 'V9 combined page is left in place
 assert.match(v900, /ยังไม่รวมเข้าเกม live V8\.4/, 'V9 is not moved onto the live 8.4 entry');
 assert.match(worlds, /mergedIntoLiveV800: false/, 'V9 is not moved onto live');
 assert.match(boot, /pirateFruitFrame/, 'V9 pirate boot is not rewritten');
+assert.match(liveJs, /function liveWarpLabel\(route\)/, 'live remaps hub warp returns onto Pirate Fruit');
+assert.match(liveJs, /if\(!pirateThrowWorld&&route\?\.to==='hub'\)return 'Pirate Fruit'/, 'hub-safe warp returns present as Pirate Fruit');
+assert.match(liveJs, /title\.textContent=`ไป \$\{liveWarpLabel\(nearbyWarp\)\}`/, 'in-scene warp prompt uses the live Pirate Fruit label');
+assert.match(liveJs, /state\.currentZone==='hub'\?msg\('เดินไปที่ประตูวาปสีทอง/, 'Pirate Fruit home still uses the in-scene gold warp, not a second runtime');
+assert.match(liveJs, /switchZone\(route\.to,false\)/, 'warp still travels through the existing route catalog');
+assert.doesNotMatch(liveJs, /id:'pirate-to-grass'|from:'pirate-fruit'/, 'live does not add a new pirate-fruit route that would break the world catalog');
 
 console.log('V8.4 live Pirate Fruit entry contract: PASS');
