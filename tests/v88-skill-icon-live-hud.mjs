@@ -59,7 +59,7 @@ assert.match(css,/\.action\.skill\.no-uses \.uses-overlay\{/);
 assert.match(css,/\.skill4\{[^}]*width:58px[^}]*height:58px/,'desktop S4 remains above 48px touch minimum');
 assert.match(css,/@media\(max-width:700px\)[\s\S]*\.skill4\{[^}]*width:52px[^}]*height:52px/,'mobile S4 remains above 48px touch minimum');
 
-const mirrorHtml=fs.readFileSync(new URL('v800.html',rootUrl),'utf8');
+const mirrorHtml=fs.readFileSync(new URL('v900.html',rootUrl),'utf8');
 assert.equal(activeHtml,mirrorHtml,'active HTML entries remain byte-identical');
 
 console.log('V8.8 live skill icon HUD: PASS (S1-S4 + Uses/Cooldown + Android touch size)');

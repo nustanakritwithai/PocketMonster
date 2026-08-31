@@ -98,7 +98,7 @@ function readAction(documentLike, id, selector) {
     cooldownRemaining: 0,
     cooldownTotal: 0,
     count: observedCount ?? 0,
-    state: isVisible ? (cooling ? 'cooling' : (unavailable ? 'unavailable' : 'ready')) : 'unavailable',
+    state: isVisible ? (cooling ? 'cooling' : (unavailable ? 'unavailable' : 'availability-observed')) : 'unavailable',
     reason: !isVisible ? 'source-unavailable'
       : (countUnavailable ? 'count-unavailable'
         : (cooling ? 'cooldown-values-unavailable'

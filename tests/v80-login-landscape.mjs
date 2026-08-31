@@ -4,7 +4,7 @@ import fs from 'node:fs';
 const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
 assert.match(html,/id="accountGate"/,'Login gate exists');
 assert.match(html,/id="loginPage" class="account-card auth-page"/,'Login uses the account card');
 assert.match(html,/id="guestLoginBtn"/,'Guest login stays available');

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
 assert.match(html,/data-zone="grass-meadow"/,'Grass Meadow scene route exists');
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
 const grassStage=js.match(/['"]grass-meadow['"]\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
 assert.ok(grassStage,'Grass Meadow stage config is bounded before the next zone');
 assert.match(grassStage,/sceneStatus:'normal-encounters'/,'Grass Meadow normal encounter stage exists');

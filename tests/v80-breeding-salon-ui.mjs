@@ -19,7 +19,7 @@ assert.match(html, /id="parentABtn"/, 'manager Parent A picker remains');
 assert.match(html, /id="parentBBtn"/, 'manager Parent B picker remains');
 assert.match(html, /id="breedBtn"/, 'manager create-egg control remains');
 assert.match(html, /id="eggList"/, 'manager incubator list remains');
-assert.equal(html, fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8'), 'HTML parity remains exact');
+assert.equal(html, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'), 'HTML parity remains exact');
 
 const lounge = css.match(/\/\* Breeding Salon lounge \*\/([\s\S]*?)\/\* Mobile NPC interaction pass:/)?.[1] || '';
 assert.ok(lounge, 'Breeding Salon lounge CSS block is required');

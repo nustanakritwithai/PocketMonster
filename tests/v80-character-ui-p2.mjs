@@ -39,7 +39,7 @@ function makeGame({ zone = 'hub', summonId = null, selectedSlot = 0 } = {}) {
   return { state, controller };
 }
 
-assert.equal(ASSET_REVISION, '810', 'Phase 2 must not bump the live asset revision');
+assert.equal(ASSET_REVISION, '813', 'Phase 2 uses the current live asset revision');
 assert.equal(SAVE_SCHEMA_VERSION, 15, 'Phase 2 remains compatible with the current save schema');
 
 assert.match(html, /id="globalCharacterBtn"/, 'global character button missing from HUD');

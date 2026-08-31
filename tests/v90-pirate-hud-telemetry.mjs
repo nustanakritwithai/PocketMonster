@@ -47,6 +47,7 @@ assert.deepEqual(dom.player.buffs, []);
 assert.equal(dom.target.available, false);
 assert.equal(dom.quest.available, false);
 assert.equal(dom.actions.items.find(({ id }) => id === 'capture').enabled, true);
+assert.equal(dom.actions.items.find(({ id }) => id === 'capture').state, 'availability-observed');
 assert.equal(dom.actions.items.find(({ id }) => id === 'capture').reason, 'cooldown-values-unavailable');
 assert.equal(dom.actions.items.find(({ id }) => id === 'skill1').enabled, false);
 assert.equal(dom.actions.items.find(({ id }) => id === 'potion1').count, 12);

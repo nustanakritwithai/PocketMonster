@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
 const ember=js.match(/["']ember-valley["']\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
 assert.match(ember,/primaryTypes:\['Fire'\]/,'Ember Valley primary type is Fire');
 assert.match(ember,/secondaryTypes:\['Rock','Ground'\]/,'Ember Valley counters are explicit');
