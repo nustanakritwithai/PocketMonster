@@ -50,6 +50,7 @@ body[data-control-panel="human"] .ball-pill,
 body[data-control-panel="human"] .active-pill,
 body[data-control-panel="human"] #actionReason,
 body[data-control-panel="human"] #stageObjective,
+body[data-control-panel="human"] #stageObjectiveToggle,
 body[data-control-panel="human"] #globalCharacterBtn,
 body[data-control-panel="human"] #characterAccessEntry{display:none!important}
 body[data-combined-world="living-world"][data-control-panel="throw"] #huntBtn,
@@ -107,3 +108,7 @@ body[data-combined-world="living-world"] .help{display:none!important}
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnifiedControls .controls-right{display:block!important}
 @media(max-width:700px){#pirateUnifiedControls #piratePotion1Btn.tc-potion1{right:242px!important}#pirateUnifiedControls #piratePotion2Btn.tc-potion2{right:242px!important}}
 @media(max-height:420px){#pirateUnifiedControls #joystick.tc-joyzone{height:82%!important}#pirateUnifiedControls .controls-right.tc-actions{transform:scale(.86)!important;transform-origin:right bottom!important}}
+.quest-tracker{pointer-events:auto!important;padding-right:25px!important}
+.quest-tracker-list,.quest-tracker-title{pointer-events:none}
+.quest-tracker-close{position:absolute;right:3px;top:2px;z-index:2;width:20px;height:20px;min-width:20px;min-height:20px;padding:0;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(2,6,23,.72);color:#fff;font:800 15px/18px system-ui;pointer-events:auto;touch-action:none}
+.quest-tracker-toggle{position:absolute;z-index:8;top:calc(var(--safe-top) + var(--touch-min) + 20px);left:var(--safe-left);min-height:32px;padding:5px 9px;border:1px solid rgba(134,239,172,.38);border-radius:8px;background:rgba(5,16,22,.82);color:#dcfce7;font:800 10px system-ui;pointer-events:auto;touch-action:none}

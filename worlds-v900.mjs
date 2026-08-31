@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=918';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=919';
 import {
   allowedPanelForWorld,
   applyControlPanel,

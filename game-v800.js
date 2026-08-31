@@ -2592,11 +2592,22 @@ function stageObjectiveText(objective,zoneId=state.currentZone){
   if(objective.phase==='stage-cleared')return `✓ เคลียร์ ${stageName} แล้ว • จุดวาปด่านถัดไปเปิดแล้ว`;
   return 'สำรวจพื้นที่และเตรียมทีมสำหรับด่านถัดไป';
 }
+let stageObjectiveDismissed=false;
+function syncStageObjectiveVisibility(){
+  const panel=el('stageObjective'),toggle=el('stageObjectiveToggle');
+  panel?.classList.toggle('hidden',stageObjectiveDismissed);
+  toggle?.classList.toggle('hidden',!stageObjectiveDismissed);
+}
+function setStageObjectiveDismissed(dismissed){
+  stageObjectiveDismissed=dismissed===true;
+  syncStageObjectiveVisibility();
+  return stageObjectiveDismissed;
+}
 function renderStarterJourney(){
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
   if(!STAGE_BY_ID[state.currentZone]){
-    panel.classList.remove('hidden');
+    syncStageObjectiveVisibility();
     if(stepEl)setTextIfChanged(stepEl,'เดินไปที่ประตูวาปเพื่อเข้าสู่ Grass Meadow และเริ่มเควส');
     if(titleEl)setTextIfChanged(titleEl,'เริ่มการผจญภัย');
     if(listEl){
@@ -2614,7 +2625,7 @@ function renderStarterJourney(){
   const speciesId=objective.speciesId||ZONES[zoneId]?.progressionBossSpeciesId;
   const monsterName=speciesId?(spById[speciesId]?.displayName||spById[speciesId]?.name||speciesId):'';
   const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName});
-  panel.classList.remove('hidden');
+  syncStageObjectiveVisibility();
   setTextIfChanged(stepEl,stageObjectiveText(objective));
   if(titleEl)setTextIfChanged(titleEl,tracker.title);
   if(!listEl)return;
@@ -3118,7 +3129,7 @@ let immersiveStarted=true;
 let sceneRuntimeActive=!sceneRuntimePrewarming;
 function setSceneRuntimeActive(active,reason=active?'scene-mount':'scene-unmount'){
   sceneRuntimeActive=active===true;
-  mobileDualPointerInput?.reset?.(reason);
+  window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.(reason);
   joyEnd();
   endCam();
   for(const code of Object.keys(keys))keys[code]=false;
@@ -7234,6 +7245,13 @@ for(const b of [enterImmersiveBtn,retryImmersiveBtn,fullscreenBtn]){
 el('menuBtn').onclick=()=>{playSFX('sfx_ui_click');el('utilityMenu').classList.toggle('hidden');};
 window.addEventListener('resize',syncOrientationLock); window.addEventListener('orientationchange',syncOrientationLock); document.addEventListener('fullscreenchange',syncOrientationLock);
 startGameInteraction(); setTimeout(syncOrientationLock,80);
+for(const [id,dismissed] of [['stageObjectiveClose',true],['stageObjectiveToggle',false]]){
+  el(id)?.addEventListener('pointerdown',event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    setStageObjectiveDismissed(dismissed);
+  },{passive:false});
+}
 el('parentABtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentA');};el('parentBBtn').onclick=()=>{playSFX('sfx_ui_click');openMonsterPicker('parentB');};el('breedBtn').onclick=()=>{playSFX('sfx_ui_click');createEgg();};el('closePicker').onclick=()=>{playSFX('sfx_ui_click');closeMonsterPicker();};el('monsterPicker').addEventListener('pointerdown',e=>{if(e.target===el('monsterPicker'))closeMonsterPicker();});
 el('healAllBtn').onclick=()=>{playSFX('sfx_ui_click');healAll();};el('refillBallsBtn').onclick=()=>{playSFX('sfx_ui_click');if(!assertRanchOperation())return;const balls=state.inventory.captureBalls||0;if(balls>0){msg('ยังมี Capture Ball อยู่ — safety floor จะทำงานเมื่อหมดเท่านั้น');return;}state.inventory.captureBalls=5;msg('NPC มอบ Capture Ball ฉุกเฉิน +5');renderManager();renderHUD();saveGame(false);};
 function bindActionPress(button,handler){
