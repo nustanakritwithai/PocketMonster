@@ -8,6 +8,9 @@ if (existingRuntime) {
 } else {
 const SESSION_KEY = 'monsterlife.session.v1';
 const MAX_SOCKET_MESSAGE_LENGTH = 262_144;
+const MAX_COMBAT_FRAME_BYTES = 32 * 1024;
+const COMBAT_PREDICTION_SCHEMA = 'combat-prediction-envelope/v9.1';
+const COMBAT_AUTHORITY_RESPONSE_SCHEMA = 'combat-authority-response/v9.1.2';
 const TERMINAL_SESSION_REJECTIONS = new Set([
   'AUTHENTICATION_REQUIRED',
   'INVALID_SESSION',
@@ -25,6 +28,9 @@ const state = {
   worldPulse: null,
   reconnectTimer: null,
   worldConnected: false,
+  combatConnected: false,
+  combatPredictionSends: 0,
+  combatAuthorityMessages: 0,
   stopped: false,
   paused: false,
   stopReason: null,
@@ -36,6 +42,65 @@ const state = {
   socketCreates: 0,
   socketGeneration: 0,
 };
+const combatAuthorityListeners = new Set();
+const combatStatusListeners = new Set();
+
+function combatStatus() {
+  return Object.freeze({
+    connected: state.combatConnected,
+    socketGeneration: state.socketGeneration,
+    stopped: state.stopped,
+    paused: state.paused,
+  });
+}
+
+function setCombatConnected(connected) {
+  const next = connected === true;
+  if (state.combatConnected === next) return;
+  state.combatConnected = next;
+  const status = combatStatus();
+  for (const listener of [...combatStatusListeners]) {
+    try { listener(status); } catch {}
+  }
+}
+
+function subscribeCombatAuthority(listener) {
+  if (typeof listener !== 'function') return null;
+  combatAuthorityListeners.add(listener);
+  return () => combatAuthorityListeners.delete(listener);
+}
+
+function subscribeCombatStatus(listener) {
+  if (typeof listener !== 'function') return null;
+  combatStatusListeners.add(listener);
+  try { listener(combatStatus()); } catch {}
+  return () => combatStatusListeners.delete(listener);
+}
+
+function sendCombatPrediction(envelope) {
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)
+    || envelope.schemaVersion !== COMBAT_PREDICTION_SCHEMA) {
+    return Object.freeze({ ok: false, reason: 'invalid_prediction_envelope' });
+  }
+  const context = activeRequestContext();
+  const socket = state.socket;
+  if (!context || !state.combatConnected || socket?.readyState !== WebSocket.OPEN) {
+    return Object.freeze({ ok: false, reason: 'combat_transport_disconnected' });
+  }
+  let payload;
+  try { payload = JSON.stringify(envelope); } catch {
+    return Object.freeze({ ok: false, reason: 'prediction_serialization_failed' });
+  }
+  if (new TextEncoder().encode(payload).byteLength > MAX_COMBAT_FRAME_BYTES) {
+    return Object.freeze({ ok: false, reason: 'prediction_frame_too_large' });
+  }
+  try { socket.send(payload); } catch {
+    setCombatConnected(false);
+    return Object.freeze({ ok: false, reason: 'combat_transport_send_failed' });
+  }
+  state.combatPredictionSends += 1;
+  return Object.freeze({ ok: true, reason: 'prediction_sent', socketGeneration: state.socketGeneration });
+}
 function setWorldConnected(connected) {
   const next = connected === true;
   if (state.worldConnected === next && window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === next) return;
@@ -185,6 +250,7 @@ function clearTransportTimers() {
 }
 function closeTransport(reason) {
   clearTransportTimers();
+  setCombatConnected(false);
   const socket = state.socket;
   try {
     if (socket?.readyState === WebSocket.CLOSED) state.socket = null;
@@ -224,6 +290,7 @@ function connectSocket() {
       const openContext = activeRequestContext();
       if (!openContext) return;
       socket.send(JSON.stringify({ token: openContext.token }));
+      setCombatConnected(true);
       const sendWorld = () => {
         if (!activeRequestContext()) return;
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
@@ -239,6 +306,13 @@ function connectSocket() {
       if (typeof event.data !== 'string' || event.data.length > MAX_SOCKET_MESSAGE_LENGTH) return;
       try {
         const message = JSON.parse(event.data);
+        if (message?.schemaVersion === COMBAT_AUTHORITY_RESPONSE_SCHEMA) {
+          state.combatAuthorityMessages += 1;
+          const response = Object.freeze(message);
+          for (const listener of [...combatAuthorityListeners]) {
+            try { listener(response); } catch {}
+          }
+        }
         if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
           const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload);
@@ -247,11 +321,15 @@ function connectSocket() {
       } catch {}
     });
     socket.addEventListener('error', () => {
-      if (state.socket === socket) setWorldConnected(false);
+      if (state.socket === socket) {
+        setCombatConnected(false);
+        setWorldConnected(false);
+      }
     });
     socket.addEventListener('close', event => {
       if (state.socket !== socket) return;
       state.socket = null;
+      setCombatConnected(false);
       setWorldConnected(false);
       if (state.worldPulse) {
         clearInterval(state.worldPulse);
@@ -359,6 +437,19 @@ async function start() {
 const runtime = Object.freeze({
   mount,
   stop,
+  combat: Object.freeze({
+    sendPrediction: sendCombatPrediction,
+    subscribeAuthority: subscribeCombatAuthority,
+    subscribeStatus: subscribeCombatStatus,
+    diagnostics: () => Object.freeze({
+      connected: state.combatConnected,
+      socketGeneration: state.socketGeneration,
+      predictionSends: state.combatPredictionSends,
+      authorityMessages: state.combatAuthorityMessages,
+      authoritySubscribers: combatAuthorityListeners.size,
+      statusSubscribers: combatStatusListeners.size,
+    }),
+  }),
   diagnostics: () => Object.freeze({
     socketCreates: state.socketCreates,
     socketGeneration: state.socketGeneration,
@@ -367,6 +458,9 @@ const runtime = Object.freeze({
     worldPulseActive: Boolean(state.worldPulse),
     reconnectPending: Boolean(state.reconnectTimer),
     worldConnected: state.worldConnected,
+    combatConnected: state.combatConnected,
+    combatPredictionSends: state.combatPredictionSends,
+    combatAuthorityMessages: state.combatAuthorityMessages,
     stopped: state.stopped,
     paused: state.paused,
     stopReason: state.stopReason,

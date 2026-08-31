@@ -31,6 +31,7 @@ const clientModules = Object.freeze([
   'combat-v91-rules.mjs',
   'combat-v91-stat-projection.mjs',
   'combat-v91-status.mjs',
+  'combat-v91-transport.mjs',
   'combat-v91-ui.mjs',
 ]);
 const clientAssets = Object.freeze([...clientModules, 'combat-v91.css']);

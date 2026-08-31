@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createCombatV91Shell } from '../combat-v91-entry.mjs';
+import { createCombatV91ProductionTransport } from '../combat-v91-transport.mjs';
 import {
   TEST_DYNAMICS_SOURCE_PROVENANCE_FINGERPRINT,
   fixtureDirectDynamics,
@@ -53,7 +54,8 @@ assert.equal(shell.policy.statusWriteAuthority,
 assert.equal(shell.policy.worldPositionWriteAuthority,
   'world_server_only_client_never_commits_transform');
 assert.equal(shell.policy.productionTransport,
-  'disabled_no_authoritative_response_ingress');
+  'shared_authenticated_chat_socket_v1_opt_in');
+assert.equal(shell.policy.authorityResponseIngress, 'private_transport_binding_only');
 assert.equal(shell.getState(), null);
 assert.equal(shell.predict().reason, 'combat_session_inactive');
 assert.equal(shell.reconcile({}).reason, 'combat_session_inactive');
@@ -135,6 +137,77 @@ assert.equal(shell.closeSession().ok, true);
 assert.equal(container.hidden, true);
 assert.deepEqual(container.children, []);
 assert.equal(shell.getState(), null);
+
+const transportedContainer = new FakeElement(documentRef, 'aside');
+const transportCreated = createCombatV91ProductionTransport();
+assert.equal(transportCreated.ok, true, transportCreated.reason);
+const authorityListeners = new Set();
+const sentPredictions = [];
+const sharedRuntime = {
+  combat: {
+    sendPrediction(envelope) {
+      sentPredictions.push(envelope);
+      return { ok: true, socketGeneration: 1 };
+    },
+    subscribeAuthority(listener) {
+      authorityListeners.add(listener);
+      return () => authorityListeners.delete(listener);
+    },
+    subscribeStatus(listener) {
+      listener({ connected: true, socketGeneration: 1 });
+      return () => {};
+    },
+  },
+};
+const transportedCreated = createCombatV91Shell({
+  container: transportedContainer,
+  transport: transportCreated.transport,
+});
+assert.equal(transportedCreated.ok, true, transportedCreated.reason);
+const transportedShell = transportedCreated.shell;
+assert.equal(transportCreated.transport.start({ runtime: sharedRuntime }).ok, true);
+assert.equal(transportedShell.openSession({
+  combatId: fixture.combatId,
+  profiles: [fixture.actor, fixture.target],
+  statusSnapshots: [fixture.actorStatus, fixture.targetStatus],
+  focusedEntityId: fixture.actor.entityId,
+}).ok, true);
+assert.equal(transportedShell.scheduleAction({
+  actionSequence: 1,
+  actorEntityId: fixture.actor.entityId,
+  targetEntityId: fixture.target.entityId,
+  startTick: 0,
+  bindingVersion: 'test-shell-action-dynamics/v1',
+  sourceProvenanceFingerprint: TEST_DYNAMICS_SOURCE_PROVENANCE_FINGERPRINT,
+  action: fixture.action,
+  dynamics: fixtureDirectDynamics(fixture.action),
+}).ok, true);
+const transportedAdvance = transportedShell.advanceAction({ actionSequence: 1, throughTick: 2 });
+const transportedImpact = transportedAdvance.events.find(event => event.type === 'impact.requested');
+const transportedPrediction = transportedShell.predict({
+  intentId: 'intent:single-html-shell:transported',
+  actionSequence: 1,
+  actorEntityId: fixture.actor.entityId,
+  targetEntityId: fixture.target.entityId,
+  action: fixture.action,
+  dynamicsImpactKey: transportedImpact.payload.idempotencyKey,
+  worldSnapshot: fixture.world,
+});
+assert.equal(transportedPrediction.ok, true, transportedPrediction.reason);
+assert.equal(sentPredictions[0].intentId, transportedPrediction.envelope.intentId,
+  'shell egresses the exact prediction over the injected shared transport');
+const transportedAuthority = fixtureAuthorityResponse({
+  fixture,
+  proposal: transportedPrediction.proposal,
+  envelope: transportedPrediction.envelope,
+});
+for (const listener of authorityListeners) listener(transportedAuthority.response);
+assert.equal(transportedShell.getState().authoritativeBase[fixture.target.entityId].stats.hpCurrent,
+  transportedAuthority.authoritativeProfile.stats.hpCurrent,
+  'private transport ingress reconciles the Server response into the active shell');
+assert.equal(transportCreated.transport.diagnostics().pendingCount, 0);
+transportCreated.transport.stop();
+
 assert.equal(createCombatV91Shell({ container: {} }).reason, 'invalid_active_shell_container');
 
 console.log('V9.1 single HTML shell: PASS (one container, one state, Server-only commit)');

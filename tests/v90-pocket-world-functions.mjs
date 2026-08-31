@@ -37,7 +37,7 @@ assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent j
 assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
 assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
 assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');
-assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-2'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
+assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-3'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
 assert.match(worldsJs, /POCKETMONSTER_SCENE_EMBEDDED !== true[\s\S]*chat-runtime/, 'standalone compatibility path may mount chat but hosted scenes skip it');
 assert.doesNotMatch(sceneEntryJs, /chat-runtime|new WebSocket|prepareLaunch/, 'hosted scene entry cannot create another socket or login bootstrap');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');

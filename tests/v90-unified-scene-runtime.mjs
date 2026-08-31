@@ -90,7 +90,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     webSocketConstructs: 0,
   };
   const sceneQuery = new URLSearchParams({ world, panel });
-  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '12');
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '13');
   const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
@@ -470,7 +470,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
-  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '12', 'hosted route normalization preserves the exact scene lease URL');
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '13', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);

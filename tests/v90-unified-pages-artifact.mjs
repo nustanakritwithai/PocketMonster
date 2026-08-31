@@ -18,6 +18,7 @@ const required = new Set([
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
   'combat-v91-entry.mjs',
+  'combat-v91-transport.mjs',
   'combat-v91.css',
   'scene-entry-v900.mjs',
   'style-v900.css',
@@ -49,7 +50,7 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900\.mjs\?v=924/);
+assert.match(index, /entry-preload-v900\.mjs\?v=925/);
 assert.match(index, /style-v900\.css\?v=913/);
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');

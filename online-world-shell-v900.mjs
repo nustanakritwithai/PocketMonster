@@ -15,7 +15,8 @@ import {
   createCombatV91Shell,
   createPirateComboDynamicsDefinition,
   createPirateSkillDynamicsDefinition,
-} from './combat-v91-entry.mjs?v=2';
+} from './combat-v91-entry.mjs?v=3';
+import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -67,7 +68,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '12');
+  url.searchParams.set('shellRevision', '13');
   return url.href;
 }
 
@@ -89,7 +90,15 @@ combatHost.id = 'combatV91Shell';
 combatHost.className = 'combat-v91-shell';
 combatHost.hidden = true;
 combatHost.setAttribute('aria-label', 'Combat V9.1');
-const combatShellResult = createCombatV91Shell({ container: combatHost });
+const combatTransportResult = createCombatV91ProductionTransport();
+if (!combatTransportResult.ok) {
+  throw Object.assign(new Error('Combat V9.1 transport could not be created'), {
+    code: 'COMBAT_V91_TRANSPORT_REQUIRED',
+    reason: combatTransportResult.reason,
+  });
+}
+const combatTransport = combatTransportResult.transport;
+const combatShellResult = createCombatV91Shell({ container: combatHost, transport: combatTransport });
 if (!combatShellResult.ok) {
   throw Object.assign(new Error('Combat V9.1 shell could not be mounted'), {
     code: 'COMBAT_V91_SHELL_REQUIRED',
@@ -172,12 +181,14 @@ const publicCombatShell = Object.freeze({
       active: Boolean(state),
       pendingCount: state ? Object.keys(state.pendingOverlay).length : 0,
       hostHidden: combatHost.hidden === true,
+      transport: combatTransport.diagnostics(),
     });
   },
 });
 
 function destroyCombatShell() {
   closeCombatSession();
+  combatTransport.stop('online-shell-destroyed');
   try { combatHost.remove(); } catch {}
 }
 
@@ -507,5 +518,15 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-2');
+await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-3');
+const combatTransportStarted = combatTransport.start({
+  runtime: window.POCKETMONSTER_CHAT_RUNTIME,
+});
+if (!combatTransportStarted.ok) {
+  endSession('combat-transport-unavailable');
+  throw Object.assign(new Error('Combat V9.1 transport could not bind the shared socket'), {
+    code: 'COMBAT_V91_TRANSPORT_REQUIRED',
+    reason: combatTransportStarted.reason,
+  });
+}
 scheduleSessionExpiryCheck();

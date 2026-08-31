@@ -22,9 +22,9 @@ release candidate และยังไม่ควร merge จนกว่า 
   authoritative Status มาจาก Server/entity-owner snapshot เท่านั้น
 - **Client ไม่เขียน World position/transform** — หลังผลยืนยัน Client ทำได้เพียงส่ง
   `world.impulse_commit_requested`; World/Server spatial authority ต้องเป็นผู้ commit
-- **Combat production transport ยังไม่ wire** — `networkCreation: false`, public shell ตั้ง
-  `serverReconcileExposed: false` และยังไม่มี authenticated response ingress หรือ live
-  World impulse consumer
+- **Combat production transport ใช้ socket เดิมเท่านั้น** — `networkCreation: false`, public shell ตั้ง
+  `serverReconcileExposed: false` และส่ง/รับ raw Combat envelope ผ่าน authenticated
+  `/ws/chat` เดิม โดย response ingress ถูกผูกไว้ภายใน shell ไม่เปิดให้ scene เรียกเอง
 
 Server modules ใน PR เป็น executable reference boundary/test harness และถูกกันออกจาก
 Pages artifact ด้วย `combat-v91-server-*`; ค่า `productionWritesEnabled` ยังคง `false`
@@ -192,7 +192,7 @@ Live resolution รอบนี้จงใจ **fail closed ที่ `single d
   collision receipt + expiry + Server verification
 - impulse/knockback และ hitstop ถูกปล่อยจาก internal Client integration hook หลังได้รับ
   authoritative effect receipt ที่ binding ตรงกับ committed hit outcome เท่านั้น ปัจจุบัน
-  public shell ยังไม่เปิด response ingress และยังไม่มี World transform consumer จริง
+  private response ingress เชื่อมแล้ว แต่ยังไม่มี World transform consumer จริง
 
 Server ใช้ `ServerDynamicsPermit` ผูก binding/provenance, start/impact/expiry CombatTick,
 actor/target/action, resource reservation และ dynamics/actor-occupancy state versions
@@ -271,14 +271,26 @@ SHA-256 fingerprints ใน contract ใช้ตรวจ identity/drift/replay
 รับ response ผ่านช่องทางที่เชื่อถือได้ และ Server ต้อง reload definition/provenance/
 clock/owner state จาก storage ของตนเองก่อนออก permit ทุกครั้ง
 
+## Production Transport
+
+`combat-v91-transport.mjs` ใช้ physical socket เดียวกับ Chat/World และไม่สร้าง
+`WebSocket` เอง โดยมีขอบเขตดังนี้:
+
+- auth frame ของ launch session ถูกส่งก่อน Combat envelope ทุกครั้ง
+- prediction ที่ยังไม่ settle ถูกเก็บแบบ bounded และ replay envelope เดิมเมื่อ reconnect
+- route authority response ด้วย `intentId + combatId`; response ต่าง session/combat ไม่เข้า store
+- raw `combat-authority-response/v9.1.2` เข้า private reconcile callback เท่านั้น
+- logout, scene/session close และ shell destroy ล้าง pending queue/subscription
+- Client ยังคงไม่ commit HP, Status หรือ World transform จาก prediction
+
 ## Browser Artifact
 
-Pages artifact ปัจจุบันมี Combat client modules 17 ไฟล์ + `combat-v91.css` รวม 18 assets:
+Pages artifact ปัจจุบันมี Combat client modules 18 ไฟล์ + `combat-v91.css` รวม 19 assets:
 
 - adapters, Core/Profile/action projections และ mode policy
 - contract, protocol, RNG, rules และ Status
 - Dynamics contract/scheduler/binding, authoritative effect receipt และ Pirate dynamics adapter
-- client store, entry และ UI
+- client store, production transport, entry และ UI
 
 Build บังคับว่า `combat-v91-server-*`, tests, docs และ one-document shadow runtime
 ทั้ง V9.10/V9.12 ต้องไม่ถูก publish เป็น browser assets
@@ -290,14 +302,15 @@ Build บังคับว่า `combat-v91-server-*`, tests, docs และ o
 - `npm run ci` — full legacy + V8.x + V9.0 + V9.1 regression
 - `npm run test:v91:combat`
 - `npm run test:v91:runtime`
-- `npm run build:pages` — 229 public files after syncing `origin/main`; Combat closure 18 assets
+- `npm run build:pages` — 230 public files after syncing `origin/main`; Combat closure 19 assets
 - `npm run test:hosting`
 - `node tests/v90-unified-pages-artifact.mjs`
 
 ชุด Combat ครอบคลุม Profile12/Core6, level 1–60, proficiency projection, Ring mode,
 Status, STAB 1.5, RNG parity, mutants 21/21, fixed-tick Dynamics, mandatory entity-bound
 Client impact gate, Server timing/occupancy permit, Server action/status atomic authority
-และ Pirate/Pocket defeat semantics
+และ Pirate/Pocket defeat semantics รวม shared-socket egress/ingress, reconnect replay,
+foreign-response rejection และ private shell reconciliation
 
 ## งานที่ยังเหลือ
 
@@ -305,19 +318,19 @@ Client impact gate, Server timing/occupancy permit, Server action/status atomic 
    profile/status/resource stores, atomic DB transaction, ticket และ outbox
 2. ต่อ World spatial authority จริงสำหรับ target/range/LOS/safe-zone/terrain,
    projectile collision receipt, movement/impulse commit และ authoritative snapshot
-3. ต่อ transport เดิมให้ส่ง prediction/authority response โดยไม่สร้าง connection ซ้ำ
-4. ทำ latency/reorder/duplicate/replay/soak tests กับ backend และ World จริง
-5. เพิ่ม per-impact transaction/receipt ก่อนเปิด multi-hit และ projectile ใน live resolver
-6. แปลง Living → Pocket → Pirate เป็น import-pure runtime factory ที่คืน resource ทุกชนิด,
+3. ทำ live two-client latency/reorder/duplicate/replay/soak tests กับ backend และ World จริง
+4. เพิ่ม per-impact transaction/receipt ก่อนเปิด multi-hit และ projectile ใน live resolver
+5. แปลง Living → Pocket → Pirate เป็น import-pure runtime factory ที่คืน resource ทุกชนิด,
    แยก Pocket domain capability แบบ headless แล้วจึงถอด scene/Pirate iframe
-7. ผ่าน security/balance/release review ก่อนเปิด PvP, reward settlement หรือ production writes
-8. ฝั่ง Server ต้องโหลด trusted ActionStatProjection snapshot จาก Pirate domain แยกจาก
+6. ผ่าน security/balance/release review ก่อนเปิด PvP, reward settlement หรือ production writes
+7. ฝั่ง Server ต้องโหลด trusted ActionStatProjection snapshot จาก Pirate domain แยกจาก
    action permit และ CAS source state/fingerprint ใน transaction เดียวกัน
-9. เปลี่ยน authoritative version/tick/sequence counters ที่เหลือให้เป็น safe integer พร้อม
+8. เปลี่ยน authoritative version/tick/sequence counters ที่เหลือให้เป็น safe integer พร้อม
    MAX_SAFE regression vectors และให้ dynamics registry ยืนยัน canonical direct-hit metadata
 
 ดังนั้นคำกล่าวอ้างที่ถูกต้องตอนนี้คือ: **Shared Combat V9.1.2 ใช้ Pocket-based
 CombatProfile12, Pirate action proficiency และ Pirate fixed-tick dynamics ใน Client shell
 เดียวกันแล้ว พร้อม executable Server authority V3 ที่ fail closed สำหรับ timing; live
-resolution รองรับ single-direct action เท่านั้น ส่วน backend production, multi-hit/
+Client transport ใช้ authenticated shared socket เดิมและรองรับ single-direct action เท่านั้น
+ส่วน backend production authority, live two-client E2E, multi-hit/
 projectile receipt และ whole-game one-document migration ยังไม่เสร็จ**

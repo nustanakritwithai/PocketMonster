@@ -25,7 +25,7 @@ export {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-pirate-dynamics-adapter.mjs';
 
-export const COMBAT_V91_ENTRY_VERSION = 'combat-v91-entry/v2';
+export const COMBAT_V91_ENTRY_VERSION = 'combat-v91-entry/v3';
 const CLIENT_ACTION_RECORD_LIMIT = 128;
 export const COMBAT_V91_ENTRY_POLICY = Object.freeze({
   activation: 'active_shell_adapter',
@@ -35,7 +35,8 @@ export const COMBAT_V91_ENTRY_POLICY = Object.freeze({
   hpWriteAuthority: 'server_target_owner_only_client_projection_never_commits',
   statusWriteAuthority: 'server_entity_owner_only_client_projection_never_commits',
   worldPositionWriteAuthority: 'world_server_only_client_never_commits_transform',
-  productionTransport: 'disabled_no_authoritative_response_ingress',
+  productionTransport: 'shared_authenticated_chat_socket_v1_opt_in',
+  authorityResponseIngress: 'private_transport_binding_only',
   shellMount: COMBAT_V91_UI_MOUNT_POLICY.shell,
   singleHtmlShell: true,
   singleActiveSession: true,
@@ -357,9 +358,17 @@ export function createCombatV91Client({ combatId, profiles, statusSnapshots } = 
   return result(true, null, { client });
 }
 
-export function createCombatV91Shell({ container } = {}) {
+export function createCombatV91Shell({ container, transport = null } = {}) {
   if (!container?.ownerDocument || typeof container.replaceChildren !== 'function') {
     return result(false, 'invalid_active_shell_container');
+  }
+  if (transport !== null
+    && (typeof transport?.bindReconcile !== 'function'
+      || typeof transport?.canAcceptIntent !== 'function'
+      || typeof transport?.canEnqueue !== 'function'
+      || typeof transport?.enqueue !== 'function'
+      || typeof transport?.clearSession !== 'function')) {
+    return result(false, 'invalid_combat_transport');
   }
   let activeClient = null;
   let focusedEntityId = null;
@@ -387,6 +396,7 @@ export function createCombatV91Shell({ container } = {}) {
       if (!created.ok) return created;
       const firstEntityId = requestedEntityId ?? profiles?.[0]?.entityId;
       if (!created.client.getState().authoritativeBase[firstEntityId]) return result(false, 'unknown_entity');
+      transport?.clearSession('combat-session-replaced');
       activeClient = created.client;
       focusedEntityId = firstEntityId;
       return render();
@@ -395,16 +405,24 @@ export function createCombatV91Shell({ container } = {}) {
       if (!activeClient) return result(false, 'combat_session_inactive');
       if (focusEntityId !== undefined
         && !activeClient.getState().authoritativeBase[focusEntityId]) return result(false, 'unknown_entity');
+      if (transport) {
+        const transportCapacity = transport.canAcceptIntent(command.intentId);
+        if (!transportCapacity.ok) return transportCapacity;
+      }
       const predicted = activeClient.predict(command);
       if (!predicted.ok) return predicted;
+      const transportCapacity = transport?.canEnqueue(predicted.envelope) ?? result(true, 'transport_not_bound');
+      if (!transportCapacity.ok) return transportCapacity;
       if (focusEntityId !== undefined) focusedEntityId = focusEntityId;
       const rendered = render();
       if (!rendered.ok) return rendered;
+      const transportResult = transport?.enqueue(predicted.envelope) ?? null;
       return result(true, predicted.reason, {
         proposal: predicted.proposal,
         envelope: predicted.envelope,
         state: predicted.state,
         viewModel: rendered.viewModel,
+        transport: transportResult,
       });
     },
     scheduleAction(command = {}) {
@@ -442,6 +460,7 @@ export function createCombatV91Shell({ container } = {}) {
       return render(options);
     },
     closeSession() {
+      transport?.clearSession('combat-session-closed');
       activeClient = null;
       focusedEntityId = null;
       container.replaceChildren();
@@ -449,6 +468,11 @@ export function createCombatV91Shell({ container } = {}) {
       return result(true, null);
     },
   });
+
+  if (transport) {
+    const bound = transport.bindReconcile(response => shell.reconcile(response));
+    if (!bound?.ok) return bound;
+  }
 
   container.hidden = true;
   return result(true, null, { shell });
