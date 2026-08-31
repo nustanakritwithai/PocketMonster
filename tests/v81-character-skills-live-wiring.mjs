@@ -230,14 +230,15 @@ export function assertCharacterSkillsLiveWiring(source = gameSource, css = cssSo
   assert.strictEqual(resolveKey(tabs[2], 'End', tabs), tabs[4]);
   assert.equal(resolveKey(tabs[2], 'Enter', tabs), null);
 
+  const a37Css = css.match(/\/\* V8\.1 A37[\s\S]*?\/\* V8\.0 UX Phase 4/)?.[0] ?? '';
   for (const cssToken of [
     '.character-info-body .character-skills-a37{min-width:0',
     'grid-template-columns:repeat(auto-fit',
     '.character-info-body .character-skill-slot-card.is-no-uses',
     '.character-info-body .character-skill-slot-card.is-invalid',
     'overflow-wrap:anywhere',
-  ]) assert.ok(css.includes(cssToken), `responsive A37 CSS requires ${cssToken}`);
-  assert.doesNotMatch(css.match(/\/\* V8\.1 A37[\s\S]*?\/\* V8\.0 UX Phase 4/)?.[0] ?? '', /(?:^|[;{])(?:height|width):\s*\d+px/m,
+  ]) assert.ok(a37Css.includes(cssToken), `responsive A37 CSS requires ${cssToken}`);
+  assert.doesNotMatch(a37Css, /(?:^|[;{])(?:height|width):\s*\d+px/m,
     'A37 cards must not add fixed geometry or a nested fixed-height scroller');
 
   const probeDocument = new FakeDocument();
