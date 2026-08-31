@@ -72,7 +72,9 @@ assert.deepEqual(emptySelectedSlot.states, ['selected']);
 assert.equal(emptySelectedSlot.ariaPressed, true);
 assert.match(emptySelectedSlot.stateText, /เลือกช่องว่างแล้ว/);
 
-assert.doesNotMatch(html, /id="attackBtn"|class="[^"]*\battack\b/, 'player Attack control remains forbidden');
+assert.doesNotMatch(html, /id="attackBtn"/, 'dedicated player Attack control remains forbidden');
+const htmlClassLists = [...html.matchAll(/\bclass="([^"]*)"/g)].map(([, value]) => value.split(/\s+/));
+assert.equal(htmlClassLists.some(tokens => tokens.includes('attack')), false, 'legacy Attack class remains forbidden');
 assert.match(js, /function ensureCombatHudSemantics\(/);
 for (const semantic of [
   "status.setAttribute('role','group')",

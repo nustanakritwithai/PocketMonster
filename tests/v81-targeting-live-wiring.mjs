@@ -172,7 +172,7 @@ const root = new URL('../', import.meta.url);
 const sources = {
   js: fs.readFileSync(new URL('game-v800.js', root), 'utf8'),
   html: fs.readFileSync(new URL('index.html', root), 'utf8'),
-  versionedHtml: fs.readFileSync(new URL('v800.html', root), 'utf8'),
+  versionedHtml: fs.readFileSync(new URL('v900.html', root), 'utf8'),
   css: fs.readFileSync(new URL('style-v800.css', root), 'utf8'),
   hud: fs.readFileSync(new URL('combat-ui-view-model.mjs', root), 'utf8'),
 };

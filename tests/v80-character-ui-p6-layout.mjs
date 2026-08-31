@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html } from './active-assets.mjs';
 
-const versionedHtml = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
-assert.equal(html, versionedHtml, 'index.html and v800.html must remain byte-identical');
+const versionedHtml = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
+assert.equal(html, versionedHtml, 'index.html and v900.html must remain byte-identical');
 assert.match(html, /id="monsterManager"/, 'the existing manager remains the only full-screen surface');
 assert.match(html, /class="[^"]*\bcharacter-roster\b[^"]*"/, 'full Character UI needs a left Party / Monster List region');
 assert.match(html, /class="[^"]*\bcharacter-preview\b[^"]*"/, 'full Character UI needs a center selected Monster Preview region');

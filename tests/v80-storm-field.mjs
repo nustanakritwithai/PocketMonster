@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
 
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
 const storm=js.match(/["']storm-field["']\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
 assert.match(storm,/primaryTypes:\['Electric'\]/,'Storm Field primary type is Electric');
 assert.match(storm,/secondaryTypes:\['Flying','Steel'\]/,'Storm Field secondary types are explicit');

@@ -5,9 +5,9 @@ import fs from 'node:fs';
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const versioned = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
+const versioned = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 
-assert.equal(html, versioned, 'index.html and v800.html must stay identical');
+assert.equal(html, versioned, 'index.html and v900.html must stay identical');
 assert.match(html, /data-manager-tab="skills">สกิล/, 'Skills tab button missing');
 assert.match(html, /id="skillsPanel"/, 'Skills pane missing');
 assert.match(js, /function renderSkills\([^)]*\)/, 'renderSkills missing');

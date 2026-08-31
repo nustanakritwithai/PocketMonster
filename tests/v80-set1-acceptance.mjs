@@ -10,7 +10,7 @@ const expectedTypes={
   'misty-lake':['Water','Grass','Flying'],
   'storm-field':['Electric','Flying','Steel'],
 };
-assert.equal(html,fs.readFileSync(new URL('../v800.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
 assert.equal(set1Ids.length,4,'Set 1 contains four playable stages');
 for(const [index,id] of set1Ids.entries()){
   const definition=STAGE_BY_ID[id];

@@ -14,7 +14,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '810'/, 'mutant 2: polish ASSET_REVISION stays 810');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: polish uses the current ASSET_REVISION');
 assert.equal(selectQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, devicePixelRatio: 2 }).shadows, false,
   'mutant 3: adaptive medium quality must not force a shadow pass');
 assert.match(extractFn('addDeco'), /obj\.isMesh/, 'mutant 4: group decorations must flag child meshes, not only the group');
