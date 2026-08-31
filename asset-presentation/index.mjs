@@ -54,10 +54,20 @@ export {
   resolveMonsterAssetId,
 } from './monster-ids.mjs';
 export { createAssetEngine } from './engine.mjs';
+export {
+  getImg2ThreeJsModel,
+  listImg2ThreeJsModels,
+  loadImg2ThreeJsModule,
+  prewarmImg2ThreeJsModel,
+  registerImg2ThreeJsModel,
+  registerImg2ThreeJsModule,
+  resetImg2ThreeJsRegistry,
+} from './img2threejs-registry.mjs';
 export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
 export { createBigheadProvider } from './providers/procedural-bighead.mjs';
 export { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';
 export { createPirateFruitPlayerProvider } from './providers/pirate-fruit-player.mjs';
+export { createImg2ThreeJsProvider } from './providers/img2threejs.mjs';
 export {
   applyMonsterFourSide,
   compileMonsterFourSideAtlas,
