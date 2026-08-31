@@ -124,7 +124,7 @@ assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world lo
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');
 assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persistent shell owns fullscreen across scene swaps');
-assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=1/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
+assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=2/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');
