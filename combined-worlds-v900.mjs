@@ -40,21 +40,21 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'เกมเดิม',
     title: 'Pocket Monster',
     detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
-    runtime: './game-v800.js?v=819',
+    runtime: './game-v800.js?v=820',
   }),
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
     title: 'Pirate Fruit',
     detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • Pocket วาดภาพทับ • วาปเชื่อมเข้าเกมเดิม',
-    runtime: './boot-pirate-fruit-v900.mjs?v=913',
+    runtime: './boot-pirate-fruit-v900.mjs?v=914',
   }),
   Object.freeze({
     id: 'living-world',
     label: 'โลกกลาง',
     title: 'World Layer',
     detail: 'ชั้นโลกกลาง (World) • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP',
-    runtime: './world-living-v900.mjs?v=902',
+    runtime: './world-living-v900.mjs?v=903',
   }),
 ]);
 

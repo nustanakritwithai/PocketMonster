@@ -3879,9 +3879,22 @@ const joy={x:0,y:0};
 const unifiedMobileControls=window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
 if(!unifiedMobileControls)throw new Error('V9 boot: unified mobile controls not found');
 unifiedMobileControls.registerAdapter('pocket-monster',Object.freeze({
-  interceptActions:false,
+  interceptActions:true,
   move:({x=0,z=0,active=false})=>{joy.x=active?x:0;joy.y=active?z:0;},
   camera:({phase,dx=0,dy=0})=>{if(phase!=='move')return;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);},
+  action:({action,phase})=>{
+    if(action==='capture'){
+      if(phase==='start'){playSFX('sfx_ui_click');beginCaptureAim();}
+      else if(phase==='end')executeCaptureThrow();
+      else cancelCaptureAim();
+      return;
+    }
+    if(phase!=='start')return;
+    playSFX('sfx_ui_click');
+    if(action==='summon')summonThrow();
+    else if(action==='recall')recall(true);
+    else if(action.startsWith('skill'))dispatchSkill(Number(action.slice(5))-1);
+  },
   reset:()=>{joy.x=0;joy.y=0;},
   activate:()=>{joy.x=0;joy.y=0;renderHUD();},
 }));

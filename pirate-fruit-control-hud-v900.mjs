@@ -4,8 +4,8 @@ export const PIRATE_FRUIT_ORIGINAL_HUD = false;
 /** Pirate Fruit keeps its gameplay runtime in the same-origin iframe, but the
  * parent v900 document is the only visible/touchable mobile control surface. */
 export const PIRATE_FRUIT_CONTROL_HUD_CSS = `
-html[data-pirate-hud="parent-unified"] .tc-root,
-html[data-pirate-hud="parent-unified"] .hud-help {
+html[data-pirate-hud="pirate-primary-parent"] .tc-root,
+html[data-pirate-hud="pirate-primary-parent"] .hud-help {
   visibility: hidden !important;
   pointer-events: none !important;
 }
@@ -23,7 +23,7 @@ export function syncPirateFruitControlHud(frame = globalThis.document?.getElemen
     }
     style.textContent = PIRATE_FRUIT_CONTROL_HUD_CSS;
   }
-  doc.documentElement.dataset.pirateHud = 'parent-unified';
+  doc.documentElement.dataset.pirateHud = 'pirate-primary-parent';
   doc.documentElement.dataset.controlPanel = globalThis.document?.body?.dataset?.controlPanel || 'human';
   return true;
 }
