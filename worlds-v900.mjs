@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=916';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=917';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -7,6 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=1';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
@@ -108,6 +109,7 @@ async function switchWorldInDocument(id, panelOverride = null) {
   });
   document.body.dataset.combinedWorld = world.id;
   document.body.dataset.controlPanel = panel;
+  unifiedMobileControls.activate(world.id);
   const game = document.getElementById('game');
   if (activeRuntimeId && game) savedWorldGameNodes.set(activeRuntimeId, [...game.childNodes]);
   const switched = await routeController.switchTo(world.id, { panel });
@@ -132,6 +134,7 @@ async function bootWorld(id) {
   const world = worldById(id);
   if (!world) return;
   document.body.dataset.combinedWorld = world.id;
+  unifiedMobileControls.activate(world.id);
   const panel = applyControlPanel(panelIdFromLocation(location, world.id), world.id);
   const canonical = combinedWorldLocation(world.id, panel.id);
   if (`${location.pathname}${location.search}` !== canonical) history.replaceState(null, '', canonical);

@@ -18,6 +18,7 @@ const versionedHtml = fs.readFileSync(new URL('../v900.html', import.meta.url), 
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 const launcher = fs.readFileSync(new URL('../firebase-launcher-entry.mjs', import.meta.url), 'utf8');
 const helper = fs.readFileSync(new URL('../world-presence-v800.mjs', import.meta.url), 'utf8');
+const unifiedControls = fs.readFileSync(new URL('../unified-mobile-controls-v900.mjs', import.meta.url), 'utf8');
 
 for (const file of ['world-presence-v800.mjs', 'chat-runtime.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
@@ -30,8 +31,9 @@ assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), '
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=815/, 'legacy preload binds chat before game overlays');
-assert.match(liveJs, /bindMobileDualPointerInput\(/, 'Pocket movement and camera use the shared dual-pointer lifecycle');
-assert.match(liveJs, /onJoystickStart:[\s\S]*onCameraStart:/, 'joystick and camera keep independent pointer channels');
+assert.doesNotMatch(liveJs, /bindMobileDualPointerInput\(/, 'Pocket runtime does not create a second pointer lifecycle');
+assert.match(liveJs, /registerAdapter\('pocket-monster'/, 'Pocket movement and camera register with the parent control lifecycle');
+assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent joystick and camera keep independent pointer channels');
 assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
 assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
 assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');

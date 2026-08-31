@@ -4,7 +4,6 @@ import { resolveOwnedBasicAiAction } from './basic-ai-resolver.mjs';
 import { createMonsterAIState, isCanonicalMonsterAIState, validateMonsterAIState, resetMonsterAIState, resolveWildMonsterAI, settleWildAIIntent } from './wild-ai-resolver.mjs';
 import { disposeObject3D, removeAndDispose } from './scene-resource-lifecycle.mjs';
 import { createDirtyGate, createDistanceTickScheduler, createObjectPool, createSharedResourceCache, remainingCountdownSeconds, selectQualityProfile, shouldRefreshEggCountdown } from './performance-runtime.mjs';
-import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=2';
 import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeStateForPersistence, writeStoredSave } from './save-schema.mjs';
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
@@ -3871,34 +3870,22 @@ function clearBossChallengeCombatEffects(){clearSkillFields();clearSkillSwarms()
 // ---------- Camera / input ----------
 let cameraYaw=0,cameraPitch=.48;
 cameraPitch=.28;
-const cameraPad=el('cameraPad');
-let camDrag={active:false,pid:null,x:0,y:0};
-function moveCameraPointer(e){if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);}
-function endCam(){camDrag.active=false;camDrag.pid=null;}
 const keys={};
 addEventListener('pointerdown',()=>initAudio(),{once:true});
 addEventListener('keydown',()=>initAudio(),{once:true});
 addEventListener('keydown',e=>{if(pirateThrowPanelPaused())return;keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
-const joy={x:0,y:0,active:false,pid:null};
-const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.4.0 boot: #joystick not found');
-const stick=el('stick'); if(!stick) throw new Error('V8.4.0 boot: #stick not found');
-
-function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
-function joyEnd(){joy.active=false;joy.pid=null;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}
-const mobileDualPointerInput=bindMobileDualPointerInput({
-  windowLike:window,
-  documentLike:document,
-  joystickElement:joyEl,
-  cameraElement:cameraPad,
-  onJoystickStart:e=>{joy.active=true;joy.pid=e.pointerId;joyPoint(e);},
-  onJoystickMove:joyPoint,
-  onJoystickEnd:joyEnd,
-  onCameraStart:e=>{camDrag.active=true;camDrag.pid=e.pointerId;camDrag.x=e.clientX;camDrag.y=e.clientY;},
-  onCameraMove:moveCameraPointer,
-  onCameraEnd:endCam,
-});
-window.POCKETMONSTER_MOBILE_INPUT=mobileDualPointerInput;
+const joy={x:0,y:0};
+const unifiedMobileControls=window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
+if(!unifiedMobileControls)throw new Error('V9 boot: unified mobile controls not found');
+unifiedMobileControls.registerAdapter('pocket-monster',Object.freeze({
+  interceptActions:false,
+  move:({x=0,z=0,active=false})=>{joy.x=active?x:0;joy.y=active?z:0;},
+  camera:({phase,dx=0,dy=0})=>{if(phase!=='move')return;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);},
+  reset:()=>{joy.x=0;joy.y=0;},
+  activate:()=>{joy.x=0;joy.y=0;renderHUD();},
+}));
+window.POCKETMONSTER_MOBILE_INPUT=unifiedMobileControls;
 function forward(){return new THREE.Vector3(-Math.sin(cameraYaw),0,-Math.cos(cameraYaw)).normalize();}
 function cameraRight(){const f=forward();return new THREE.Vector3(-f.z,0,f.x).normalize();}
 function worldToScreen(pos,output=null,vectorScratch=null){

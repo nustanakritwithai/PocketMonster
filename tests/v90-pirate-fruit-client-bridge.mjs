@@ -166,7 +166,7 @@ assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
 assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
 assert.equal(pirateSource.pocketPresentation.people, 'character.human.blocky-bighead.v1');
-assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-original');
+assert.equal(pirateSource.pocketPresentation.ui, 'v900-parent-unified');
 
 assert.doesNotMatch(bridgeSrc, /from ['"]three['"]/, 'bridge must not import the three npm package');
 assert.doesNotMatch(hookSrc, /from ['"]three['"]/, 'offline hook must not import the three npm package');
