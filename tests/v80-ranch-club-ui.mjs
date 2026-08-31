@@ -16,7 +16,7 @@ assert.match(js, /function initRanchClubPreview3D\(/, 'club preview initializes 
 assert.match(js, /ranchClubPreviewRenderer=new THREE\.WebGLRenderer\(\{canvas,antialias:qualityProfile\.antialias,alpha:true,powerPreference:'low-power'\}\)/, 'club preview honors adaptive antialiasing');
 assert.match(js, /ranchClubPreviewRenderer\.setPixelRatio\(Math\.min\(devicePixelRatio\|\|1,qualityProfile\.maxDpr\)\)/, 'club preview honors the adaptive DPR cap');
 assert.match(js, /updateRanchClubPreview\(dt\)/, 'frame loop renders the club model while the page is open');
-assert.equal(html, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'), 'HTML parity remains exact');
+assert.equal(html, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'), 'active V9 HTML parity remains exact');
 
 assert.match(css, /\.ranch-storage-page[\s\S]*grid-template-columns/, 'Storage page keeps a three-column layout');
 assert.match(css, /@media\s*\(max-width:700px\)[\s\S]*\.ranch-storage-page/, 'Storage page keeps the narrow fallback');

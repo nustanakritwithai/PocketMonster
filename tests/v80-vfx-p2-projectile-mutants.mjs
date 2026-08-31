@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: projectile uses the current ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: projectile swap ASSET_REVISION stays at the reviewed baseline');
 
 const throwFn = extractFn('throwProjectile');
 assert.doesNotMatch(throwFn, /sphereGeometry/, 'mutant 3: throwProjectile must not keep a sphere');

@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: type motion uses the current ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: type motion ASSET_REVISION stays at the reviewed baseline');
 
 assert.match(js, /function updateSparkType/, 'mutant 3: type-specific spark motion must exist');
 assert.match(extractFn('updateEffects'), /updateSparkType\(e,dt,t\)/, 'mutant 4: updater must call type motion');

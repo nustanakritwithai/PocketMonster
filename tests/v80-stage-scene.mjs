@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+import { activeHtml as html, activeJs as js } from './active-assets.mjs';
 
-assert.match(html,/data-zone="grass-meadow"/,'Grass Meadow scene route exists');
-assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'HTML parity remains exact');
+assert.doesNotMatch(html,/data-zone="grass-meadow"/,'Active V9 removes direct stage-menu travel');
+assert.equal(html,fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8'),'active V9 HTML parity remains exact');
 const grassStage=js.match(/['"]grass-meadow['"]\s*:\s*\{[\s\S]*?\n  grassland:/)?.[0]||'';
 assert.ok(grassStage,'Grass Meadow stage config is bounded before the next zone');
 assert.match(grassStage,/sceneStatus:'normal-encounters'/,'Grass Meadow normal encounter stage exists');
@@ -14,8 +14,9 @@ const normalSpawn=grassStage.match(/spawn:\[([\s\S]*?)\]\s*,rareSpawn/)?.[1]||''
 assert.ok(normalSpawn,'Grass Meadow normal spawn list is bounded');
 assert.doesNotMatch(normalSpawn,/\{elite:true|\{boss:true/,'Grass Meadow normal spawn list has no Elite/Boss entry');
 assert.match(js,/function makeStageBeacon\(/,'scene traversal markers exist');
+assert.match(js,/function makeWarpBeacon\(route\)/,'Stage routes render as in-scene portals');
+assert.match(js,/for\(const route of routesFrom\(zone\)\)makeWarpBeacon\(route\)/,'Zone population creates its authoritative route portals');
 assert.match(js,/bounds=ZONES\[state\.currentZone\]\?\.bounds/,'player bounds are zone-aware');
-assert.match(js,/const start=cfg\.playerStart/,'zone player start is data-driven');
+assert.match(js,/const start=warpSpawnOverride\|\|cfg\.playerStart\|\|\[0,0,5\]/,'authoritative portal arrival wins before the data-driven zone start');
 assert.match(js,/cfg\.sceneStatus==='blockout'/,'blockout scene has dedicated message');
-assert.match(css,/data-zone="grass-meadow"/,'Grass Meadow has scene travel styling');
 console.log('V8.3 Scene-first Grass Meadow blockout: PASS');

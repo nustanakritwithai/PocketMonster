@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const versioned = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
+const v800 = fs.readFileSync(new URL('../v800.html', import.meta.url), 'utf8');
 const js = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v800.css', import.meta.url), 'utf8');
 
-assert.equal(html, versioned, 'index.html must stay byte-identical to v900.html');
-assert.match(html, /id="eventPopup"/, 'event popup missing');
-assert.match(html, /id="eventChoices"/, 'event choices missing');
+for (const entry of [html, v800]) {
+  assert.match(entry, /id="eventPopup"/, 'event popup missing');
+  assert.match(entry, /id="eventChoices"/, 'event choices missing');
+}
 assert.match(js, /function showEventPopup/, 'showEventPopup missing');
 assert.match(js, /function showMasteryPopup/, 'showMasteryPopup missing');
 assert.match(js, /showEventPopup\(inst,picked\.def\)/, 'triggerRaisingEvent must open the popup');

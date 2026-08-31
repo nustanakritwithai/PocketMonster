@@ -72,9 +72,11 @@ assert.deepEqual(emptySelectedSlot.states, ['selected']);
 assert.equal(emptySelectedSlot.ariaPressed, true);
 assert.match(emptySelectedSlot.stateText, /เลือกช่องว่างแล้ว/);
 
-assert.doesNotMatch(html, /id="attackBtn"/, 'dedicated player Attack control remains forbidden');
-const htmlClassLists = [...html.matchAll(/\bclass="([^"]*)"/g)].map(([, value]) => value.split(/\s+/));
-assert.equal(htmlClassLists.some(tokens => tokens.includes('attack')), false, 'legacy Attack class remains forbidden');
+assert.doesNotMatch(html, /\bid="attackBtn"/, 'Pocket Monster must not restore the legacy player Attack button');
+const htmlClassTokens = [...html.matchAll(/\bclass="([^"]*)"/g)]
+  .flatMap(([, value]) => value.trim().split(/\s+/));
+assert.equal(htmlClassTokens.includes('attack'), false,
+  'Pocket Monster must not restore the generic player Attack control class');
 assert.match(js, /function ensureCombatHudSemantics\(/);
 for (const semantic of [
   "status.setAttribute('role','group')",

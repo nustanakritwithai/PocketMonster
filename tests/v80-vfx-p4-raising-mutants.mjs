@@ -21,7 +21,7 @@ function extractFn(name) {
 }
 
 assert.doesNotMatch(js, /from ['"]three['"]/, 'mutant 1: do not import the three package');
-assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: raising VFX uses the current ASSET_REVISION');
+assert.match(schema, /export const ASSET_REVISION = '813'/, 'mutant 2: raising VFX ASSET_REVISION stays at the reviewed baseline');
 
 assert.match(js, /function spawnTrainingEffect/, 'mutant 3: training VFX must exist');
 assert.match(js, /function spawnEvolutionEffect/, 'mutant 4: evolution VFX must exist');

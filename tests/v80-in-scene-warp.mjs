@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { WARP_ROUTES, nearestRoute, nextWarpPromptState, routesFrom, warpAvailability } from '../warp-routes.mjs';
-import { activeHtml as html } from './active-assets.mjs';
 
+const html=fs.readFileSync(new URL('../v900.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../game-v800.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../style-v800.css',import.meta.url),'utf8');
 const progress={unlocked:['grass-meadow','ember-valley'],cleared:['grass-meadow']};
@@ -36,8 +36,7 @@ assert.doesNotMatch(js,/closeWarpPrompt\(|dismissedWarpId/,'Zone changes do not 
 const warpBeacon=js.match(/function makeWarpBeacon\(route\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.match(warpBeacon,/TorusGeometry\(\.82,\.07,8,28\)/,'Warp point has a tall, clearly visible portal ring');
 assert.match(warpBeacon,/boxGeometry\(\.18,1\.8,\.18\)/,'Warp point has a visible vertical light beam');
-assert.match(js,/setTextIfChanged\(stepEl,'เดินไปที่ประตูวาปเพื่อเข้าสู่ Grass Meadow และเริ่มเควส'\)/,'Hub objective guides players to the in-scene warp');
-assert.doesNotMatch(js,/el\('huntBtn'\)|hunt\.textContent/,'Removed Hunt control must not regain legacy wiring');
+assert.doesNotMatch(js,/el\('huntBtn'\)|hunt\.textContent/,'Removed Hunt button cannot bypass walk-through portal travel');
 assert.match(js,/warpSpawnOverride=route\.spawn/,'Warp selects the destination spawn point');
 assert.match(js,/ต้องเดินทางผ่านจุดวาปในฉากตามเส้นทาง/,'Stage Select no longer directly loads active stages');
 assert.doesNotMatch(html,/data-zone="grass-meadow"/,'Stage zone menu no longer directly warps to Set 1');

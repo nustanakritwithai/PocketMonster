@@ -77,7 +77,7 @@ const liveMutations = [
   ['drop summon damage ratio', 'Math.round(resolved.damage*swarm.tickDamageRatio)', 'Math.round(resolved.damage)'],
   ['stop summon cadence', 'swarm.nextTickSec+=swarm.tickIntervalSec;', 'swarm.nextTickSec=Infinity;'],
   ['consume Uses on summon tick', 'const damage=Math.max(1,Math.round(resolved.damage*swarm.tickDamageRatio));', 'consumeSkillUse();const damage=Math.max(1,Math.round(resolved.damage*swarm.tickDamageRatio));'],
-  ['keep swarm across zone change', 'clearSkillSwarms();\n  closeWarpPrompt();', 'void liveSkillSwarms;\n  closeWarpPrompt();'],
+  ['keep swarm across zone change', '  clearSkillSwarms();\n  closeStageSelect();', '  void liveSkillSwarms;\n  closeStageSelect();'],
   ['keep swarm after recall', '  clearSkillSwarms();\n  discardBattleEventsForSource(inst.instanceId);', '  void liveSkillSwarms;\n  discardBattleEventsForSource(inst.instanceId);'],
   ['recall keeps old contributor ledger', "  discardBattleEventsForSource(inst.instanceId);\n  try{cancelOwnedAIAction(summon,'owned_recall');}catch{}", "  void inst.instanceId;\n  try{cancelOwnedAIAction(summon,'owned_recall');}catch{}"],
   ['keep swarm after faint', 'clearSkillSwarms();discardBattleEventsForSource(inst.instanceId);', 'void liveSkillSwarms;discardBattleEventsForSource(inst.instanceId);'],

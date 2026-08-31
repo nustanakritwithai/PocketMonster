@@ -54,6 +54,7 @@ jobs:
           npm run test:v90:pirate-player
           node scripts/build-firebase-launcher.mjs
           node tests/hosting-architecture.mjs
+          npm run test:v91:combat
 
       - name: Verify Monster Life backend before Firebase deployment
         env:

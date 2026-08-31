@@ -49,8 +49,9 @@ jobs:
           node tests/hosting-architecture.mjs
           node tests/v90-deployment-gates.mjs
           npm run test:v90:pirate-player
+          npm run test:v91:combat
       - name: Build public game artifact
-        run: node scripts/build-github-pages.mjs
+        run: npm run build:pages
       - name: Verify unified-world artifact
         run: node tests/v90-unified-pages-artifact.mjs
       - name: Upload Pages artifact

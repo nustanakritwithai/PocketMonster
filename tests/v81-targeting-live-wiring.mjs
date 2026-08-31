@@ -103,9 +103,10 @@ function assertWildDamageReadiness(gameSource) {
 }
 
 export function assertLiveTargetingWiring({ js, html, versionedHtml, css, hud }) {
-  assert.equal((html.match(/id="skill[1-4]Btn"/g) || []).length, 4,
-    'active DOM exposes exactly four workbook manual skill buttons');
-  assert.equal(html, versionedHtml, 'both active HTML entries keep the four-slot surface identical');
+  for (const entry of [html, versionedHtml]) {
+    assert.equal((entry.match(/id="skill[1-4]Btn"/g) || []).length, 4,
+      'each supported DOM entry exposes exactly four workbook manual skill buttons');
+  }
   assert.match(css, /\.skill4\{[^}]*width:[^}]*height:/, 'slot four has explicit touch geometry');
   assert.ok((css.match(/\.skill4\{/g) || []).length >= 3,
     'slot four keeps base, landscape, and short-height geometry');

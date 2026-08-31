@@ -50,7 +50,7 @@ assert.match(extractFn('updateWild'), /w\.capturing/, 'AI skips a wild that is i
 assert.match(extractFn('switchZone'), /abortCaptureSequence/, 'changing zone disposes the capture ball');
 assert.match(extractFn('clearWilds'), /abortCaptureSequence/, 'despawning wilds aborts an open capture');
 
-assert.match(schema, /ASSET_REVISION = '813'/, 'capture FX uses the current live asset revision');
+assert.match(schema, /ASSET_REVISION = '813'/, 'capture FX fix does not bump the reviewed live asset revision');
 assert.match(extractFn('throwProjectile'), /boxGeometry\(\.14,\.14,\.14\)/, 'P2 throw cube stays');
 
 console.log('V8.2 capture FX sequence: PASS');

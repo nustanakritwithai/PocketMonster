@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (window.POCKETMONSTER_SCENE_EMBEDDED !== true) {
-  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-2');
+  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-3');
 }
 
 const startup = document.getElementById('startupStatus');

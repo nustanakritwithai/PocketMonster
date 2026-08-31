@@ -487,7 +487,7 @@ function assertRecallPresentationIsolation(gameSource) {
     target: { id: 'wild-recall' }, aiDecision: { action: 'basic_attack', targetId: 'wild-recall' },
   };
   const api = Function(
-    'activeSummon', 'pendingSummon', 'summonCooldownUntil', 'clearProjectiles',
+    'pirateThrowPanelPaused', 'activeSummon', 'pendingSummon', 'summonCooldownUntil', 'clearProjectiles',
     'removeSceneRole', 'msg', 'clearSkillSwarms', 'discardBattleEventsForSource',
     'displayName', 'cancelOwnedAIAction', 'cancelWildAITarget', 'ownedWildAiTargetId',
     'endEncounterEffects', 'removeAndDispose', 'scene', 'state', 'markStarterJourney',
@@ -495,7 +495,7 @@ function assertRecallPresentationIsolation(gameSource) {
     'renderParty', 'renderSkillButtons', 'renderHUD',
     `'use strict';${bestEffortSource}${recallSource};return {recall,state:()=>({activeSummon,pendingSummon,summonCooldownUntil})};`,
   )(
-    summon, null, 0, () => {}, role => calls.push(`remove-role:${role}`), () => {},
+    () => false, summon, null, 0, () => {}, role => calls.push(`remove-role:${role}`), () => {},
     () => calls.push('clear-skills'), sourceId => calls.push(`discard:${sourceId}`), () => 'Owned Recall',
     actor => { calls.push('cancel-owned'); actor.target = null; actor.aiDecision = null; return true; },
     (targetId, reason) => { calls.push(`cancel-wild:${targetId}:${reason}`); return 1; },
@@ -627,12 +627,12 @@ function assertSummonProjectileSettlement(gameSource) {
   let hitCallback = null;
   const summonInst = { instanceId: 'owned-1', hp: 10, fainted: false };
   const summonApi = Function(
-    'inst', 'throwProjectile', 'spawnOwned', 'selectedInstance', 'msg', 'displayName',
+    'pirateThrowPanelPaused', 'inst', 'throwProjectile', 'spawnOwned', 'selectedInstance', 'msg', 'displayName',
     'player', 'forward', 'runBestEffortCombatPresentation', 'playerVisual',
     'clearHubCompanion',
     `'use strict';let activeCaptureAttempt=null,captureSequence=null,summonCooldownUntil=0,activeSummon=null,pendingSummon=null;const state={currentZone:'grass-meadow'};${bestEffortSource}${summonThrowSource};return{summonThrow,pending:()=>pendingSummon};`,
   )(
-    summonInst,
+    () => false, summonInst,
     (_type, _end, callback) => { hitCallback = callback; return true; },
     () => false, () => summonInst, () => {}, () => 'Owned',
     { position: { clone() { return { y: 0, add() { return this; } }; } } },

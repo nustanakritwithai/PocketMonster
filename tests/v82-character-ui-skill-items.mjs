@@ -18,7 +18,7 @@ function extractFunction(source, name) {
   assert.fail(`unclosed function ${name}`);
 }
 
-assert.equal(html, mirrorHtml, 'active and mirror HTML entries remain byte-identical');
+assert.equal(html, mirrorHtml, 'active and declared V9 HTML entries remain byte-identical');
 assert.match(html, /id="skillItemConfirm"[^>]*role="dialog"[^>]*aria-modal="true"/);
 assert.match(html, /id="skillItemConfirmCancel"/);
 assert.match(html, /id="skillItemConfirmAccept"/);

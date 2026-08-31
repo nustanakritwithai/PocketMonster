@@ -48,6 +48,8 @@ for (const file of [
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=925/, 'active HTML cache-busts the persistent-shell entry');
 assert.match(indexHtml, /style-v900\.css\?v=913/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
+  'the parent document loads one Combat V9.1 stylesheet');
 assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=15'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
@@ -66,11 +68,27 @@ assert.match(entry, /POCKETMONSTER_SERVER_GATE_OBSERVATION/, 'parent publishes o
 assert.doesNotMatch(entry, /worlds-v900\.mjs|new WebSocket/, 'top-level entry never boots a scene or socket outside the shell');
 assert.match(shell, /createElement\('iframe'\)/, 'shell owns one active scene browsing context');
 assert.equal((shell.match(/createElement\('iframe'\)/g) || []).length, 1, 'shell creates exactly one scene iframe');
-assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-2'\)/, 'shell owns the one chat transport');
+assert.equal((shell.match(/from '\.\/combat-v91-entry\.mjs\?v=3'/g) || []).length, 1,
+  'parent shell imports one Combat V9.1 controller module');
+assert.equal((shell.match(/createCombatV91Shell\(\{ container: combatHost, transport: combatTransport \}\)/g) || []).length, 1,
+  'parent shell creates one Combat controller in one host');
+assert.equal((shell.match(/from '\.\/combat-v91-transport\.mjs\?v=1'/g) || []).length, 1,
+  'parent shell imports one production Combat transport');
+assert.match(shell, /combatTransport\.start\(\{[\s\S]*runtime: window\.POCKETMONSTER_CHAT_RUNTIME/,
+  'Combat binds only to the authenticated shared socket runtime');
+assert.match(shell, /combatHost\.id = 'combatV91Shell'/, 'Combat uses one persistent parent host');
+assert.match(shell, /combat: publicCombatShell/, 'Combat projection capability is part of the one online-shell authority');
+assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
+  'scene code cannot access a second Combat global or forge Server reconciliation');
+assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
+  'scene teardown closes pending Combat state without destroying the persistent host');
+assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-3'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");
+const shellCombatHostIndex = shell.indexOf("createElement('aside')");
 assert.ok(shellServerGateIndex >= 0 && shellServerGateIndex < shellFrameIndex, 'shell verifies the inherited healthy gate before creating a scene or socket');
+assert.ok(shellCombatHostIndex > shellServerGateIndex, 'shell creates Combat only after the inherited Server gate passes');
 assert.doesNotMatch(shell, /location\.(?:assign|replace|reload)/, 'scene changes never navigate the top-level document');
 assert.doesNotMatch(shell, /createElement\('style'\)|style\.textContent/, 'shell cannot depend on CSP-blocked inline styles');
 assert.match(shellCss, /#onlineWorldSceneFrame\{position:absolute;inset:0;width:100%;height:100%;border:0/, 'external V9 CSS fills the viewport with the active scene');

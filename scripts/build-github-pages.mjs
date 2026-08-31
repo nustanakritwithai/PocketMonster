@@ -15,6 +15,17 @@ const ROOT_EXCLUDES = new Set([
   'server_save_backup.json',
   'workspace-manifest.json',
 ]);
+const SERVER_ONLY_ROOT_PREFIXES = Object.freeze([
+  'combat-v91-server-',
+]);
+const SOURCE_ONLY_ROOT_FILES = new Set([
+  // Shadow foundation: publish only after runtime factories replace the
+  // iframe realms and these modules enter the verified browser closure.
+  'one-document-world-runtime-host-v910.mjs',
+  'world-runtime-lifecycle-v910.mjs',
+  'world-runtime-import-purity-v912.mjs',
+  'world-runtime-resource-scope-v912.mjs',
+]);
 const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/', 'pirate-fruit-offline/'];
 const DEPENDENCY_EXTENSIONS = new Set([
   '.bin', '.css', '.gif', '.glb', '.gltf', '.html', '.ico', '.jpeg', '.jpg', '.js', '.json',
@@ -44,9 +55,12 @@ function normalize(relative) {
 
 export function isPublicGameFile(relative) {
   const name = normalize(relative);
+  const basename = path.posix.basename(name);
   if (path.extname(name).toLowerCase() === '.md') return false;
+  if (SERVER_ONLY_ROOT_PREFIXES.some(prefix => basename.startsWith(prefix))) return false;
   if (PUBLIC_DIRECTORIES.some(prefix => name.startsWith(prefix))) return true;
   if (name.includes('/')) return false;
+  if (SOURCE_ONLY_ROOT_FILES.has(name)) return false;
   return !ROOT_EXCLUDES.has(name) && ROOT_FILE_EXTENSIONS.has(path.extname(name).toLowerCase());
 }
 
