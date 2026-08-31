@@ -1,3 +1,9 @@
+import {
+  PIRATE_ONBOARDING_COMPACT_CSS,
+  PIRATE_ONBOARDING_COMPACT_STYLE_ID,
+  PIRATE_ONBOARDING_STATE_MESSAGE,
+} from '../pirate-onboarding-overlay-v900.mjs?v=1';
+
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const query = new URLSearchParams(location.search);
@@ -26,6 +32,42 @@ const ACTION_SELECTORS = Object.freeze({
 let joystickActive = false;
 let cameraActive = false;
 let cameraPoint = { x: 0, y: 0 };
+let onboardingActive = null;
+let onboardingObserver = null;
+
+function installCompactOnboardingStyle() {
+  if (document.getElementById(PIRATE_ONBOARDING_COMPACT_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = PIRATE_ONBOARDING_COMPACT_STYLE_ID;
+  style.textContent = PIRATE_ONBOARDING_COMPACT_CSS;
+  document.head?.appendChild(style);
+}
+
+function syncOnboardingOverlay() {
+  const root = document.querySelector('.onboarding-root');
+  const style = root ? getComputedStyle(root) : null;
+  const active = Boolean(root && style?.display !== 'none' && style?.visibility !== 'hidden');
+  const hudMode = active ? 'pirate-onboarding-local' : 'pirate-primary-parent';
+  if (document.documentElement.dataset.pirateHud !== hudMode) {
+    document.documentElement.dataset.pirateHud = active ? 'pirate-onboarding-local' : 'pirate-primary-parent';
+  }
+  if (active) installCompactOnboardingStyle();
+  if (active === onboardingActive || !allowedParentOrigin) return;
+  onboardingActive = active;
+  window.parent.postMessage({ type: PIRATE_ONBOARDING_STATE_MESSAGE, active }, allowedParentOrigin);
+}
+
+function monitorOnboardingOverlay() {
+  onboardingObserver?.disconnect();
+  onboardingObserver = new MutationObserver(syncOnboardingOverlay);
+  onboardingObserver.observe(document.documentElement, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+    attributeFilter: ['class', 'style', 'data-pirate-hud'],
+  });
+  syncOnboardingOverlay();
+}
 
 function dispatchPointer(target, type, { pointerId, x = 0, y = 0 } = {}) {
   if (!target?.dispatchEvent) return false;
@@ -116,5 +158,16 @@ window.addEventListener('message', event => {
   else if (message.kind === 'reset') resetInputs();
 });
 
-window.addEventListener('pagehide', resetInputs);
+window.addEventListener('pagehide', () => {
+  resetInputs();
+  onboardingObserver?.disconnect();
+  if (allowedParentOrigin) {
+    window.parent.postMessage({ type: PIRATE_ONBOARDING_STATE_MESSAGE, active: false }, allowedParentOrigin);
+  }
+});
 document.documentElement.dataset.unifiedParentControls = 'active';
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', monitorOnboardingOverlay, { once: true });
+} else {
+  monitorOnboardingOverlay();
+}

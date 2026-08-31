@@ -78,6 +78,8 @@ body[data-combined-world="living-world"] .help{display:none!important}
 #pirateUnifiedControls #stick.tc-joybase.tc-visible{display:block}
 #pirateUnifiedControls .tc-joyknob{position:absolute;left:50%;top:50%;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.45);border:2px solid rgba(255,255,255,.7);box-shadow:none;transform:translate(-50%,-50%)}
 #pirateUnifiedControls #cameraPad.tc-camzone{display:block!important;position:absolute!important;z-index:1;right:0!important;top:0!important;width:55%!important;height:100%!important;pointer-events:auto;touch-action:none}
+#pirateUnifiedControls[data-pirate-onboarding="active"]{visibility:hidden;pointer-events:none!important}
+#pirateUnifiedControls[data-pirate-onboarding="active"] *{pointer-events:none!important}
 #pirateUnifiedControls .camera-hint{display:none}
 #pirateUnifiedControls .controls-right.tc-actions{display:block!important;position:absolute!important;z-index:3;inset:0!important;width:auto!important;height:auto!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;transform:none!important;pointer-events:none}
 #pirateUnifiedControls .tc-btn{position:absolute!important;display:flex;align-items:center;justify-content:center;border-radius:50%;pointer-events:auto;touch-action:none;color:#fff!important;background-color:rgba(10,25,45,.55)!important;border:2px solid rgba(255,255,255,.45)!important;box-shadow:0 2px 8px rgba(0,0,0,.35)!important;text-shadow:0 2px 4px #0009;overflow:hidden}

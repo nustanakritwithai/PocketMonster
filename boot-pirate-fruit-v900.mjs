@@ -1,6 +1,7 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=1';
+import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import { publishWorldState } from './world-presence-v800.mjs';
 import {
   PIRATE_PRESENCE_ZONE,
@@ -101,6 +102,13 @@ function bindPocketMonsterLink(frame) {
     if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
+    const onboarding = readPirateOnboardingState(message);
+    if (onboarding) {
+      const controls = document.getElementById('pirateUnifiedControls');
+      if (controls) controls.dataset.pirateOnboarding = onboarding.active ? 'active' : 'inactive';
+      if (onboarding.active) window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.('pirate-onboarding-active');
+      return;
+    }
     const nextPose = sanitizePirateLocalPresence(message);
     if (nextPose) {
       piratePose = nextPose;
