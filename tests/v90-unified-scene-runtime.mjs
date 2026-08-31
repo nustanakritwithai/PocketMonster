@@ -25,17 +25,17 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=913',
+    runtime: './boot-pirate-fruit-v900.mjs?v=914',
   }),
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=819',
+    runtime: './game-v800.js?v=820',
   }),
   Object.freeze({
     world: 'living-world',
     panel: 'human',
-    runtime: './world-living-v900.mjs?v=902',
+    runtime: './world-living-v900.mjs?v=903',
   }),
 ]);
 const worldRuntimePaths = new Set(worldCases.map(item => new URL(item.runtime, 'https://game.example/').pathname));
@@ -90,7 +90,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     webSocketConstructs: 0,
   };
   const sceneQuery = new URLSearchParams({ world, panel });
-  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '8');
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '9');
   const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
@@ -187,10 +187,12 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
   for (const id of ['chatToggleBtn', 'gameChat', 'accountGate', 'startupStatus']) {
     elements.set(id, makeElement(id, metrics));
   }
-  for (const id of ['joystick', 'stick', 'cameraPad', 'skill1Btn', 'skill2Btn', 'skill3Btn', 'skill4Btn', 'captureBtn', 'summonBtn', 'recallBtn']) {
+  for (const id of ['pirateUnifiedControls', 'joystick', 'stick', 'pirateJoyKnob', 'cameraPad', 'skill1Btn', 'skill2Btn', 'skill3Btn', 'skill4Btn', 'captureBtn', 'summonBtn', 'recallBtn', 'pirateBlockBtn', 'pirateWeaponBtn', 'piratePotion1Btn', 'piratePotion2Btn', 'pirateZoomInBtn', 'pirateZoomOutBtn']) {
     const target = new EventTarget();
     target.id = id;
     target.style = {};
+    target.dataset = {};
+    target.classList = makeClassList();
     target.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 });
     target.setPointerCapture = () => {};
     target.hasPointerCapture = () => false;
@@ -262,7 +264,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     metrics.timeline.push('fetch:template');
     assert.equal(url.origin, 'https://game.example');
     assert.equal(url.pathname, '/v900.html');
-    assert.equal(url.search, '?v=913');
+    assert.equal(url.search, '?v=914');
     assert.equal(options.cache, 'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     return {
@@ -468,7 +470,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
-  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '8', 'hosted route normalization preserves the exact scene lease URL');
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '9', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);

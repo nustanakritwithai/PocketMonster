@@ -89,9 +89,9 @@ assert.doesNotMatch(html, /id="pocketWorldWarpBtn"|data-combined-world=/, 'V9 wo
 assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=819');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=913');
-assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=902');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=820');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=914');
+assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=903');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
 assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit');
@@ -144,7 +144,7 @@ assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'V9 stylesheet defensively hides stale panel switchers');
-assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="parent-unified"/, 'iframe uses the parent unified control surface');
+assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="pirate-primary-parent"/, 'iframe uses the Pirate-primary parent control surface');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !important/, 'vendored touch HUD is not visible');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
 assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, false, 'V9 parent HTML is the only mobile control chrome');
@@ -157,7 +157,7 @@ assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, false, 'V9 parent HTML is the only mobil
     createElement() { return { id: '', textContent: '' }; },
   };
   assert.equal(syncPirateFruitControlHud({ contentDocument: doc }), true);
-  assert.equal(doc.documentElement.dataset.pirateHud, 'parent-unified');
+  assert.equal(doc.documentElement.dataset.pirateHud, 'pirate-primary-parent');
   assert.equal(headChildren[0].textContent.includes('pointer-events: none'), true);
 }
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
@@ -166,7 +166,7 @@ assert.match(cssV900, /#pirateFruitFrame\{position:absolute;inset:0/, 'offline P
 assert.match(cssV900, /throw"\] #pirateFruitFrame\{visibility:hidden/, 'throw panel hides the real Pirate Fruit frame');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] \.message/, 'human pirate panel hides leftover Pocket stage message chrome');
 assert.doesNotMatch(cssV900, /\.combined-world-warp|#worldSwitcher/, 'clickable world warp controls have no live CSS');
-assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] \.controls-right\{[\s\S]*background:none/, 'throw overlay keeps the circular action cluster, not a rectangular tray');
+assert.match(cssV900, /#pirateUnifiedControls \.controls-right\.tc-actions\{[^}]*background:none/, 'the shared Pirate control surface keeps a circular action cluster, not a rectangular tray');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
 assert.doesNotMatch(cssV900, /body\[data-combined-world\][^\n]*#controlPanelSwitcher\{display:flex/, 'V9 never reveals the removed panel switcher');
 
@@ -232,7 +232,7 @@ assert.match(boot, /remote: false/, 'pirate world is local, not a remote Pirate 
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
-assert.match(boot, /game-v800\.js\?v=819&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
+assert.match(boot, /game-v800\.js\?v=820&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
 assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes the top status bar');
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
@@ -259,7 +259,7 @@ assert.ok(
 );
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene is gone');
 assert.match(boot, /visual: 'pocket-asset-engine'/, 'pirate boot records Pocket presentation overlays');
-assert.match(boot, /ui: 'v900-parent-unified'/, 'pirate boot uses the persistent parent control HUD');
+assert.match(boot, /ui: 'pirate-fruit-parent-primary'/, 'pirate boot uses the Pirate Fruit parent control HUD');
 assert.match(boot, /syncPirateFruitControlHud/, 'pirate boot disables the iframe touch HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] #hud,/, 'parent HUD container stays mounted so its shared controls remain interactive');
 assert.equal(pirateSource.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
@@ -268,7 +268,7 @@ assert.equal(pirateSource.remote, false);
 assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
 assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
-assert.equal(pirateSource.pocketPresentation.ui, 'v900-parent-unified');
+assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-parent-primary');
 assert.equal(pirateSource.commit, 'fa71c41fa50edba67609d90ae2d5418455817c00');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');

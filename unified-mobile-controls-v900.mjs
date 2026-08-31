@@ -10,6 +10,18 @@ const ACTION_BUTTONS = Object.freeze({
   captureBtn: 'capture',
   summonBtn: 'summon',
   recallBtn: 'recall',
+  pirateBlockBtn: 'block',
+  pirateWeaponBtn: 'weapon',
+  piratePotion1Btn: 'potion1',
+  piratePotion2Btn: 'potion2',
+  pirateZoomInBtn: 'zoomIn',
+  pirateZoomOutBtn: 'zoomOut',
+});
+
+const CONTROL_MODES = Object.freeze({
+  'pirate-fruit': 'pirate',
+  'pocket-monster': 'capture',
+  'living-world': 'travel',
 });
 
 export function createUnifiedMobileControls({
@@ -18,36 +30,74 @@ export function createUnifiedMobileControls({
 } = {}) {
   const joystickElement = documentLike?.getElementById?.('joystick');
   const stickElement = documentLike?.getElementById?.('stick');
+  const joystickKnobElement = documentLike?.getElementById?.('pirateJoyKnob');
   const cameraElement = documentLike?.getElementById?.('cameraPad');
-  if (!joystickElement || !stickElement || !cameraElement) {
-    throw new Error('Unified mobile controls require #joystick, #stick, and #cameraPad');
+  const controlSurface = documentLike?.getElementById?.('pirateUnifiedControls');
+  if (!joystickElement || !stickElement || !joystickKnobElement || !cameraElement || !controlSurface) {
+    throw new Error('Pirate-primary mobile controls require the shared Pirate control surface');
   }
 
   const adapters = new Map();
   const actionPointers = new Map();
   let activeWorldId = null;
   let cameraPoint = null;
+  let joystickCenter = null;
 
   const activeAdapter = () => adapters.get(activeWorldId) || null;
 
-  const updateJoystick = event => {
+  const setControlMode = worldId => {
+    const mode = CONTROL_MODES[worldId] || 'travel';
+    controlSurface.dataset.controlMode = mode;
+    if (documentLike?.body?.dataset) documentLike.body.dataset.mobileControlMode = mode;
+    if (mode === 'pirate') {
+      for (const buttonId of Object.keys(ACTION_BUTTONS)) {
+        const button = documentLike.getElementById(buttonId);
+        if (!button) continue;
+        button.disabled = false;
+        button.removeAttribute?.('aria-disabled');
+        button.removeAttribute?.('data-state');
+        button.removeAttribute?.('data-sub');
+        button.classList?.remove?.('aiming', 'cooldown', 'on-cooldown', 'no-uses');
+        for (const property of ['backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat']) {
+          if (button.style) button.style[property] = '';
+        }
+      }
+    }
+    return mode;
+  };
+
+  const beginJoystick = event => {
     const rect = joystickElement.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const radius = Math.max(1, rect.width * .34);
-    let dx = event.clientX - centerX;
-    let dy = event.clientY - centerY;
+    joystickCenter = {
+      x: event.clientX,
+      y: event.clientY,
+      localX: event.clientX - rect.left,
+      localY: event.clientY - rect.top,
+    };
+    stickElement.style.left = `${joystickCenter.localX}px`;
+    stickElement.style.top = `${joystickCenter.localY}px`;
+    stickElement.classList?.add?.('tc-visible');
+    updateJoystick(event);
+  };
+
+  const updateJoystick = event => {
+    if (!joystickCenter) return;
+    const radius = 43;
+    let dx = event.clientX - joystickCenter.x;
+    let dy = event.clientY - joystickCenter.y;
     const magnitude = Math.hypot(dx, dy) || 1;
     if (magnitude > radius) {
       dx *= radius / magnitude;
       dy *= radius / magnitude;
     }
-    stickElement.style.transform = `translate(${dx}px,${dy}px)`;
+    joystickKnobElement.style.transform = `translate(-50%,-50%) translate(${dx}px,${dy}px)`;
     activeAdapter()?.move?.({ x: dx / radius, z: dy / radius, active: true });
   };
 
   const endJoystick = reason => {
-    stickElement.style.transform = 'translate(0,0)';
+    joystickCenter = null;
+    stickElement.classList?.remove?.('tc-visible');
+    joystickKnobElement.style.transform = 'translate(-50%,-50%)';
     activeAdapter()?.move?.({ x: 0, z: 0, active: false, reason });
   };
 
@@ -56,7 +106,7 @@ export function createUnifiedMobileControls({
     documentLike,
     joystickElement,
     cameraElement,
-    onJoystickStart: updateJoystick,
+    onJoystickStart: beginJoystick,
     onJoystickMove: updateJoystick,
     onJoystickEnd: endJoystick,
     onCameraStart: event => {
@@ -121,7 +171,9 @@ export function createUnifiedMobileControls({
     }
     actionPointers.clear();
     cameraPoint = null;
-    stickElement.style.transform = 'translate(0,0)';
+    joystickCenter = null;
+    stickElement.classList?.remove?.('tc-visible');
+    joystickKnobElement.style.transform = 'translate(-50%,-50%)';
     activeAdapter()?.reset?.(reason);
   };
 
@@ -136,17 +188,20 @@ export function createUnifiedMobileControls({
     activate(worldId) {
       if (typeof worldId !== 'string' || !worldId) return false;
       if (activeWorldId === worldId) {
+        setControlMode(worldId);
         activeAdapter()?.activate?.();
         return true;
       }
       reset('world-switch');
       activeWorldId = worldId;
+      setControlMode(worldId);
       activeAdapter()?.activate?.();
       return true;
     },
     reset,
     diagnostics: () => Object.freeze({
       activeWorldId,
+      controlMode: controlSurface.dataset.controlMode,
       adapters: Object.freeze([...adapters.keys()]),
       actionPointerCount: actionPointers.size,
       pointerInput: pointerInput.diagnostics(),
