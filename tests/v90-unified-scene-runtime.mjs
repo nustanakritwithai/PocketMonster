@@ -16,6 +16,8 @@ const actualSources = new Map([
   ['/scene-route-controller-v900.mjs', read('scene-route-controller-v900.mjs')],
   ['/online-world-bridge-v900.mjs', read('online-world-bridge-v900.mjs')],
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
+  ['/unified-mobile-controls-v900.mjs', read('unified-mobile-controls-v900.mjs')],
+  ['/mobile-dual-pointer-input-v900.mjs', read('mobile-dual-pointer-input-v900.mjs')],
 ]);
 const realTemplateText = read('v900.html');
 
@@ -23,12 +25,12 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=912',
+    runtime: './boot-pirate-fruit-v900.mjs?v=913',
   }),
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=818',
+    runtime: './game-v800.js?v=819',
   }),
   Object.freeze({
     world: 'living-world',
@@ -88,7 +90,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     webSocketConstructs: 0,
   };
   const sceneQuery = new URLSearchParams({ world, panel });
-  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '7');
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '8');
   const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
@@ -185,6 +187,16 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
   for (const id of ['chatToggleBtn', 'gameChat', 'accountGate', 'startupStatus']) {
     elements.set(id, makeElement(id, metrics));
   }
+  for (const id of ['joystick', 'stick', 'cameraPad', 'skill1Btn', 'skill2Btn', 'skill3Btn', 'skill4Btn', 'captureBtn', 'summonBtn', 'recallBtn']) {
+    const target = new EventTarget();
+    target.id = id;
+    target.style = {};
+    target.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 });
+    target.setPointerCapture = () => {};
+    target.hasPointerCapture = () => false;
+    target.releasePointerCapture = () => {};
+    elements.set(id, target);
+  }
   const body = {
     dataset: {},
     children: [],
@@ -198,8 +210,12 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     makeElement('scene-root', metrics, 'MAIN'),
     makeElement('scene-overlay', metrics, 'ASIDE'),
   ];
+  const documentEvents = new EventTarget();
   const document = {
     body,
+    visibilityState: 'visible',
+    addEventListener: documentEvents.addEventListener.bind(documentEvents),
+    removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
     getElementById(id) { return elements.get(id) || null; },
     importNode(node, deep) {
       assert.equal(deep, true);
@@ -246,7 +262,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     metrics.timeline.push('fetch:template');
     assert.equal(url.origin, 'https://game.example');
     assert.equal(url.pathname, '/v900.html');
-    assert.equal(url.search, '?v=912');
+    assert.equal(url.search, '?v=913');
     assert.equal(options.cache, 'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     return {
@@ -452,7 +468,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
-  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '7', 'hosted route normalization preserves the exact scene lease URL');
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '8', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);
