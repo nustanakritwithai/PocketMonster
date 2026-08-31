@@ -28,11 +28,16 @@ const ACTION_SELECTORS = Object.freeze({
   zoomIn: '.tc-zoom-in',
   zoomOut: '.tc-zoom-out',
 });
+const ONBOARDING_ACTION_SELECTORS = Object.freeze({
+  prev: '.onboarding-prev',
+  pause: '.onboarding-pause',
+  next: '.onboarding-next',
+});
 
 let joystickActive = false;
 let cameraActive = false;
 let cameraPoint = { x: 0, y: 0 };
-let onboardingActive = null;
+let onboardingStateSignature = null;
 let onboardingObserver = null;
 
 function installCompactOnboardingStyle() {
@@ -47,14 +52,22 @@ function syncOnboardingOverlay() {
   const root = document.querySelector('.onboarding-root');
   const style = root ? getComputedStyle(root) : null;
   const active = Boolean(root && style?.display !== 'none' && style?.visibility !== 'hidden');
-  const hudMode = active ? 'pirate-onboarding-local' : 'pirate-primary-parent';
-  if (document.documentElement.dataset.pirateHud !== hudMode) {
-    document.documentElement.dataset.pirateHud = active ? 'pirate-onboarding-local' : 'pirate-primary-parent';
-  }
   if (active) installCompactOnboardingStyle();
-  if (active === onboardingActive || !allowedParentOrigin) return;
-  onboardingActive = active;
-  window.parent.postMessage({ type: PIRATE_ONBOARDING_STATE_MESSAGE, active }, allowedParentOrigin);
+  const actions = {};
+  if (active) {
+    for (const [action, selector] of Object.entries(ONBOARDING_ACTION_SELECTORS)) {
+      const element = document.querySelector(selector);
+      const rect = element?.getBoundingClientRect?.();
+      if (rect?.width > 0 && rect?.height > 0) {
+        actions[action] = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      }
+    }
+  }
+  const state = { type: PIRATE_ONBOARDING_STATE_MESSAGE, active, actions };
+  const signature = JSON.stringify(state);
+  if (signature === onboardingStateSignature || !allowedParentOrigin) return;
+  onboardingStateSignature = signature;
+  window.parent.postMessage(state, allowedParentOrigin);
 }
 
 function monitorOnboardingOverlay() {
@@ -64,7 +77,7 @@ function monitorOnboardingOverlay() {
     attributes: true,
     childList: true,
     subtree: true,
-    attributeFilter: ['class', 'style', 'data-pirate-hud'],
+    attributeFilter: ['class', 'style'],
   });
   syncOnboardingOverlay();
 }
@@ -152,7 +165,9 @@ window.addEventListener('message', event => {
   if (window.parent === window || event.source !== window.parent || event.origin !== allowedParentOrigin) return;
   const message = event.data;
   if (message?.type !== PIRATE_UNIFIED_INPUT_MESSAGE) return;
-  if (message.kind === 'move' && Number.isFinite(message.x) && Number.isFinite(message.z)) handleMove(message);
+  if (message.kind === 'onboarding-action' && ONBOARDING_ACTION_SELECTORS[message.action]) {
+    document.querySelector(ONBOARDING_ACTION_SELECTORS[message.action])?.click();
+  } else if (message.kind === 'move' && Number.isFinite(message.x) && Number.isFinite(message.z)) handleMove(message);
   else if (message.kind === 'camera' && ['start', 'move', 'end'].includes(message.phase)) handleCamera(message);
   else if (message.kind === 'action' && ACTION_SELECTORS[message.action]) handleAction(message);
   else if (message.kind === 'reset') resetInputs();
