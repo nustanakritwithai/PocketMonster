@@ -20,9 +20,9 @@ assert.equal(syntax.status, 0, syntax.stderr || `${mapFile} syntax failed`);
 
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
-const offlineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
-const bundleRef = offlineHtml.match(/src="\.\/(assets\/index-[^"]+\.js)"/)?.[1];
-assert.ok(bundleRef, 'offline entry declares the current Pirate Fruit bundle');
+const bootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
+const bundleRef = bootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
+assert.ok(bundleRef, 'offline save bootstrap declares the current Pirate Fruit bundle');
 const bundle = fs.readFileSync(new URL(`../pirate-fruit-offline/${bundleRef}`, import.meta.url), 'utf8');
 
 assert.equal(pirateSource.islandMap.sourceCommit, PIRATE_FRUIT_MAP_SOURCE_COMMIT);

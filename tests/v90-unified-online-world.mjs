@@ -30,6 +30,7 @@ const indexHtml = read('index.html');
 const v900Html = read('v900.html');
 const runtimeConfig = JSON.parse(read('runtime-config.json'));
 const pirateOfflineHtml = read('pirate-fruit-offline/index.html');
+const pirateBootstrap = read('pirate-fruit-offline/pocket-bootstrap.mjs');
 
 for (const file of [
   'entry-preload-v900.mjs',
@@ -47,7 +48,7 @@ for (const file of [
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=922/, 'active HTML cache-busts the persistent-shell entry');
 assert.match(indexHtml, /style-v900\.css\?v=912/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=12'\)/, 'top-level authenticates once before starting the shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=13'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -55,7 +56,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=12')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=13')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -86,7 +87,8 @@ assert.match(shell, /POCKETMONSTER_WORLD_PRESENCE = payload => presenceBridge\.a
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_LAUNCH_SESSION/, 'hosted scenes reuse the parent session object without redeeming it');
 assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=1/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=1[\s\S]*index-C3SJLfq8\.js/, 'Pirate iframe installs the bridge before its vendored runtime');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=1[\s\S]*pocket-bootstrap\.mjs\?v=1/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-C3SJLfq8\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
 assert.match(sceneEntry, /__POCKETMONSTER_RUNTIME_MANIFEST__ = config/, 'legacy scene runtimes receive the same normalized configuration');
