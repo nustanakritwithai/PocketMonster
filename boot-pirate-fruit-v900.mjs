@@ -9,8 +9,8 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=909', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=819&animalControl=pirate-fruit';
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=910', import.meta.url).href;
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=820&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const startup = document.getElementById('startupStatus');
@@ -25,7 +25,7 @@ export function ensurePocketAnimalControl() {
     return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
   }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=819&animalControl=pirate-fruit').then(() => {
+    throwRuntimePromise = import('./game-v800.js?v=820&animalControl=pirate-fruit').then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
@@ -121,7 +121,7 @@ if (typeof window !== 'undefined') {
   window.POCKETMONSTER_PIRATE_FRUIT = Object.freeze({
     source: 'pirate-fruit-offline',
     visual: 'pocket-asset-engine',
-    ui: 'v900-parent-unified',
+    ui: 'pirate-fruit-parent-primary',
     entry: PIRATE_FRUIT_OFFLINE_ENTRY,
     remote: false,
     mergedWithV800: false,

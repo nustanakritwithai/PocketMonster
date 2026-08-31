@@ -252,49 +252,24 @@ if (typeof window !== 'undefined') {
 
 let cameraYaw = 0.05;
 let cameraPitch = 0.42;
-const camDrag = { active: false, pid: null, x: 0, y: 0 };
-const cameraPad = el('cameraPad');
-if (cameraPad) {
-  cameraPad.addEventListener('pointerdown', e => {
-    camDrag.active = true; camDrag.pid = e.pointerId; camDrag.x = e.clientX; camDrag.y = e.clientY;
-    cameraPad.setPointerCapture?.(e.pointerId);
-  });
-  cameraPad.addEventListener('pointermove', e => {
-    if (!camDrag.active || e.pointerId !== camDrag.pid) return;
-    const dx = e.clientX - camDrag.x, dy = e.clientY - camDrag.y;
-    camDrag.x = e.clientX; camDrag.y = e.clientY;
-    cameraYaw -= dx * .006;
-    cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * .004, .20, .84);
-  });
-  function endCam(e) { if (e.pointerId !== camDrag.pid) return; camDrag.active = false; camDrag.pid = null; }
-  cameraPad.addEventListener('pointerup', endCam);
-  cameraPad.addEventListener('pointercancel', endCam);
-}
 
 const keys = {};
 addEventListener('keydown', e => { keys[e.code] = true; });
 addEventListener('keyup', e => { keys[e.code] = false; });
-const joy = { x: 0, y: 0, active: false, pid: null };
-const joyEl = el('joystick');
-const stick = el('stick');
-if (joyEl && stick) {
-  function joyPoint(e) {
-    const r = joyEl.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    let dx = e.clientX - cx, dy = e.clientY - cy;
-    const max = r.width * .34, mag = Math.hypot(dx, dy) || 1;
-    if (mag > max) { dx *= max / mag; dy *= max / mag; }
-    joy.x = dx / max; joy.y = dy / max;
-    stick.style.transform = `translate(${dx}px,${dy}px)`;
-  }
-  joyEl.addEventListener('pointerdown', e => { joy.active = true; joy.pid = e.pointerId; joyEl.setPointerCapture(e.pointerId); joyPoint(e); });
-  joyEl.addEventListener('pointermove', e => { if (joy.active && e.pointerId === joy.pid) joyPoint(e); });
-  function joyEnd(e) {
-    if (e.pointerId !== joy.pid) return;
-    joy.active = false; joy.x = joy.y = 0; stick.style.transform = 'translate(0,0)';
-  }
-  joyEl.addEventListener('pointerup', joyEnd);
-  joyEl.addEventListener('pointercancel', joyEnd);
-}
+const joy = { x: 0, y: 0 };
+const unifiedMobileControls = window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
+if (!unifiedMobileControls) throw new Error('V9 living world: Pirate-primary mobile controls not found');
+unifiedMobileControls.registerAdapter(LIVING_WORLD_ID, Object.freeze({
+  interceptActions: true,
+  move: ({ x = 0, z = 0, active = false }) => { joy.x = active ? x : 0; joy.y = active ? z : 0; },
+  camera: ({ phase, dx = 0, dy = 0 }) => {
+    if (phase !== 'move') return;
+    cameraYaw -= dx * .006;
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * .004, .20, .84);
+  },
+  reset: () => { joy.x = 0; joy.y = 0; },
+  activate: () => { joy.x = 0; joy.y = 0; },
+}));
 
 function forward() { return new THREE.Vector3(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw)).normalize(); }
 function cameraRight() { const f = forward(); return new THREE.Vector3(-f.z, 0, f.x).normalize(); }

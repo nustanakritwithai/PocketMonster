@@ -15,6 +15,12 @@ const ACTION_SELECTORS = Object.freeze({
   capture: '.tc-attack',
   summon: '.tc-dash',
   recall: '.tc-jump',
+  block: '.tc-block',
+  weapon: '.tc-weapon',
+  potion1: '.tc-potion1',
+  potion2: '.tc-potion2',
+  zoomIn: '.tc-zoom-in',
+  zoomOut: '.tc-zoom-out',
 });
 
 let joystickActive = false;
