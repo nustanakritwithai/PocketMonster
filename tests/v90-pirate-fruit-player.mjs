@@ -74,7 +74,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=815/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=11/, 'V9 preload boots the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=12/, 'V9 preload boots the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -89,8 +89,8 @@ assert.doesNotMatch(html, /id="pocketWorldWarpBtn"|data-combined-world=/, 'V9 wo
 assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=820');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=914');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=821');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=915');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=903');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -116,7 +116,7 @@ assert.match(worldsJs, /preparePocketRuntime\(worldById\('pocket-monster'\)\)/, 
 assert.match(worldsJs, /await preparePocketRuntime\(world\);[\s\S]*applyControlPanel\(panelId, world\.id\)/, 'Pocket scene and controls switch atomically only after its runtime is ready');
 assert.match(worldsJs, /POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget[\s\S]*savedWorldGameNodes\.set\(world\.id, \[\.\.\.mountTarget\.childNodes\]\)/, 'Pocket prewarm builds its canvas off-DOM for an instant mount');
 assert.match(liveJs, /POCKETMONSTER_SCENE_MOUNT_TARGET[\s\S]*sceneRuntimeActive=!sceneRuntimePrewarming/, 'Pocket prewarm remains inactive until scene mount');
-assert.match(liveJs, /mobileDualPointerInput\?\.reset\?\.\(reason\);[\s\S]*joyEnd\(\);[\s\S]*endCam\(\);[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms both control surfaces after every scene mount');
+assert.match(liveJs, /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*joyEnd\(\);[\s\S]*endCam\(\);[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms the shared control surface after every scene mount');
 assert.match(boot, /pirateFrame\.contentWindow\?\.focus\?\.\(\)/, 'Pirate lifecycle restores iframe focus after returning without a document reload');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
@@ -232,7 +232,7 @@ assert.match(boot, /remote: false/, 'pirate world is local, not a remote Pirate 
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
-assert.match(boot, /game-v800\.js\?v=820&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
+assert.match(boot, /game-v800\.js\?v=821&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
 assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes the top status bar');
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
