@@ -11,9 +11,9 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-  <script type="module" src="./entry-preload-v900.mjs?v=923"></script>
+  <script type="module" src="./entry-preload-v900.mjs?v=924"></script>
   <link rel="stylesheet" href="./style-v800.css?v=813" />
-  <link rel="stylesheet" href="./style-v900.css?v=912" />
+  <link rel="stylesheet" href="./style-v900.css?v=913" />
 </head>
 <body>
   <div id="accountGate" class="account-gate">
@@ -159,6 +159,7 @@
       </div>
       <div id="cameraPad" class="camera-pad tc-camzone" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
       <div class="controls-right tc-actions">
+        <button id="persistentFullscreenBtn" class="action tc-btn tc-fullscreen" data-pirate-icon="⛶" aria-label="เปิดเต็มจอ"></button>
         <button id="skill1Btn" class="action skill skill1 tc-btn tc-skill tc-skill1" data-pirate-icon="1" aria-label="สกิล Pirate 1"></button>
         <button id="skill2Btn" class="action skill skill2 tc-btn tc-skill tc-skill2" data-pirate-icon="2" aria-label="สกิล Pirate 2"></button>
         <button id="skill3Btn" class="action skill skill3 tc-btn tc-skill tc-skill3" data-pirate-icon="3" aria-label="สกิล Pirate 3"></button>

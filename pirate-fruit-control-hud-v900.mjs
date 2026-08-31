@@ -10,6 +10,10 @@ html[data-pirate-hud="pirate-primary-parent"] .hud-help {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+html[data-pirate-hud="pirate-primary-parent"] .fullscreen-prompt-root {
+  display: none !important;
+  pointer-events: none !important;
+}
 `;
 
 export function syncPirateFruitControlHud(frame = globalThis.document?.getElementById('pirateFruitFrame')) {
