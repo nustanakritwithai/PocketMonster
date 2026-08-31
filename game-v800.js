@@ -106,7 +106,8 @@ if (typeof window !== 'undefined') window.MLRPG_BALANCE = MLRPG_BALANCE;
 console.info(`Monster Life RPG V8.4.0 • PocketMonster latest progression live loop v${BALANCE_SCHEMA_VERSION} loaded`);
 
 const startup = document.getElementById('startupStatus');
-function startupText(text, cls=''){ if(startup){ startup.textContent=text; startup.className='startup-status '+cls; } }
+const sceneRuntimePrewarming=window.POCKETMONSTER_SCENE_PREWARM===true;
+function startupText(text, cls=''){ if(startup&&!sceneRuntimePrewarming){ startup.textContent=text; startup.className='startup-status '+cls; } }
 
 async function loadThree(){
   const urls=[
@@ -250,7 +251,7 @@ const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl'
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
-function gameMount(){return (pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
+function gameMount(){return window.POCKETMONSTER_SCENE_MOUNT_TARGET||(pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
 const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
 const rand=a=>a[Math.floor(Math.random()*a.length)];
 const nowMs=()=>Date.now();
@@ -798,7 +799,9 @@ function updatePirateFruitReturnPortal(dt){
   pirateFruitReturnPortal.light.intensity=1.7+pulse*1.1;
   if(pirateFruitReturnPortalBusy||distXZ(player.position,pirateFruitReturnPortal.group.position)>2.25)return;
   pirateFruitReturnPortalBusy=true;
-  location.assign(`${location.pathname}?world=pirate-fruit&panel=human`);
+  window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {
+    detail: { type: 'pocketmonster:world-warp-v1', world: 'pirate-fruit', panel: 'human', source: 'pocket-monster-ranch-portal' },
+  }));
 }
 const incubator=new THREE.Group();
 const baseInc=new THREE.Mesh(boxGeometry(.9,.35,.9),new THREE.MeshStandardMaterial({color:0x6d28d9,metalness:.2,roughness:.6})); baseInc.position.y=.18; baseInc.castShadow=true; baseInc.receiveShadow=true; incubator.add(baseInc);
@@ -3112,6 +3115,21 @@ function renderEquipment(targetPanel=null){
   panel.querySelectorAll('[data-equip]').forEach(b=>b.onclick=()=>{toggleStarterEquip(inst.instanceId,b.dataset.equip);renderEquipment();});
 }
 let immersiveStarted=true;
+let sceneRuntimeActive=!sceneRuntimePrewarming;
+function setSceneRuntimeActive(active,reason=active?'scene-mount':'scene-unmount'){
+  sceneRuntimeActive=active===true;
+  mobileDualPointerInput?.reset?.(reason);
+  joyEnd();
+  endCam();
+  for(const code of Object.keys(keys))keys[code]=false;
+  if(sceneRuntimeActive){
+    requestAnimationFrame(()=>{
+      try{window.focus();}catch{}
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+  return sceneRuntimeActive;
+}
 function startGameInteraction(){
   immersiveStarted=true;
   const gate=el('immersiveGate');
@@ -3139,10 +3157,15 @@ function requestImmersiveMode(e){
 function syncOrientationLock(){
   const portrait=window.innerHeight>window.innerWidth;
   const gate=el('immersiveGate'), rotate=el('rotateNotice');
+  // The authenticated online shell owns fullscreen/orientation across scene
+  // swaps.  An embedded child must never re-open the standalone rotate gate
+  // after a warp, otherwise the old scene's enforcement UI can remain visible
+  // while the new scene is already interactive.
+  const embeddedOnlineScene=window.POCKETMONSTER_SCENE_EMBEDDED===true;
   // V7.0.2: startup overlays must never block gameplay.
   if(gate){ gate.classList.add('hidden'); gate.style.display='none'; gate.style.pointerEvents='none'; }
   if(rotate){
-    rotate.classList.toggle('hidden',!portrait);
+    rotate.classList.toggle('hidden',embeddedOnlineScene||!portrait);
     rotate.style.pointerEvents='none';
   }
 }
@@ -3847,25 +3870,22 @@ function clearBossChallengeCombatEffects(){clearSkillFields();clearSkillSwarms()
 // ---------- Camera / input ----------
 let cameraYaw=0,cameraPitch=.48;
 cameraPitch=.28;
-const cameraPad=el('cameraPad');
-let camDrag={active:false,pid:null,x:0,y:0};
-cameraPad.addEventListener('pointerdown',e=>{camDrag.active=true;camDrag.pid=e.pointerId;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraPad.setPointerCapture?.(e.pointerId);});
-cameraPad.addEventListener('pointermove',e=>{if(!camDrag.active||e.pointerId!==camDrag.pid)return;const dx=e.clientX-camDrag.x,dy=e.clientY-camDrag.y;camDrag.x=e.clientX;camDrag.y=e.clientY;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);});
-function endCam(e){if(e.pointerId!==camDrag.pid)return;camDrag.active=false;camDrag.pid=null;}
-cameraPad.addEventListener('pointerup',endCam);
-cameraPad.addEventListener('pointercancel',endCam);
 const keys={};
 addEventListener('pointerdown',()=>initAudio(),{once:true});
 addEventListener('keydown',()=>initAudio(),{once:true});
 addEventListener('keydown',e=>{if(pirateThrowPanelPaused())return;keys[e.code]=true;if(e.repeat)return;if(e.code==='KeyJ')useSkill(0);if(e.code==='KeyK')useSkill(1);if(e.code==='KeyL')useSkill(2);if(e.code==='KeyC')captureThrow();if(e.code==='KeyR')summonThrow();if(e.code==='KeyT')recall();if(['Digit1','Digit2','Digit3'].includes(e.code)){switchPartySlot(Number(e.code.at(-1))-1);}});
 addEventListener('keyup',e=>keys[e.code]=false);
-const joy={x:0,y:0,active:false,pid:null};
-const joyEl=el('joystick'); if(!joyEl) throw new Error('V8.4.0 boot: #joystick not found');
-const stick=el('stick'); if(!stick) throw new Error('V8.4.0 boot: #stick not found');
-
-function joyPoint(e){const r=joyEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.34,mag=Math.hypot(dx,dy)||1;if(mag>max){dx*=max/mag;dy*=max/mag;}joy.x=dx/max;joy.y=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
-joyEl.addEventListener('pointerdown',e=>{joy.active=true;joy.pid=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyPoint(e);});joyEl.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.pid)joyPoint(e);});
-function joyEnd(e){if(e.pointerId!==joy.pid)return;joy.active=false;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}joyEl.addEventListener('pointerup',joyEnd);joyEl.addEventListener('pointercancel',joyEnd);
+const joy={x:0,y:0};
+const unifiedMobileControls=window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
+if(!unifiedMobileControls)throw new Error('V9 boot: unified mobile controls not found');
+unifiedMobileControls.registerAdapter('pocket-monster',Object.freeze({
+  interceptActions:false,
+  move:({x=0,z=0,active=false})=>{joy.x=active?x:0;joy.y=active?z:0;},
+  camera:({phase,dx=0,dy=0})=>{if(phase!=='move')return;cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,.12,.55);},
+  reset:()=>{joy.x=0;joy.y=0;},
+  activate:()=>{joy.x=0;joy.y=0;renderHUD();},
+}));
+window.POCKETMONSTER_MOBILE_INPUT=unifiedMobileControls;
 function forward(){return new THREE.Vector3(-Math.sin(cameraYaw),0,-Math.cos(cameraYaw)).normalize();}
 function cameraRight(){const f=forward();return new THREE.Vector3(-f.z,0,f.x).normalize();}
 function worldToScreen(pos,output=null,vectorScratch=null){
@@ -7322,6 +7342,7 @@ void syncCloudSave();
 let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 const wildFrameSnapshot=[];
 function loop(now){
+  if(!sceneRuntimeActive){requestAnimationFrame(loop);return;}
   try{
     const frameMs=now-last;
     const dt=Math.min(.033,frameMs/1000);
@@ -7417,6 +7438,7 @@ function loop(now){
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 if(typeof window!=='undefined'){
+  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>setSceneRuntimeActive(false),diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',

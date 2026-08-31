@@ -19,7 +19,25 @@ const SERVER_ONLY_ROOT_PREFIXES = Object.freeze([
   'combat-v91-server-',
 ]);
 const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/', 'pirate-fruit-offline/'];
-const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs', 'chat-runtime.mjs'];
+const DEPENDENCY_EXTENSIONS = new Set([
+  '.bin', '.css', '.gif', '.glb', '.gltf', '.html', '.ico', '.jpeg', '.jpg', '.js', '.json',
+  '.mjs', '.mp3', '.ogg', '.png', '.svg', '.wasm', '.wav', '.webmanifest', '.webp', '.woff', '.woff2',
+]);
+const TEXT_DEPENDENCY_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.mjs']);
+export const REQUIRED_V9_ENTRY_FILES = Object.freeze(['index.html', 'v900.html', 'scene-v900.html']);
+const REQUIRED_BOOTSTRAP_FILES = [
+  ...REQUIRED_V9_ENTRY_FILES,
+  'entry-preload.mjs',
+  'entry-preload-v900.mjs',
+  'launch-bootstrap.mjs',
+  'runtime-config.mjs',
+  'startup-errors.mjs',
+  'chat-runtime.mjs',
+  'online-world-bridge-v900.mjs',
+  'online-world-shell-v900.mjs',
+  'scene-entry-v900.mjs',
+  'worlds-v900.mjs',
+];
 
 function normalize(relative) {
   return relative.replaceAll('\\', '/');
@@ -43,13 +61,125 @@ function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+function cleanLocalReference(value) {
+  if (typeof value !== 'string') return null;
+  let reference = value.trim();
+  if (!reference || reference.startsWith('#') || reference.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(reference)) return null;
+  reference = reference.split(/[?#]/, 1)[0];
+  if (!reference || reference.endsWith('/')) return null;
+  try { reference = decodeURIComponent(reference); } catch { /* keep the literal path */ }
+  return DEPENDENCY_EXTENSIONS.has(path.posix.extname(normalize(reference)).toLowerCase()) ? normalize(reference) : null;
+}
+
+function addMatches(source, expression, references, valueIndex = 2) {
+  for (const match of source.matchAll(expression)) {
+    const reference = cleanLocalReference(match[valueIndex]);
+    if (reference) references.add(reference);
+  }
+}
+
+function collectJsonStrings(value, references) {
+  if (typeof value === 'string') {
+    const reference = cleanLocalReference(value);
+    if (reference) references.add(reference);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectJsonStrings(item, references);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectJsonStrings(item, references);
+  }
+}
+
+export function extractPublicDependencyReferences(relative, source) {
+  const extension = path.posix.extname(normalize(relative)).toLowerCase();
+  const references = new Set();
+  if (extension === '.html') {
+    addMatches(source, /\b(?:href|src)\s*=\s*(["'])(.*?)\1/gis, references);
+  } else if (extension === '.css') {
+    addMatches(source, /@import\s+(?:url\(\s*)?(["'])(.*?)\1\s*\)?/gis, references);
+    for (const match of source.matchAll(/\burl\(\s*(?:(["'])(.*?)\1|([^)'"\s][^)]*))\s*\)/gis)) {
+      const reference = cleanLocalReference(match[2] || match[3]);
+      if (reference) references.add(reference);
+    }
+  } else if (extension === '.js' || extension === '.mjs') {
+    addMatches(source, /\bimport\s*\(\s*(["'])(.*?)\1\s*\)/gis, references);
+    addMatches(source, /\b(?:import|export)\s+(?:[^;'"()]*?\bfrom\s*)?(["'])(.*?)\1/gis, references);
+    addMatches(source, /\bnew\s+URL\s*\(\s*(["'])(.*?)\1\s*,\s*import\.meta\.url\s*\)/gis, references);
+    // Vite chunk maps and runtime catalogs keep browser-loaded filenames in string literals.
+    addMatches(source, /(["'])((?:\.{1,2}\/|\/)[^'"\\\r\n]+)\1/g, references);
+  } else if (extension === '.json') {
+    let json;
+    try { json = JSON.parse(source); } catch (error) {
+      throw new Error(`Invalid public JSON dependency ${relative}: ${error.message}`);
+    }
+    collectJsonStrings(json, references);
+  }
+  return references;
+}
+
+function insideRoot(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+function resolvePublicDependency(root, importer, reference) {
+  const rootPath = path.resolve(root);
+  const importerDirectory = path.posix.dirname(normalize(importer));
+  const candidates = [];
+  if (reference.startsWith('/')) {
+    candidates.push(reference.slice(1));
+  } else {
+    candidates.push(path.posix.normalize(path.posix.join(importerDirectory, reference)));
+    if (!reference.startsWith('../')) candidates.push(reference.replace(/^\.\//, ''));
+  }
+
+  for (const candidate of new Set(candidates)) {
+    const absolute = path.resolve(rootPath, ...normalize(candidate).split('/'));
+    if (!insideRoot(rootPath, absolute)) throw new Error(`Public dependency escapes the repository: ${reference} from ${importer}`);
+    if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) return normalize(path.relative(rootPath, absolute));
+  }
+  throw new Error(`Missing public dependency ${reference} referenced by ${importer}`);
+}
+
+export function collectPublicDependencyClosure(root = process.cwd(), entryFiles = REQUIRED_V9_ENTRY_FILES) {
+  const rootPath = path.resolve(root);
+  const queue = [...entryFiles].map(normalize);
+  const closure = new Set();
+  while (queue.length > 0) {
+    const relative = queue.shift();
+    if (closure.has(relative)) continue;
+    const absolute = path.resolve(rootPath, ...relative.split('/'));
+    if (!insideRoot(rootPath, absolute) || !fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
+      throw new Error(`Required V9 entry or dependency is missing: ${relative}`);
+    }
+    if (!isPublicGameFile(relative)) throw new Error(`V9 entry depends on a non-public file: ${relative}`);
+    closure.add(relative);
+    const extension = path.posix.extname(relative).toLowerCase();
+    if (!TEXT_DEPENDENCY_EXTENSIONS.has(extension)) continue;
+    const source = fs.readFileSync(absolute, 'utf8');
+    for (const reference of extractPublicDependencyReferences(relative, source)) {
+      const dependency = resolvePublicDependency(rootPath, relative, reference);
+      if (!closure.has(dependency)) queue.push(dependency);
+    }
+  }
+  return new Set([...closure].sort());
+}
+
 export function buildGitHubPages({ root = process.cwd(), output = path.join(root, 'dist-pages'), writeRootManifest = false } = {}) {
+  const dependencyClosure = collectPublicDependencyClosure(root);
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });
   for (const relative of REQUIRED_BOOTSTRAP_FILES) {
     if (!fs.existsSync(path.join(root, relative))) throw new Error(`Required bootstrap file is missing: ${relative}`);
   }
-  const files = [...new Set([...trackedFiles(root).filter(isPublicGameFile), ...REQUIRED_BOOTSTRAP_FILES])].sort();
+  const files = [...new Set([
+    ...trackedFiles(root).filter(isPublicGameFile),
+    ...REQUIRED_BOOTSTRAP_FILES,
+    ...dependencyClosure,
+  ])].sort();
   for (const relative of files) {
     const source = path.join(root, relative);
     const destination = path.join(output, relative);

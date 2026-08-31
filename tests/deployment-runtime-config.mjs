@@ -26,6 +26,8 @@ assert.throws(() => createAuthProfilePreviewConfig('https://157.85.96.139', { pr
 const checkedInConfig = JSON.parse(fs.readFileSync('runtime-config.json', 'utf8'));
 assert.equal(checkedInConfig.firebase?.projectId, 'pocketmonster-game');
 assert.equal(checkedInConfig.firebase?.authDomain, 'pocketmonster-game.firebaseapp.com');
+assert.equal(checkedInConfig.healthPath, '/api/health');
+assert.equal(checkedInConfig.versionPath, '/api/version');
 
 const ticketConfig = createReadOnlyRuntimeConfig('https://157.85.96.139', { launchTicket: true });
 assert.equal(ticketConfig.featureFlags.launchTicket, true);

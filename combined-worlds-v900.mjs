@@ -1,5 +1,5 @@
 /** V9 combined channel: 3 worlds. Control panels (human/throw) live in control-panels-v900.mjs. */
-export const COMBINED_VERSION = '9.0.0-combined';
+export const COMBINED_VERSION = '9.0.1-unified-online-shell';
 export const COMBINED_WORLD_COUNT = 3;
 export const DEFAULT_COMBINED_WORLD = 'pirate-fruit';
 
@@ -40,14 +40,14 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'เกมเดิม',
     title: 'Pocket Monster',
     detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
-    runtime: './game-v800.js?v=815',
+    runtime: './game-v800.js?v=819',
   }),
   Object.freeze({
     id: 'pirate-fruit',
     label: 'Pirate Fruit',
     title: 'Pirate Fruit',
-    detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • วาปเชื่อมเข้าเกมเดิม',
-    runtime: './boot-pirate-fruit-v900.mjs?v=909',
+    detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • Pocket วาดภาพทับ • วาปเชื่อมเข้าเกมเดิม',
+    runtime: './boot-pirate-fruit-v900.mjs?v=913',
   }),
   Object.freeze({
     id: 'living-world',

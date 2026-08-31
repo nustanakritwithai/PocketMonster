@@ -11,8 +11,8 @@
 .world-gate-btn small{color:#94a3b8;font-size:12px;line-height:1.35}
 #pirateFruitFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#06121f}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #pirateFruitFrame{visibility:hidden;pointer-events:none}
-body[data-combined-world="pirate-fruit"][data-control-panel="human"] #joystick,
-body[data-combined-world="pirate-fruit"][data-control-panel="human"] #cameraPad{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #controlPanelHint{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateFruitFrame{z-index:5}
 #controlPanelSwitcher{display:none!important}
 .control-panel-hint{position:fixed;left:8px;top:72px;z-index:9998;max-width:70vw;padding:4px 8px;border-radius:8px;background:#0f172acc;color:#cbd5e1;font:600 11px system-ui;pointer-events:none}
 body[data-combined-world] .control-panel-hint{display:block}
@@ -22,6 +22,12 @@ body[data-combined-world] .zone-travel{display:none!important}
 body[data-combined-world] .message{top:58px}
 #monsterThrowStage{position:fixed;inset:0;z-index:0;display:none;background:#0b1020}
 #monsterThrowStage canvas{display:block;width:100%;height:100%}
+html[data-online-world-shell="active"],html[data-online-world-shell="active"] body{width:100%;height:100%;margin:0;overflow:hidden;background:#020617}
+#onlineWorldShell{position:fixed;inset:0;overflow:hidden;background:#020617}
+#onlineWorldSceneFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#020617}
+#onlineWorldShellStatus{position:absolute;left:50%;top:50%;z-index:2;transform:translate(-50%,-50%);padding:10px 14px;border:1px solid #38bdf866;border-radius:14px;background:#082f49e8;color:#e0f2fe;font:700 13px system-ui;pointer-events:none}
+#onlineWorldShellStatus.hidden{display:none}
+#onlineWorldShellStatus.error{border-color:#fb718577;background:#4c0519ee;color:#ffe4e6}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #monsterThrowStage{display:block}
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #game canvas{visibility:hidden;pointer-events:none}
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] .combat-pill,
@@ -80,3 +86,19 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #characterA
 body[data-combined-world="living-world"][data-control-panel="human"] #characterAccessEntry,
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] .help,
 body[data-combined-world="living-world"] .help{display:none!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #joystick,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #cameraPad,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .controls-right{display:block!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #cameraPad{z-index:8}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .controls-left,
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .controls-right{z-index:9}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .action{background-image:none!important;color:transparent!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .action>*{visibility:hidden!important}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] .action::after{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:24px;line-height:1;text-shadow:0 2px 4px #0009}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #skill1Btn::after{content:'1'}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #skill2Btn::after{content:'2'}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #skill3Btn::after{content:'3'}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #skill4Btn::after{content:'ULT';font-size:13px}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #captureBtn::after{content:'⚔'}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #summonBtn::after{content:'💨'}
+body[data-combined-world="pirate-fruit"][data-control-panel="human"] #recallBtn::after{content:'⬆'}

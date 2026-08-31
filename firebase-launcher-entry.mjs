@@ -1,19 +1,12 @@
 const status = document.getElementById('startupStatus');
 
-async function loadLegacyGame(config, assetBase) {
-  if (status) status.textContent = 'กำลังโหลดเกม…';
-  await import(new URL(`chat-runtime.mjs?v=8.4.0-chat-top-right`, assetBase).href);
-  await import(new URL(`game-v800.js?v=${encodeURIComponent(config.deployedRelease || Date.now())}`, assetBase).href);
-  if (status) status.remove();
-}
-
 try {
   const response = await fetch('./runtime-config.json', { cache: 'no-store' });
   if (!response.ok) throw new Error(`Launcher config failed (${response.status})`);
   const config = await response.json();
   const assetBase = new URL(config.assetBaseUrl);
   if (!config?.featureFlags?.launchTicket) {
-    await loadLegacyGame(config, assetBase);
+    throw Object.assign(new Error('Monster Life online launch-ticket mode is required'), { code: 'ONLINE_CONFIG_REQUIRED' });
   } else {
     let brave = false;
     try { brave = await globalThis.navigator?.brave?.isBrave?.() === true; } catch { brave = false; }
@@ -38,14 +31,7 @@ try {
     const user = await requireFirebaseLogin(config);
     document.querySelector('#accountGate')?.classList.add('hidden');
     if (status) status.textContent = 'กำลังเปิดเกมอย่างปลอดภัย…';
-    let launch;
-    try {
-      launch = await issueLaunchTicket(config, user);
-    } catch (error) {
-      if (error?.code !== 'LAUNCH_TICKET_QA_ONLY') throw error;
-      await loadLegacyGame(config, assetBase);
-      launch = null;
-    }
+    const launch = await issueLaunchTicket(config, user);
     if (launch) {
       if (!brave) {
         window.name = JSON.stringify(launch.launchContext);

@@ -8,6 +8,8 @@ import { installWorldPresence, publishWorldState } from '../world-presence-v800.
 const liveJs = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
+const shellJs = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
+const sceneEntryJs = fs.readFileSync(new URL('../scene-entry-v900.mjs', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const livingJs = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
@@ -16,6 +18,7 @@ const versionedHtml = fs.readFileSync(new URL('../v900.html', import.meta.url), 
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 const launcher = fs.readFileSync(new URL('../firebase-launcher-entry.mjs', import.meta.url), 'utf8');
 const helper = fs.readFileSync(new URL('../world-presence-v800.mjs', import.meta.url), 'utf8');
+const unifiedControls = fs.readFileSync(new URL('../unified-mobile-controls-v900.mjs', import.meta.url), 'utf8');
 
 for (const file of ['world-presence-v800.mjs', 'chat-runtime.mjs']) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
@@ -28,8 +31,15 @@ assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), '
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=815/, 'legacy preload binds chat before game overlays');
-assert.match(launcher, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'Firebase launcher mounts chat before the game');
-assert.match(worldsJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-pirate-presence-status'\)/, 'V9 combined channel loads the presence-aware chat for every world');
+assert.doesNotMatch(liveJs, /bindMobileDualPointerInput\(/, 'Pocket runtime does not create a second pointer lifecycle');
+assert.match(liveJs, /registerAdapter\('pocket-monster'/, 'Pocket movement and camera register with the parent control lifecycle');
+assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent joystick and camera keep independent pointer channels');
+assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
+assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
+assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');
+assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-2'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
+assert.match(worldsJs, /POCKETMONSTER_SCENE_EMBEDDED !== true[\s\S]*chat-runtime/, 'standalone compatibility path may mount chat but hosted scenes skip it');
+assert.doesNotMatch(sceneEntryJs, /chat-runtime|new WebSocket|prepareLaunch/, 'hosted scene entry cannot create another socket or login bootstrap');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'real pirate portals assign only their validated destination');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'chat is not gated to Pocket Monster only');
@@ -50,15 +60,15 @@ assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'pirate presence uses the 
 assert.match(livingJs, /from '\.\/world-presence-v800\.mjs'/, 'living world uses the shared presence helper');
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
-assert.match(livingJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Living World returns directly to Pirate Fruit');
+assert.match(livingJs, /pocketmonster:world-warp-v1/, 'Living World returns directly to Pirate Fruit through the in-document route');
 assert.match(boot, /source === 'pirate-fruit-living-portal'/, 'Pirate iframe bridge accepts the physical Living World portal');
 assert.doesNotMatch(html, /id="worldGate"|id="worldSwitcher"|id="pocketWorldWarpBtn"|id="controlPanelSwitcher"/, 'V9 exposes no clickable world or panel travel controls');
 assert.match(liveJs, /pirate-fruit-world-return-portal/, 'Ranch Hub ships a visible in-world return portal');
 assert.match(liveJs, /group\.position\.set\(-8,0,3\)/, 'return portal stays at the approved Ranch Hub coordinate');
 assert.match(liveJs, /state\.currentZone==='hub'/, 'return portal is active only inside Ranch Hub');
-assert.match(liveJs, /location\.assign\(`\$\{location\.pathname\}\?world=pirate-fruit&panel=human`\)/, 'Ranch return portal navigates directly to Pirate Fruit');
+assert.match(liveJs, /pocketmonster:world-warp-v1/, 'Ranch return portal routes to Pirate Fruit in-document');
 assert.match(worldsJs, /window\.addEventListener\('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp\)/, 'V9 router binds the local return portal event');
-assert.match(worldsJs, /selectWorld\(warp\.world, warp\.panel\)/, 'validated return portals preserve their Pirate Fruit human destination');
+assert.match(worldsJs, /switchWorldInDocument\(warp\.world, warp\.panel\)/, 'validated return portals preserve their Pirate Fruit human destination');
 assert.doesNotMatch(liveJs.match(/function updatePirateFruitReturnPortal\(dt\)\{[\s\S]*?\n\}/)?.[0]||'', /saveGame|vpsWrites|playerDataWrites/, 'return portal does not write save or enable server writes');
 assert.match(helper, /remoteWorldPlayers/, 'presence overlay tracks remote markers');
 assert.doesNotMatch(helper, /vpsWrites|playerDataWrites/, 'presence helper must not open write flags');

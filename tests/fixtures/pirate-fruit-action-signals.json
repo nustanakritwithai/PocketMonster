@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "source": "pirate-fruit-offline runtime probe",
+  "presentationOnly": true,
+  "locomotion": {
+    "idleSpeed": 0,
+    "walkSpeed": 4,
+    "runWhenSpeedGreaterThan": 5,
+    "fields": [
+      "controller.moveState.speed",
+      "controller.moveState.sprinting",
+      "controller.moveState.dashing"
+    ]
+  },
+  "actions": {
+    "melee": {
+      "combatStatePattern": "^attack",
+      "edgeField": "swing",
+      "timingFields": ["swing.comboIndex", "swing.timer", "swing.hitDone"]
+    },
+    "skill": {
+      "combatState": "casting",
+      "edgeField": "pendingCast",
+      "timingFields": [
+        "skillVisualElapsed",
+        "skillVisualDuration",
+        "skillVisualType",
+        "skillVisualCategory"
+      ]
+    },
+    "hurt": {
+      "edgeField": "damageReactionSerial",
+      "activeWhile": "timeSinceDamaged < 0.3",
+      "directionField": "damageReactionAngle"
+    },
+    "dead": {
+      "any": ["combatState === dead", "controller.hp <= 0"]
+    }
+  },
+  "equipment": {
+    "statePath": "loadout.state",
+    "fields": ["activeSet", "equippedWeaponKind", "equippedFightingStyleId"],
+    "visibleNodePrefix": "equipment:"
+  },
+  "sourceRig": [
+    "player-rig:hips",
+    "player-rig:spine",
+    "player-rig:chest",
+    "player-rig:head",
+    "player-rig:left-arm",
+    "player-rig:left-forearm",
+    "player-rig:left-hand",
+    "player-rig:right-arm",
+    "player-rig:right-forearm",
+    "player-rig:right-hand",
+    "player-rig:left-leg",
+    "player-rig:left-lower-leg",
+    "player-rig:left-foot",
+    "player-rig:right-leg",
+    "player-rig:right-lower-leg",
+    "player-rig:right-foot"
+  ]
+}

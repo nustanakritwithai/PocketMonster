@@ -4,6 +4,8 @@
   "assetBaseUrl": "https://nustanakritwithai.github.io/PocketMonster/",
   "apiBaseUrl": "https://157.85.96.139",
   "webSocketUrl": "wss://157.85.96.139/ws/chat",
+  "healthPath": "/api/health",
+  "versionPath": "/api/version",
   "apiVersion": "1.1",
   "minimumClientVersion": "8.3.0",
   "saveSchemaVersion": 1,
