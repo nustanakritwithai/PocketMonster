@@ -1,6 +1,6 @@
 # ส่งมอบงาน Client Combat V9.1
 
-เอกสารนี้บันทึกสถาปัตยกรรมและสถานะหลัง implementation commit `e5e432a`, merge checkpoint `f0cc1b7` และ parent-shell wiring ใน delivery head ปัจจุบัน เป้าหมายคือให้ Human, Monster, NPC, Boss และ Ship ต่อสู้ด้วย `CombatStats` 12 ค่า, `CombatRules` และ Status lifecycle ชุดเดียวกัน โดยฝั่ง Client ทำ domain calculation, prediction และ presentation แต่ไม่เป็น authoritative writer
+เอกสารนี้บันทึกสถาปัตยกรรมและสถานะหลัง implementation commit `e5e432a`, parent-shell commit `223b57a` และ latest-main merge checkpoint `6022bbf` เป้าหมายคือให้ Human, Monster, NPC, Boss และ Ship ต่อสู้ด้วย `CombatStats` 12 ค่า, `CombatRules` และ Status lifecycle ชุดเดียวกัน โดยฝั่ง Client ทำ domain calculation, prediction และ presentation แต่ไม่เป็น authoritative writer
 
 > คำว่า “Server authoritative writer” ในเอกสารนี้หมายถึง contract และ transaction boundary ที่ต้องใช้ฝั่ง Server ไม่ได้หมายความว่ามี production endpoint หรือฐานข้อมูลที่ deploy แล้ว ปัจจุบัน production writes ยังคงปิด
 
