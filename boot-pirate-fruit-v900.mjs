@@ -135,6 +135,10 @@ function bindPocketMonsterLink(frame) {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
   frame.addEventListener('load', () => {
+    if (!pirateRuntimeActive) {
+      hudTelemetry.invalidate('load-after-teardown');
+      return;
+    }
     activateHudTelemetry('reload');
     try { frame.contentWindow?.focus?.(); } catch {}
     forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
@@ -234,6 +238,7 @@ window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   diagnostics:()=>Object.freeze({active:pirateRuntimeActive}),
 });
 pirateFrame.addEventListener('load', () => {
+  if (!pirateRuntimeActive) return;
   syncPirateFruitControlHud(pirateFrame);
   let tries = 0;
   const retry = setInterval(() => {

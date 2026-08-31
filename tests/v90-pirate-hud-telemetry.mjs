@@ -229,6 +229,8 @@ assert.match(parent, /event\.source !== frame\.contentWindow \|\| event\.origin 
 assert.match(parent, /frameGeneration/);
 assert.match(parent, /pagehide/);
 assert.match(parent, /pocketmonster:world-warp-v1/);
+assert.match(parent, /frame\.addEventListener\('load',[\s\S]*if \(!pirateRuntimeActive\)[\s\S]*return;[\s\S]*activateHudTelemetry\('reload'\)/,
+  'a delayed iframe load cannot reactivate telemetry after scene teardown');
 assert.match(parent, /mount:\(\)=>\{[\s\S]*pirateHudTelemetry\.activate\('mount'\)/, 'scene remount starts a fresh telemetry generation');
 assert.doesNotMatch(parent, /allow-same-origin/);
 assert.ok(PIRATE_HUD_MAX_PAYLOAD_BYTES > 0);
