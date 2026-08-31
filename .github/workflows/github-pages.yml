@@ -47,8 +47,9 @@ jobs:
           node tests/deployment-runtime-config.mjs
           node tests/production-launch-workflows.mjs
           node tests/hosting-architecture.mjs
+          npm run test:v91:combat
       - name: Build public game artifact
-        run: node scripts/build-github-pages.mjs
+        run: npm run build:pages
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

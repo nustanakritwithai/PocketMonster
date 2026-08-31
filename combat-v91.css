@@ -1,0 +1,147 @@
+.combat-v91-panel,
+.combat-v91-panel * {
+  box-sizing: border-box;
+}
+
+.combat-v91-panel {
+  --combat-v91-surface: color-mix(in srgb, #101827 92%, transparent);
+  --combat-v91-border: color-mix(in srgb, #8fd3ff 32%, transparent);
+  --combat-v91-muted: #a9b7c9;
+  --combat-v91-accent: #8fd3ff;
+  display: grid;
+  gap: 0.75rem;
+  inline-size: 100%;
+  max-inline-size: 48rem;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  overflow: hidden;
+  color: #f5f8fc;
+  background: var(--combat-v91-surface);
+  border: 1px solid var(--combat-v91-border);
+  border-radius: 0.9rem;
+  font: inherit;
+  touch-action: pan-y;
+  user-select: text;
+}
+
+.combat-v91-heading {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(1rem, 3.4vw, 1.25rem);
+}
+
+.combat-v91-pending-summary {
+  display: flex;
+  min-block-size: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--combat-v91-muted);
+  background: color-mix(in srgb, var(--combat-v91-accent) 9%, transparent);
+  border-radius: 0.65rem;
+}
+
+.combat-v91-pending-summary[data-pending="true"] {
+  color: #fff1b8;
+  background: color-mix(in srgb, #ffbf47 16%, transparent);
+}
+
+.combat-v91-stat-list {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.8fr) minmax(15rem, 2fr);
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+}
+
+.combat-v91-stat-label,
+.combat-v91-stat-values {
+  min-block-size: 44px;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--combat-v91-border) 55%, transparent);
+}
+
+.combat-v91-stat-label {
+  display: flex;
+  align-items: center;
+  color: var(--combat-v91-muted);
+  font-weight: 650;
+}
+
+.combat-v91-stat-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.combat-v91-stat-value {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.1rem;
+  text-align: end;
+}
+
+.combat-v91-stat-value small {
+  overflow: hidden;
+  color: var(--combat-v91-muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+}
+
+.combat-v91-stat-effective {
+  color: var(--combat-v91-accent);
+}
+
+.combat-v91-stat-pending {
+  color: #fff1b8;
+  font-weight: 700;
+}
+
+.combat-v91-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.combat-v91-statuses li {
+  min-block-size: 44px;
+  padding: 0.55rem 0.7rem;
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--combat-v91-accent) 11%, transparent);
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .combat-v91-stat-list {
+    grid-template-columns: 1fr;
+  }
+
+  .combat-v91-stat-label {
+    min-block-size: 0;
+    padding-block-end: 0;
+    border-block-end: 0;
+  }
+
+  .combat-v91-stat-values {
+    padding-block-start: 0.25rem;
+  }
+
+  .combat-v91-pending-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-v91-panel * {
+    scroll-behavior: auto;
+  }
+}

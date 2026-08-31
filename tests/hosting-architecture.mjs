@@ -10,6 +10,9 @@ assert.equal(isPublicGameFile('pirate-fruit-offline/SOURCE.json'), true);
 assert.equal(isPublicGameFile('assets/catalog/monster-slimes.json'), true);
 assert.equal(isPublicGameFile('assets/textures/monsters/flame-wolf-f2/README.md'), false);
 assert.equal(isPublicGameFile('tests/server-auth.mjs'), false);
+assert.equal(isPublicGameFile('combat-v91-entry.mjs'), true);
+assert.equal(isPublicGameFile('combat-v91-server-authority.mjs'), false,
+  'Server authority code must stay outside the browser artifact');
 assert.equal(isPublicGameFile('server_save_backup.json'), false);
 assert.equal(isPublicGameFile('firebase.json'), false);
 assert.equal(isPublicGameFile('package.json'), false);

@@ -43,6 +43,7 @@ jobs:
           node tests/production-launch-workflows.mjs
           node scripts/build-firebase-launcher.mjs
           node tests/hosting-architecture.mjs
+          npm run test:v91:combat
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

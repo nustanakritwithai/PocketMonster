@@ -15,6 +15,9 @@ const ROOT_EXCLUDES = new Set([
   'server_save_backup.json',
   'workspace-manifest.json',
 ]);
+const SERVER_ONLY_ROOT_PREFIXES = Object.freeze([
+  'combat-v91-server-',
+]);
 const PUBLIC_DIRECTORIES = ['asset-presentation/', 'assets/', 'pirate-fruit-offline/'];
 const REQUIRED_BOOTSTRAP_FILES = ['entry-preload.mjs', 'launch-bootstrap.mjs', 'runtime-config.mjs', 'startup-errors.mjs', 'chat-runtime.mjs'];
 
@@ -27,6 +30,7 @@ export function isPublicGameFile(relative) {
   if (path.extname(name).toLowerCase() === '.md') return false;
   if (PUBLIC_DIRECTORIES.some(prefix => name.startsWith(prefix))) return true;
   if (name.includes('/')) return false;
+  if (SERVER_ONLY_ROOT_PREFIXES.some(prefix => name.startsWith(prefix))) return false;
   return !ROOT_EXCLUDES.has(name) && ROOT_FILE_EXTENSIONS.has(path.extname(name).toLowerCase());
 }
 
