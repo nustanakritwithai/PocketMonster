@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   bindPersistentFullscreenControls,
@@ -48,7 +49,7 @@ assert.equal(owner.calls.length, 1, 'scene swaps reuse one persistent parent ful
 assert.deepEqual(owner.calls[0], { navigationUI: 'hide' });
 
 const controlListeners = new Map();
-const controlButtons = new Map(['enterImmersiveBtn', 'retryImmersiveBtn', 'fullscreenBtn'].map(id => [id, {
+const controlButtons = new Map(['enterImmersiveBtn', 'retryImmersiveBtn', 'fullscreenBtn', 'persistentFullscreenBtn'].map(id => [id, {
   addEventListener(type, listener) { controlListeners.set(`${id}:${type}`, listener); },
 }]));
 const sceneDocument = {
@@ -65,7 +66,7 @@ const sceneWindow = {
     },
   },
 };
-assert.equal(bindPersistentFullscreenControls(sceneWindow), 3, 'scene entry owns all visible fullscreen controls');
+assert.equal(bindPersistentFullscreenControls(sceneWindow), 4, 'scene entry owns all visible fullscreen controls');
 let prevented = 0;
 let stopped = 0;
 await controlListeners.get('fullscreenBtn:click')({
@@ -74,6 +75,20 @@ await controlListeners.get('fullscreenBtn:click')({
 });
 assert.equal(prevented, 1);
 assert.equal(stopped, 1, 'scene entry prevents the late Pocket runtime from issuing a duplicate request');
+await controlListeners.get('persistentFullscreenBtn:click')({
+  preventDefault() { prevented += 1; },
+  stopImmediatePropagation() { stopped += 1; },
+});
+assert.equal(prevented, 2, 'persistent mobile fullscreen button uses the parent bridge');
+assert.equal(stopped, 2);
+
+const html = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
+assert.match(html, /id="persistentFullscreenBtn"[^>]*data-pirate-icon="⛶"/);
+assert.match(css, /#pirateUnifiedControls #persistentFullscreenBtn\.tc-fullscreen/);
+assert.match(css, /#persistentFullscreenBtn\.tc-fullscreen::after\{content:'⛶'!important/);
+assert.match(pirateHud, /\.fullscreen-prompt-root/);
 
 const standalone = createDocument();
 const standaloneWindow = { document: standalone.document };
