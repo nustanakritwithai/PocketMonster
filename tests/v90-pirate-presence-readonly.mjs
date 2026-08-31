@@ -81,11 +81,11 @@ assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25,
 });
 
-assert.match(boot, /event\.source !== frame\.contentWindow \|\| event\.origin !== frameOrigin/, 'frame source and exact origin are checked before accepting pose');
+assert.match(boot, /event\.source !== frame\.contentWindow \|\| event\.origin !== 'null'/, 'frame source and opaque sandbox origin are checked before accepting pose');
 assert.match(boot, /sanitizePirateLocalPresence\(message\)/, 'parent accepts only the validated local pose contract');
 assert.match(boot, /sanitizePirateWorldSnapshot\(payload\)/, 'parent sanitizes Server snapshots before forwarding');
-assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPirateSnapshotMessage\(snapshot\), frameOrigin\)/, 'snapshot targets only the mounted frame origin');
-assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPiratePresenceStatusMessage\(connected\), frameOrigin\)/, 'presence status targets only the mounted frame origin');
+assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPirateSnapshotMessage\(snapshot\), '\*'\)/, 'snapshot targets the exact mounted opaque frame window');
+assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPiratePresenceStatusMessage\(connected\), '\*'\)/, 'presence status targets the exact mounted opaque frame window');
 assert.match(boot, /pocketmonster:world-socket-status/, 'parent listens for the real shared-socket status');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\)/, 'existing authenticated chat socket reads the bridged local pose');
 assert.match(chat, /type: 'world-pos'/, 'existing socket publishes the ephemeral world position');

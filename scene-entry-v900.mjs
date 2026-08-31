@@ -107,7 +107,10 @@ window.addEventListener(ONLINE_WORLD_SCENE_TEARDOWN_EVENT, event => {
 window.addEventListener('pocketmonster:session-ended', () => {
   if (teardownScene('scene-session-ended')) endParentSession('scene-session-ended');
 }, { signal: sceneLifetime.signal });
-window.addEventListener('pagehide', leaveParentSceneBoot, { signal: sceneLifetime.signal });
+window.addEventListener('pagehide', () => {
+  leaveParentSceneBoot();
+  teardownScene('scene-pagehide');
+}, { signal: sceneLifetime.signal });
 
 function sceneAbortError() {
   return Object.assign(new Error('Online scene bootstrap was stopped'), {

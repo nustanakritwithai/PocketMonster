@@ -76,11 +76,13 @@ const sceneWindow = {
 };
 const frameListeners = new Map();
 const sceneFrame = element('iframe', 'onlineWorldSceneFrame');
+let sceneSrcAssignments = 0;
 sceneFrame.contentWindow = sceneWindow;
 sceneFrame.addEventListener = (type, handler) => frameListeners.set(type, handler);
 Object.defineProperty(sceneFrame, 'src', {
   get() { return this.srcValue || ''; },
   set(value) {
+    sceneSrcAssignments += 1;
     if (value === 'about:blank') teardownSequence.push('blank');
     this.srcValue = value;
     sceneWindow.location.href = value;
@@ -237,6 +239,19 @@ assert.equal(onlineShell.diagnostics().activeWorld, 'pirate-fruit');
 assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'hub', players: [] }), false);
 assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', players: [{ id: 'p1', x: 1, z: 2 }] }), true);
 assert.equal(snapshots.length, 1);
+
+const sceneAssignmentsBeforeRestore = sceneSrcAssignments;
+const leaseBeforeRestore = activeLease;
+const restoredPage = new Event('pageshow');
+Object.defineProperty(restoredPage, 'persisted', { value: true });
+window.dispatchEvent(restoredPage);
+assert.equal(sceneSrcAssignments, sceneAssignmentsBeforeRestore + 1, 'BFCache restoration loads a fresh scene document');
+assert.equal(onlineShell.reportSceneBoot(sceneWindow, leaseBeforeRestore, { status: 'ready' }), false, 'BFCache restoration revokes the frozen document lease');
+snapshots = installScenePose('pirate-fruit');
+activeLease = registerSceneBoot();
+sceneFrame.emitLoad();
+reportSceneReady(activeLease);
+assert.equal(FakeWebSocket.instances.length, 1, 'BFCache restoration reuses the parent transport');
 
 for (const [world, panel, zone] of [
   ['pocket-monster', 'throw', 'hub'],

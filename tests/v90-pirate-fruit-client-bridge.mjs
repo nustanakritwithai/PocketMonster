@@ -22,6 +22,7 @@ import {
 const bridgeSrc = fs.readFileSync(new URL('../asset-presentation/pirate-fruit-client-bridge.mjs', import.meta.url), 'utf8');
 const hookSrc = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldsJs = fs.readFileSync(new URL('../combined-worlds-v900.mjs', import.meta.url), 'utf8');
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
@@ -197,12 +198,12 @@ assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene file is gone');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline HTML loads the Pocket hook');
-const pirateBundleRef = pirateOfflineHtml.match(/src="\.\/(assets\/index-[^"]+\.js)"/)?.[1];
-assert.ok(pirateBundleRef, 'offline HTML still boots the real Vite client');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=3"/, 'offline HTML cache-busts and loads the Pocket hook');
+const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
+assert.ok(pirateBundleRef, 'offline save bootstrap still boots the real Vite client');
 assert.ok(
-  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf(`src="./${pirateBundleRef}"`),
-  'Pocket hook is listed before the Pirate Fruit bundle',
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
+  'Pocket hook is listed before the save bootstrap that imports the Pirate Fruit bundle',
 );
 assert.match(hookSrc, /vendor-three-Bv6LZXUZ\.js/, 'hook shares the Pirate Fruit vendor Three instance');
 assert.match(hookSrc, /hookPirateFruitRenderer/, 'hook installs the Pocket overlay before the client renders');
@@ -219,6 +220,11 @@ assert.equal(classifyPirateFruitNode('monster:crab'), 'monster');
 assert.equal(classifyPirateFruitNode('PF_TERRAIN_STARTER-ISLAND'), 'terrain');
 assert.equal(classifyPirateFruitNode('boat:skiff'), 'boat');
 assert.equal(classifyPirateFruitNode('PF_ISLAND_STARTER_DETAILS'), 'prop');
+assert.equal(
+  classifyPirateFruitNode('PF_STATIC_BATCH_0'),
+  'skip',
+  'merged static batches keep their original geometry instead of receiving one oversized box overlay',
+);
 assert.equal(classifyPirateFruitNode('pocket-monster-world-portal'), 'skip');
 assert.equal(classifyPirateFruitNode('effect:slash'), 'skip');
 assert.equal(classifyPirateFruitNode('player-rig:right-arm'), 'skip');
