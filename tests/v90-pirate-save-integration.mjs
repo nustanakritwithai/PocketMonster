@@ -21,17 +21,18 @@ assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-bu
 
 assert.match(boot, /bindPirateSaveHost/, 'parent owns the isolated Pirate save persistence host');
 assert.match(boot, /pirate-save-bridge-v900\.mjs\?v=1/, 'parent cache-busts the save bridge');
-assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=1/, 'parent boot cache-busts the message-only HUD contract');
+assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=2/, 'parent boot cache-busts the message-only HUD contract');
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=911/, 'parent cache-busts the save-aware offline HTML');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=918/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=13/, 'top-level entry cache-busts BFCache restore behavior beyond latest main');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=14/, 'scene HTML cache-busts scene-entry fullscreen ownership beyond latest main');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=3/, 'offline HTML cache-busts presentation integration');
+assert.match(boot, /index\.html\?v=912/, 'parent cache-busts the save-aware offline HTML');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=919/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=14/, 'top-level entry cache-busts BFCache restore behavior beyond latest main');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=15/, 'scene HTML cache-busts scene-entry fullscreen ownership beyond latest main');
+assert.match(sceneHtml, /style-v900\.css\?v=913/, 'scene HTML cache-busts the persistent fullscreen control layout');
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=4/, 'offline HTML cache-busts presentation integration');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');
-assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=1/, 'presentation cache-busts the message-only HUD contract');
+assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=2/, 'presentation cache-busts the message-only HUD contract');
 
 assert.match(build, /'pirate-save-bridge-v900\.mjs'/, 'Pages artifact includes the parent/child save bridge');
 assert.match(build, /'pirate-fruit-offline\/pocket-bootstrap\.mjs'/, 'Pages artifact includes the save-aware child bootstrap');

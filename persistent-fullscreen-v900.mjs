@@ -4,6 +4,7 @@ const FULLSCREEN_CONTROL_IDS = Object.freeze([
   'enterImmersiveBtn',
   'retryImmersiveBtn',
   'fullscreenBtn',
+  'persistentFullscreenBtn',
 ]);
 const boundFullscreenControls = new WeakSet();
 
