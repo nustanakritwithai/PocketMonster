@@ -13,9 +13,10 @@ assert.doesNotMatch(
 );
 assert.match(
   game,
-  /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*joyEnd\(\);[\s\S]*endCam\(\);/,
-  'scene lifecycle resets the shared mobile controller before clearing Pocket input state',
+  /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*for\(const code of Object\.keys\(keys\)\)keys\[code\]=false;/,
+  'scene lifecycle resets the shared controller before clearing keyboard input state',
 );
+assert.doesNotMatch(game, /\b(?:joyEnd|endCam)\s*\(/, 'scene lifecycle must not call removed legacy pointer helpers');
 
 assert.equal(liveHtml, html, 'index.html and v900.html must remain byte-identical');
 for (const id of ['stageObjective', 'stageObjectiveClose', 'stageObjectiveToggle']) {
