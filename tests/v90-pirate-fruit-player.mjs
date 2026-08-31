@@ -149,16 +149,13 @@ assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
 assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, false, 'V9 parent HTML is the only mobile control chrome');
 {
-  const headChildren = [];
-  const doc = {
-    head: { appendChild(node) { headChildren.push(node); } },
-    documentElement: { dataset: {} },
-    getElementById() { return null; },
-    createElement() { return { id: '', textContent: '' }; },
-  };
-  assert.equal(syncPirateFruitControlHud({ contentDocument: doc }), true);
-  assert.equal(doc.documentElement.dataset.pirateHud, 'pirate-primary-parent');
-  assert.equal(headChildren[0].textContent.includes('pointer-events: none'), true);
+  const sent = [];
+  const frame = { contentWindow: { postMessage(message, origin) { sent.push({ message, origin }); } } };
+  assert.equal(syncPirateFruitControlHud(frame), true);
+  assert.deepEqual(sent, [{
+    message: { type: 'pocketmonster:pirate-control-v1', panel: 'human' },
+    origin: '*',
+  }]);
 }
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
@@ -239,7 +236,9 @@ assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can reques
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
-assert.match(boot, /event\.origin !== frameOrigin/, 'parent accepts portal messages only from the mounted Pirate Fruit origin');
+assert.match(boot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'\)/, 'nested Pirate Fruit runs in an opaque-origin sandbox');
+assert.doesNotMatch(boot, /allow-same-origin/, 'nested Pirate Fruit cannot read the scene session or shared storage');
+assert.match(boot, /event\.origin !== 'null'/, 'parent accepts portal messages only from the mounted opaque-origin frame');
 assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
@@ -252,7 +251,7 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline client loads the Pocket visual hook before the Vite bundle');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=2"/, 'offline client cache-busts and loads the Pocket visual hook before the Vite bundle');
 assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('src="./assets/index-'),
   'Pocket visual hook evaluates before the real Pirate Fruit bundle',

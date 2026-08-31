@@ -43,6 +43,7 @@ function mountPirateOffline() {
   const frameUrl = new URL(PIRATE_FRUIT_OFFLINE_ENTRY);
   frameUrl.searchParams.set('parentOrigin', location.origin);
   frame.src = frameUrl.href;
+  frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen');
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
   return frame;
@@ -55,11 +56,10 @@ function assignCombinedWorld(worldId) {
 }
 
 function bindPocketMonsterLink(frame) {
-  const frameOrigin = new URL(frame.src).origin;
   const sendInput = payload => frame.contentWindow?.postMessage({
     type: PIRATE_UNIFIED_INPUT_MESSAGE,
     ...payload,
-  }, frameOrigin);
+  }, '*');
   window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.registerAdapter?.('pirate-fruit', Object.freeze({
     interceptActions: true,
     move: payload => sendInput({ kind: 'move', ...payload }),
@@ -71,10 +71,10 @@ function bindPocketMonsterLink(frame) {
   let piratePose = null;
   let latestPresenceSnapshot = null;
   const forwardPresence = snapshot => {
-    frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), frameOrigin);
+    frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), '*');
   };
   const forwardPresenceStatus = connected => {
-    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), frameOrigin);
+    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
   frame.addEventListener('load', () => {
     try { frame.contentWindow?.focus?.(); } catch {}
@@ -97,7 +97,7 @@ function bindPocketMonsterLink(frame) {
   };
   window.addEventListener('message', event => {
     if (!pirateRuntimeActive) return;
-    if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
+    if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
     const nextPose = sanitizePirateLocalPresence(message);
     if (nextPose) {

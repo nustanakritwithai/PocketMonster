@@ -105,6 +105,7 @@ assert.doesNotMatch(gameSource, /bindMobileDualPointerInput/, 'Pocket runtime no
 assert.match(gameSource, /registerAdapter\('pocket-monster'/);
 assert.match(gameSource, /registerAdapter\('pocket-monster',[\s\S]*interceptActions:true[\s\S]*beginCaptureAim\(\)[\s\S]*executeCaptureThrow\(\)[\s\S]*summonThrow\(\)[\s\S]*recall\(true\)[\s\S]*dispatchSkill/);
 assert.match(bootSource, /registerAdapter\?\.\('pirate-fruit'/);
+assert.match(bootSource, /postMessage\([\s\S]*, '\*'\)/, 'parent targets the exact opaque Pirate frame window');
 assert.match(bridgeSource, /event\.source !== window\.parent \|\| event\.origin !== allowedParentOrigin/);
 assert.match(bridgeSource, /\.tc-joyzone/);
 assert.match(bridgeSource, /block: '\.tc-block'/);

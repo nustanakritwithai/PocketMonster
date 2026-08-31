@@ -76,8 +76,9 @@ export function classifyPirateFruitNode(name = '') {
     || id.startsWith('socket:')
     || (id.startsWith('player:') && id !== 'player:pirate-v1' && id !== 'player:gameplay-root')
     || /portal|water|ocean|wake|foam|wave/i.test(id)
+    || id.startsWith('PF_STATIC_BATCH_')
   ) return 'skip';
-  if (id.startsWith('PF_ISLAND_') || id.startsWith('PF_STATIC_BATCH_')) return 'prop';
+  if (id.startsWith('PF_ISLAND_')) return 'prop';
   return 'other';
 }
 

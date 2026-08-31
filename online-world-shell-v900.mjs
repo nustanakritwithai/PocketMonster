@@ -393,7 +393,13 @@ Object.defineProperty(window, 'POCKETMONSTER_ONLINE_SHELL', {
 window.addEventListener('pocketmonster:session-ended', () => {
   if (!sessionEnding) endSession('session-ended');
 });
-window.addEventListener('pageshow', scheduleSessionExpiryCheck);
+window.addEventListener('pageshow', event => {
+  scheduleSessionExpiryCheck();
+  if (event.persisted !== true || sessionEnding) return;
+  invalidateSceneBoot({ showLoading: true, message: `กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…` });
+  presenceBridge.reset();
+  sceneFrame.src = sceneUrl(activeWorld, activePanel);
+});
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);

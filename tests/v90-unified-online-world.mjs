@@ -95,6 +95,7 @@ assert.match(sceneEntry, /POCKETMONSTER_SERVER_GATE = serverGate/, 'legacy scene
 assert.match(sceneEntry, /registerSceneBoot\?\.\(window, sceneHref\)/, 'child registers its exact document URL with the parent shell');
 assert.match(sceneEntry, /reportSceneBoot\?\.\(window, sceneLease/, 'child reports boot outcome with its exact lease');
 assert.match(sceneEntry, /v900\.html\?v=915/, 'hosted scene cache-busts the shared V9 DOM template');
+assert.match(sceneEntry, /pagehide[\s\S]*leaveParentSceneBoot\(\)[\s\S]*teardownScene\('scene-pagehide'\)/, 'pagehide revokes the lease and aborts scene capabilities before BFCache');
 assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child logout delegates cleanup to the parent session owner');
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
