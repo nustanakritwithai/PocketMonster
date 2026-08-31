@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { fixtureCombat } from './v91-combat-fixtures.mjs';
 
 const scenario = process.argv[2] || '';
 const windowEvents = new EventTarget();
@@ -46,6 +47,7 @@ function classList() {
 }
 function element(tag, id = '') {
   return {
+    get ownerDocument() { return globalThis.document; },
     tagName: tag.toUpperCase(),
     id,
     title: '',
@@ -194,17 +196,44 @@ const onlineShell = window.POCKETMONSTER_ONLINE_SHELL;
 const bootId = onlineShell.bootId;
 const chatNode = elements.get('gameChat');
 const frameNode = body.children[0].children.find(node => node.tagName === 'IFRAME');
+const combatHostNode = body.children[0].children.find(node => node.id === 'combatV91Shell');
+const combatController = onlineShell.combat;
 const shellStatusNode = body.children[0].children.find(node => node.id === 'onlineWorldShellStatus');
 let readyEvents = 0;
 let errorEvents = 0;
 window.addEventListener('pocketmonster:online-scene-ready', () => { readyEvents += 1; });
 window.addEventListener('pocketmonster:online-scene-error', () => { errorEvents += 1; });
 assert.equal(frameNode, sceneFrame);
+assert.ok(combatHostNode, 'persistent parent shell owns one Combat V9.1 host');
+assert.equal(body.children[0].children.filter(node => node.id === 'combatV91Shell').length, 1);
+assert.equal(iframeCreates, 1, 'Combat integration must not create another iframe');
+assert.ok(Object.isFrozen(combatController));
+assert.equal(combatController.authority, 'client_projection_only');
+assert.equal(combatController.serverReconcileExposed, false);
+assert.equal(typeof combatController.reconcile, 'undefined', 'untrusted scenes cannot forge Server reconciliation');
+assert.equal('POCKETMONSTER_COMBAT_V91_SHELL' in window, false,
+  'Combat reuses the one non-configurable online-shell capability instead of adding another global');
 assert.equal(FakeWebSocket.instances.length, 1);
 assert.equal(onlineShell.diagnostics().chat.socketCreates, 1);
 assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
 assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
 assert.equal(fullscreenRequestCount, 1, 'persistent shell requests fullscreen once and reuses it across scene swaps');
+
+const combatFixture = fixtureCombat({ combatId: 'combat:v90-parent-shell' });
+const combatSessionOptions = Object.freeze({
+  combatId: combatFixture.combatId,
+  profiles: [combatFixture.actor, combatFixture.target],
+  statusSnapshots: [combatFixture.actorStatus, combatFixture.targetStatus],
+  focusedEntityId: combatFixture.actor.entityId,
+});
+function openCombatProjection() {
+  const opened = combatController.openSession(combatSessionOptions);
+  assert.equal(opened.ok, true, opened.reason);
+  assert.equal(combatHostNode.hidden, false);
+  assert.equal(combatHostNode.children.length, 1, 'one host renders one Combat panel');
+  assert.equal(combatController.readState()?.combatId, combatFixture.combatId);
+  assert.equal(onlineShell.diagnostics().combat.active, true);
+}
 
 function installScenePose(zone) {
   const snapshots = [];
@@ -228,7 +257,10 @@ let activeLease = registerSceneBoot();
 sceneFrame.emitLoad();
 assert.equal(shellStatusNode.classList.contains('hidden'), false, 'iframe load alone cannot claim runtime readiness');
 assert.equal(onlineShell.diagnostics().sceneReadyCount, 0);
+assert.equal(combatController.openSession(combatSessionOptions).reason, 'online_scene_inactive',
+  'Combat remains unavailable until the active scene reports ready');
 reportSceneReady(activeLease);
+openCombatProjection();
 assert.equal(sceneFocusCount, 1, 'ready scene receives input focus');
 assert.equal(shellStatusNode.classList.contains('hidden'), true);
 assert.equal(readyEvents, 1);
@@ -238,12 +270,28 @@ assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'hub', players: [] }), 
 assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', players: [{ id: 'p1', x: 1, z: 2 }] }), true);
 assert.equal(snapshots.length, 1);
 
+const teardownCombatReopenAttempts = [];
+sceneWindow.addEventListener('pocketmonster:online-scene-teardown', event => {
+  teardownCombatReopenAttempts.push(Object.freeze({
+    reason: event.detail?.reason,
+    result: combatController.openSession(combatSessionOptions),
+  }));
+});
+
 for (const [world, panel, zone] of [
   ['pocket-monster', 'throw', 'hub'],
   ['living-world', 'human', 'living-world'],
   ['pirate-fruit', 'human', 'pirate-fruit'],
 ]) {
+  const reopenAttemptCount = teardownCombatReopenAttempts.length;
   assert.equal(onlineShell.navigate(world, panel), true);
+  assert.equal(teardownCombatReopenAttempts.length, reopenAttemptCount + 1,
+    'the outgoing child receives one synchronous teardown signal');
+  assert.equal(teardownCombatReopenAttempts.at(-1).result.reason, 'online_scene_inactive',
+    'the outgoing child cannot reopen Combat during scene teardown');
+  assert.equal(combatController.readState(), null, 'scene navigation closes pending Combat state');
+  assert.equal(combatHostNode.hidden, true);
+  assert.deepEqual(combatHostNode.children, []);
   assert.equal(shellStatusNode.classList.contains('hidden'), false);
   assert.equal(onlineShell.reportSceneBoot(sceneWindow, activeLease, { status: 'ready' }), false, 'navigation invalidates the prior document lease before changing src');
   snapshots = installScenePose(zone);
@@ -258,7 +306,11 @@ for (const [world, panel, zone] of [
   assert.equal(window.POCKETMONSTER_LAUNCH_SESSION, launchSessionIdentity, 'the same Monster Life session object survives scene navigation');
   assert.equal(elements.get('gameChat'), chatNode, 'Chat DOM identity survives scene navigation');
   assert.equal(body.children[0].children.find(node => node.tagName === 'IFRAME'), frameNode, 'one iframe browsing context is reused');
+  assert.equal(body.children[0].children.find(node => node.id === 'combatV91Shell'), combatHostNode,
+    'one Combat host DOM identity survives scene navigation');
+  assert.equal(onlineShell.combat, combatController, 'one Combat controller identity survives scene navigation');
   assert.equal(FakeWebSocket.instances.length, 1, 'scene navigation cannot create another socket');
+  openCombatProjection();
 }
 
 const readyCountBeforeError = onlineShell.diagnostics().sceneReadyCount;
@@ -275,6 +327,8 @@ assert.equal(shellStatusNode.classList.contains('error'), true);
 assert.equal(onlineShell.diagnostics().sceneReadyCount, readyCountBeforeError);
 assert.equal(errorEvents, 1);
 assert.equal(onlineShell.reportSceneBoot(sceneWindow, errorLease, { status: 'ready' }), false, 'an errored lease cannot later become ready');
+assert.equal(combatController.openSession(combatSessionOptions).reason, 'online_scene_inactive',
+  'an errored scene cannot open Combat');
 
 setTopLocation('/index.html?world=living-world&panel=human');
 window.dispatchEvent(new Event('popstate'));
@@ -283,6 +337,7 @@ assert.equal(onlineShell.reportSceneBoot(sceneWindow, errorLease, { status: 'rea
 activeLease = registerSceneBoot();
 sceneFrame.emitLoad();
 reportSceneReady(activeLease);
+openCombatProjection();
 assert.equal(onlineShell.diagnostics().activeWorld, 'living-world');
 assert.equal(FakeWebSocket.instances.length, 1, 'history traversal keeps the same socket');
 assert.ok(historyCalls.every(call => call.type === 'replace'));
@@ -313,6 +368,14 @@ assert.deepEqual(childTeardownDetail, { reason: 'test-session-ended', acknowledg
 assert.equal('POCKETMONSTER_LAUNCH_SESSION' in sceneWindow, false, 'child receives teardown before its realm is discarded');
 assert.equal(sceneFrame.src, 'about:blank', 'parent blanks the child browsing context before redirect');
 assert.equal(sceneFrame.removed, true, 'parent removes the child iframe before redirect');
+assert.equal(combatController.readState(), null, 'logout clears the Combat state');
+assert.equal(combatHostNode.hidden, true, 'logout hides the Combat host before removing it');
+assert.deepEqual(combatHostNode.children, []);
+assert.equal(combatHostNode.removed, true, 'logout removes the Combat host before redirect');
+assert.equal(combatController.openSession({}).reason, 'online_session_inactive');
+assert.equal(teardownCombatReopenAttempts.at(-1).reason, 'test-session-ended');
+assert.equal(teardownCombatReopenAttempts.at(-1).result.reason, 'online_session_inactive',
+  'the child cannot reopen Combat during logout teardown');
 assert.deepEqual(
   teardownSequence,
   ['child-signal', 'blank', 'remove', 'redirect'],

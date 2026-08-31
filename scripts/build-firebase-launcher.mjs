@@ -16,13 +16,14 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   }
   if (isCombinedV9) {
     html = html
-      .replace(/src="\.\/entry-preload-v900\.mjs(?:\?[^\"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
+      .replace(/src="\.\/entry-preload-v900\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
       .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
-      .replace(/href="\.\/style-v900\.css(?:\?[^\"]*)?"/, `href="${assetBase}style-v900.css?v=${release}"`)
+      .replace(/href="\.\/style-v900\.css(?:\?[^"]*)?"/, `href="${assetBase}style-v900.css?v=${release}"`)
+      .replace(/\n\s*<link rel="stylesheet" href="\.\/combat-v91\.css(?:\?[^"]*)?"\s*\/?>/, '')
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`);
   } else {
     html = html
-      .replace(/src="\.\/entry-preload\.mjs(?:\?[^\"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
+      .replace(/src="\.\/entry-preload\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
       .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`)
       .replace(`  <script type="module" src="./game-v800.js?v=815"></script>`, '');
@@ -31,6 +32,9 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   if (isCombinedV9) required.push(`${assetBase}style-v900.css`);
   for (const requiredFile of required) {
     if (!html.includes(requiredFile)) throw new Error(`Firebase launcher build is missing ${requiredFile}`);
+  }
+  if (isCombinedV9 && /href="\.\/combat-v91\.css(?:\?[^"]*)?"/.test(html)) {
+    throw new Error('Firebase launcher must not load the Pages-only Combat stylesheet locally');
   }
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });

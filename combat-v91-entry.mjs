@@ -1,4 +1,5 @@
 import { resolveCombatV91Proposal } from './combat-v91-rules.mjs';
+import { createDomainCombatProfile } from './combat-v91-adapters.mjs';
 import {
   createCombatPredictionEnvelope,
   createCombatV91ClientState,
@@ -24,9 +25,14 @@ export const COMBAT_V91_ENTRY_POLICY = Object.freeze({
   singleActiveSession: true,
   standaloneDocument: false,
   iframeCreation: false,
+  baseProfileCreation: 'pirate_pocket_domain_calculators_only',
   stylesheetHref: COMBAT_V91_STYLESHEET_HREF,
   stylesheetLoading: COMBAT_V91_UI_MOUNT_POLICY.stylesheetLoading,
 });
+
+export function createCombatV91BaseProfile(source = {}) {
+  return createDomainCombatProfile(source);
+}
 
 function result(ok, reason, detail = {}) {
   return Object.freeze({ ok, reason, ...detail });

@@ -45,9 +45,11 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=920/, 'active HTML cache-busts the persistent-shell entry');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=921/, 'active HTML cache-busts the persistent-shell entry');
 assert.match(indexHtml, /style-v900\.css\?v=910/, 'active HTML cache-busts the merged Pirate presentation and persistent shell layout');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=10'\)/, 'top-level authenticates once before starting the shell');
+assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
+  'the parent document loads one Combat V9.1 stylesheet');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=11'\)/, 'top-level authenticates once before starting the shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -55,7 +57,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=10')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=11')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -65,11 +67,23 @@ assert.match(entry, /POCKETMONSTER_SERVER_GATE_OBSERVATION/, 'parent publishes o
 assert.doesNotMatch(entry, /worlds-v900\.mjs|new WebSocket/, 'top-level entry never boots a scene or socket outside the shell');
 assert.match(shell, /createElement\('iframe'\)/, 'shell owns one active scene browsing context');
 assert.equal((shell.match(/createElement\('iframe'\)/g) || []).length, 1, 'shell creates exactly one scene iframe');
+assert.equal((shell.match(/from '\.\/combat-v91-entry\.mjs\?v=1'/g) || []).length, 1,
+  'parent shell imports one Combat V9.1 controller module');
+assert.equal((shell.match(/createCombatV91Shell\(\{ container: combatHost \}\)/g) || []).length, 1,
+  'parent shell creates one Combat controller in one host');
+assert.match(shell, /combatHost\.id = 'combatV91Shell'/, 'Combat uses one persistent parent host');
+assert.match(shell, /combat: publicCombatShell/, 'Combat projection capability is part of the one online-shell authority');
+assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
+  'scene code cannot access a second Combat global or forge Server reconciliation');
+assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
+  'scene teardown closes pending Combat state without destroying the persistent host');
 assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-2'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");
+const shellCombatHostIndex = shell.indexOf("createElement('aside')");
 assert.ok(shellServerGateIndex >= 0 && shellServerGateIndex < shellFrameIndex, 'shell verifies the inherited healthy gate before creating a scene or socket');
+assert.ok(shellCombatHostIndex > shellServerGateIndex, 'shell creates Combat only after the inherited Server gate passes');
 assert.doesNotMatch(shell, /location\.(?:assign|replace|reload)/, 'scene changes never navigate the top-level document');
 assert.doesNotMatch(shell, /createElement\('style'\)|style\.textContent/, 'shell cannot depend on CSP-blocked inline styles');
 assert.match(shellCss, /#onlineWorldSceneFrame\{position:absolute;inset:0;width:100%;height:100%;border:0/, 'external V9 CSS fills the viewport with the active scene');

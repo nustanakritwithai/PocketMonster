@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { collectPublicDependencyClosure } from '../scripts/build-github-pages.mjs';
+
 const root = path.resolve('.');
 const output = path.join(root, 'dist-pages');
 const manifestPath = path.join(output, 'patch-manifest.json');
@@ -11,6 +13,7 @@ assert.equal(fs.existsSync(manifestPath), true,
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const published = new Set(manifest.files.map(entry => entry.path));
+const publicDependencyClosure = collectPublicDependencyClosure(root);
 const clientModules = Object.freeze([
   'combat-v91-adapters.mjs',
   'combat-v91-client-store.mjs',
@@ -26,9 +29,20 @@ const clientAssets = Object.freeze([...clientModules, 'combat-v91.css']);
 
 for (const assetName of clientAssets) {
   assert.equal(published.has(assetName), true, `${assetName} must ship in the Pages artifact`);
+  assert.equal(publicDependencyClosure.has(assetName), true,
+    `${assetName} must be reachable from the public V9 parent shell`);
 }
 assert.equal([...published].some(name => name.startsWith('combat-v91-server-')), false,
   'Server authority implementations must not be published as browser assets');
+for (const serverOnlyModule of [
+  'combat-v91-server-authority.mjs',
+  'combat-v91-server-status-authority.mjs',
+]) {
+  assert.equal(published.has(serverOnlyModule), false,
+    `${serverOnlyModule} must never ship in the Pages artifact`);
+  assert.equal(publicDependencyClosure.has(serverOnlyModule), false,
+    `${serverOnlyModule} must never enter the browser dependency closure`);
+}
 assert.equal([...published].some(name => name.startsWith('tests/v91-combat-')), false,
   'V9.1 tests must not ship in the public artifact');
 assert.equal(published.has('docs/combat-v91-client-handoff.md'), false,
@@ -42,6 +56,20 @@ for (const moduleName of clientModules) {
     assert.equal(published.has(dependency), true,
       `${moduleName} import closure is missing ${dependency}`);
   }
+}
+
+const parentShell = fs.readFileSync(path.join(output, 'online-world-shell-v900.mjs'), 'utf8');
+assert.match(parentShell,
+  /(?:from\s*|import\s*\()\s*['"]\.\/combat-v91-entry\.mjs(?:\?[^'"]*)?['"]/,
+  'the persistent online-world parent shell must import Combat V9.1');
+assert.match(parentShell, /\bcreateCombatV91Shell\b/,
+  'the persistent online-world parent shell must install the single Combat V9.1 controller');
+
+for (const htmlName of ['index.html', 'v900.html']) {
+  const html = fs.readFileSync(path.join(output, htmlName), 'utf8');
+  const stylesheetReferences = html.match(/\bhref\s*=\s*['"]\.\/combat-v91\.css(?:\?[^'"]*)?['"]/g) || [];
+  assert.equal(stylesheetReferences.length, 1,
+    `${htmlName} must load the Combat V9.1 stylesheet exactly once in the parent document`);
 }
 
 console.log(`V9.1 Pages artifact: PASS (${clientAssets.length} client assets, server authority excluded)`);

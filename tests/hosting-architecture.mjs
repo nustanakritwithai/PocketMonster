@@ -25,6 +25,10 @@ try {
   assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v800\.css/);
   assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v900\.css/);
   assert.doesNotMatch(html, /entry-preload-v900\.mjs/, 'Firebase launcher must redirect into the GitHub V9 entry instead of booting V9 locally');
+  assert.doesNotMatch(html, /combat-v91\.css/,
+    'Firebase login/redirect launcher must not request the Pages-only Combat stylesheet');
+  assert.equal(fs.existsSync(path.join(output, 'combat-v91.css')), false,
+    'Firebase launcher must not copy a dormant Combat client asset');
   assert.equal(fs.existsSync(path.join(output, 'firebase-launcher-entry.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'firebase-auth-ui.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'server-auth.mjs')), true);

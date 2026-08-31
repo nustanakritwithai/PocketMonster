@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createCombatV91Client } from '../combat-v91-entry.mjs';
+import {
+  createCombatV91BaseProfile,
+  createCombatV91Client,
+} from '../combat-v91-entry.mjs';
 import {
   COMBAT_STAT_LABELS,
   COMBAT_V91_STYLESHEET_HREF,
@@ -65,7 +68,10 @@ assert.equal(client.policy.singleActiveSession, true);
 assert.equal(client.policy.shellMount, 'active_shell_container_only');
 assert.equal(client.policy.standaloneDocument, false);
 assert.equal(client.policy.iframeCreation, false);
+assert.equal(client.policy.baseProfileCreation, 'pirate_pocket_domain_calculators_only');
 assert.equal(client.policy.stylesheetHref, COMBAT_V91_STYLESHEET_HREF);
+assert.equal(createCombatV91BaseProfile({ ownerDomain: 'World', profileInput: {} }).reason,
+  'unsupported_combat_profile_owner', 'active client entry cannot create World or generic base profiles');
 assert.deepEqual(COMBAT_V91_UI_MOUNT_POLICY, {
   shell: 'active_shell_container_only',
   standaloneDocument: false,

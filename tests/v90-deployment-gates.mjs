@@ -93,9 +93,10 @@ function mappedFetch(baseUrl, files, backend = {}) {
 
 const pagesFiles = new Map(PAGES_LIVE_SMOKE_FILES.map(relative => [relative, `fixture:${relative}`]));
 pagesFiles.set('runtime-config.json', JSON.stringify(runtimeConfig()));
-pagesFiles.set('index.html', '<link href="./style-v900.css"><script type="module" src="./entry-preload-v900.mjs"></script>');
+pagesFiles.set('index.html', '<link href="./style-v900.css"><link href="./combat-v91.css?v=1"><script type="module" src="./entry-preload-v900.mjs"></script>');
 pagesFiles.set('v900.html', pagesFiles.get('index.html'));
 pagesFiles.set('scene-v900.html', '<script type="module" src="./scene-entry-v900.mjs"></script>');
+pagesFiles.set('online-world-shell-v900.mjs', "import { createCombatV91Shell } from './combat-v91-entry.mjs?v=1';\nvoid createCombatV91Shell;");
 pagesFiles.set('pirate-fruit-offline/index.html', '<script type="module" src="./assets/index-C3SJLfq8.js"></script>');
 const manifest = {
   files: [...pagesFiles].map(([relative, body]) => ({
@@ -117,6 +118,46 @@ await verifyLiveV9Deployment({
 });
 assert.deepEqual(pagesFetch.calls.filter(value => new URL(value).origin === new URL(API_BASE).origin)
   .map(value => new URL(value).pathname).sort(), ['/api/health', '/api/version']);
+
+const detachedCombatShellPages = new Map(pagesFiles);
+const detachedShellBody = 'export const shell = true;';
+detachedCombatShellPages.set('online-world-shell-v900.mjs', detachedShellBody);
+const detachedManifest = JSON.parse(detachedCombatShellPages.get('patch-manifest.json'));
+detachedManifest.files.find(entry => entry.path === 'online-world-shell-v900.mjs').sha256 = crypto
+  .createHash('sha256').update(detachedShellBody).digest('hex');
+detachedCombatShellPages.set('patch-manifest.json', JSON.stringify(detachedManifest));
+await assert.rejects(
+  verifyLiveV9Deployment({
+    target: 'pages',
+    baseUrl: PAGES_BASE,
+    expectedSha: SHA,
+    expectedApiBaseUrl: API_BASE,
+    fetchImpl: mappedFetch(PAGES_BASE, detachedCombatShellPages),
+    attempts: 1,
+    retryDelayMs: 0,
+  }),
+  /must import and install combat-v91-entry\.mjs/,
+);
+
+const leakedCombatServerPages = new Map(pagesFiles);
+const leakedManifest = JSON.parse(leakedCombatServerPages.get('patch-manifest.json'));
+leakedManifest.files.push({
+  path: 'combat-v91-server-authority.mjs',
+  sha256: crypto.createHash('sha256').update('server-only').digest('hex'),
+});
+leakedCombatServerPages.set('patch-manifest.json', JSON.stringify(leakedManifest));
+await assert.rejects(
+  verifyLiveV9Deployment({
+    target: 'pages',
+    baseUrl: PAGES_BASE,
+    expectedSha: SHA,
+    expectedApiBaseUrl: API_BASE,
+    fetchImpl: mappedFetch(PAGES_BASE, leakedCombatServerPages),
+    attempts: 1,
+    retryDelayMs: 0,
+  }),
+  /must not publish server-only Combat module combat-v91-server-authority\.mjs/,
+);
 
 const backendCliFetch = mappedFetch(PAGES_BASE, new Map());
 const backendCliLogs = [];
@@ -159,6 +200,22 @@ await verifyLiveV9Deployment({
   attempts: 1,
   retryDelayMs: 0,
 });
+
+const localCombatCssFirebase = new Map(firebaseFiles);
+localCombatCssFirebase.set('index.html', `${firebaseFiles.get('index.html')}<link href="./combat-v91.css?v=1">`);
+await assert.rejects(
+  verifyLiveV9Deployment({
+    target: 'firebase',
+    baseUrl: FIREBASE_BASE,
+    expectedSha: SHA,
+    expectedApiBaseUrl: API_BASE,
+    expectedAssetBaseUrl: PAGES_BASE,
+    fetchImpl: mappedFetch(FIREBASE_BASE, localCombatCssFirebase),
+    attempts: 1,
+    retryDelayMs: 0,
+  }),
+  /must not load the Pages-only Combat stylesheet locally/,
+);
 
 const unsafePages = new Map(pagesFiles);
 unsafePages.set('runtime-config.json', JSON.stringify(runtimeConfig({ vpsWrites: true })));

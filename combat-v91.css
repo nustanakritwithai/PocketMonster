@@ -1,3 +1,19 @@
+.combat-v91-shell {
+  position: absolute;
+  inset-block-start: max(0.75rem, env(safe-area-inset-top));
+  inset-inline-end: max(0.75rem, env(safe-area-inset-right));
+  z-index: 3;
+  inline-size: min(48rem, calc(100% - 1.5rem));
+  max-block-size: calc(100% - 1.5rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.combat-v91-shell[hidden] {
+  display: none !important;
+}
+
 .combat-v91-panel,
 .combat-v91-panel * {
   box-sizing: border-box;

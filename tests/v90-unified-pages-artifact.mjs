@@ -17,6 +17,8 @@ const required = new Set([
   'entry-preload-v900.mjs',
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
+  'combat-v91-entry.mjs',
+  'combat-v91.css',
   'scene-entry-v900.mjs',
   'style-v900.css',
   'worlds-v900.mjs',
@@ -45,7 +47,7 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900\.mjs\?v=920/);
+assert.match(index, /entry-preload-v900\.mjs\?v=921/);
 assert.match(index, /style-v900\.css\?v=910/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));

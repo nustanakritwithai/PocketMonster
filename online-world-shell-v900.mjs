@@ -10,6 +10,10 @@ import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
 } from './online-world-bridge-v900.mjs?v=2';
+import {
+  createCombatV91BaseProfile,
+  createCombatV91Shell,
+} from './combat-v91-entry.mjs?v=1';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -78,11 +82,81 @@ sceneFrame.id = 'onlineWorldSceneFrame';
 sceneFrame.title = worldById(activeWorld)?.title || 'Monster Life scene';
 sceneFrame.referrerPolicy = 'no-referrer';
 sceneFrame.setAttribute('allow', 'fullscreen');
+const combatHost = document.createElement('aside');
+combatHost.id = 'combatV91Shell';
+combatHost.className = 'combat-v91-shell';
+combatHost.hidden = true;
+combatHost.setAttribute('aria-label', 'Combat V9.1');
+const combatShellResult = createCombatV91Shell({ container: combatHost });
+if (!combatShellResult.ok) {
+  throw Object.assign(new Error('Combat V9.1 shell could not be mounted'), {
+    code: 'COMBAT_V91_SHELL_REQUIRED',
+    reason: combatShellResult.reason,
+  });
+}
+const combatShell = combatShellResult.shell;
 const shellStatus = document.createElement('div');
 shellStatus.id = 'onlineWorldShellStatus';
 shellStatus.textContent = 'กำลังเปิดโลกออนไลน์…';
-shell.append(sceneFrame, shellStatus);
+shell.append(sceneFrame, combatHost, shellStatus);
 document.body.replaceChildren(shell);
+
+function combatUnavailable() {
+  const sessionActive = !sessionEnding && isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION);
+  return Object.freeze({
+    ok: false,
+    reason: sessionActive ? 'online_scene_inactive' : 'online_session_inactive',
+  });
+}
+
+function combatSessionAvailable() {
+  return !sessionEnding
+    && sceneBootState === 'ready'
+    && Boolean(activeSceneLease)
+    && isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION);
+}
+
+function closeCombatSession() {
+  return combatShell.closeSession();
+}
+
+const publicCombatShell = Object.freeze({
+  kind: 'combat-v91-client-shell/v1',
+  version: combatShell.version,
+  authority: 'client_projection_only',
+  serverReconcileExposed: false,
+  calculateBaseProfile(source = {}) {
+    return combatSessionAvailable() ? createCombatV91BaseProfile(source) : combatUnavailable();
+  },
+  openSession(options = {}) {
+    return combatSessionAvailable() ? combatShell.openSession(options) : combatUnavailable();
+  },
+  predict(command = {}, options = {}) {
+    return combatSessionAvailable() ? combatShell.predict(command, options) : combatUnavailable();
+  },
+  focus(entityId, options = {}) {
+    return combatSessionAvailable() ? combatShell.focus(entityId, options) : combatUnavailable();
+  },
+  closeSession() {
+    return closeCombatSession();
+  },
+  readState() {
+    return combatSessionAvailable() ? combatShell.getState() : null;
+  },
+  diagnostics() {
+    const state = combatSessionAvailable() ? combatShell.getState() : null;
+    return Object.freeze({
+      active: Boolean(state),
+      pendingCount: state ? Object.keys(state.pendingOverlay).length : 0,
+      hostHidden: combatHost.hidden === true,
+    });
+  },
+});
+
+function destroyCombatShell() {
+  closeCombatSession();
+  try { combatHost.remove(); } catch {}
+}
 
 const presenceBridge = createOnlineScenePresenceBridge({
   getSceneWindow: () => sceneFrame.contentWindow,
@@ -159,6 +233,7 @@ function scheduleSessionExpiryCheck() {
 }
 
 function signalSceneTeardown(reason) {
+  closeCombatSession();
   const detail = { reason, acknowledged: false };
   try {
     const sceneWindow = sceneFrame.contentWindow;
@@ -183,6 +258,7 @@ function endSession(reason = 'session-ended') {
   sessionExpiryTimer = null;
   invalidateSceneBoot();
   teardownSceneRealm(sessionEndReason);
+  destroyCombatShell();
   presenceBridge.reset();
   window.POCKETMONSTER_CHAT_RUNTIME?.stop?.(sessionEndReason);
   clearLaunchSession(window.sessionStorage);
@@ -279,6 +355,7 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
   if (outcome?.status === 'error'
     && outcome.code === 'ONLINE_SCENE_BOOT_FAILED'
     && ONLINE_SCENE_ERROR_STAGES.has(outcome.stage)) {
+    closeCombatSession();
     sceneBootState = 'error';
     sceneErrorCount += 1;
     activeSceneLease = null;
@@ -303,6 +380,7 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
 
 function leaveSceneBoot(sceneWindow, lease) {
   if (sessionEnding || !sceneWindowIsCurrent(sceneWindow) || !(activeSceneLease === lease)) return false;
+  closeCombatSession();
   activeSceneLease = null;
   presenceBridge.reset();
   showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
@@ -357,6 +435,7 @@ const publicShell = Object.freeze({
   oneSocket: true,
   // Child scenes may trust this authenticated shell during in-tab navigation.
   sceneNavigationTrusted: true,
+  combat: publicCombatShell,
   registerSceneBoot,
   reportSceneBoot,
   leaveSceneBoot,
@@ -379,6 +458,7 @@ const publicShell = Object.freeze({
     sessionActive: isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
     sessionEnding,
     sessionEndReason,
+    combat: publicCombatShell.diagnostics(),
     ...presenceBridge.diagnostics(),
     chat: window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.() || null,
   }),

@@ -25,6 +25,8 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'launch-bootstrap.mjs',
   'server-sync.mjs',
   'online-world-shell-v900.mjs',
+  'combat-v91-entry.mjs',
+  'combat-v91.css',
   'online-world-bridge-v900.mjs',
   'scene-entry-v900.mjs',
   'worlds-v900.mjs',
@@ -168,6 +170,11 @@ async function verifyPages(options, runtimeConfig) {
     if (entries.has(entry.path)) throw new Error(`patch-manifest.json contains duplicate path ${entry.path}`);
     entries.set(entry.path, entry);
   }
+  for (const relative of entries.keys()) {
+    if (relative.startsWith('combat-v91-server-')) {
+      throw new Error(`patch-manifest.json must not publish server-only Combat module ${relative}`);
+    }
+  }
 
   const bodies = new Map();
   for (const relative of PAGES_LIVE_SMOKE_FILES) {
@@ -186,8 +193,16 @@ async function verifyPages(options, runtimeConfig) {
   validateRuntimeConfig(parseJson(bodies.get('runtime-config.json'), 'runtime-config.json'), options.expectedSha, options.expectedApiBaseUrl);
   for (const entry of ['index.html', 'v900.html']) {
     if (!bodies.get(entry).includes('entry-preload-v900.mjs')) throw new Error(`${entry} must boot entry-preload-v900.mjs`);
+    if (!/\bhref\s*=\s*['"]\.\/combat-v91\.css(?:\?[^'"]*)?['"]/.test(bodies.get(entry))) {
+      throw new Error(`${entry} must load combat-v91.css in the parent document`);
+    }
   }
   if (!bodies.get('scene-v900.html').includes('scene-entry-v900.mjs')) throw new Error('scene-v900.html must boot scene-entry-v900.mjs');
+  const parentShell = bodies.get('online-world-shell-v900.mjs');
+  if (!/(?:from\s*|import\s*\()\s*['"]\.\/combat-v91-entry\.mjs(?:\?[^'"]*)?['"]/.test(parentShell)
+    || !/\bcreateCombatV91Shell\b/.test(parentShell)) {
+    throw new Error('online-world-shell-v900.mjs must import and install combat-v91-entry.mjs in the parent shell');
+  }
   if (!bodies.get('pirate-fruit-offline/index.html').includes('assets/index-C3SJLfq8.js')) {
     throw new Error('Pirate Fruit entry must boot its vendored scene bundle');
   }
@@ -201,6 +216,9 @@ async function verifyFirebase(options, runtimeConfig, expectedAssetBaseUrl) {
   ]);
   if (!index.includes('firebase-launcher-entry.mjs')) throw new Error('Firebase index must boot firebase-launcher-entry.mjs');
   if (index.includes('src="./entry-preload-v900.mjs')) throw new Error('Firebase index must not boot the V9 game locally');
+  if (/href\s*=\s*['"]\.\/combat-v91\.css(?:\?[^'"]*)?['"]/.test(index)) {
+    throw new Error('Firebase index must not load the Pages-only Combat stylesheet locally');
+  }
   if (!launcher.includes('runtime-config.json')) throw new Error('Firebase launcher must load runtime-config.json');
   if (expectedAssetBaseUrl) {
     const expectedAssetBase = secureBaseUrl(expectedAssetBaseUrl, 'expected asset base URL');
