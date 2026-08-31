@@ -30,7 +30,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=821',
+    runtime: './game-v800.js?v=822',
   }),
   Object.freeze({
     world: 'living-world',
@@ -90,7 +90,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     webSocketConstructs: 0,
   };
   const sceneQuery = new URLSearchParams({ world, panel });
-  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '10');
+  if (hostMode === 'hosted') sceneQuery.set('shellRevision', '11');
   const initialSceneHref = `https://game.example/scene-v900.html?${sceneQuery}`;
 
   const config = Object.freeze({
@@ -470,7 +470,7 @@ for (const expected of worldCases) {
   assert.equal(metrics.sceneBootRegistrations.length, 1);
   assert.equal(metrics.sceneBootReports.length, 1);
   assert.deepEqual({ ...metrics.sceneBootReports[0] }, { status: 'ready' });
-  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '10', 'hosted route normalization preserves the exact scene lease URL');
+  assert.equal(new URL(childWindow.location.href).searchParams.get('shellRevision'), '11', 'hosted route normalization preserves the exact scene lease URL');
   assert.equal(Object.isFrozen(sceneLease), true);
   assert.deepEqual(metrics.importedNodes, ['scene-root', 'scene-overlay'], 'template scripts are not re-imported');
   assert.equal(elements.get('chatToggleBtn').removed, true);

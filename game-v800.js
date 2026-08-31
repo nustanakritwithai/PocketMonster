@@ -3130,8 +3130,6 @@ let sceneRuntimeActive=!sceneRuntimePrewarming;
 function setSceneRuntimeActive(active,reason=active?'scene-mount':'scene-unmount'){
   sceneRuntimeActive=active===true;
   window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.(reason);
-  joyEnd();
-  endCam();
   for(const code of Object.keys(keys))keys[code]=false;
   if(sceneRuntimeActive){
     requestAnimationFrame(()=>{
