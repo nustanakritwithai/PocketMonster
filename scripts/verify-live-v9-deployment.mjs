@@ -35,6 +35,8 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
+  'pirate-fruit-offline/pocket-bootstrap.mjs',
+  'pirate-save-bridge-v900.mjs',
   'pirate-fruit-offline/assets/index-C3SJLfq8.js',
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
 ]);
@@ -188,8 +190,13 @@ async function verifyPages(options, runtimeConfig) {
     if (!bodies.get(entry).includes('entry-preload-v900.mjs')) throw new Error(`${entry} must boot entry-preload-v900.mjs`);
   }
   if (!bodies.get('scene-v900.html').includes('scene-entry-v900.mjs')) throw new Error('scene-v900.html must boot scene-entry-v900.mjs');
-  if (!bodies.get('pirate-fruit-offline/index.html').includes('assets/index-C3SJLfq8.js')) {
-    throw new Error('Pirate Fruit entry must boot its vendored scene bundle');
+  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=1')) {
+    throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
+  }
+  const pirateBootstrap = bodies.get('pirate-fruit-offline/pocket-bootstrap.mjs');
+  if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
+    || !pirateBootstrap.includes("await import('./assets/index-C3SJLfq8.js')")) {
+    throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
   }
   return { runtimeConfig, manifest };
 }
