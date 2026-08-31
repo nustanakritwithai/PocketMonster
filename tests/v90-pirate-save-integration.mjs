@@ -26,7 +26,7 @@ const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
 assert.match(boot, /index\.html\?v=911/, 'parent cache-busts the save-aware offline HTML');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=917/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=918/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=13/, 'top-level entry cache-busts BFCache restore behavior beyond latest main');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=14/, 'scene HTML cache-busts scene-entry fullscreen ownership beyond latest main');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=3/, 'offline HTML cache-busts presentation integration');
