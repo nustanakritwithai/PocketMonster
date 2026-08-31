@@ -25,8 +25,8 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=2/, 'parent boot cache
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=912/, 'parent cache-busts the save-aware offline HTML');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=919/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
+assert.match(boot, /index\.html\?v=913/, 'parent cache-busts the telemetry-aware offline HTML');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=920/, 'world catalog cache-busts the sandbox/save boot beyond latest main');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=14/, 'top-level entry cache-busts BFCache restore behavior beyond latest main');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=15/, 'scene HTML cache-busts scene-entry fullscreen ownership beyond latest main');
 assert.match(sceneHtml, /style-v900\.css\?v=913/, 'scene HTML cache-busts the persistent fullscreen control layout');

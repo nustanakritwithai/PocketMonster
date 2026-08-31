@@ -3,6 +3,10 @@ import {
   PIRATE_ONBOARDING_COMPACT_STYLE_ID,
   PIRATE_ONBOARDING_STATE_MESSAGE,
 } from '../pirate-onboarding-overlay-v900.mjs?v=1';
+import {
+  PIRATE_HUD_INIT_MESSAGE,
+  startPirateHudTelemetryPublisher,
+} from '../pirate-hud-telemetry-v900.mjs?v=1';
 
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -39,6 +43,7 @@ let cameraActive = false;
 let cameraPoint = { x: 0, y: 0 };
 let onboardingStateSignature = null;
 let onboardingObserver = null;
+let hudTelemetryPublisher = null;
 
 function installCompactOnboardingStyle() {
   if (document.getElementById(PIRATE_ONBOARDING_COMPACT_STYLE_ID)) return;
@@ -164,6 +169,15 @@ function resetInputs() {
 window.addEventListener('message', event => {
   if (window.parent === window || event.source !== window.parent || event.origin !== allowedParentOrigin) return;
   const message = event.data;
+  if (message?.type === PIRATE_HUD_INIT_MESSAGE && Number.isSafeInteger(message.frameGeneration) && message.frameGeneration >= 0) {
+    hudTelemetryPublisher?.stop();
+    hudTelemetryPublisher = startPirateHudTelemetryPublisher({
+      document,
+      frameGeneration: message.frameGeneration,
+      parentOrigin: allowedParentOrigin,
+    });
+    return;
+  }
   if (message?.type !== PIRATE_UNIFIED_INPUT_MESSAGE) return;
   if (message.kind === 'onboarding-action' && ONBOARDING_ACTION_SELECTORS[message.action]) {
     document.querySelector(ONBOARDING_ACTION_SELECTORS[message.action])?.click();
@@ -176,6 +190,8 @@ window.addEventListener('message', event => {
 window.addEventListener('pagehide', () => {
   resetInputs();
   onboardingObserver?.disconnect();
+  hudTelemetryPublisher?.stop();
+  hudTelemetryPublisher = null;
   if (allowedParentOrigin) {
     window.parent.postMessage({ type: PIRATE_ONBOARDING_STATE_MESSAGE, active: false }, allowedParentOrigin);
   }

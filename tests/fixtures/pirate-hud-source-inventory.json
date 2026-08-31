@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "capturedFrom": "pirate-fruit-offline/index.html",
+  "captureMode": "local-headless-runtime-dom",
+  "player": {
+    "available": true,
+    "selectors": {
+      "level": ".progression-hud-level",
+      "hp": ".progression-hp-text",
+      "resource": ".progression-mp-text",
+      "mode": ".progression-energy-text"
+    },
+    "unavailableFields": ["portraitKey", "displayName", "title", "buffs"]
+  },
+  "quest": {
+    "availableWhenVisible": true,
+    "selectors": {
+      "root": ".quest-tracker",
+      "title": ".quest-tracker-title",
+      "objective": ".quest-tracker-objective"
+    }
+  },
+  "target": {
+    "available": false,
+    "observedSelectors": [".boss-bar", ".boss-bar-title", ".boss-bar-lv", ".boss-bar-fill"],
+    "reason": "The DOM exposes only a fraction bar and no authoritative current/max HP or stable entity ID."
+  },
+  "actions": [
+    { "id": "capture", "selector": ".tc-attack", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "summon", "selector": ".tc-dash", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "recall", "selector": ".tc-jump", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "skill1", "selector": ".tc-skill1", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "skill2", "selector": ".tc-skill2", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "skill3", "selector": ".tc-skill3", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "skill4", "selector": ".tc-ult", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "block", "selector": ".tc-block", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "weapon", "selector": ".tc-weapon", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "potion1", "selector": ".tc-potion1", "countSelector": ".tc-potion-count", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "potion2", "selector": ".tc-potion2", "countSelector": ".tc-potion-count", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "zoomIn", "selector": ".tc-zoom-in", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" },
+    { "id": "zoomOut", "selector": ".tc-zoom-out", "cooldownTextSelector": ".tc-cd-text", "cooldownMaskSelector": ".tc-ring" }
+  ],
+  "utilities": [
+    { "id": "stats", "selector": ".stats-open-button" },
+    { "id": "audio", "selector": ".audio-toggle" },
+    { "id": "graphics", "selector": ".graphics-setting" }
+  ],
+  "unavailableFeatures": ["chat", "party", "mapMarkers", "buffs"],
+  "cooldownTelemetry": {
+    "available": false,
+    "reason": "The child exposes a remaining-time label and fraction mask but no authoritative total cooldown, so numeric cooldown values are not published."
+  }
+}
