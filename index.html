@@ -11,9 +11,9 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-  <script type="module" src="./entry-preload-v900.mjs?v=921"></script>
+  <script type="module" src="./entry-preload-v900.mjs?v=923"></script>
   <link rel="stylesheet" href="./style-v800.css?v=813" />
-  <link rel="stylesheet" href="./style-v900.css?v=911" />
+  <link rel="stylesheet" href="./style-v900.css?v=912" />
   <link rel="stylesheet" href="./combat-v91.css?v=1" />
 </head>
 <body>
@@ -176,7 +176,8 @@
       </div>
     </div>
     <div id="actionReason" class="action-reason" role="status" aria-live="polite">อยู่ Ranch • ออกไป Wild Zone ก่อน</div>
-    <div id="stageObjective" class="quest-tracker starter-journey hidden" role="status" aria-live="polite" aria-label="เป้าหมายด่าน"><b class="quest-tracker-kicker">เควส</b><span class="quest-tracker-sr">STAGE OBJECTIVE</span><span id="stageObjectiveTitle" class="quest-tracker-title"></span><ol id="stageObjectiveList" class="quest-tracker-list"></ol><span id="stageObjectiveStep" class="quest-tracker-sr">สำรวจพื้นที่และทำภารกิจเพื่อเปิดจุดวาป</span></div>
+    <button id="stageObjectiveToggle" class="quest-tracker-toggle hidden" type="button" aria-label="เปิดเควส">เควส</button>
+    <div id="stageObjective" class="quest-tracker starter-journey hidden" role="status" aria-live="polite" aria-label="เป้าหมายด่าน"><button id="stageObjectiveClose" class="quest-tracker-close" type="button" aria-label="ปิดเควส">×</button><b class="quest-tracker-kicker">เควส</b><span class="quest-tracker-sr">STAGE OBJECTIVE</span><span id="stageObjectiveTitle" class="quest-tracker-title"></span><ol id="stageObjectiveList" class="quest-tracker-list"></ol><span id="stageObjectiveStep" class="quest-tracker-sr">สำรวจพื้นที่และทำภารกิจเพื่อเปิดจุดวาป</span></div>
 
 
     <button id="npcBtn" class="npc-btn hidden">คุย</button>

@@ -1,4 +1,4 @@
-import './persistent-fullscreen-v900.mjs?v=1';
+import { bindPersistentFullscreenControls } from './persistent-fullscreen-v900.mjs?v=2';
 import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
@@ -107,7 +107,10 @@ window.addEventListener(ONLINE_WORLD_SCENE_TEARDOWN_EVENT, event => {
 window.addEventListener('pocketmonster:session-ended', () => {
   if (teardownScene('scene-session-ended')) endParentSession('scene-session-ended');
 }, { signal: sceneLifetime.signal });
-window.addEventListener('pagehide', leaveParentSceneBoot, { signal: sceneLifetime.signal });
+window.addEventListener('pagehide', () => {
+  leaveParentSceneBoot();
+  teardownScene('scene-pagehide');
+}, { signal: sceneLifetime.signal });
 
 function sceneAbortError() {
   return Object.assign(new Error('Online scene bootstrap was stopped'), {
@@ -159,7 +162,7 @@ try {
   window.POCKETMONSTER_SCENE_EMBEDDED = true;
 
   bootStage = 'template';
-  const templateUrl = new URL('./v900.html?v=914', import.meta.url);
+  const templateUrl = new URL('./v900.html?v=915', import.meta.url);
   const templateResponse = await fetch(templateUrl, { cache: 'no-store', signal: sceneLifetime.signal });
   requireLiveScene();
   if (!templateResponse.ok) throw new Error(`โหลดโครงฉาก V9 ไม่สำเร็จ (${templateResponse.status})`);
@@ -173,13 +176,14 @@ try {
   document.getElementById('chatToggleBtn')?.remove();
   document.getElementById('gameChat')?.remove();
   document.getElementById('accountGate')?.classList.add('hidden');
+  bindPersistentFullscreenControls(window, { signal: sceneLifetime.signal });
 
   bootStage = 'startup';
   requireLiveScene();
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=919');
+  await import('./worlds-v900.mjs?v=921');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });

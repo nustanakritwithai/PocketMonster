@@ -30,6 +30,7 @@ const indexHtml = read('index.html');
 const v900Html = read('v900.html');
 const runtimeConfig = JSON.parse(read('runtime-config.json'));
 const pirateOfflineHtml = read('pirate-fruit-offline/index.html');
+const pirateBootstrap = read('pirate-fruit-offline/pocket-bootstrap.mjs');
 
 for (const file of [
   'entry-preload-v900.mjs',
@@ -45,11 +46,11 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=921/, 'active HTML cache-busts the persistent-shell entry');
-assert.match(indexHtml, /style-v900\.css\?v=911/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=923/, 'active HTML cache-busts the persistent-shell entry');
+assert.match(indexHtml, /style-v900\.css\?v=912/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=11'\)/, 'top-level authenticates once before starting the shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=13'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -57,7 +58,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=11')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=13')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -98,9 +99,11 @@ assert.doesNotMatch(rawLoadHandler, /classList\.add\('hidden'\)|online-scene-loa
 assert.match(shell, /POCKETMONSTER_WORLD_STATE = \(\) => presenceBridge\.readPose\(\)/, 'shell owns the stable pose provider');
 assert.match(shell, /POCKETMONSTER_WORLD_PRESENCE = payload => presenceBridge\.acceptSnapshot\(payload\)/, 'shell owns the stable snapshot consumer');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_LAUNCH_SESSION/, 'hosted scenes reuse the parent session object without redeeming it');
-assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=1/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
+assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=2/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
+assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: sceneLifetime\.signal \}\)/, 'scene entry binds visible fullscreen controls before any world runtime starts');
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=1[\s\S]*index-C3SJLfq8\.js/, 'Pirate iframe installs the bridge before its vendored runtime');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=2[\s\S]*pocket-bootstrap\.mjs\?v=1/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-C3SJLfq8\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
 assert.match(sceneEntry, /__POCKETMONSTER_RUNTIME_MANIFEST__ = config/, 'legacy scene runtimes receive the same normalized configuration');
@@ -108,13 +111,14 @@ assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_SERVER_GATE/, 'hosted sc
 assert.match(sceneEntry, /POCKETMONSTER_SERVER_GATE = serverGate/, 'legacy scene runtimes receive the inherited gate capability');
 assert.match(sceneEntry, /registerSceneBoot\?\.\(window, sceneHref\)/, 'child registers its exact document URL with the parent shell');
 assert.match(sceneEntry, /reportSceneBoot\?\.\(window, sceneLease/, 'child reports boot outcome with its exact lease');
-assert.match(sceneEntry, /v900\.html\?v=914/, 'hosted scene cache-busts the shared V9 DOM template');
+assert.match(sceneEntry, /v900\.html\?v=915/, 'hosted scene cache-busts the shared V9 DOM template');
+assert.match(sceneEntry, /pagehide[\s\S]*leaveParentSceneBoot\(\)[\s\S]*teardownScene\('scene-pagehide'\)/, 'pagehide revokes the lease and aborts scene capabilities before BFCache');
 assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child logout delegates cleanup to the parent session owner');
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(sceneEntry, /worlds-v900\.mjs\?v=919/, 'hosted scene boots the existing three-world router');
-const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=919')");
+assert.match(sceneEntry, /worlds-v900\.mjs\?v=921/, 'hosted scene boots the existing three-world router');
+const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=921')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');
 assert.doesNotMatch(sceneEntry, /prepareLaunch|redeemLaunchTicket|chat-runtime|new WebSocket|sessionStorage/, 'scene entry cannot redeem, persist, or create another transport');

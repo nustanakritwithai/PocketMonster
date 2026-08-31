@@ -78,11 +78,13 @@ const sceneWindow = {
 };
 const frameListeners = new Map();
 const sceneFrame = element('iframe', 'onlineWorldSceneFrame');
+let sceneSrcAssignments = 0;
 sceneFrame.contentWindow = sceneWindow;
 sceneFrame.addEventListener = (type, handler) => frameListeners.set(type, handler);
 Object.defineProperty(sceneFrame, 'src', {
   get() { return this.srcValue || ''; },
   set(value) {
+    sceneSrcAssignments += 1;
     if (value === 'about:blank') teardownSequence.push('blank');
     this.srcValue = value;
     sceneWindow.location.href = value;
@@ -277,6 +279,28 @@ sceneWindow.addEventListener('pocketmonster:online-scene-teardown', event => {
     result: combatController.openSession(combatSessionOptions),
   }));
 });
+
+const sceneAssignmentsBeforeRestore = sceneSrcAssignments;
+const leaseBeforeRestore = activeLease;
+const teardownCountBeforeRestore = teardownCombatReopenAttempts.length;
+const restoredPage = new Event('pageshow');
+Object.defineProperty(restoredPage, 'persisted', { value: true });
+window.dispatchEvent(restoredPage);
+assert.equal(sceneSrcAssignments, sceneAssignmentsBeforeRestore + 1, 'BFCache restoration loads a fresh scene document');
+assert.equal(teardownCombatReopenAttempts.length, teardownCountBeforeRestore + 1,
+  'BFCache restoration tears down the stale Combat session before reloading the scene');
+assert.equal(teardownCombatReopenAttempts.at(-1).reason, 'scene-bfcache-restore');
+assert.equal(teardownCombatReopenAttempts.at(-1).result.reason, 'online_scene_inactive',
+  'the stale child cannot reopen Combat during BFCache teardown');
+assert.equal(onlineShell.reportSceneBoot(sceneWindow, leaseBeforeRestore, { status: 'ready' }), false, 'BFCache restoration revokes the frozen document lease');
+snapshots = installScenePose('pirate-fruit');
+activeLease = registerSceneBoot();
+sceneFrame.emitLoad();
+reportSceneReady(activeLease);
+assert.equal(FakeWebSocket.instances.length, 1, 'BFCache restoration reuses the parent transport');
+assert.equal(combatController.readState(), null,
+  'a fresh scene lease cannot resurrect the Combat state owned by the prior document');
+openCombatProjection();
 
 for (const [world, panel, zone] of [
   ['pocket-monster', 'throw', 'hub'],

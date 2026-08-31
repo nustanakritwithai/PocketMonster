@@ -1,5 +1,7 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
-import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs';
+import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
+import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=1';
+import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import { publishWorldState } from './world-presence-v800.mjs';
 import {
   PIRATE_PRESENCE_ZONE,
@@ -9,8 +11,8 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=910', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=820&animalControl=pirate-fruit';
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=911', import.meta.url).href;
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=822&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const startup = document.getElementById('startupStatus');
@@ -25,7 +27,7 @@ export function ensurePocketAnimalControl() {
     return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
   }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=820&animalControl=pirate-fruit').then(() => {
+    throwRuntimePromise = import('./game-v800.js?v=822&animalControl=pirate-fruit').then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
@@ -42,9 +44,11 @@ function mountPirateOffline() {
   frame.title = 'Pirate Fruit';
   const frameUrl = new URL(PIRATE_FRUIT_OFFLINE_ENTRY);
   frameUrl.searchParams.set('parentOrigin', location.origin);
-  frame.src = frameUrl.href;
+  frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen');
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
+  bindPirateSaveHost(frame);
+  frame.src = frameUrl.href;
   return frame;
 }
 
@@ -55,11 +59,10 @@ function assignCombinedWorld(worldId) {
 }
 
 function bindPocketMonsterLink(frame) {
-  const frameOrigin = new URL(frame.src).origin;
   const sendInput = payload => frame.contentWindow?.postMessage({
     type: PIRATE_UNIFIED_INPUT_MESSAGE,
     ...payload,
-  }, frameOrigin);
+  }, '*');
   window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.registerAdapter?.('pirate-fruit', Object.freeze({
     interceptActions: true,
     move: payload => sendInput({ kind: 'move', ...payload }),
@@ -71,10 +74,10 @@ function bindPocketMonsterLink(frame) {
   let piratePose = null;
   let latestPresenceSnapshot = null;
   const forwardPresence = snapshot => {
-    frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), frameOrigin);
+    frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), '*');
   };
   const forwardPresenceStatus = connected => {
-    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), frameOrigin);
+    frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
   frame.addEventListener('load', () => {
     try { frame.contentWindow?.focus?.(); } catch {}
@@ -97,8 +100,15 @@ function bindPocketMonsterLink(frame) {
   };
   window.addEventListener('message', event => {
     if (!pirateRuntimeActive) return;
-    if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
+    if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
+    const onboarding = readPirateOnboardingState(message);
+    if (onboarding) {
+      const controls = document.getElementById('pirateUnifiedControls');
+      if (controls) controls.dataset.pirateOnboarding = onboarding.active ? 'active' : 'inactive';
+      if (onboarding.active) window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.('pirate-onboarding-active');
+      return;
+    }
     const nextPose = sanitizePirateLocalPresence(message);
     if (nextPose) {
       piratePose = nextPose;

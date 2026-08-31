@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  bindPersistentFullscreenControls,
   PERSISTENT_FULLSCREEN_BRIDGE_KIND,
   installPersistentFullscreenBridge,
 } from '../persistent-fullscreen-v900.mjs';
@@ -45,6 +46,34 @@ for (const depth of ['scene', 'pirate']) {
 
 assert.equal(owner.calls.length, 1, 'scene swaps reuse one persistent parent fullscreen request');
 assert.deepEqual(owner.calls[0], { navigationUI: 'hide' });
+
+const controlListeners = new Map();
+const controlButtons = new Map(['enterImmersiveBtn', 'retryImmersiveBtn', 'fullscreenBtn'].map(id => [id, {
+  addEventListener(type, listener) { controlListeners.set(`${id}:${type}`, listener); },
+}]));
+const sceneDocument = {
+  ...createDocument().document,
+  getElementById(id) { return controlButtons.get(id) || null; },
+};
+const sceneWindow = {
+  document: sceneDocument,
+  screen: { orientation: { lock: async mode => mode } },
+  POCKETMONSTER_PERSISTENT_FULLSCREEN: {
+    async request(options) {
+      assert.deepEqual(options, { navigationUI: 'hide' });
+      return true;
+    },
+  },
+};
+assert.equal(bindPersistentFullscreenControls(sceneWindow), 3, 'scene entry owns all visible fullscreen controls');
+let prevented = 0;
+let stopped = 0;
+await controlListeners.get('fullscreenBtn:click')({
+  preventDefault() { prevented += 1; },
+  stopImmediatePropagation() { stopped += 1; },
+});
+assert.equal(prevented, 1);
+assert.equal(stopped, 1, 'scene entry prevents the late Pocket runtime from issuing a duplicate request');
 
 const standalone = createDocument();
 const standaloneWindow = { document: standalone.document };

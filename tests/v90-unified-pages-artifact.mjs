@@ -49,8 +49,8 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900\.mjs\?v=921/);
-assert.match(index, /style-v900\.css\?v=911/);
+assert.match(index, /entry-preload-v900\.mjs\?v=923/);
+assert.match(index, /style-v900\.css\?v=912/);
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));

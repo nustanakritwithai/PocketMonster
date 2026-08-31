@@ -43,6 +43,8 @@ const REQUIRED_BOOTSTRAP_FILES = [
   'chat-runtime.mjs',
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
+  'pirate-save-bridge-v900.mjs',
+  'pirate-fruit-offline/pocket-bootstrap.mjs',
   'scene-entry-v900.mjs',
   'worlds-v900.mjs',
 ];

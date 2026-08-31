@@ -48,9 +48,10 @@ const preloadV900 = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.
 const shellV900 = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url), 'utf8');
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
-const pirateBundleRef = pirateOfflineHtml.match(/src="\.\/(assets\/index-[^"]+\.js)"/)?.[1];
-assert.ok(pirateBundleRef, 'offline Pirate Fruit entry declares its main bundle');
+const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
+assert.ok(pirateBundleRef, 'offline Pirate Fruit bootstrap imports its main bundle after save hydration');
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/' + pirateBundleRef, import.meta.url), 'utf8');
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
@@ -74,7 +75,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=815/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=11/, 'V9 preload boots the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900\.mjs\?v=13/, 'V9 preload cache-busts the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -89,8 +90,8 @@ assert.doesNotMatch(html, /id="pocketWorldWarpBtn"|data-combined-world=/, 'V9 wo
 assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=820');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=914');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=822');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=917');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=903');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -116,13 +117,14 @@ assert.match(worldsJs, /preparePocketRuntime\(worldById\('pocket-monster'\)\)/, 
 assert.match(worldsJs, /await preparePocketRuntime\(world\);[\s\S]*applyControlPanel\(panelId, world\.id\)/, 'Pocket scene and controls switch atomically only after its runtime is ready');
 assert.match(worldsJs, /POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget[\s\S]*savedWorldGameNodes\.set\(world\.id, \[\.\.\.mountTarget\.childNodes\]\)/, 'Pocket prewarm builds its canvas off-DOM for an instant mount');
 assert.match(liveJs, /POCKETMONSTER_SCENE_MOUNT_TARGET[\s\S]*sceneRuntimeActive=!sceneRuntimePrewarming/, 'Pocket prewarm remains inactive until scene mount');
-assert.match(liveJs, /mobileDualPointerInput\?\.reset\?\.\(reason\);[\s\S]*joyEnd\(\);[\s\S]*endCam\(\);[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms both control surfaces after every scene mount');
+assert.match(liveJs, /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*for\(const code of Object\.keys\(keys\)\)keys\[code\]=false;[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms the shared control surface after every scene mount');
+assert.doesNotMatch(liveJs, /\b(?:joyEnd|endCam)\s*\(/, 'Pocket lifecycle cannot call removed legacy pointer helpers');
 assert.match(boot, /pirateFrame\.contentWindow\?\.focus\?\.\(\)/, 'Pirate lifecycle restores iframe focus after returning without a document reload');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');
 assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persistent shell owns fullscreen across scene swaps');
-assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=1/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
+assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=2/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');
@@ -149,16 +151,13 @@ assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
 assert.equal(PIRATE_FRUIT_ORIGINAL_HUD, false, 'V9 parent HTML is the only mobile control chrome');
 {
-  const headChildren = [];
-  const doc = {
-    head: { appendChild(node) { headChildren.push(node); } },
-    documentElement: { dataset: {} },
-    getElementById() { return null; },
-    createElement() { return { id: '', textContent: '' }; },
-  };
-  assert.equal(syncPirateFruitControlHud({ contentDocument: doc }), true);
-  assert.equal(doc.documentElement.dataset.pirateHud, 'pirate-primary-parent');
-  assert.equal(headChildren[0].textContent.includes('pointer-events: none'), true);
+  const sent = [];
+  const frame = { contentWindow: { postMessage(message, origin) { sent.push({ message, origin }); } } };
+  assert.equal(syncPirateFruitControlHud(frame), true);
+  assert.deepEqual(sent, [{
+    message: { type: 'pocketmonster:pirate-control-v1', panel: 'human' },
+    origin: '*',
+  }]);
 }
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'throw stage stays under the Pocket HUD');
 assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #monsterThrowStage\{display:block\}/, 'throw panel reveals the Pocket stage');
@@ -232,14 +231,16 @@ assert.match(boot, /remote: false/, 'pirate world is local, not a remote Pirate 
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
-assert.match(boot, /game-v800\.js\?v=820&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
+assert.match(boot, /game-v800\.js\?v=822&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
 assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes the top status bar');
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
-assert.match(boot, /event\.origin !== frameOrigin/, 'parent accepts portal messages only from the mounted Pirate Fruit origin');
+assert.match(boot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'\)/, 'nested Pirate Fruit runs in an opaque-origin sandbox');
+assert.doesNotMatch(boot, /allow-same-origin/, 'nested Pirate Fruit cannot read the scene session or shared storage');
+assert.match(boot, /event\.origin !== 'null'/, 'parent accepts portal messages only from the mounted opaque-origin frame');
 assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
@@ -251,11 +252,11 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
   assert.doesNotMatch(serverGate, /vpsWrites=true|playerDataWrites=true|firebaseFallback=true/, 'Server gate response must not ask Server to open writes');
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
-assert.match(pirateOfflineHtml, /src="\.\/assets\/index-/, 'offline client uses relative Vite assets');
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs"/, 'offline client loads the Pocket visual hook before the Vite bundle');
+assert.match(pirateBootstrap, /import\('\.\/assets\/index-/, 'offline bootstrap imports the relative playable Vite bundle');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=3"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
 assert.ok(
-  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('src="./assets/index-'),
-  'Pocket visual hook evaluates before the real Pirate Fruit bundle',
+  pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
+  'Pocket visual hook is listed before the save bootstrap that loads the real Pirate Fruit bundle',
 );
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene is gone');
 assert.match(boot, /visual: 'pocket-asset-engine'/, 'pirate boot records Pocket presentation overlays');

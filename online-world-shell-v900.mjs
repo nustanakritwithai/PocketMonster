@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=918';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=920';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -67,7 +67,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '9');
+  url.searchParams.set('shellRevision', '11');
   return url.href;
 }
 
@@ -496,7 +496,14 @@ Object.defineProperty(window, 'POCKETMONSTER_ONLINE_SHELL', {
 window.addEventListener('pocketmonster:session-ended', () => {
   if (!sessionEnding) endSession('session-ended');
 });
-window.addEventListener('pageshow', scheduleSessionExpiryCheck);
+window.addEventListener('pageshow', event => {
+  scheduleSessionExpiryCheck();
+  if (event.persisted !== true || sessionEnding) return;
+  invalidateSceneBoot({ showLoading: true, message: `กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…` });
+  signalSceneTeardown('scene-bfcache-restore');
+  presenceBridge.reset();
+  sceneFrame.src = sceneUrl(activeWorld, activePanel);
+});
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);

@@ -22,7 +22,7 @@ release candidate และยังไม่ควร merge จนกว่า 
   authoritative Status มาจาก Server/entity-owner snapshot เท่านั้น
 - **Client ไม่เขียน World position/transform** — หลังผลยืนยัน Client ทำได้เพียงส่ง
   `world.impulse_commit_requested`; World/Server spatial authority ต้องเป็นผู้ commit
-- **Production transport ยังปิด** — `networkCreation: false`, public shell ตั้ง
+- **Combat production transport ยังไม่ wire** — `networkCreation: false`, public shell ตั้ง
   `serverReconcileExposed: false` และยังไม่มี authenticated response ingress หรือ live
   World impulse consumer
 
@@ -290,7 +290,7 @@ Build บังคับว่า `combat-v91-server-*`, tests, docs และ o
 - `npm run ci` — full legacy + V8.x + V9.0 + V9.1 regression
 - `npm run test:v91:combat`
 - `npm run test:v91:runtime`
-- `npm run build:pages` — 226 public files; Combat closure 18 assets
+- `npm run build:pages` — 229 public files after syncing `origin/main`; Combat closure 18 assets
 - `npm run test:hosting`
 - `node tests/v90-unified-pages-artifact.mjs`
 
