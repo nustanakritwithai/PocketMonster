@@ -10,7 +10,7 @@ import {
   validateCombatStatusSnapshot,
 } from './combat-v91-status.mjs';
 
-export const COMBAT_V91_SERVER_STATUS_AUTHORITY_VERSION = 'combat-v91-server-status-authority/v1';
+export const COMBAT_V91_SERVER_STATUS_AUTHORITY_VERSION = 'combat-v91-server-status-authority/v2';
 export const COMBAT_V91_STATUS_TICK_REQUEST_SCHEMA = 'combat-status-tick-request/v9.1';
 export const COMBAT_V91_STATUS_TICK_RESPONSE_SCHEMA = 'combat-status-tick-response/v9.1';
 export const COMBAT_V91_STATUS_TICK_OUTCOME_SCHEMA = 'combat-status-tick-outcome/v9.1';
@@ -142,6 +142,26 @@ export function createCombatStatusTickRequest(input = {}) {
   return result(true, null, { request: deepFreeze({ ...payload, fingerprint }) });
 }
 
+function profileSourceInvariantPayload(source) {
+  const profileInput = { ...source.profileInput };
+  if (source.ownerDomain === 'Pocket') {
+    delete profileInput.currentHp;
+    delete profileInput.stateVersion;
+  } else if (source.ownerDomain === 'Pirate') {
+    // Pirate owns mutable HP in a fingerprinted nested state object. Preserve
+    // its identity/core binding while excluding only fields that an HP commit
+    // is allowed to advance.
+    profileInput.currentHpOwnerState = Object.fromEntries(
+      Object.entries(profileInput.currentHpOwnerState)
+        .filter(([key]) => !['hpCurrent', 'stateVersion', 'fingerprint'].includes(key)),
+    );
+  }
+  return {
+    ownerDomain: source.ownerDomain,
+    profileInput,
+  };
+}
+
 function deriveProfileSource(source, { entityId } = {}) {
   if (!exactKeys(source, PROFILE_SOURCE_KEYS)) return result(false, 'invalid_domain_profile_source');
   const derived = createDomainCombatProfile(source);
@@ -155,11 +175,7 @@ function deriveProfileSource(source, { entityId } = {}) {
   return result(true, null, {
     source,
     sourceFingerprint: fingerprintCombatValue(source),
-    sourceInvariantFingerprint: fingerprintCombatValue({
-      ownerDomain: source.ownerDomain,
-      profileInput: Object.fromEntries(Object.entries(source.profileInput)
-        .filter(([key]) => key !== 'currentHp' && key !== 'stateVersion')),
-    }),
+    sourceInvariantFingerprint: fingerprintCombatValue(profileSourceInvariantPayload(source)),
     profile: derived.profile,
   });
 }
@@ -233,10 +249,10 @@ function validateStatusTickOutcome(input) {
       payload.planFingerprint].every(nonEmptyString)
     || !Number.isInteger(payload.clockTick) || payload.clockTick < 0
     || !Number.isFinite(payload.combatTimeSec) || payload.combatTimeSec < 0
-    || !Number.isFinite(payload.scheduledDamage) || payload.scheduledDamage < 0
-    || !Number.isFinite(payload.damage) || payload.damage < 0
+    || !Number.isSafeInteger(payload.scheduledDamage) || payload.scheduledDamage < 0
+    || !Number.isSafeInteger(payload.damage) || payload.damage < 0
     || payload.scheduledDamage < payload.damage
-    || !Number.isFinite(payload.hpBefore) || !Number.isFinite(payload.hpAfter)
+    || !Number.isSafeInteger(payload.hpBefore) || !Number.isSafeInteger(payload.hpAfter)
     || payload.hpAfter < 0
     || payload.hpBefore < payload.hpAfter || payload.damage !== payload.hpBefore - payload.hpAfter
     || typeof payload.defeated !== 'boolean' || typeof payload.fainted !== 'boolean'
@@ -245,7 +261,7 @@ function validateStatusTickOutcome(input) {
       || !nonEmptyString(tick.statusId)
       || !Number.isFinite(tick.atSec) || tick.atSec < 0
       || !Number.isInteger(tick.stacks) || tick.stacks < 1
-      || !Number.isFinite(tick.damage) || tick.damage < 0
+      || !Number.isSafeInteger(tick.damage) || tick.damage < 0
       || !(tick.sourceInstanceId === null || typeof tick.sourceInstanceId === 'string'))
     || payload.expiredStatusIds.some(statusId => !nonEmptyString(statusId))
     || new Set(payload.expiredStatusIds).size !== payload.expiredStatusIds.length

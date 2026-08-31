@@ -49,6 +49,14 @@ const target = fixtureProfile({
   entityId: 'mutant:target', ownerDomain: 'Pocket', entityKind: 'Monster',
   level: 20, types: ['Fire'], stats: targetStats,
 });
+const defeatedActor = fixtureProfile({
+  entityId: 'mutant:defeated-actor', ownerDomain: 'Pirate', entityKind: 'Human',
+  level: 20, types: ['Fire'], stats: { ...actorStats, hpCurrent: 0 },
+});
+const terminalTarget = fixtureProfile({
+  entityId: 'mutant:terminal-target', ownerDomain: 'Pocket', entityKind: 'Monster',
+  level: 20, types: ['Fire'], stats: { ...targetStats, hpCurrent: 0 },
+});
 const action = fixtureAction({
   actionId: 'mutant:action',
   definitionVersion: 'mutant/action-v1',
@@ -139,10 +147,25 @@ function resolveBuff(module) {
 function assertRules(module) {
   assert.equal(module.COMBAT_V91_RULES_POLICY.authority, 'deterministic_proposal_only');
   assert.equal(module.COMBAT_V91_RULES_POLICY.sharedPath, 'all_entity_kinds');
-  assert.equal(module.COMBAT_V91_RULES_POLICY.stab, 1.2);
+  assert.equal(module.COMBAT_V91_RULES_POLICY.stab, 1.5);
   assert.equal(module.COMBAT_V91_RULES_POLICY.criticalMultiplier, 1.5);
   assert.equal(module.COMBAT_V91_RULES_POLICY.varianceMin, 0.9);
   assert.equal(module.COMBAT_V91_RULES_POLICY.maximumCombinedPenetration, 0.95);
+
+  const actorLifecycle = module.resolveCombatV91Proposal({
+    combatId: 'mutant:defeated-actor', actionSequence: 1,
+    attacker: defeatedActor, target,
+  });
+  assert.deepEqual(actorLifecycle, {
+    ok: false, reason: 'actor_not_combat_capable', rngDraws: 0, rngTrace: [],
+  });
+  const targetLifecycle = module.resolveCombatV91Proposal({
+    combatId: 'mutant:terminal-target', actionSequence: 1,
+    attacker: actor, target: terminalTarget,
+  });
+  assert.deepEqual(targetLifecycle, {
+    ok: false, reason: 'target_terminal', rngDraws: 0, rngTrace: [],
+  });
 
   const resolved = resolve(module);
   assert.equal(resolved.ok, true, resolved.reason);
@@ -150,10 +173,10 @@ function assertRules(module) {
   assert.equal(proposal.committed, false);
   assert.equal(proposal.effectiveActorStats.atk, 32);
   assert.ok(Math.abs(proposal.effectiveDefense - 5.5) < 1e-9);
-  assert.equal(proposal.stabMultiplier, 1.2);
+  assert.equal(proposal.stabMultiplier, 1.5);
   assert.equal(proposal.critical, true);
   assert.equal(proposal.varianceMultiplier, 0.9492365127651381);
-  assert.equal(proposal.totalDamage, 41);
+  assert.equal(proposal.totalDamage, 51);
   assert.equal(proposal.rngVersion, 'combat-rng/sha256-counter-v1');
   assert.equal(proposal.rngStreamFingerprint,
     '640ceed7068f5ed6888116ee59a0afae96a7d0f41e360d7b93e3b18b52d5bb0e');
@@ -218,12 +241,14 @@ assertRules(await loadSource(originalSource, 'combat-v91-rules-current'));
 const mutations = [
   ['claim runtime authority', "authority: 'deterministic_proposal_only'", "authority: 'client_authority'"],
   ['branch per domain', "sharedPath: 'all_entity_kinds'", "sharedPath: 'per_domain'"],
-  ['change STAB', 'stab: 1.2', 'stab: 1'],
+  ['change STAB', 'stab: 1.5', 'stab: 1'],
   ['change critical multiplier', 'criticalMultiplier: 1.5', 'criticalMultiplier: 2'],
   ['change variance floor', 'varianceMin: 0.9', 'varianceMin: 0.5'],
   ['weaken penetration safety cap', 'maximumCombinedPenetration: 0.95', 'maximumCombinedPenetration: 0.5'],
   ['replace World multiplier with addition', 'values[key] *= worldMultipliers[key]', 'values[key] += worldMultipliers[key]'],
   ['ignore safe zone', 'if (snapshot.validation.safeZone)', 'if (false)'],
+  ['allow defeated actor', 'if (actorProfile.stats.hpCurrent === 0)', 'if (false)'],
+  ['allow terminal target', 'if (targetProfile.stats.hpCurrent === 0)', 'if (false)'],
   ['claim committed outcome', 'committed: false,', 'committed: true,'],
   [
     'swap physical attack channel',
@@ -232,7 +257,7 @@ const mutations = [
   ],
   ['ignore Server RNG seed', 'seed: snapshot.rngSeed,', "seed: '0'.repeat(64),"],
   ['unbind RNG from ticket', 'rngTicketId: snapshot.rngTicketId,', "rngTicketId: 'rng:fixed',"],
-  ['unbind RNG from action definition', 'actionFingerprint: canonicalAction.fingerprint,', "actionFingerprint: '0'.repeat(64),"],
+  ['unbind RNG from action execution', 'actionFingerprint: rngActionFingerprint,', "actionFingerprint: '0'.repeat(64),"],
   ['unbind RNG from World snapshot', 'worldSnapshotFingerprint: snapshot.fingerprint,', "worldSnapshotFingerprint: '0'.repeat(64),"],
   ['hide status transition change', 'changed: plan.changed,', 'changed: false,'],
   [

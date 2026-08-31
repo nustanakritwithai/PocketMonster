@@ -401,7 +401,7 @@ export function reconcileCombatPrediction(state, response = {}) {
     if (settled.actionSequence === response.actionSequence
       && settled.status === response.status
       && settled.responseFingerprint === response.responseFingerprint) {
-      return result(true, 'already_settled', { state });
+      return result(true, 'already_settled', { state, response });
     }
     return result(false, 'settled_response_mismatch', { state });
   }
@@ -478,6 +478,7 @@ export function reconcileCombatPrediction(state, response = {}) {
         settledByIntent,
         lastServerSequence: state.lastServerSequence,
       }),
+      response,
     });
   }
 
@@ -528,6 +529,7 @@ export function reconcileCombatPrediction(state, response = {}) {
       lastServerSequence: Math.max(state.lastServerSequence, response.actionSequence),
     }),
     staleComponentsOnly: !appliedComponent,
+    response,
   });
 }
 

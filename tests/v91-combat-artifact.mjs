@@ -16,12 +16,20 @@ const published = new Set(manifest.files.map(entry => entry.path));
 const publicDependencyClosure = collectPublicDependencyClosure(root);
 const clientModules = Object.freeze([
   'combat-v91-adapters.mjs',
+  'combat-v91-action-dynamics-binding.mjs',
+  'combat-v91-action-stat-projection.mjs',
+  'combat-v91-authoritative-dynamics-effect.mjs',
   'combat-v91-client-store.mjs',
   'combat-v91-contract.mjs',
+  'combat-v91-dynamics-contract.mjs',
+  'combat-v91-dynamics-scheduler.mjs',
   'combat-v91-entry.mjs',
+  'combat-v91-mode-policy.mjs',
+  'combat-v91-pirate-dynamics-adapter.mjs',
   'combat-v91-protocol.mjs',
   'combat-v91-rng.mjs',
   'combat-v91-rules.mjs',
+  'combat-v91-stat-projection.mjs',
   'combat-v91-status.mjs',
   'combat-v91-ui.mjs',
 ]);
@@ -32,16 +40,29 @@ for (const assetName of clientAssets) {
   assert.equal(publicDependencyClosure.has(assetName), true,
     `${assetName} must be reachable from the public V9 parent shell`);
 }
-assert.equal([...published].some(name => name.startsWith('combat-v91-server-')), false,
+assert.equal([...published].some(name => path.posix.basename(name).startsWith('combat-v91-server-')), false,
   'Server authority implementations must not be published as browser assets');
 for (const serverOnlyModule of [
   'combat-v91-server-authority.mjs',
+  'combat-v91-server-dynamics-permit.mjs',
+  'combat-v91-server-mode-authority.mjs',
   'combat-v91-server-status-authority.mjs',
 ]) {
   assert.equal(published.has(serverOnlyModule), false,
     `${serverOnlyModule} must never ship in the Pages artifact`);
   assert.equal(publicDependencyClosure.has(serverOnlyModule), false,
     `${serverOnlyModule} must never enter the browser dependency closure`);
+}
+for (const shadowFoundation of [
+  'one-document-world-runtime-host-v910.mjs',
+  'world-runtime-lifecycle-v910.mjs',
+  'world-runtime-import-purity-v912.mjs',
+  'world-runtime-resource-scope-v912.mjs',
+]) {
+  assert.equal(published.has(shadowFoundation), false,
+    `${shadowFoundation} must stay source-only until iframe replacement is wired`);
+  assert.equal(publicDependencyClosure.has(shadowFoundation), false,
+    `${shadowFoundation} must not be presented as a live browser runtime`);
 }
 assert.equal([...published].some(name => name.startsWith('tests/v91-combat-')), false,
   'V9.1 tests must not ship in the public artifact');

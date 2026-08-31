@@ -37,6 +37,40 @@ export const TEST_STATS = Object.freeze({
   ...TEST_RATINGS,
 });
 
+export const TEST_DYNAMICS_SOURCE_PROVENANCE_FINGERPRINT = 'a'.repeat(64);
+
+export function fixtureDirectDynamics(action, {
+  definitionVersion = `${action.actionId}/test-dynamics-v1`,
+} = {}) {
+  return {
+    actionId: action.actionId,
+    definitionVersion,
+    windupTicks: 1,
+    castTicks: 1,
+    activeTicks: 1,
+    recoveryTicks: 1,
+    impactWindows: [{
+      windowId: `${action.actionId}:direct-contact`,
+      opensAtActiveTick: 0,
+      closesAtActiveTickExclusive: 1,
+      hits: [{ hitOrdinal: 0, atActiveTick: 0, delivery: 'direct' }],
+    }],
+    comboWindow: null,
+    cancelPolicy: { windows: [] },
+    interruptPolicy: {
+      allowedPhases: ['windup', 'cast', 'active', 'recovery'],
+      allowedReasons: ['damage'],
+      superArmorPhases: [],
+    },
+    resourceCosts: [],
+    projectiles: [],
+    impulses: [],
+    guard: null,
+    movementLocks: [],
+    hitstopPresentation: null,
+  };
+}
+
 export function must(result, label = 'fixture') {
   if (!result?.ok) {
     const error = new Error(`${label}: ${result?.reason ?? 'unknown failure'}`);
@@ -163,6 +197,7 @@ export function fixtureCombat({
   actorStatus,
   targetStatus,
   action = fixtureAction(),
+  actionStatProjection = null,
   world,
   tick = 50,
   combatTimeSec = 0,
@@ -177,6 +212,7 @@ export function fixtureCombat({
     actorStatus: attackerStatusSnapshot,
     targetStatus: targetStatusSnapshot,
     action,
+    actionStatProjection,
     world: world ?? fixtureWorld({ actor, target, tick, combatTimeSec, seed }),
   });
 }
@@ -188,6 +224,7 @@ export function fixtureProposal(fixture, { actionSequence = 1 } = {}) {
     attacker: fixture.actor,
     target: fixture.target,
     action: fixture.action,
+    actionStatProjection: fixture.actionStatProjection,
     worldSnapshot: fixture.world,
     attackerStatusSnapshot: fixture.actorStatus,
     targetStatusSnapshot: fixture.targetStatus,
@@ -215,7 +252,14 @@ export function committedTargetProfile(target, proposal, {
   }), `committed target ${target.entityId}`).profile;
 }
 
-export function fixtureExecutionReceipt({ fixture, proposal } = {}) {
+export function fixtureExecutionReceipt({
+  fixture,
+  proposal,
+  dynamicsStateVersion = 0,
+  actorOccupancyStateVersion = 0,
+  dynamicsPermitFingerprint = 'd'.repeat(64),
+  authoritativeDynamicsEffectReceipt = null,
+} = {}) {
   return Object.freeze({
     actorEntityId: fixture.actor.entityId,
     actorStateVersionBefore: fixture.actor.stateVersion,
@@ -228,6 +272,12 @@ export function fixtureExecutionReceipt({ fixture, proposal } = {}) {
     rngTicketId: fixture.world.rngTicketId,
     rngTicketStateVersionBefore: fixture.world.rngTicketStateVersion,
     rngTicketStateVersionAfter: fixture.world.rngTicketStateVersion + 1,
+    dynamicsStateVersionBefore: dynamicsStateVersion,
+    dynamicsStateVersionAfter: dynamicsStateVersion + 1,
+    actorOccupancyStateVersionBefore: actorOccupancyStateVersion,
+    actorOccupancyStateVersionAfter: actorOccupancyStateVersion + 1,
+    dynamicsPermitFingerprint,
+    authoritativeDynamicsEffectReceipt,
   });
 }
 

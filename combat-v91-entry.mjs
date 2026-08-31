@@ -1,5 +1,11 @@
 import { resolveCombatV91Proposal } from './combat-v91-rules.mjs';
 import { createDomainCombatProfile } from './combat-v91-adapters.mjs';
+import { createCombatActionDefinition } from './combat-v91-contract.mjs';
+import { createCombatActionDynamicsBinding } from './combat-v91-action-dynamics-binding.mjs';
+import {
+  advanceCombatDynamicsSchedule,
+  createCombatDynamicsSchedule,
+} from './combat-v91-dynamics-scheduler.mjs';
 import {
   createCombatPredictionEnvelope,
   createCombatV91ClientState,
@@ -14,18 +20,34 @@ import {
 } from './combat-v91-ui.mjs';
 import { createCombatStatusProjection } from './combat-v91-status.mjs';
 
-export const COMBAT_V91_ENTRY_VERSION = 'combat-v91-entry/v1';
+export {
+  createPirateComboDynamicsDefinition,
+  createPirateSkillDynamicsDefinition,
+} from './combat-v91-pirate-dynamics-adapter.mjs';
+
+export const COMBAT_V91_ENTRY_VERSION = 'combat-v91-entry/v2';
+const CLIENT_ACTION_RECORD_LIMIT = 128;
 export const COMBAT_V91_ENTRY_POLICY = Object.freeze({
   activation: 'active_shell_adapter',
   monolithWiring: false,
   networkCreation: false,
   authoritativeWrites: false,
+  hpWriteAuthority: 'server_target_owner_only_client_projection_never_commits',
+  statusWriteAuthority: 'server_entity_owner_only_client_projection_never_commits',
+  worldPositionWriteAuthority: 'world_server_only_client_never_commits_transform',
+  productionTransport: 'disabled_no_authoritative_response_ingress',
   shellMount: COMBAT_V91_UI_MOUNT_POLICY.shell,
   singleHtmlShell: true,
   singleActiveSession: true,
   standaloneDocument: false,
   iframeCreation: false,
   baseProfileCreation: 'pirate_pocket_domain_calculators_only',
+  actionDynamics: 'bound_fixed_60hz_client_proposal_plus_server_permit',
+  scheduledPredictionGate: 'mandatory_single_direct_impact',
+  multiHitResolution: 'fail_closed_until_per_impact_protocol',
+  projectileCollisionAuthority: 'fail_closed_until_world_collision_receipt',
+  actorOccupancy: 'single_nonterminal_schedule_per_actor',
+  confirmedMotionEffects: 'released_only_after_authoritative_outcome',
   stylesheetHref: COMBAT_V91_STYLESHEET_HREF,
   stylesheetLoading: COMBAT_V91_UI_MOUNT_POLICY.stylesheetLoading,
 });
@@ -42,6 +64,42 @@ export function createCombatV91Client({ combatId, profiles, statusSnapshots } = 
   const initial = createCombatV91ClientState({ combatId, profiles, statusSnapshots });
   if (!initial.ok) return initial;
   let currentState = initial.state;
+  const dynamicsBySequence = new Map();
+
+  function pruneTerminalDynamicsRecords() {
+    if (dynamicsBySequence.size < CLIENT_ACTION_RECORD_LIMIT) return;
+    for (const [sequence, record] of dynamicsBySequence) {
+      if (record.state.terminal !== null) dynamicsBySequence.delete(sequence);
+      if (dynamicsBySequence.size < CLIENT_ACTION_RECORD_LIMIT) return;
+    }
+  }
+
+  function activeScheduleForActor(actorEntityId) {
+    return [...dynamicsBySequence.values()].find(record => (
+      record.actorEntityId === actorEntityId && record.state.terminal === null
+    )) ?? null;
+  }
+
+  function liveResolutionSupported(bound) {
+    if (bound.action.hitCount !== 1 || bound.dynamics.hitCount !== 1) return false;
+    const hits = bound.dynamics.impactWindows.flatMap(window => window.hits);
+    return hits.length === 1 && hits[0].hitOrdinal === 0 && hits[0].delivery === 'direct';
+  }
+
+  function dynamicsView(record) {
+    if (!record) return null;
+    return Object.freeze({
+      binding: record.binding,
+      state: record.state,
+      actorEntityId: record.actorEntityId,
+      targetEntityId: record.targetEntityId,
+      startTick: record.startTick,
+      predictionEnqueued: record.predictionEnqueued,
+      consumedImpactKey: record.consumedImpactKey,
+      sourceProvenanceFingerprint: record.binding.sourceProvenanceFingerprint,
+      availableImpactKeys: Object.freeze([...record.availableImpactKeys].sort()),
+    });
+  }
 
   const client = Object.freeze({
     version: COMBAT_V91_ENTRY_VERSION,
@@ -49,23 +107,129 @@ export function createCombatV91Client({ combatId, profiles, statusSnapshots } = 
     getState() {
       return currentState;
     },
+    scheduleAction({
+      actionSequence,
+      actorEntityId,
+      targetEntityId,
+      startTick,
+      bindingVersion,
+      sourceProvenanceFingerprint,
+      action,
+      dynamics,
+    } = {}) {
+      if (!currentState.authoritativeBase[actorEntityId]
+        || !currentState.authoritativeBase[targetEntityId]) return result(false, 'unknown_entity');
+      if (dynamicsBySequence.has(actionSequence)) return result(false, 'duplicate_action_schedule');
+      if (activeScheduleForActor(actorEntityId)) return result(false, 'actor_action_in_progress');
+      pruneTerminalDynamicsRecords();
+      if (dynamicsBySequence.size >= CLIENT_ACTION_RECORD_LIMIT) {
+        return result(false, 'action_schedule_capacity_reached');
+      }
+      const bound = createCombatActionDynamicsBinding({
+        bindingVersion,
+        sourceProvenanceFingerprint,
+        action,
+        dynamics,
+      });
+      if (!bound.ok) return bound;
+      if (!liveResolutionSupported(bound)) {
+        return result(false, 'action_dynamics_resolution_unsupported');
+      }
+      const scheduled = createCombatDynamicsSchedule({
+        combatId,
+        actionSequence,
+        actorEntityId,
+        targetEntityId,
+        startTick,
+        definition: bound.dynamics,
+      });
+      if (!scheduled.ok) return scheduled;
+      const record = {
+        binding: bound.binding,
+        action: bound.action,
+        dynamics: bound.dynamics,
+        actorEntityId,
+        targetEntityId,
+        startTick,
+        state: scheduled.state,
+        predictionEnqueued: false,
+        consumedImpactKey: null,
+        intentId: null,
+        confirmedEffectsReleased: false,
+        impactEventByKey: new Map(),
+        availableImpactKeys: new Set(),
+      };
+      dynamicsBySequence.set(actionSequence, record);
+      return result(true, null, { dynamics: dynamicsView(record) });
+    },
+    advanceAction({ actionSequence, throughTick, transitionRequests = [] } = {}) {
+      const record = dynamicsBySequence.get(actionSequence);
+      if (!record) return result(false, 'unknown_action_schedule');
+      const advanced = advanceCombatDynamicsSchedule({
+        state: record.state,
+        definition: record.dynamics,
+        throughTick,
+        transitionRequests,
+      });
+      if (!advanced.ok) return advanced;
+      record.state = advanced.state;
+      for (const event of advanced.events) {
+        if (event.type === 'impact.requested'
+          && event.payload.delivery === 'direct'
+          && event.payload.hitOrdinal === 0) {
+          record.availableImpactKeys.add(event.payload.idempotencyKey);
+          record.impactEventByKey.set(event.payload.idempotencyKey, event);
+        }
+      }
+      return result(true, null, {
+        events: advanced.events,
+        dynamics: dynamicsView(record),
+      });
+    },
+    readActionDynamics(actionSequence) {
+      const record = dynamicsBySequence.get(actionSequence);
+      return record
+        ? result(true, null, { dynamics: dynamicsView(record) })
+        : result(false, 'unknown_action_schedule');
+    },
     predict({
       intentId,
       actionSequence,
       actorEntityId,
       targetEntityId,
       action,
+      actionStatProjection = null,
+      dynamicsImpactKey = null,
       worldSnapshot,
     } = {}) {
       const attacker = currentState.authoritativeBase[actorEntityId];
       const target = currentState.authoritativeBase[targetEntityId];
       if (!attacker || !target) return result(false, 'unknown_entity');
+      const dynamicsRecord = dynamicsBySequence.get(actionSequence);
+      if (!dynamicsRecord) return result(false, 'action_schedule_required');
+      if (dynamicsRecord.actorEntityId !== actorEntityId
+        || dynamicsRecord.targetEntityId !== targetEntityId) {
+        return result(false, 'action_dynamics_entity_binding_mismatch');
+      }
+      const canonicalAction = createCombatActionDefinition(action);
+      if (!canonicalAction.ok
+        || canonicalAction.action.fingerprint !== dynamicsRecord.binding.actionFingerprint) {
+        return result(false, 'action_dynamics_binding_mismatch');
+      }
+      if (dynamicsRecord.predictionEnqueued) {
+        return result(false, 'action_prediction_already_enqueued');
+      }
+      if (typeof dynamicsImpactKey !== 'string'
+        || !dynamicsRecord.availableImpactKeys.has(dynamicsImpactKey)) {
+        return result(false, 'action_impact_not_reached');
+      }
       const resolved = resolveCombatV91Proposal({
         combatId,
         actionSequence,
         attacker,
         target,
         action,
+        actionStatProjection,
         worldSnapshot,
         attackerStatusSnapshot: currentState.authoritativeStatusByEntity[actorEntityId],
         targetStatusSnapshot: currentState.authoritativeStatusByEntity[targetEntityId],
@@ -79,9 +243,24 @@ export function createCombatV91Client({ combatId, profiles, statusSnapshots } = 
       });
       if (!enqueued.ok) return enqueued;
       currentState = enqueued.state;
+      dynamicsRecord.availableImpactKeys.delete(dynamicsImpactKey);
+      dynamicsRecord.predictionEnqueued = true;
+      dynamicsRecord.consumedImpactKey = dynamicsImpactKey;
+      dynamicsRecord.intentId = intentId;
       return result(true, resolved.reason, {
         proposal: resolved.proposal,
         envelope: envelope.envelope,
+        dynamicsClaim: Object.freeze({
+          authority: 'client_prediction_only',
+          combatId,
+          actionSequence,
+          actorEntityId,
+          targetEntityId,
+          actionDynamicsBindingFingerprint: dynamicsRecord.binding.fingerprint,
+          sourceProvenanceFingerprint: dynamicsRecord.binding.sourceProvenanceFingerprint,
+          impactIdempotencyKey: dynamicsImpactKey,
+          impactCombatTick: dynamicsRecord.impactEventByKey.get(dynamicsImpactKey).tick,
+        }),
         state: currentState,
       });
     },
@@ -89,7 +268,64 @@ export function createCombatV91Client({ combatId, profiles, statusSnapshots } = 
       const reconciled = reconcileCombatPrediction(currentState, response);
       if (!reconciled.ok) return reconciled;
       currentState = reconciled.state;
-      return result(true, reconciled.reason, { state: currentState });
+      const authoritativeResponse = reconciled.response;
+      const dynamicsRecord = [...dynamicsBySequence.values()]
+        .find(record => record.intentId === authoritativeResponse.intentId) ?? null;
+      const confirmedDynamicsEffects = [];
+      let dynamicsEffectsDisposition = 'not_applicable';
+      if (dynamicsRecord && !dynamicsRecord.confirmedEffectsReleased
+        && authoritativeResponse.committed === true
+        && authoritativeResponse.authoritativeOutcome?.damage > 0) {
+        const impact = dynamicsRecord.impactEventByKey.get(dynamicsRecord.consumedImpactKey);
+        const effect = authoritativeResponse.executionReceipt
+          ?.authoritativeDynamicsEffectReceipt ?? null;
+        const bindingMatches = effect !== null
+          && effect.actionDynamicsBindingFingerprint === dynamicsRecord.binding.fingerprint
+          && effect.sourceProvenanceFingerprint
+            === dynamicsRecord.binding.sourceProvenanceFingerprint
+          && effect.combatId === combatId
+          && effect.actionSequence === impact?.actionSequence
+          && effect.actorEntityId === dynamicsRecord.actorEntityId
+          && effect.targetEntityId === dynamicsRecord.targetEntityId
+          && effect.actionId === dynamicsRecord.action.actionId
+          && effect.hitOrdinal === impact?.payload.hitOrdinal
+          && effect.impactCombatTick === impact?.tick;
+        dynamicsEffectsDisposition = bindingMatches
+          ? 'authoritative_effect_applied'
+          : effect === null ? 'authoritative_effect_absent' : 'authoritative_effect_binding_mismatch';
+        if (bindingMatches && effect.impulse) {
+          confirmedDynamicsEffects.push(Object.freeze({
+            type: 'world.impulse_commit_requested',
+            authority: 'server_confirmed_world_commit_required',
+            combatId,
+            actionSequence: impact.actionSequence,
+            actorEntityId: dynamicsRecord.actorEntityId,
+            targetEntityId: dynamicsRecord.targetEntityId,
+            authoritativeOutcomeFingerprint:
+              authoritativeResponse.authoritativeOutcome.outcomeFingerprint,
+            authoritativeEffectFingerprint: effect.fingerprint,
+            impulse: effect.impulse,
+          }));
+        }
+        if (bindingMatches && effect.hitstopPresentation) {
+          confirmedDynamicsEffects.push(Object.freeze({
+            type: 'presentation.hitstop_requested',
+            authority: 'server_confirmed_presentation_only',
+            combatId,
+            actionSequence: impact.actionSequence,
+            authoritativeOutcomeFingerprint:
+              authoritativeResponse.authoritativeOutcome.outcomeFingerprint,
+            authoritativeEffectFingerprint: effect.fingerprint,
+            hitstop: effect.hitstopPresentation,
+          }));
+        }
+        dynamicsRecord.confirmedEffectsReleased = true;
+      }
+      return result(true, reconciled.reason, {
+        state: currentState,
+        confirmedDynamicsEffects: Object.freeze(confirmedDynamicsEffects),
+        dynamicsEffectsDisposition,
+      });
     },
     view(entityId, options = {}) {
       const projection = currentState.displayProjection[entityId];
@@ -171,6 +407,18 @@ export function createCombatV91Shell({ container } = {}) {
         viewModel: rendered.viewModel,
       });
     },
+    scheduleAction(command = {}) {
+      if (!activeClient) return result(false, 'combat_session_inactive');
+      return activeClient.scheduleAction(command);
+    },
+    advanceAction(command = {}) {
+      if (!activeClient) return result(false, 'combat_session_inactive');
+      return activeClient.advanceAction(command);
+    },
+    readActionDynamics(actionSequence) {
+      if (!activeClient) return result(false, 'combat_session_inactive');
+      return activeClient.readActionDynamics(actionSequence);
+    },
     reconcile(response, { focusEntityId } = {}) {
       if (!activeClient) return result(false, 'combat_session_inactive');
       if (focusEntityId !== undefined
@@ -183,6 +431,8 @@ export function createCombatV91Shell({ container } = {}) {
       return result(true, reconciled.reason, {
         state: reconciled.state,
         viewModel: rendered.viewModel,
+        confirmedDynamicsEffects: reconciled.confirmedDynamicsEffects,
+        dynamicsEffectsDisposition: reconciled.dynamicsEffectsDisposition,
       });
     },
     focus(entityId, options = {}) {

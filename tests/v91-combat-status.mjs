@@ -3,23 +3,27 @@ import { STATUS_CATALOG, statusCatalogEntry } from '../status-catalog.mjs';
 import { applyEncounterStatus, createEncounterStatusState } from '../status-lifecycle.mjs';
 import {
   COMBAT_V91_STATUS_AUTHORITY,
+  COMBAT_V91_STATUS_DAMAGE_POLICY,
   COMBAT_V91_STATUS_IDS,
   COMBAT_V91_STATUS_VERSION,
   advancePredictedCombatStatus,
   applyPredictedCombatStatus,
   combatStatusStackCount,
+  createCombatClockSnapshot,
   createCombatStatusProjection,
   createCombatStatusSnapshot,
   planCombatStatusSnapshot,
+  planCombatStatusTick,
   proposeCombatStatusApplication,
   validateCombatStatusSnapshot,
 } from '../combat-v91-status.mjs';
 import { fixtureProfile, fixtureStatusSnapshot } from './v91-combat-fixtures.mjs';
 
-assert.equal(COMBAT_V91_STATUS_VERSION, 'combat-v91-status/v1');
+assert.equal(COMBAT_V91_STATUS_VERSION, 'combat-v91-status/v2');
 assert.equal(COMBAT_V91_STATUS_IDS.length, 26);
 assert.deepEqual(COMBAT_V91_STATUS_IDS, STATUS_CATALOG.map(status => status.id));
 assert.equal(COMBAT_V91_STATUS_AUTHORITY.authoritativeWriter, 'server_or_target_owner');
+assert.equal(COMBAT_V91_STATUS_DAMAGE_POLICY.hpUnit, 'safe_integer');
 
 function stateWith(statusId, encounterId = `v91:${statusId}`) {
   const definition = statusCatalogEntry(statusId);
@@ -111,6 +115,31 @@ assert.equal(burnTick.ok, true);
 assert.equal(burnTick.predictedDamage, 1.5);
 assert.equal(burnTick.predictedHp, 98.5);
 assert.equal(combatStatusStackCount(predicted.predictedState, 'ST_BURN'), 1);
+
+const burnClock = createCombatClockSnapshot({
+  authority: 'server',
+  combatId,
+  clockTick: 1,
+  combatTimeSec: 1,
+  clockStateVersion: 1,
+  ended: false,
+});
+assert.equal(burnClock.ok, true, burnClock.reason);
+const authoritativeBurnTick = planCombatStatusTick(burnPlan.after, {
+  combatClock: burnClock.snapshot,
+  targetHp: 145,
+  targetMaxHp: 145,
+});
+assert.equal(authoritativeBurnTick.ok, true, authoritativeBurnTick.reason);
+assert.equal(authoritativeBurnTick.plan.scheduledDamage, 2,
+  'authoritative percent DoT is quantized once per tick to integer HP');
+assert.equal(authoritativeBurnTick.plan.hpAfter, 143);
+assert.equal(Number.isSafeInteger(authoritativeBurnTick.plan.ticks[0].damage), true);
+assert.equal(planCombatStatusTick(burnPlan.after, {
+  combatClock: burnClock.snapshot,
+  targetHp: 144.5,
+  targetMaxHp: 145,
+}).reason, 'invalid_status_tick_input');
 
 // Regression: resolver returns potency for lifecycle input, not total next stacks.
 const poisonDefinition = statusCatalogEntry('ST_POISON');

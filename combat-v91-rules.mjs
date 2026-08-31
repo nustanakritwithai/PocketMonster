@@ -2,6 +2,7 @@ import {
   COMBAT_RATIO_KEYS,
   COMBAT_STAT_KEYS,
   COMBAT_V91_RULES_VERSION,
+  COMBAT_V91_SAFETY_BOUNDS,
   createCombatActionDefinition,
   createWorldCombatSnapshot,
   fingerprintCombatValue,
@@ -18,6 +19,7 @@ import { SKILL_STATUS_LINKS } from './status-catalog.mjs';
 import { splitDamageBudget } from './damage-resolver.mjs';
 import { typeEffectiveness } from './type-catalog.mjs';
 import { COMBAT_V91_RNG_VERSION, createCombatV91Rng } from './combat-v91-rng.mjs';
+import { validateCombatActionStatProjection } from './combat-v91-action-stat-projection.mjs';
 
 export const COMBAT_V91_RULES_POLICY = Object.freeze({
   version: COMBAT_V91_RULES_VERSION,
@@ -27,7 +29,9 @@ export const COMBAT_V91_RULES_POLICY = Object.freeze({
   levelScaleDivisor: 5,
   baseFormulaDivisor: 50,
   baseDamageFlat: 2,
-  stab: 1.2,
+  // Monster Life V7.0.6 section 7.3 is the current locked baseline. Keep the
+  // value centralized here so later Ring 2 balancing never forks the resolver.
+  stab: 1.5,
   criticalMultiplier: 1.5,
   varianceMin: 0.9,
   varianceMax: 1,
@@ -73,6 +77,17 @@ function effectiveStats(profile, worldMultipliers, status, role) {
   }
   for (const key of COMBAT_RATIO_KEYS) values[key] = clamp(values[key], 0, 1);
   return Object.freeze(values);
+}
+
+function effectiveProjectedAttackStat(projection, worldMultipliers, status) {
+  let value = projection.projectedStat * worldMultipliers[projection.sourceStat];
+  if (projection.sourceStat === 'atk') value *= status.modifiers.attackMultiplier;
+  else value *= status.modifiers.specialAttackMultiplier;
+  if (!Number.isFinite(value) || value < 0
+    || value > COMBAT_V91_SAFETY_BOUNDS.effectiveStatMax) {
+    return result(false, 'projected_attack_stat_out_of_range');
+  }
+  return result(true, null, { value });
 }
 
 function readRng(rng, trace, label) {
@@ -129,6 +144,7 @@ export function resolveCombatV91Proposal({
   worldSnapshot,
   attackerStatusSnapshot,
   targetStatusSnapshot,
+  actionStatProjection = null,
 } = {}) {
   if (typeof combatId !== 'string' || combatId.length === 0) return result(false, 'invalid_combat_id');
   if (!Number.isInteger(actionSequence) || actionSequence < 0) return result(false, 'invalid_action_sequence');
@@ -136,15 +152,40 @@ export function resolveCombatV91Proposal({
   if (!actorValidation.ok) return result(false, 'invalid_attacker_profile', { cause: actorValidation });
   const targetValidation = validateCombatProfile(target);
   if (!targetValidation.ok) return result(false, 'invalid_target_profile', { cause: targetValidation });
+  const actorProfile = actorValidation.profile;
+  const targetProfile = targetValidation.profile;
+  if (actorProfile.stats.hpCurrent === 0) {
+    return result(false, 'actor_not_combat_capable', {
+      rngDraws: 0,
+      rngTrace: Object.freeze([]),
+    });
+  }
+  if (targetProfile.stats.hpCurrent === 0) {
+    return result(false, 'target_terminal', {
+      rngDraws: 0,
+      rngTrace: Object.freeze([]),
+    });
+  }
   const actionValidation = createCombatActionDefinition(action);
   if (!actionValidation.ok) return result(false, 'invalid_action_definition', { cause: actionValidation });
   const worldValidation = createWorldCombatSnapshot(worldSnapshot);
   if (!worldValidation.ok) return result(false, 'invalid_world_snapshot', { cause: worldValidation });
 
-  const actorProfile = actorValidation.profile;
-  const targetProfile = targetValidation.profile;
   const canonicalAction = actionValidation.action;
   const snapshot = worldValidation.snapshot;
+  const expectedActionStat = canonicalAction.channel === 'physical' ? 'atk' : 'spAtk';
+  let canonicalActionStatProjection = null;
+  if (actionStatProjection !== null && actionStatProjection !== undefined) {
+    const projectionValidation = validateCombatActionStatProjection(actionStatProjection, {
+      profile: actorProfile,
+      action: canonicalAction,
+      expectedSourceStat: expectedActionStat,
+    });
+    if (!projectionValidation.ok) {
+      return result(false, 'invalid_action_stat_projection', { cause: projectionValidation });
+    }
+    canonicalActionStatProjection = projectionValidation.projection;
+  }
   const actorStatusValidation = validateCombatStatusSnapshot(attackerStatusSnapshot, {
     combatId,
     entityId: actorValidation.profile.entityId,
@@ -188,6 +229,12 @@ export function resolveCombatV91Proposal({
     return result(false, 'actor_status_controlled', { rngDraws: 0, rngTrace: Object.freeze([]) });
   }
 
+  const rngActionFingerprint = canonicalActionStatProjection === null
+    ? canonicalAction.fingerprint
+    : fingerprintCombatValue({
+      actionFingerprint: canonicalAction.fingerprint,
+      actionStatProjectionFingerprint: canonicalActionStatProjection.fingerprint,
+    });
   const rngStream = createCombatV91Rng({
     seed: snapshot.rngSeed,
     combatId,
@@ -195,7 +242,7 @@ export function resolveCombatV91Proposal({
     actorEntityId: actorProfile.entityId,
     targetEntityId: targetProfile.entityId,
     actionId: canonicalAction.actionId,
-    actionFingerprint: canonicalAction.fingerprint,
+    actionFingerprint: rngActionFingerprint,
     worldSnapshotFingerprint: snapshot.fingerprint,
     rngTicketId: snapshot.rngTicketId,
   });
@@ -216,7 +263,16 @@ export function resolveCombatV91Proposal({
   const hit = hitRoll.value < hitChance;
   const criticalChance = canonicalAction.criticalAllowed ? actorStats.crit : 0;
   const critical = hit && criticalRoll.value < criticalChance;
-  const attackStat = canonicalAction.channel === 'physical' ? actorStats.atk : actorStats.spAtk;
+  let attackStat = canonicalAction.channel === 'physical' ? actorStats.atk : actorStats.spAtk;
+  if (canonicalActionStatProjection !== null) {
+    const projected = effectiveProjectedAttackStat(
+      canonicalActionStatProjection,
+      snapshot.actorMultipliers,
+      actorStatus.context,
+    );
+    if (!projected.ok) return projected;
+    attackStat = projected.value;
+  }
   const defenseStat = canonicalAction.channel === 'physical' ? targetStats.def : targetStats.spDef;
   const combinedPenetration = clamp(
     canonicalAction.armorPierce + actorStats.penetration,
@@ -347,6 +403,8 @@ export function resolveCombatV91Proposal({
     actorProfileFingerprint: actorProfile.fingerprint,
     targetProfileFingerprint: targetProfile.fingerprint,
     actionFingerprint: canonicalAction.fingerprint,
+    actionStatProjectionFingerprint: canonicalActionStatProjection?.fingerprint ?? null,
+    rngActionFingerprint,
     worldSnapshotFingerprint: snapshot.fingerprint,
     actorStateVersion: actorProfile.stateVersion,
     targetStateVersion: targetProfile.stateVersion,

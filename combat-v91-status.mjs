@@ -17,7 +17,7 @@ import {
   fingerprintCombatValue,
 } from './combat-v91-contract.mjs';
 
-export const COMBAT_V91_STATUS_VERSION = 'combat-v91-status/v1';
+export const COMBAT_V91_STATUS_VERSION = 'combat-v91-status/v2';
 export const COMBAT_V91_STATUS_SNAPSHOT_SCHEMA = 'combat-status-snapshot/v9.1';
 export const COMBAT_V91_COMBAT_CLOCK_SNAPSHOT_SCHEMA = 'combat-clock-snapshot/v9.1';
 export const COMBAT_V91_STATUS_TICK_PLAN_SCHEMA = 'combat-status-tick-plan/v9.1';
@@ -28,6 +28,11 @@ export const COMBAT_V91_STATUS_AUTHORITY = Object.freeze({
   tickPlanner: 'pure_snapshot_transition',
   psychologicalFearOwner: 'World',
   combatFearId: 'ST_FEAR',
+});
+export const COMBAT_V91_STATUS_DAMAGE_POLICY = Object.freeze({
+  hpUnit: 'safe_integer',
+  perTickRounding: 'floor_minimum_one_if_positive',
+  lethalClamp: true,
 });
 
 export const COMBAT_V91_STATUS_IDS = Object.freeze(STATUS_CATALOG.map(status => status.id));
@@ -72,6 +77,12 @@ function exactKeys(value, keys) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function integerTickDamage(value) {
+  if (!Number.isFinite(value) || value < 0) return null;
+  if (value === 0) return 0;
+  return Math.max(1, Math.floor(value));
 }
 
 function canonicalStatusState(input) {
@@ -379,7 +390,7 @@ export function planCombatStatusTick(statusSnapshot, {
   if (!clockValidation.ok) return result(false, clockValidation.reason, { cause: clockValidation });
   const before = statusValidation.snapshot;
   const clock = clockValidation.snapshot;
-  if (!Number.isFinite(targetHp) || !Number.isFinite(targetMaxHp)
+  if (!Number.isSafeInteger(targetHp) || !Number.isSafeInteger(targetMaxHp)
     || targetMaxHp <= 0 || targetHp < 0 || targetHp > targetMaxHp
     || before.state.currentTimeSec > clock.combatTimeSec
     || before.state.ended) {
@@ -406,7 +417,18 @@ export function planCombatStatusTick(statusSnapshot, {
     fingerprint: undefined,
   });
   if (!next.ok) return next;
-  const appliedDamage = targetHp - advanced.targetHp;
+  const ticks = [];
+  let scheduledDamage = 0;
+  for (const tick of advanced.ticks) {
+    const damage = integerTickDamage(tick.damage);
+    if (damage === null || !Number.isSafeInteger(scheduledDamage + damage)) {
+      return result(false, 'status_tick_damage_out_of_range');
+    }
+    scheduledDamage += damage;
+    ticks.push(Object.freeze({ ...tick, damage }));
+  }
+  const appliedDamage = Math.min(targetHp, scheduledDamage);
+  const hpAfter = targetHp - appliedDamage;
   const payload = {
     schemaVersion: COMBAT_V91_STATUS_TICK_PLAN_SCHEMA,
     combatId: before.combatId,
@@ -417,15 +439,15 @@ export function planCombatStatusTick(statusSnapshot, {
     clockStateVersion: clock.clockStateVersion,
     clockFingerprint: clock.fingerprint,
     hpBefore: targetHp,
-    hpAfter: advanced.targetHp,
-    scheduledDamage: advanced.damage,
+    hpAfter,
+    scheduledDamage,
     appliedDamage,
     statusStateVersionBefore: before.statusStateVersion,
     statusStateVersionAfter: next.snapshot.statusStateVersion,
     statusFingerprintBefore: before.fingerprint,
     statusFingerprintAfter: next.snapshot.fingerprint,
     expiredStatusIds,
-    ticks: advanced.ticks.map(tick => Object.freeze({ ...tick })),
+    ticks,
     before,
     after: next.snapshot,
   };

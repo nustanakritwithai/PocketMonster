@@ -14,8 +14,10 @@ import {
 import { COMBAT_V91_RNG_VERSION } from './combat-v91-rng.mjs';
 import { resolveCombatV91Proposal } from './combat-v91-rules.mjs';
 import { validateCombatStatusSnapshot } from './combat-v91-status.mjs';
+import { validateCombatActionStatProjection } from './combat-v91-action-stat-projection.mjs';
+import { validateCombatServerDynamicsPermit } from './combat-v91-server-dynamics-permit.mjs';
 
-export const COMBAT_V91_SERVER_AUTHORITY_VERSION = 'combat-v91-server-authority/v2';
+export const COMBAT_V91_SERVER_AUTHORITY_VERSION = 'combat-v91-server-authority/v3';
 export const COMBAT_V91_SERVER_AUTHORITY_POLICY = Object.freeze({
   executionAuthority: 'server',
   profileAuthority: 'domain_calculator_only',
@@ -23,6 +25,9 @@ export const COMBAT_V91_SERVER_AUTHORITY_POLICY = Object.freeze({
   hpWriter: 'target_owner_inside_atomic_server_transaction',
   statusWriter: 'entity_owner_inside_atomic_server_transaction',
   resourceWriter: 'actor_owner_inside_atomic_server_transaction',
+  dynamicsAuthority: 'server_dynamics_permit_inside_atomic_server_transaction',
+  supportedDynamicsResolution: 'single_direct_impact',
+  actorOccupancyWriter: 'server_cas',
   trustsClientPrediction: false,
   rngAuthority: 'server_world_snapshot_and_one_use_ticket',
   terminalResponse: 'same_transaction_as_owner_state',
@@ -31,19 +36,30 @@ export const COMBAT_V91_SERVER_AUTHORITY_POLICY = Object.freeze({
   idempotencyKey: 'authorityScope+combatId+intentId',
 });
 
-export const COMBAT_V91_ACTION_PERMIT_SCHEMA = 'combat-action-permit/v9.1';
+export const COMBAT_V91_ACTION_PERMIT_SCHEMA = 'combat-action-permit/v9.1.2';
 export const COMBAT_V91_RNG_TICKET_SCHEMA = 'combat-rng-ticket/v9.1';
-export const COMBAT_V91_AUTHORITY_TRANSACTION_SCHEMA = 'combat-authority-transaction/v9.1';
+export const COMBAT_V91_AUTHORITY_TRANSACTION_SCHEMA = 'combat-authority-transaction/v9.1.2';
+export const COMBAT_V91_DYNAMICS_AUTHORITY_SNAPSHOT_SCHEMA =
+  'combat-dynamics-authority-snapshot/v9.1.2';
 const ACTION_PERMIT_SCHEMA = COMBAT_V91_ACTION_PERMIT_SCHEMA;
 const RNG_TICKET_SCHEMA = COMBAT_V91_RNG_TICKET_SCHEMA;
 const TRANSACTION_SCHEMA = COMBAT_V91_AUTHORITY_TRANSACTION_SCHEMA;
 const TRANSACTION_DISPOSITIONS = new Set(['committed', 'rejected', 'replayed']);
 const AUTHORITY_CONTEXT_KEYS = Object.freeze(['principalId', 'sessionId', 'idempotencyScope']);
 const PROFILE_SOURCE_KEYS = Object.freeze(['ownerDomain', 'profileInput']);
+const HASH_PATTERN = /^[0-9a-f]{64}$/;
+const DYNAMICS_AUTHORITY_SNAPSHOT_KEYS = Object.freeze([
+  'schemaVersion', 'authority', 'combatId', 'actionSequence', 'actorEntityId',
+  'targetEntityId', 'actionId', 'actionFingerprint',
+  'actionDynamicsBindingFingerprint', 'sourceProvenanceFingerprint',
+  'currentCombatTick', 'dynamicsStateVersion', 'actorOccupancyStateVersion',
+  'actorOccupancyLeaseId', 'occupiedUntilCombatTick', 'fingerprint',
+]);
 const ACTION_PERMIT_KEYS = Object.freeze([
   'schemaVersion', 'authority', 'permitId', 'principalId', 'sessionId',
   'combatId', 'actorEntityId', 'targetEntityId', 'nextActionSequence',
-  'action', 'actorStateVersion', 'actorStateVersionAfter',
+  'action', 'actionStatProjection', 'dynamicsPermit',
+  'actorStateVersion', 'actorStateVersionAfter',
   'resourceStateVersion', 'resourceStateVersionAfter', 'entitlementStateVersion',
   'sequenceStateVersion', 'sequenceStateVersionAfter', 'resourceCommitToken',
   'fingerprint',
@@ -59,6 +75,10 @@ const EXECUTION_RECEIPT_KEYS = Object.freeze([
   'sequenceStateVersionBefore', 'sequenceStateVersionAfter',
   'committedActionSequence', 'rngTicketId',
   'rngTicketStateVersionBefore', 'rngTicketStateVersionAfter',
+  'dynamicsStateVersionBefore', 'dynamicsStateVersionAfter',
+  'actorOccupancyStateVersionBefore', 'actorOccupancyStateVersionAfter',
+  'dynamicsPermitFingerprint',
+  'authoritativeDynamicsEffectReceipt',
 ]);
 const COMMITTED_RECEIPT_KEYS = Object.freeze([
   'committed', 'commitId', 'authoritativeTargetSource',
@@ -79,6 +99,15 @@ function isRecord(value) {
 
 function nonEmptyString(value) {
   return typeof value === 'string' && value.length > 0;
+}
+
+function safeVersion(value, { incremented = false } = {}) {
+  return Number.isSafeInteger(value) && value >= 0
+    && (!incremented || value < Number.MAX_SAFE_INTEGER);
+}
+
+function validHash(value) {
+  return typeof value === 'string' && HASH_PATTERN.test(value);
 }
 
 function exactKeys(value, keys) {
@@ -115,6 +144,60 @@ function validateAuthorityContext(context) {
   });
 }
 
+function validateDynamicsAuthoritySnapshot(input, { envelope, actor, target } = {}) {
+  if (!exactKeys(input, DYNAMICS_AUTHORITY_SNAPSHOT_KEYS)
+    || input.schemaVersion !== COMBAT_V91_DYNAMICS_AUTHORITY_SNAPSHOT_SCHEMA
+    || input.authority !== 'server_registry'
+    || ![
+      input.combatId, input.actorEntityId, input.targetEntityId, input.actionId,
+      input.actorOccupancyLeaseId,
+    ].every(nonEmptyString)
+    || !validHash(input.actionFingerprint)
+    || !validHash(input.actionDynamicsBindingFingerprint)
+    || !validHash(input.sourceProvenanceFingerprint)
+    || !safeVersion(input.actionSequence)
+    || !safeVersion(input.currentCombatTick)
+    || !safeVersion(input.dynamicsStateVersion, { incremented: true })
+    || !safeVersion(input.actorOccupancyStateVersion, { incremented: true })
+    || !safeVersion(input.occupiedUntilCombatTick)
+    || input.occupiedUntilCombatTick < input.currentCombatTick) {
+    return result(false, 'invalid_dynamics_authority_snapshot');
+  }
+  const payload = Object.fromEntries(DYNAMICS_AUTHORITY_SNAPSHOT_KEYS
+    .filter(key => key !== 'fingerprint')
+    .map(key => [key, input[key]]));
+  const fingerprint = fingerprintCombatValue(payload);
+  if (input.fingerprint !== fingerprint) {
+    return result(false, 'dynamics_authority_snapshot_fingerprint_mismatch');
+  }
+  if (input.combatId !== envelope.combatId
+    || input.actionSequence !== envelope.actionSequence
+    || input.actorEntityId !== actor.entityId
+    || input.targetEntityId !== target.entityId
+    || input.actionId !== envelope.actionId
+    || input.actionFingerprint !== envelope.actionFingerprint) {
+    return result(false, 'dynamics_authority_snapshot_binding_mismatch');
+  }
+  return result(true, null, { snapshot: Object.freeze({ ...payload, fingerprint }) });
+}
+
+function profileSourceInvariantPayload(source) {
+  const profileInput = { ...source.profileInput };
+  if (source.ownerDomain === 'Pocket') {
+    delete profileInput.currentHp;
+    delete profileInput.stateVersion;
+  } else if (source.ownerDomain === 'Pirate') {
+    profileInput.currentHpOwnerState = Object.fromEntries(
+      Object.entries(profileInput.currentHpOwnerState)
+        .filter(([key]) => !['hpCurrent', 'stateVersion', 'fingerprint'].includes(key)),
+    );
+  }
+  return {
+    ownerDomain: source.ownerDomain,
+    profileInput,
+  };
+}
+
 function deriveProfileSource(source, { entityId } = {}) {
   if (!exactKeys(source, PROFILE_SOURCE_KEYS)) return result(false, 'invalid_domain_profile_source');
   const derived = createDomainCombatProfile(source);
@@ -128,12 +211,15 @@ function deriveProfileSource(source, { entityId } = {}) {
   return result(true, null, {
     source,
     sourceFingerprint: fingerprintCombatValue(source),
+    sourceInvariantFingerprint: fingerprintCombatValue(profileSourceInvariantPayload(source)),
     profile: derived.profile,
     provenance: derived.provenance,
   });
 }
 
-function validateActionPermit(input, { context, envelope, actor, target } = {}) {
+function validateActionPermit(input, {
+  context, envelope, actor, target, dynamicsAuthority,
+} = {}) {
   if (!exactKeys(input, ACTION_PERMIT_KEYS)
     || input.schemaVersion !== ACTION_PERMIT_SCHEMA
     || input.authority !== 'server'
@@ -148,16 +234,54 @@ function validateActionPermit(input, { context, envelope, actor, target } = {}) 
     'resourceStateVersion', 'resourceStateVersionAfter', 'entitlementStateVersion',
     'sequenceStateVersion', 'sequenceStateVersionAfter',
   ]) {
-    if (!Number.isInteger(input[field]) || input[field] < 0) {
+    if (!safeVersion(input[field], {
+      incremented: ['resourceStateVersion', 'sequenceStateVersion'].includes(field),
+    })) {
       return result(false, 'invalid_action_permit_version', { field });
     }
   }
-  if (input.actorStateVersionAfter < input.actorStateVersion
+  if (input.actorStateVersionAfter !== input.actorStateVersion
     || input.resourceStateVersionAfter !== input.resourceStateVersion + 1
     || input.sequenceStateVersionAfter !== input.sequenceStateVersion + 1) {
     return result(false, 'invalid_action_permit_transition');
   }
   const action = actionValidation.action;
+  let actionStatProjection = null;
+  if (input.actionStatProjection !== null) {
+    const expectedSourceStat = action.channel === 'physical' ? 'atk' : 'spAtk';
+    const projectionValidation = validateCombatActionStatProjection(input.actionStatProjection, {
+      profile: actor,
+      action,
+      expectedSourceStat,
+    });
+    if (!projectionValidation.ok) {
+      return result(false, 'invalid_action_permit_stat_projection', { cause: projectionValidation });
+    }
+    actionStatProjection = projectionValidation.projection;
+  }
+  if (action.hitCount !== 1) {
+    return result(false, 'action_dynamics_resolution_unsupported');
+  }
+  const dynamicsValidation = validateCombatServerDynamicsPermit(input.dynamicsPermit, {
+    combatId: input.combatId,
+    actionSequence: input.nextActionSequence,
+    actorEntityId: input.actorEntityId,
+    targetEntityId: input.targetEntityId,
+    actionId: action.actionId,
+    actionFingerprint: action.fingerprint,
+    resourceReservationToken: input.resourceCommitToken,
+    actionDynamicsBindingFingerprint: dynamicsAuthority.actionDynamicsBindingFingerprint,
+    sourceProvenanceFingerprint: dynamicsAuthority.sourceProvenanceFingerprint,
+    currentCombatTick: dynamicsAuthority.currentCombatTick,
+    dynamicsStateVersion: dynamicsAuthority.dynamicsStateVersion,
+    actorOccupancyStateVersion: dynamicsAuthority.actorOccupancyStateVersion,
+    actorOccupancyLeaseId: dynamicsAuthority.actorOccupancyLeaseId,
+    occupiedUntilCombatTick: dynamicsAuthority.occupiedUntilCombatTick,
+  });
+  if (!dynamicsValidation.ok) {
+    return result(false, 'invalid_action_permit_dynamics', { cause: dynamicsValidation });
+  }
+  const dynamicsPermit = dynamicsValidation.permit;
   const payload = {
     schemaVersion: ACTION_PERMIT_SCHEMA,
     authority: 'server',
@@ -169,6 +293,8 @@ function validateActionPermit(input, { context, envelope, actor, target } = {}) 
     targetEntityId: input.targetEntityId,
     nextActionSequence: input.nextActionSequence,
     action,
+    actionStatProjection,
+    dynamicsPermit,
     actorStateVersion: input.actorStateVersion,
     actorStateVersionAfter: input.actorStateVersionAfter,
     resourceStateVersion: input.resourceStateVersion,
@@ -314,6 +440,7 @@ function validateStatusSnapshotSet(inputs, { combatId, actor, target, expectedBy
 }
 
 function validateExecutionReceipt(receipt, { actor, permit, envelope, ticket } = {}) {
+  const dynamicsPermit = permit.dynamicsPermit;
   if (!exactKeys(receipt, EXECUTION_RECEIPT_KEYS)
     || receipt.actorEntityId !== actor.entityId
     || receipt.actorStateVersionBefore !== permit.actorStateVersion
@@ -325,7 +452,14 @@ function validateExecutionReceipt(receipt, { actor, permit, envelope, ticket } =
     || receipt.committedActionSequence !== envelope.actionSequence
     || receipt.rngTicketId !== ticket.ticketId
     || receipt.rngTicketStateVersionBefore !== ticket.stateVersion
-    || receipt.rngTicketStateVersionAfter !== ticket.stateVersion + 1) {
+    || receipt.rngTicketStateVersionAfter !== ticket.stateVersion + 1
+    || receipt.dynamicsStateVersionBefore !== dynamicsPermit.dynamicsStateVersion
+    || receipt.dynamicsStateVersionAfter !== dynamicsPermit.dynamicsStateVersionAfter
+    || receipt.actorOccupancyStateVersionBefore !== dynamicsPermit.actorOccupancyStateVersion
+    || receipt.actorOccupancyStateVersionAfter !== dynamicsPermit.actorOccupancyStateVersionAfter
+    || receipt.dynamicsPermitFingerprint !== dynamicsPermit.fingerprint
+    || fingerprintCombatValue(receipt.authoritativeDynamicsEffectReceipt)
+      !== fingerprintCombatValue(dynamicsPermit.authoritativeEffectReceipt)) {
     return result(false, 'invalid_execution_receipt');
   }
   return result(true, null, { receipt: Object.freeze({ ...receipt }) });
@@ -340,6 +474,7 @@ function validateCommittedReceipt(receipt, {
   proposal,
   actorStatus,
   targetStatus,
+  targetSourceInvariantFingerprint,
 } = {}) {
   if (!exactKeys(receipt, COMMITTED_RECEIPT_KEYS) || receipt.committed !== true
     || !nonEmptyString(receipt.commitId)
@@ -351,7 +486,8 @@ function validateCommittedReceipt(receipt, {
   });
   if (!committedTarget.ok) return result(false, 'invalid_committed_profile_source', { cause: committedTarget });
   const profile = committedTarget.profile;
-  if (fingerprintCombatValue(profileBasePayload(profile)) !== fingerprintCombatValue(profileBasePayload(target))
+  if (committedTarget.sourceInvariantFingerprint !== targetSourceInvariantFingerprint
+    || fingerprintCombatValue(profileBasePayload(profile)) !== fingerprintCombatValue(profileBasePayload(target))
     || profile.stats.hpCurrent !== proposal.predictedHp
     || profile.stateVersion !== proposal.targetStateVersionAfter) {
     return result(false, 'committed_profile_invariant_mismatch');
@@ -554,15 +690,16 @@ async function settleRejection({
 }
 
 /**
- * Transport-neutral V2 authority boundary. All irreversible writes are delegated
+ * Transport-neutral V3 authority boundary. All irreversible writes are delegated
  * to transactCombatIntent, which must CAS every expected version, invoke finalize
  * before durability, and persist the returned terminal response in the same
  * transaction as HP/status/resource/sequence/RNG-ticket state.
  */
-export async function executeCombatV91AuthorityV2({ envelope, authorityContext } = {}, {
+export async function executeCombatV91AuthorityV3({ envelope, authorityContext } = {}, {
   readTerminalResponse,
   loadProfileSource,
   authorizeAction,
+  loadActionDynamicsAuthority,
   loadWorldSnapshot,
   loadStatusSnapshot,
   loadRngTicket,
@@ -624,6 +761,8 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
     targetProfile: target,
     actionId: envelope.actionId,
     actionSequence: envelope.actionSequence,
+    actionFingerprint: envelope.actionFingerprint,
+    requestedWorldSnapshotTick: envelope.worldSnapshotTick,
   }, 'action_authorization');
   if (!authorization.ok) return authorization;
   if (!isRecord(authorization.value) || typeof authorization.value.authorized !== 'boolean') {
@@ -643,11 +782,36 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
   if (!exactKeys(authorization.value, ['authorized', 'permit'])) {
     return result(false, 'invalid_action_authorization');
   }
+  const dynamicsAuthorityLoaded = await loadDependency(loadActionDynamicsAuthority, {
+    authorityContext: context,
+    combatId: envelope.combatId,
+    actionSequence: envelope.actionSequence,
+    actorEntityId: actor.entityId,
+    targetEntityId: target.entityId,
+    actionId: envelope.actionId,
+    actionFingerprint: envelope.actionFingerprint,
+  }, 'action_dynamics_authority');
+  if (!dynamicsAuthorityLoaded.ok) return dynamicsAuthorityLoaded;
+  const dynamicsAuthorityValidation = validateDynamicsAuthoritySnapshot(
+    dynamicsAuthorityLoaded.value,
+    { envelope, actor, target },
+  );
+  if (!dynamicsAuthorityValidation.ok) {
+    return settleRejection({
+      context,
+      envelope,
+      reason: dynamicsAuthorityValidation.reason.toUpperCase(),
+      transactCombatIntent,
+      resyncProfileSources: profileSources,
+    });
+  }
+  const dynamicsAuthority = dynamicsAuthorityValidation.snapshot;
   const permitValidation = validateActionPermit(authorization.value.permit, {
     context,
     envelope,
     actor,
     target,
+    dynamicsAuthority,
   });
   if (!permitValidation.ok) {
     return settleRejection({
@@ -756,6 +920,7 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
     attacker: actor,
     target,
     action,
+    actionStatProjection: permit.actionStatProjection,
     worldSnapshot,
     attackerStatusSnapshot: actorStatus,
     targetStatusSnapshot: targetStatus,
@@ -806,6 +971,10 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
       actorStatusFingerprint: actorStatus.fingerprint,
       targetStatusFingerprint: targetStatus.fingerprint,
       actionPermitFingerprint: permit.fingerprint,
+      dynamicsPermitFingerprint: permit.dynamicsPermit.fingerprint,
+      dynamicsAuthorityFingerprint: dynamicsAuthority.fingerprint,
+      combatDynamicsStateVersion: permit.dynamicsPermit.dynamicsStateVersion,
+      actorOccupancyStateVersion: permit.dynamicsPermit.actorOccupancyStateVersion,
       actorResourceStateVersion: permit.resourceStateVersion,
       actionEntitlementStateVersion: permit.entitlementStateVersion,
       combatSequenceStateVersion: permit.sequenceStateVersion,
@@ -816,6 +985,7 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
     actorProfile: actor,
     targetProfile: target,
     actionPermit: permit,
+    dynamicsAuthoritySnapshot: dynamicsAuthority,
     worldSnapshot,
     actorStatusSnapshot: actorStatus,
     targetStatusSnapshot: targetStatus,
@@ -828,6 +998,8 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
       authoritativeStatusSnapshots: proposal.predictedStatusSnapshots,
       statusApplied: proposal.predictedStatusApplied,
       resourceCommitToken: permit.resourceCommitToken,
+      dynamicsStateVersionAfter: permit.dynamicsPermit.dynamicsStateVersionAfter,
+      actorOccupancyStateVersionAfter: permit.dynamicsPermit.actorOccupancyStateVersionAfter,
       committedActionSequence: envelope.actionSequence,
     }),
     rejectionFallback,
@@ -851,6 +1023,7 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
       proposal,
       actorStatus,
       targetStatus,
+      targetSourceInvariantFingerprint: targetDerived.sourceInvariantFingerprint,
     });
     if (!committed.ok) throw contractError(committed.reason, committed.cause);
     const outcome = createCombatAuthorityOutcome({
@@ -910,6 +1083,6 @@ export async function executeCombatV91AuthorityV2({ envelope, authorityContext }
   }, transactCombatIntent, envelope);
 }
 
-// The stable entry name now points at the strict V2 boundary. Keeping a named V2
-// export lets integration code pin the contract explicitly during migration.
-export const executeCombatV91Authority = executeCombatV91AuthorityV2;
+// V2 remains a compatibility alias while all new integration code pins V3.
+export const executeCombatV91AuthorityV2 = executeCombatV91AuthorityV3;
+export const executeCombatV91Authority = executeCombatV91AuthorityV3;

@@ -13,6 +13,16 @@ assert.equal(isPublicGameFile('tests/server-auth.mjs'), false);
 assert.equal(isPublicGameFile('combat-v91-entry.mjs'), true);
 assert.equal(isPublicGameFile('combat-v91-server-authority.mjs'), false,
   'Server authority code must stay outside the browser artifact');
+assert.equal(isPublicGameFile('assets/combat-v91-server-authority.mjs'), false,
+  'Server authority basename must stay private inside public directories too');
+assert.equal(isPublicGameFile('world-runtime-lifecycle-v910.mjs'), false,
+  'unwired one-document runtime lifecycle must stay source-only');
+assert.equal(isPublicGameFile('one-document-world-runtime-host-v910.mjs'), false,
+  'unwired one-document runtime host must stay source-only');
+assert.equal(isPublicGameFile('world-runtime-resource-scope-v912.mjs'), false,
+  'unwired runtime resource scope must stay source-only');
+assert.equal(isPublicGameFile('world-runtime-import-purity-v912.mjs'), false,
+  'unwired import-purity contract must stay source-only');
 assert.equal(isPublicGameFile('server_save_backup.json'), false);
 assert.equal(isPublicGameFile('firebase.json'), false);
 assert.equal(isPublicGameFile('package.json'), false);

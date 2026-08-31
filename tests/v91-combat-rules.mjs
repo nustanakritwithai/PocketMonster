@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createCombatV91Rng } from '../combat-v91-rng.mjs';
 import { COMBAT_V91_RULES_POLICY, resolveCombatV91Proposal } from '../combat-v91-rules.mjs';
+import {
+  COMBAT_V91_ACTION_STAT_PROJECTION_SCHEMA,
+  COMBAT_V91_ACTION_STAT_PROJECTION_VERSION,
+  createCombatActionStatProjection,
+} from '../combat-v91-action-stat-projection.mjs';
 import { statusCatalogEntry } from '../status-catalog.mjs';
 import { applyEncounterStatus, createEncounterStatusState } from '../status-lifecycle.mjs';
 import {
@@ -127,6 +132,51 @@ const beta = fixtureProposal(fixtureCombat({
 assert.notEqual(beta.rngStreamFingerprint, first.rngStreamFingerprint);
 assert.notEqual(beta.predictedResultFingerprint, first.predictedResultFingerprint);
 
+// HP lifecycle gates precede action, World, status, RNG and proposal planning.
+// Omitting every downstream input proves a terminal profile cannot reach those stages.
+{
+  const defeatedActor = fixtureProfile({
+    entityId: 'human:rules:defeated-actor', ownerDomain: 'Pirate', entityKind: 'Human',
+    stateVersion: 11,
+    stats: { ...TEST_STATS, hpCurrent: 0 },
+  });
+  const terminalTarget = fixtureProfile({
+    entityId: 'monster:rules:terminal-target', ownerDomain: 'Pocket', entityKind: 'Monster',
+    stateVersion: 12,
+    stats: { ...TEST_STATS, hpCurrent: 0 },
+  });
+  const actorBlocked = resolveCombatV91Proposal({
+    combatId: 'combat:rules:defeated-actor',
+    actionSequence: 1,
+    attacker: defeatedActor,
+    target,
+  });
+  assert.deepEqual(actorBlocked, {
+    ok: false,
+    reason: 'actor_not_combat_capable',
+    rngDraws: 0,
+    rngTrace: [],
+  });
+  const targetBlocked = resolveCombatV91Proposal({
+    combatId: 'combat:rules:terminal-target',
+    actionSequence: 1,
+    attacker,
+    target: terminalTarget,
+  });
+  assert.deepEqual(targetBlocked, {
+    ok: false,
+    reason: 'target_terminal',
+    rngDraws: 0,
+    rngTrace: [],
+  });
+  assert.equal(Object.isFrozen(actorBlocked.rngTrace), true);
+  assert.equal(Object.isFrozen(targetBlocked.rngTrace), true);
+  assert.equal(defeatedActor.stats.hpCurrent, 0);
+  assert.equal(defeatedActor.stateVersion, 11);
+  assert.equal(terminalTarget.stats.hpCurrent, 0);
+  assert.equal(terminalTarget.stateVersion, 12);
+}
+
 assert.equal(resolveCombatV91Proposal({
   combatId, actionSequence: 1, attacker, target, action, worldSnapshot: world,
   targetStatusSnapshot: targetStatus,
@@ -197,6 +247,73 @@ for (const [field, value, expected] of [
   assert.equal(special.defenseStat, channelTarget.stats.spDef);
   assert.ok(special.totalDamage > physical.totalDamage,
     'special uses SPATK/SPDEF rather than silently falling back to ATK/DEF');
+
+  const projectedAction = fixtureAction({
+    actionId: 'shared:channel:projected-physical',
+    definitionVersion: 'shared-action/projected/v1',
+    channel: 'physical',
+    power: 50,
+    accuracy: 1,
+    criticalAllowed: false,
+  });
+  const actionStatProjection = createCombatActionStatProjection({
+    schemaVersion: COMBAT_V91_ACTION_STAT_PROJECTION_SCHEMA,
+    projectionVersion: COMBAT_V91_ACTION_STAT_PROJECTION_VERSION,
+    authority: 'server',
+    ownerDomain: channelActor.ownerDomain,
+    entityId: channelActor.entityId,
+    profileSchemaVersion: channelActor.schemaVersion,
+    profileProgressionStateVersion: channelActor.progressionStateVersion,
+    profileCalculationVersion: channelActor.calculationVersion,
+    profileDefinitionVersion: channelActor.definitionVersion,
+    profileStateVersion: channelActor.stateVersion,
+    profileFingerprint: channelActor.fingerprint,
+    actionId: projectedAction.actionId,
+    actionSchemaVersion: projectedAction.schemaVersion,
+    actionDefinitionVersion: projectedAction.definitionVersion,
+    actionFingerprint: projectedAction.fingerprint,
+    sourceStat: 'atk',
+    baseStat: channelActor.stats.atk,
+    projectedStat: 300,
+    calculationVersion: 'pirate-action-stat-projection/fixed-point-v1',
+    sourceSchemaVersion: 'pirate-action-stat-projection/v9.1',
+    sourceFingerprint: 'a'.repeat(64),
+  }).projection;
+  const projected = resolveCombatV91Proposal({
+    combatId: channelCombatId,
+    actionSequence: 2,
+    attacker: channelActor,
+    target: channelTarget,
+    action: projectedAction,
+    actionStatProjection,
+    worldSnapshot: channelWorld,
+    attackerStatusSnapshot: channelActorStatus,
+    targetStatusSnapshot: channelTargetStatus,
+  });
+  assert.equal(projected.ok, true, projected.reason);
+  assert.equal(projected.proposal.attackStat, 300,
+    'action-scoped Pirate proficiency enters the shared formula');
+  assert.equal(projected.proposal.effectiveActorStats.atk, 200,
+    'the action projection never rewrites the authoritative Base/Effective profile view');
+  assert.equal(channelActor.stats.atk, 200);
+  assert.equal(projected.proposal.actionStatProjectionFingerprint, actionStatProjection.fingerprint);
+  assert.notEqual(projected.proposal.rngActionFingerprint, projected.proposal.actionFingerprint,
+    'the RNG stream binds the exact proficiency projection used by the action');
+
+  const wrongChannel = resolveCombatV91Proposal({
+    combatId: channelCombatId,
+    actionSequence: 2,
+    attacker: channelActor,
+    target: channelTarget,
+    action: { ...projectedAction, channel: 'special', fingerprint: undefined },
+    actionStatProjection,
+    worldSnapshot: channelWorld,
+    attackerStatusSnapshot: channelActorStatus,
+    targetStatusSnapshot: channelTargetStatus,
+  });
+  assert.equal(wrongChannel.reason, 'invalid_action_stat_projection');
+  assert.equal(wrongChannel.cause.reason, 'action_stat_projection_action_mismatch',
+    'changing the action changes its fingerprinted definition binding before channel use');
 }
 
 // Accuracy/evasion endpoints are closed at zero and one, independent of the RNG value.

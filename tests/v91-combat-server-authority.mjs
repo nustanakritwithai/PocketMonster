@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-  PIRATE_COMBAT_DEFINITION_VERSION,
-  createDomainCombatProfile,
-} from '../combat-v91-adapters.mjs';
+import { createDomainCombatProfile } from '../combat-v91-adapters.mjs';
 import {
   createCombatActionDefinition,
   createWorldCombatSnapshot,
@@ -19,11 +16,18 @@ import { createEncounterStatusState } from '../status-lifecycle.mjs';
 import {
   COMBAT_V91_ACTION_PERMIT_SCHEMA,
   COMBAT_V91_AUTHORITY_TRANSACTION_SCHEMA,
+  COMBAT_V91_DYNAMICS_AUTHORITY_SNAPSHOT_SCHEMA,
   COMBAT_V91_RNG_TICKET_SCHEMA,
   COMBAT_V91_SERVER_AUTHORITY_POLICY,
   COMBAT_V91_SERVER_AUTHORITY_VERSION,
   executeCombatV91AuthorityV2,
 } from '../combat-v91-server-authority.mjs';
+import { createPirateActionStatProjection } from '../combat-v91-stat-projection.mjs';
+import { createCombatServerDynamicsPermit } from '../combat-v91-server-dynamics-permit.mjs';
+import {
+  fixturePirateProfileSource,
+  withProfileSourceHp,
+} from './v91-combat-source-fixtures.mjs';
 
 const clone = value => structuredClone(value);
 const ratings = Object.freeze({
@@ -115,41 +119,23 @@ function makeScenario({
   direction = 'PirateToPocket',
   targetCurrentHp,
   actionPower = 20,
+  pirateActionCategory = null,
+  equipmentContribution = 0,
 } = {}) {
   scenarioCounter += 1;
   const suffix = String(scenarioCounter);
   const combatId = `combat:v2:${suffix}`;
   assert.ok(['PirateToPocket', 'PocketToPirate'].includes(direction));
-  const pirateSource = {
-    ownerDomain: 'Pirate',
-    profileInput: {
-      entityId: `human:v2:${suffix}`,
-      entityKind: 'Human',
-      level: 15,
-      progression: {
-        combat: 10,
-        vitality: 10,
-        blade: 10,
-        ranged: 10,
-        fruitPower: 10,
-        mana: 10,
-      },
-      currentHp: 145,
-      types: [],
-      combatDefinition: {
-        definitionVersion: PIRATE_COMBAT_DEFINITION_VERSION,
-        physicalCategory: 'style',
-        physicalBaseDamage: 10,
-        specialBaseDamage: 10,
-        def: 10,
-        spDef: 10,
-        spd: 10,
-        ...ratings,
-      },
-      progressionStateVersion: `pirate-progression/v2:${suffix}`,
-      stateVersion: 1,
-    },
-  };
+  const pirateSource = fixturePirateProfileSource({
+    entityId: `human:v2:${suffix}`,
+    combatLevel: 15,
+    currentHp: direction === 'PocketToPirate' && targetCurrentHp !== undefined
+      ? targetCurrentHp
+      : 145,
+    stateVersion: 1,
+    ratings,
+    progressionStateVersion: `pirate-progression/v3:${suffix}`,
+  });
   const pocketSource = {
     ownerDomain: 'Pocket',
     profileInput: {
@@ -157,7 +143,9 @@ function makeScenario({
       entityKind: 'Monster',
       formId: 'MON_002',
       level: 15,
-      currentHp: 41,
+      currentHp: direction === 'PirateToPocket' && targetCurrentHp !== undefined
+        ? targetCurrentHp
+        : 41,
       ratings: { ...ratings },
       progressionStateVersion: `pocket-progression/v2:${suffix}`,
       stateVersion: 2,
@@ -165,7 +153,6 @@ function makeScenario({
   };
   const actorSource = direction === 'PirateToPocket' ? pirateSource : pocketSource;
   const targetSource = direction === 'PirateToPocket' ? pocketSource : pirateSource;
-  if (targetCurrentHp !== undefined) targetSource.profileInput.currentHp = targetCurrentHp;
   const actor = domainProfile(actorSource);
   const target = domainProfile(targetSource);
   const actionResult = createCombatActionDefinition({
@@ -182,6 +169,34 @@ function makeScenario({
   });
   assert.equal(actionResult.ok, true, actionResult.reason);
   const action = actionResult.action;
+  let pirateProjection = null;
+  let actionStatProjection = null;
+  if (pirateActionCategory !== null) {
+    assert.equal(direction, 'PirateToPocket',
+      'Pirate proficiency projection requires the Pirate-owned actor');
+    const projected = createPirateActionStatProjection({
+      authority: 'server',
+      combatMode: 'pirate.adventure',
+      targetEntityKind: target.entityKind,
+      activeOwnedMonsterCount: 0,
+      combatProfile: actor,
+      proficiencySnapshot: pirateSource.profileInput.proficiencySnapshot,
+      expectedProficiencyStateVersion:
+        pirateSource.profileInput.proficiencySnapshot.stateVersion,
+      expectedProficiencyFingerprint:
+        pirateSource.profileInput.proficiencySnapshot.fingerprint,
+      action: {
+        actionId: action.actionId,
+        definitionVersion: action.definitionVersion,
+        combatActionFingerprint: action.fingerprint,
+        category: pirateActionCategory,
+        equipmentContribution,
+      },
+    });
+    assert.equal(projected.ok, true, projected.reason);
+    pirateProjection = projected.projection;
+    actionStatProjection = projected.actionStatProjection;
+  }
   const seed = scenarioCounter.toString(16).padStart(64, '0');
   const ticket = makeTicket({
     combatId,
@@ -200,6 +215,7 @@ function makeScenario({
     attacker: actor,
     target,
     action,
+    actionStatProjection,
     worldSnapshot: world,
     attackerStatusSnapshot: actorStatus,
     targetStatusSnapshot: targetStatus,
@@ -217,6 +233,8 @@ function makeScenario({
     actor,
     target,
     action,
+    pirateProjection,
+    actionStatProjection,
     ticket,
     world,
     actorStatus,
@@ -255,10 +273,15 @@ class AtomicHarness {
     serverActorStatus = scenario.actorStatus,
     serverTargetStatus = scenario.targetStatus,
     serverTicket = scenario.ticket,
+    permitActionStatProjection = scenario.actionStatProjection,
     concurrentApplyBarrier = 0,
     corruptCommit = null,
     corruptDefeatSemantics = false,
     forceFinalizerFailure = false,
+    permitDynamicsStateVersion = 3,
+    liveDynamicsStateVersion = permitDynamicsStateVersion,
+    permitActorOccupancyStateVersion = 9,
+    liveActorOccupancyStateVersion = permitActorOccupancyStateVersion,
   } = {}) {
     this.scenario = scenario;
     this.unauthorizedReason = unauthorizedReason;
@@ -275,11 +298,27 @@ class AtomicHarness {
     ]);
     this.world = clone(serverWorld);
     this.ticket = { ...clone(serverTicket), consumed: false };
+    this.permitActionStatProjection = clone(permitActionStatProjection);
+    this.permitDynamicsStateVersion = permitDynamicsStateVersion;
+    this.permitActorOccupancyStateVersion = permitActorOccupancyStateVersion;
+    this.dynamicsBindingFingerprint = fingerprintCombatValue({
+      actionId: scenario.action.actionId,
+      source: 'fixture-authoritative-registry',
+    });
+    this.dynamicsSourceProvenanceFingerprint = fingerprintCombatValue({
+      source: 'fixture-pirate-or-pocket-dynamics',
+      actionId: scenario.action.actionId,
+    });
+    this.actorOccupancyLeaseId = `occupancy:${scenario.combatId}:${scenario.actor.entityId}`;
+    this.currentCombatTick = 110;
+    this.occupiedUntilCombatTick = 120;
     this.actorExecution = {
       actorStateVersion: scenario.actor.stateVersion,
       resourceStateVersion: 4,
       entitlementStateVersion: 6,
       sequenceStateVersion: 7,
+      dynamicsStateVersion: liveDynamicsStateVersion,
+      actorOccupancyStateVersion: liveActorOccupancyStateVersion,
     };
     this.terminal = new Map();
     this.domainMutationCount = 0;
@@ -312,6 +351,36 @@ class AtomicHarness {
 
   makePermit({ authorityContext, combatId, actorProfile, targetProfile, actionId, actionSequence }) {
     assert.equal(actionId, this.scenario.action.actionId);
+    const resourceCommitToken =
+      `resource-token:${combatId}:${actionSequence}:${this.actorExecution.resourceStateVersion}`;
+    const dynamics = createCombatServerDynamicsPermit({
+      authority: 'server',
+      permitVersion: 'server-dynamics-permit/single-direct/v1',
+      combatId,
+      actionSequence,
+      actorEntityId: actorProfile.entityId,
+      targetEntityId: targetProfile.entityId,
+      actionId,
+      actionFingerprint: this.scenario.action.fingerprint,
+      actionDynamicsBindingFingerprint: this.dynamicsBindingFingerprint,
+      sourceProvenanceFingerprint: this.dynamicsSourceProvenanceFingerprint,
+      resolutionPolicy: 'single_direct_impact',
+      delivery: 'direct',
+      hitOrdinal: 0,
+      startCombatTick: 100,
+      impactCombatTick: 110,
+      validatedAtCombatTick: this.currentCombatTick,
+      expiresAtCombatTick: 120,
+      dynamicsStateVersion: this.permitDynamicsStateVersion,
+      dynamicsStateVersionAfter: this.permitDynamicsStateVersion + 1,
+      actorOccupancyStateVersion: this.permitActorOccupancyStateVersion,
+      actorOccupancyStateVersionAfter: this.permitActorOccupancyStateVersion + 1,
+      actorOccupancyLeaseId: this.actorOccupancyLeaseId,
+      occupiedUntilCombatTick: this.occupiedUntilCombatTick,
+      resourceReservationToken: resourceCommitToken,
+      authoritativeEffectReceipt: null,
+    });
+    assert.equal(dynamics.ok, true, dynamics.reason);
     const payload = {
       schemaVersion: COMBAT_V91_ACTION_PERMIT_SCHEMA,
       authority: 'server',
@@ -323,6 +392,8 @@ class AtomicHarness {
       targetEntityId: targetProfile.entityId,
       nextActionSequence: actionSequence,
       action: this.scenario.action,
+      actionStatProjection: this.permitActionStatProjection,
+      dynamicsPermit: dynamics.permit,
       actorStateVersion: this.actorExecution.actorStateVersion,
       actorStateVersionAfter: this.actorExecution.actorStateVersion,
       resourceStateVersion: this.actorExecution.resourceStateVersion,
@@ -330,7 +401,7 @@ class AtomicHarness {
       entitlementStateVersion: this.actorExecution.entitlementStateVersion,
       sequenceStateVersion: this.actorExecution.sequenceStateVersion,
       sequenceStateVersionAfter: this.actorExecution.sequenceStateVersion + 1,
-      resourceCommitToken: `resource-token:${combatId}:${actionSequence}:${this.actorExecution.resourceStateVersion}`,
+      resourceCommitToken,
     };
     return Object.freeze({ ...payload, fingerprint: fingerprintCombatValue(payload) });
   }
@@ -338,6 +409,27 @@ class AtomicHarness {
   ticketForLoad() {
     const { consumed: _consumed, ...ticket } = this.ticket;
     return clone(ticket);
+  }
+
+  dynamicsAuthoritySnapshot() {
+    const payload = {
+      schemaVersion: COMBAT_V91_DYNAMICS_AUTHORITY_SNAPSHOT_SCHEMA,
+      authority: 'server_registry',
+      combatId: this.scenario.combatId,
+      actionSequence: 1,
+      actorEntityId: this.scenario.actor.entityId,
+      targetEntityId: this.scenario.target.entityId,
+      actionId: this.scenario.action.actionId,
+      actionFingerprint: this.scenario.action.fingerprint,
+      actionDynamicsBindingFingerprint: this.dynamicsBindingFingerprint,
+      sourceProvenanceFingerprint: this.dynamicsSourceProvenanceFingerprint,
+      currentCombatTick: this.currentCombatTick,
+      dynamicsStateVersion: this.permitDynamicsStateVersion,
+      actorOccupancyStateVersion: this.permitActorOccupancyStateVersion,
+      actorOccupancyLeaseId: this.actorOccupancyLeaseId,
+      occupiedUntilCombatTick: this.occupiedUntilCombatTick,
+    };
+    return Object.freeze({ ...payload, fingerprint: fingerprintCombatValue(payload) });
   }
 
   dependencies() {
@@ -350,6 +442,7 @@ class AtomicHarness {
       authorizeAction: async request => this.unauthorizedReason
         ? { authorized: false, reason: this.unauthorizedReason }
         : { authorized: true, permit: this.makePermit(request) },
+      loadActionDynamicsAuthority: async () => clone(this.dynamicsAuthoritySnapshot()),
       loadWorldSnapshot: async () => clone(this.world),
       loadStatusSnapshot: async ({ entityId }) => this.currentStatus(entityId),
       loadRngTicket: async () => this.ticketForLoad(),
@@ -436,7 +529,9 @@ class AtomicHarness {
       } else if (this.actorExecution.actorStateVersion !== expected.actorProfileStateVersion
         || this.actorExecution.resourceStateVersion !== expected.actorResourceStateVersion
         || this.actorExecution.entitlementStateVersion !== expected.actionEntitlementStateVersion
-        || this.actorExecution.sequenceStateVersion !== expected.combatSequenceStateVersion) {
+        || this.actorExecution.sequenceStateVersion !== expected.combatSequenceStateVersion
+        || this.actorExecution.dynamicsStateVersion !== expected.combatDynamicsStateVersion
+        || this.actorExecution.actorOccupancyStateVersion !== expected.actorOccupancyStateVersion) {
         casReason = 'ACTOR_EXECUTION_CAS_MISMATCH';
       } else if (this.world.fingerprint !== expected.worldSnapshotFingerprint) {
         casReason = 'WORLD_SNAPSHOT_CAS_MISMATCH';
@@ -451,13 +546,20 @@ class AtomicHarness {
         return { atomic: true, disposition: 'rejected', response };
       }
 
-      const stagedTargetSource = clone(liveTargetSource);
-      stagedTargetSource.profileInput.currentHp = command.mutation.targetHpAfter;
-      stagedTargetSource.profileInput.stateVersion = command.mutation.targetStateVersionAfter;
+      const stagedTargetSource = withProfileSourceHp(
+        liveTargetSource,
+        command.mutation.targetHpAfter,
+        command.mutation.targetStateVersionAfter,
+      );
       if (this.corruptCommit === 'base') {
         stagedTargetSource.profileInput.ratings.resistance = 0.25;
       } else if (this.corruptCommit === 'provenance') {
         stagedTargetSource.profileInput.progressionStateVersion += ':forged';
+      } else if (this.corruptCommit === 'pirate-proficiency') {
+        const proficiency = stagedTargetSource.profileInput.proficiencySnapshot;
+        proficiency.proficiencies.blade = 2_800;
+        delete proficiency.fingerprint;
+        proficiency.fingerprint = fingerprintCombatValue(proficiency);
       }
       const stagedStatuses = command.mutation.authoritativeStatusSnapshots.map(clone);
       const stagedExecution = {
@@ -465,6 +567,8 @@ class AtomicHarness {
         resourceStateVersion: command.actionPermit.resourceStateVersionAfter,
         entitlementStateVersion: command.actionPermit.entitlementStateVersion,
         sequenceStateVersion: command.actionPermit.sequenceStateVersionAfter,
+        dynamicsStateVersion: command.mutation.dynamicsStateVersionAfter,
+        actorOccupancyStateVersion: command.mutation.actorOccupancyStateVersionAfter,
       };
       const stagedTicket = {
         ...this.ticketForLoad(),
@@ -493,6 +597,15 @@ class AtomicHarness {
           rngTicketId: this.ticket.ticketId,
           rngTicketStateVersionBefore: this.ticket.stateVersion,
           rngTicketStateVersionAfter: this.ticket.stateVersion + 1,
+          dynamicsStateVersionBefore: command.actionPermit.dynamicsPermit.dynamicsStateVersion,
+          dynamicsStateVersionAfter: command.actionPermit.dynamicsPermit.dynamicsStateVersionAfter,
+          actorOccupancyStateVersionBefore:
+            command.actionPermit.dynamicsPermit.actorOccupancyStateVersion,
+          actorOccupancyStateVersionAfter:
+            command.actionPermit.dynamicsPermit.actorOccupancyStateVersionAfter,
+          dynamicsPermitFingerprint: command.actionPermit.dynamicsPermit.fingerprint,
+          authoritativeDynamicsEffectReceipt:
+            clone(command.actionPermit.dynamicsPermit.authoritativeEffectReceipt),
         },
       };
       if (this.corruptDefeatSemantics) {
@@ -540,8 +653,12 @@ async function execute(harness, prediction) {
   }, harness.dependencies());
 }
 
-assert.equal(COMBAT_V91_SERVER_AUTHORITY_VERSION, 'combat-v91-server-authority/v2');
+assert.equal(COMBAT_V91_SERVER_AUTHORITY_VERSION, 'combat-v91-server-authority/v3');
 assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.profileAuthority, 'domain_calculator_only');
+assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.dynamicsAuthority,
+  'server_dynamics_permit_inside_atomic_server_transaction');
+assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.supportedDynamicsResolution,
+  'single_direct_impact');
 assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.terminalResponse, 'same_transaction_as_owner_state');
 assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.productionWritesEnabled, false);
 assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.networkCreation, false);
@@ -577,6 +694,57 @@ assert.equal(COMBAT_V91_SERVER_AUTHORITY_POLICY.networkCreation, false);
   assert.equal(harness.domainMutationCount, 1);
 }
 
+// Timing and actor occupancy are authoritative CAS inputs in the same atomic
+// write. A permit based on stale dynamics state cannot reach the HP writer.
+{
+  const scenario = makeScenario();
+  const prediction = predictionEnvelope(scenario, 'intent:stale-dynamics');
+  const harness = new AtomicHarness(scenario, {
+    permitDynamicsStateVersion: 3,
+    liveDynamicsStateVersion: 4,
+  });
+  const rejected = await execute(harness, prediction);
+  assert.equal(rejected.ok, true);
+  assert.equal(rejected.reason, 'ACTOR_EXECUTION_CAS_MISMATCH');
+  assert.equal(rejected.response.status, 'rejected');
+  assert.equal(harness.domainMutationCount, 0);
+}
+
+// Pirate proficiency/equipment can affect only the action-scoped attack value;
+// the Server-issued permit is the authority and Core6 remains unchanged.
+{
+  const scenario = makeScenario({
+    pirateActionCategory: 'sword',
+    equipmentContribution: 40,
+  });
+  assert.equal(scenario.actor.stats.atk, 10);
+  assert.equal(scenario.actionStatProjection.baseStat, 10);
+  assert.equal(scenario.actionStatProjection.projectedStat, 50);
+  assert.equal(scenario.proposal.attackStat, 50);
+  const actorSourceBefore = clone(scenario.actorSource);
+  const prediction = predictionEnvelope(scenario, 'intent:pirate-action-projection');
+  const harness = new AtomicHarness(scenario);
+  const confirmed = await execute(harness, prediction);
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.reason, 'confirmed');
+  assert.equal(
+    confirmed.response.authoritativeOutcome.damage,
+    scenario.proposal.totalDamage,
+  );
+  assert.deepEqual(harness.currentSource(scenario.actor.entityId), actorSourceBefore,
+    'action projection cannot rewrite Pirate Core6/proficiency ownership state');
+
+  const serverWithoutProjection = new AtomicHarness(scenario, {
+    permitActionStatProjection: null,
+  });
+  const rejected = await execute(serverWithoutProjection, prediction);
+  assert.equal(rejected.ok, true);
+  assert.equal(rejected.reason, 'RNG_STREAM_MISMATCH');
+  assert.equal(rejected.response.status, 'rejected');
+  assert.equal(serverWithoutProjection.domainMutationCount, 0,
+    'client prediction cannot promote proficiency without a Server permit');
+}
+
 // Lethal commits route HP to the target owner and preserve Human/Monster end-state semantics.
 for (const [direction, expected] of [
   ['PirateToPocket', {
@@ -604,9 +772,11 @@ for (const [direction, expected] of [
   assert.deepEqual(harness.targetOwnerCommitDomains, [expected.targetOwner]);
   assert.deepEqual(harness.currentSource(scenario.actor.entityId), actorSourceBefore,
     `${direction} never writes HP through the attacker owner`);
-  const expectedTargetSource = clone(targetSourceBefore);
-  expectedTargetSource.profileInput.currentHp = 0;
-  expectedTargetSource.profileInput.stateVersion += 1;
+  const expectedTargetSource = withProfileSourceHp(
+    targetSourceBefore,
+    0,
+    scenario.target.stateVersion + 1,
+  );
   assert.deepEqual(harness.currentSource(scenario.target.entityId), expectedTargetSource,
     `${direction} changes only target-owner HP/state version`);
 }
@@ -823,4 +993,20 @@ for (const corruptCommit of ['base', 'provenance']) {
   assert.equal(harness.rollbackCount, 1);
 }
 
-console.log('V9.1 Server Authority V2: PASS (domain HP ownership, defeat semantics, atomic CAS/idempotency, rollback)');
+// A target-owner HP commit cannot smuggle a Pirate proficiency/mastery change
+// that is intentionally absent from CombatProfile12.
+{
+  const scenario = makeScenario({ direction: 'PocketToPirate' });
+  const prediction = predictionEnvelope(scenario, 'intent:rollback:pirate-proficiency');
+  const harness = new AtomicHarness(scenario, { corruptCommit: 'pirate-proficiency' });
+  const beforeSource = harness.currentSource(scenario.target.entityId);
+  const settled = await execute(harness, prediction);
+  assert.equal(settled.ok, false);
+  assert.equal(settled.reason, 'atomic_combat_transaction_failed');
+  assert.equal(settled.error.code, 'committed_profile_invariant_mismatch');
+  assert.deepEqual(harness.currentSource(scenario.target.entityId), beforeSource);
+  assert.equal(harness.domainMutationCount, 0);
+  assert.equal(harness.rollbackCount, 1);
+}
+
+console.log('V9.1.2 Server Authority V3: PASS (HP/status/resource/dynamics atomic CAS, idempotency, rollback)');

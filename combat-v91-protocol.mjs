@@ -8,11 +8,12 @@ import {
 } from './combat-v91-contract.mjs';
 import { COMBAT_V91_RNG_VERSION } from './combat-v91-rng.mjs';
 import { validateCombatStatusSnapshot } from './combat-v91-status.mjs';
+import { validateAuthoritativeDynamicsEffectReceipt } from './combat-v91-authoritative-dynamics-effect.mjs';
 
-export const COMBAT_V91_CALCULATION_VERSION = 'combat-v91-calculation/v1';
+export const COMBAT_V91_CALCULATION_VERSION = 'combat-v91-calculation/v2';
 export const COMBAT_V91_PREDICTION_SCHEMA = 'combat-prediction-envelope/v9.1';
 export const COMBAT_V91_OUTCOME_SCHEMA = 'combat-outcome/v9.1';
-export const COMBAT_V91_AUTHORITY_RESPONSE_SCHEMA = 'combat-authority-response/v9.1';
+export const COMBAT_V91_AUTHORITY_RESPONSE_SCHEMA = 'combat-authority-response/v9.1.2';
 export const COMBAT_RECONCILIATION_STATUSES = Object.freeze(['confirmed', 'corrected', 'rejected']);
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
@@ -393,27 +394,50 @@ function validatedStatusSnapshotArray(snapshots, { combatId, requiredEntityIds =
   return result(true, null, { snapshots: canonical });
 }
 
-function validatedExecutionReceipt(receipt, { actorEntityId, actionSequence } = {}) {
+function validatedExecutionReceipt(receipt, {
+  actorEntityId, targetEntityId, actionId, combatId, actionSequence,
+} = {}) {
   if (!exactKeys(receipt, [
     'actorEntityId', 'actorStateVersionBefore', 'actorStateVersionAfter',
     'resourceStateVersionBefore', 'resourceStateVersionAfter',
     'sequenceStateVersionBefore', 'sequenceStateVersionAfter',
     'committedActionSequence', 'rngTicketId',
     'rngTicketStateVersionBefore', 'rngTicketStateVersionAfter',
+    'dynamicsStateVersionBefore', 'dynamicsStateVersionAfter',
+    'actorOccupancyStateVersionBefore', 'actorOccupancyStateVersionAfter',
+    'dynamicsPermitFingerprint',
+    'authoritativeDynamicsEffectReceipt',
   ]) || receipt.actorEntityId !== actorEntityId || !nonEmptyString(receipt.rngTicketId)
+    || !validHash(receipt.dynamicsPermitFingerprint)
     || receipt.committedActionSequence !== actionSequence) return result(false, 'invalid_execution_receipt');
   for (const field of [
     'actorStateVersionBefore', 'actorStateVersionAfter', 'resourceStateVersionBefore',
     'resourceStateVersionAfter', 'sequenceStateVersionBefore', 'sequenceStateVersionAfter',
     'rngTicketStateVersionBefore', 'rngTicketStateVersionAfter',
+    'dynamicsStateVersionBefore', 'dynamicsStateVersionAfter',
+    'actorOccupancyStateVersionBefore', 'actorOccupancyStateVersionAfter',
   ]) if (!Number.isInteger(receipt[field]) || receipt[field] < 0) return result(false, 'invalid_execution_receipt');
   if (receipt.actorStateVersionAfter < receipt.actorStateVersionBefore
     || receipt.resourceStateVersionAfter !== receipt.resourceStateVersionBefore + 1
     || receipt.sequenceStateVersionAfter !== receipt.sequenceStateVersionBefore + 1
-    || receipt.rngTicketStateVersionAfter !== receipt.rngTicketStateVersionBefore + 1) {
+    || receipt.rngTicketStateVersionAfter !== receipt.rngTicketStateVersionBefore + 1
+    || receipt.dynamicsStateVersionAfter !== receipt.dynamicsStateVersionBefore + 1
+    || receipt.actorOccupancyStateVersionAfter !== receipt.actorOccupancyStateVersionBefore + 1) {
     return result(false, 'invalid_execution_receipt_version');
   }
-  return result(true, null, { receipt: { ...receipt } });
+  const effect = receipt.authoritativeDynamicsEffectReceipt === null
+    ? result(true, null, { receipt: null })
+    : validateAuthoritativeDynamicsEffectReceipt(receipt.authoritativeDynamicsEffectReceipt, {
+      combatId,
+      actionSequence,
+      actorEntityId,
+      targetEntityId,
+      actionId,
+    });
+  if (!effect.ok) return result(false, 'invalid_execution_dynamics_effect', { cause: effect });
+  return result(true, null, {
+    receipt: { ...receipt, authoritativeDynamicsEffectReceipt: effect.receipt },
+  });
 }
 
 export function createCombatAuthorityResponse(input = {}) {
@@ -462,6 +486,9 @@ export function createCombatAuthorityResponse(input = {}) {
     if (!statuses.ok) return statuses;
     const receipt = validatedExecutionReceipt(input.executionReceipt, {
       actorEntityId: input.actorEntityId,
+      targetEntityId: input.targetEntityId,
+      actionId: input.actionId,
+      combatId: input.combatId,
       actionSequence: input.actionSequence,
     });
     if (!receipt.ok) return receipt;

@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-  PIRATE_COMBAT_DEFINITION_VERSION,
-  createDomainCombatProfile,
-} from '../combat-v91-adapters.mjs';
+import { createDomainCombatProfile } from '../combat-v91-adapters.mjs';
 import { fingerprintCombatValue } from '../combat-v91-contract.mjs';
 import {
   createCombatClockSnapshot,
@@ -21,6 +18,10 @@ import {
   applyEncounterStatus,
   createEncounterStatusState,
 } from '../status-lifecycle.mjs';
+import {
+  fixturePirateProfileSource,
+  withProfileSourceHp,
+} from './v91-combat-source-fixtures.mjs';
 
 const clone = value => structuredClone(value);
 const ratings = Object.freeze({
@@ -41,46 +42,28 @@ function profileFrom(source) {
 }
 
 function pirateSource({ suffix, currentHp = 145, stateVersion = 3 } = {}) {
-  return {
-    ownerDomain: 'Pirate',
-    profileInput: {
-      entityId: `human:status:${suffix}`,
-      entityKind: 'Human',
-      level: 15,
-      progression: {
-        combat: 10,
-        vitality: 10,
-        blade: 10,
-        ranged: 10,
-        fruitPower: 10,
-        mana: 10,
-      },
-      currentHp,
-      types: [],
-      combatDefinition: {
-        definitionVersion: PIRATE_COMBAT_DEFINITION_VERSION,
-        physicalCategory: 'style',
-        physicalBaseDamage: 10,
-        specialBaseDamage: 10,
-        def: 10,
-        spDef: 10,
-        spd: 10,
-        ...ratings,
-      },
-      progressionStateVersion: `pirate-progression/status:${suffix}`,
-      stateVersion,
-    },
-  };
+  return fixturePirateProfileSource({
+    entityId: `human:status:${suffix}`,
+    combatLevel: 15,
+    currentHp,
+    stateVersion,
+    ratings,
+    // Keep percentage-based status ticks integral under the Core6 contract.
+    coreStats: { hp: 200, atk: 10, def: 10, spAtk: 10, spDef: 10, spd: 10 },
+    progressionStateVersion: `pirate-progression/status:${suffix}`,
+  });
 }
 
-function pocketSource({ suffix, currentHp = 41, stateVersion = 7 } = {}) {
+function pocketSource({ suffix, currentHp = 100, stateVersion = 7 } = {}) {
   return {
     ownerDomain: 'Pocket',
     profileInput: {
       entityId: `monster:status:${suffix}`,
       entityKind: 'Monster',
-      formId: 'MON_002',
-      level: 15,
+      // MON_021 at level 29 has canonical HP 100, so 1% ticks preserve
+      // integer CombatStats without changing the percentage semantics.
+      formId: 'MON_021',
+      level: 29,
       potential: undefined,
       training: undefined,
       currentHp,
@@ -113,7 +96,7 @@ function scenario({ ownerDomain = 'Pocket', statusId = 'ST_POISON', durationSec 
   const suffix = String(scenarioCounter);
   const combatId = `combat:status:${suffix}`;
   const source = ownerDomain === 'Pocket'
-    ? pocketSource({ suffix, currentHp: currentHp ?? 41 })
+    ? pocketSource({ suffix, currentHp: currentHp ?? 100 })
     : pirateSource({ suffix, currentHp: currentHp ?? 145 });
   const profile = profileFrom(source);
   const statusSnapshot = must(createCombatStatusSnapshot({
@@ -274,9 +257,11 @@ class AtomicStatusHarness {
         return { atomic: true, disposition: 'rejected', response };
       }
 
-      const nextSource = clone(this.source);
-      nextSource.profileInput.currentHp = command.mutation.hpAfter;
-      nextSource.profileInput.stateVersion = command.mutation.profileStateVersionAfter;
+      const nextSource = withProfileSourceHp(
+        this.source,
+        command.mutation.hpAfter,
+        command.mutation.profileStateVersionAfter,
+      );
       const nextStatus = clone(command.mutation.authoritativeStatusSnapshot);
       const nextProfile = profileFrom(nextSource);
       const hpZero = nextProfile.stats.hpCurrent === 0;
@@ -285,7 +270,9 @@ class AtomicStatusHarness {
       let receiptSource = nextSource;
       if (this.mutateBaseInReceipt) {
         receiptSource = clone(nextSource);
-        if (receiptSource.ownerDomain === 'Pirate') receiptSource.profileInput.progression.blade += 1;
+        if (receiptSource.ownerDomain === 'Pirate') {
+          receiptSource.profileInput.humanCoreGrowthDefinition.coreStats.atk += 1;
+        }
         else receiptSource.profileInput.level += 1;
       }
       if (this.corruptDefeatSemantics) [defeated, fainted] = [fainted, defeated];
@@ -326,7 +313,7 @@ async function execute(input, harness, request = input.request) {
   }, harness.dependencies());
 }
 
-assert.equal(COMBAT_V91_SERVER_STATUS_AUTHORITY_VERSION, 'combat-v91-server-status-authority/v1');
+assert.equal(COMBAT_V91_SERVER_STATUS_AUTHORITY_VERSION, 'combat-v91-server-status-authority/v2');
 assert.equal(COMBAT_V91_SERVER_STATUS_AUTHORITY_POLICY.productionWritesEnabled, false);
 assert.equal(COMBAT_V91_SERVER_STATUS_AUTHORITY_POLICY.networkCreation, false);
 assert.equal(COMBAT_V91_SERVER_STATUS_AUTHORITY_POLICY.planner, 'pure_snapshot_transition');
@@ -383,13 +370,13 @@ for (const [ownerDomain, expected] of [
   ['Pocket', { fainted: true, defeated: false }],
   ['Pirate', { fainted: false, defeated: true }],
 ]) {
-  const input = scenario({ ownerDomain, statusId: 'ST_BURN', durationSec: 2,
-    combatTimeSec: 1, currentHp: 0.1 });
+  const input = scenario({ ownerDomain, statusId: 'ST_POISON', durationSec: 2,
+    stacks: 2, combatTimeSec: 1, currentHp: 1 });
   const harness = new AtomicStatusHarness(input);
   const settled = await execute(input, harness);
   assert.equal(settled.ok, true, settled.reason);
   assert.equal(settled.response.outcome.hpAfter, 0);
-  assert.equal(settled.response.outcome.damage, 0.1, 'outcome reports applied, HP-clamped damage');
+  assert.equal(settled.response.outcome.damage, 1, 'outcome reports applied, HP-clamped damage');
   assert.equal(settled.response.outcome.scheduledDamage > settled.response.outcome.damage, true);
   assert.equal(settled.response.outcome.fainted, expected.fainted);
   assert.equal(settled.response.outcome.defeated, expected.defeated);
@@ -449,8 +436,9 @@ for (const corruption of [
   { mutateBaseInReceipt: true },
   { corruptDefeatSemantics: true, lethal: true },
 ]) {
-  const input = scenario({ ownerDomain: 'Pocket', statusId: 'ST_BURN', durationSec: 2,
-    combatTimeSec: 1, currentHp: corruption.lethal ? 0.1 : 41 });
+  const input = scenario({ ownerDomain: 'Pocket', statusId: 'ST_POISON', durationSec: 2,
+    stacks: corruption.lethal ? 2 : 1,
+    combatTimeSec: 1, currentHp: corruption.lethal ? 1 : 41 });
   const harness = new AtomicStatusHarness(input, corruption);
   const failed = await execute(input, harness);
   assert.equal(failed.ok, false);

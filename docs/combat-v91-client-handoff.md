@@ -1,128 +1,223 @@
-# ส่งมอบงาน Client Combat V9.1
+# Client Combat V9.1.2 — Implementation Record
 
-เอกสารนี้บันทึกสถาปัตยกรรมและสถานะหลัง implementation commit `e5e432a`, parent-shell commit `223b57a` และ latest-main merge checkpoint `6022bbf` เป้าหมายคือให้ Human, Monster, NPC, Boss และ Ship ต่อสู้ด้วย `CombatStats` 12 ค่า, `CombatRules` และ Status lifecycle ชุดเดียวกัน โดยฝั่ง Client ทำ domain calculation, prediction และ presentation แต่ไม่เป็น authoritative writer
+เอกสารนี้บันทึกสถานะของ Shared Combat ที่รวมฐานสเตตัสแบบ Pocket Monster,
+ความชำนาญและจังหวะต่อสู้จาก Pirate Fruit และ authority boundary ฝั่ง Server
+โดยไม่อ้างว่า backend production หรือการถอด iframe ทั้งเกมเสร็จแล้ว
 
-> คำว่า “Server authoritative writer” ในเอกสารนี้หมายถึง contract และ transaction boundary ที่ต้องใช้ฝั่ง Server ไม่ได้หมายความว่ามี production endpoint หรือฐานข้อมูลที่ deploy แล้ว ปัจจุบัน production writes ยังคงปิด
+> `Server authoritative writer` ในงานนี้หมายถึง executable contract และ atomic
+> transaction boundary สำหรับ HP, Status, resource, sequence, dynamics/occupancy และ outcome
+> ค่า `productionWritesEnabled` ยังเป็น `false` และยังไม่มี endpoint/DB adapter จริง
 
-## Design Lock
+## Draft PR Checkpoint Boundary
 
-1. Combat vocabulary ใช้ร่วมกัน 12 ค่า แต่ที่มาของ Base Stats แยกตาม Domain
-2. `Pirate` เป็นเจ้าของ Human progression, definition และการคำนวณ Human base profile
-3. `Pocket` เป็นเจ้าของ Monster progression/catalog และการคำนวณ Monster base profile
-4. รองรับ owner domain เฉพาะ `Pirate` และ `Pocket`; ไม่มี generic authoritative passthrough และ World ไม่สร้าง Combat profile
-5. Combat resolver ใช้ rules path เดียว ห้ามเลือกสูตร damage จาก `ownerDomain` หรือ `entityKind`
-6. `WorldCombatSnapshot` contract กำหนด modifier และ spatial/permission fields แบบ immutable, bounded และ deterministic; truth จริงต้องมาจาก trusted World/Server adapter ซึ่งยังไม่มี live implementation ใน repository นี้ และ Combat ห้ามแก้ Base Stats หรือ World state
-7. Client แสดง prediction ได้ แต่ห้าม commit HP, Status, resource, defeat/faint, reward, inventory หรือ progression
-8. HP/Status/resource/sequence ต้องถูก commit ใน authoritative transaction ก่อนเผยแพร่ committed outcome
-9. Runtime Status ใช้ protocol/lifecycle กลาง ส่วน `ST_FEAR` เป็น Combat control และไม่ใช่ PsychologicalFear/Memory ของ World
-10. Ring 0/Ring 1 และ live gameplay flow เดิมยังไม่ถูกเปิดหรือเปลี่ยนโดย Combat foundation นี้
+PR นี้เป็น checkpoint สำหรับ **Shared Contract + Client foundation** เพื่อให้ฝั่ง Server
+นำ schema, intent/response และ acceptance vectors ไปทำ production adapter ต่อได้ ไม่ใช่
+release candidate และยังไม่ควร merge จนกว่า Server handoff กับ final CI จะผ่าน
 
-## CombatStats กลาง 12 ค่า
+ข้อจำกัดที่ล็อกชัดเจนใน Client:
+
+- **Client ไม่เขียน HP** — prediction เปลี่ยนได้เฉพาะ pending/display projection;
+  authoritative HP เปลี่ยนเมื่อ reconcile response ที่ Server commit แล้วเท่านั้น
+- **Client ไม่เขียน Runtime Status** — prediction เก็บเพียง proposed snapshot;
+  authoritative Status มาจาก Server/entity-owner snapshot เท่านั้น
+- **Client ไม่เขียน World position/transform** — หลังผลยืนยัน Client ทำได้เพียงส่ง
+  `world.impulse_commit_requested`; World/Server spatial authority ต้องเป็นผู้ commit
+- **Production transport ยังปิด** — `networkCreation: false`, public shell ตั้ง
+  `serverReconcileExposed: false` และยังไม่มี authenticated response ingress หรือ live
+  World impulse consumer
+
+Server modules ใน PR เป็น executable reference boundary/test harness และถูกกันออกจาก
+Pages artifact ด้วย `combat-v91-server-*`; ค่า `productionWritesEnabled` ยังคง `false`
+
+## Baseline ที่ล็อกแล้ว
+
+1. Human และ Monster ใช้ Combat vocabulary เดียวกัน แต่ progression owner คำนวณ Base Stats ของตนเอง
+2. Core6 ใช้ฐาน Pocket: `HP / ATK / DEF / SPATK / SPDEF / SPD`
+3. CombatProfile12 ประกอบด้วย Core6, `hpCurrent` และ ratings 5 ค่า
+4. Shared combat level อยู่ช่วง `1–60`; Pirate native level เป็น provenance เท่านั้น ห้ามเข้า damage formula โดยตรง
+5. Pirate `Combat / Vitality / Blade / Ranged / Fruit Power / Mana` และ Mastery เป็น proficiency/resource input ไม่ใช่ Base Stats
+6. Equipment และ proficiency เพิ่มค่าเฉพาะ Action ผ่าน `ActionStatProjection`; ห้ามแก้ Core6 หรือ HP
+7. Pocket ใช้ Monster stat formula/catalog เดิมโดยตรง
+8. World เป็นเจ้าของ spatial truth และต้นเหตุของ modifier; Combat รับ immutable snapshot และห้ามเขียนกลับ World
+9. Shared resolver, Runtime Status protocol, CombatOutcome และ CombatClock ใช้ร่วมกัน
+10. Pirate/Pocket owner เป็นผู้ commit HP ผ่าน Server transaction เท่านั้น
+
+## CombatProfile12
 
 ```js
 {
-  hpMax,
-  hpCurrent,
-  atk,
-  def,
-  spAtk,
-  spDef,
-  spd,
-  accuracy,
-  crit,
-  evasion,
-  resistance,
-  penetration
+  hpMax, hpCurrent,
+  atk, def, spAtk, spDef, spd,
+  accuracy, crit, evasion, resistance, penetration
 }
 ```
 
-Contract ปัจจุบันบังคับ exact schema, finite/non-negative values, `hpCurrent <= hpMax`, normalized ratios ช่วง `0..1`, safety bounds, deep immutability, canonical serialization และ lowercase SHA-256 fingerprint 64 ตัว Profile เก็บ `entityId`, `ownerDomain`, `entityKind`, `level`, `types`, progression/calculation/definition/state versions และ provenance ที่ตรวจสอบได้
+- Core6 และ `hpCurrent` เป็น safe integer
+- `hpMax >= 1` และ `0 <= hpCurrent <= hpMax`
+- ratings อยู่ช่วง `0..1`
+- Profile เป็น immutable, exact-schema และมี SHA-256 fingerprint
+- รองรับ `Human`, `Monster`, `Npc`, `Boss`, `Ship`
+- Owner domain ที่สร้าง Base profile ได้มีเพียง `Pirate` และ `Pocket`
 
-Entity kind ที่ contract รองรับคือ `Human`, `Monster`, `Npc`, `Boss`, `Ship` โดย mapping ที่ adapter อนุญาตคือ:
-
-- Pirate: `Human`, `Npc`, `Boss`, `Ship`
-- Pocket: `Monster`, `Npc`, `Boss`
-
-Entity kind เป็นข้อมูลประกอบ profile ไม่ใช่ตัวเลือก damage engine
-
-## Ownership และการไหลของข้อมูล
+## Base Stats แยกเจ้าของ แต่ใช้ภาษากลาง
 
 ```text
-Pirate progression + Pirate definition ─┐
-                                        ├─ Domain calculator ─ BaseCombatProfile
-Pocket progression + Pocket catalog ───┘
-                                                       │
-World snapshot / modifiers / spatial truth ────────────┤
-                                                       ▼
-                                         Shared CombatRules V9.1
-                                                       │
-                                  Client proposal + pending overlay
-                                                       │
-        Server authority harness: reload trusted inputs → recalculate
-                          → atomic owner-commit contract (not a live endpoint)
-                                                       │
-                                   Confirm / Correct / Reject / Outcome
+Pirate progression ─ Pirate authoritative Human calculator ─ Pocket-shaped Core6 ─┐
+                                                                                  ├─ CombatProfile12
+Pocket progression/catalog ─ Pocket monster formula ─────────────── Core6 ────────┘
 ```
 
-### Pirate calculator
+### Human / Pirate
 
-`combat-v91-adapters.mjs` อ้าง provenance จาก Pirate Fruit commit `4df5721de8bdb20c28e53b6a8c933616e132c96d` (`shared/src/progression/stats.ts`) และใช้ Pirate progression เป็น input เท่านั้น:
+`combat-v91-adapters.mjs` ไม่สร้างสูตร balance ใหม่และไม่ map `Blade = ATK` หรือ
+`Vitality = DEF` ตรง ๆ แต่รับผล Core6 ที่ Pirate authoritative calculator คำนวณแล้ว
+พร้อม definition/progression fingerprint แล้วจึงสร้าง CombatProfile12
 
-- stat cap 2,800
-- HP เริ่ม 100 และ Vitality เพิ่ม HP 5 ต่อแต้มหลังแต้มแรก
-- damage scaling อ้าง multiplier สูงสุด `78.26`
-- style/sword/gun/fruit map เข้าความชำนาญ combat/blade/ranged/fruitPower ตามสูตร Pirate
-- `def`, `spDef`, `spd` และ ratings ต้องมาจาก Pirate authoritative combat definition ที่มี version ตรงกัน; adapter ไม่แต่งค่าขึ้นเอง
+Input หลักคือ:
 
-### Pocket calculator
+- `humanCoreGrowthDefinition`
+- `ratingsDefinition`
+- `currentHpOwnerState`
+- `proficiencySnapshot`
 
-Pocket adapter reuse `monster-stat-formula.mjs`, `monster-stat-contract.mjs` และ `monster-stat-catalog.mjs` โดยตรง พร้อมบังคับ catalog/formula version และ authoritative ratings สูตร progression เดิมยังเป็น:
+Human Core6 ใช้ level `1–60` และไม่รวม Equipment ส่วน Pirate progression เดิมที่มี
+cap 2,800 ถูกเก็บใน `proficiencySnapshot` เท่านั้น ค่า proficiency ที่ไม่เกี่ยวกับ
+Action ปัจจุบันจะไม่มีผลกับ Action นั้น และ Mana ไม่เปลี่ยน Core6 โดยอ้อม
+
+### Monster / Pocket
+
+Pocket adapter ใช้ `monster-stat-formula.mjs` และ `monster-stat-catalog.mjs` โดยตรง:
 
 ```text
 floor(((2 * base + potential + training / 4) * level) / 100)
   + (HP ? level + 10 : 5)
 ```
 
-`createDomainCombatProfile()` dispatch ได้เฉพาะ Pirate/Pocket calculator และ fail closed สำหรับ owner, definition, shape หรือ version ที่ไม่รองรับ
+สูตร/catalog/version/fingerprint ต้องตรงกัน มิฉะนั้น fail closed
 
-## Shared CombatRules และ RNG
+## Pirate ActionStatProjection
 
-`combat-v91-rules.mjs` เป็น pure proposal resolver ชุดเดียว รองรับ:
+Pirate proficiency และ Equipment ถูกคำนวณหลัง Base profile และเฉพาะ Action:
 
-- physical/special channel
+```text
+Base ATK/SPATK/DEF
+  × bounded proficiency multiplier (fixed-point 10,000; bonusสูงสุด +50%)
+  + action equipment contribution
+  = projected action stat
+```
+
+Category mapping ปัจจุบัน:
+
+| Action | Base source | Proficiency | Mastery |
+|---|---|---|---|
+| style | ATK | Combat | Style |
+| sword | ATK | Blade | Sword |
+| gun | ATK | Ranged | Gun |
+| fruit | SPATK | Fruit Power | Fruit |
+| guard | DEF | Vitality | Guard |
+
+Projection ผูก `entity/profile/action/version/fingerprint` ครบ ไม่มี HP และไม่สามารถ
+แทน CombatProfile12 ได้ Server action permit เป็นผู้ส่ง projection ที่ใช้จริงเข้า
+Shared CombatRules ส่วน Client ที่ยกค่าขึ้นเองโดยไม่มี permit จะถูก reject
+
+## Shared CombatRules V9.1.2
+
+Resolver เป็น pure deterministic proposal path เดียวสำหรับทุก entity kind รองรับ:
+
+- physical/special
 - accuracy/evasion
 - defense/penetration
-- resistance และ Status immunity
-- STAB และ type effectiveness `0`, `0.5`, `1`, `2`
-- critical allowed/disabled
-- deterministic variance และ multi-hit
-- active buffs/debuffs และ proposed statuses
-- target, range, line-of-sight และ permission จาก World snapshot contract
+- critical และ deterministic variance
+- multi-hit ใน pure rules/proposal layer (live authoritative path ยัง fail closed ตามข้อจำกัดด้านล่าง)
+- type effectiveness `0 / 0.5 / 1 / 2`
+- STAB ที่ล็อกตาม V7.0.6 เท่ากับ `1.5`
+- World/status multipliers ที่เปลี่ยนเฉพาะ effective values
+- target/range/line-of-sight/safe-zone/permission จาก World snapshot
 
-RNG ใช้ SHA-256 counter stream และผูก seed, combat/action sequence, actor, target, action fingerprint, world snapshot และ `rngTicketId` เข้าด้วยกัน Input เดิมกับ seed/command เดิมต้องให้ proposal และ fingerprint เดิมข้าม process ส่วน Action Authority V2 harness เป็นผู้ตรวจและ consume one-use ticket ใน atomic transaction; production ticket store ยังไม่มี
+RNG ใช้ SHA-256 counter stream และผูก seed, combat/action sequence, actor, target,
+action, optional ActionStatProjection, World snapshot และ one-use RNG ticket
+Rules version ปัจจุบันคือ `combat-rules/v9.1.2` และ calculation protocol เป็น v2
 
-Resolver ไม่ mutate profile, HP, Status หรือ World state และไม่มี branch เลือกสูตร Pirate/Pocket
+## Combat Mode Policy
+
+Mode policy แยกกติกาการใช้ Shared Combat ออกจากสูตร damage:
+
+- `monster-life.capture` — Human ห้ามเป็น damage source, owned Monster อ่อนกำลังเป้าหมาย, ต้อง Recall ก่อน Capture
+- `monster-life.battle` — Human ห้ามเป็น damage source
+- `pirate.adventure` — เปิด Human/Monster/NPC/Boss/Ship ตาม policy
+- `hybrid.boss` — Human และ Monster ช่วยกันสู้ Boss
+- `world.autonomous` — World strategic AI เลือกเหตุผล/เวลา ส่วน domain combat เลือกวิธีสู้
+- `pvp` — fail closed จนกว่าจะผ่าน security/release gate
+
+Server โหลด immutable mode context เอง ผูก `actionId + actionFingerprint` และ mode state
+version กับ action entitlement พร้อมตรวจ permitted action ซ้ำหลัง authorize; ไม่เชื่อ mode
+หรือ action classification ที่ Client ส่งมา
+
+## Pirate Combat Dynamics บน Shared 60 Hz Clock
+
+จังหวะต่อสู้ใช้ contract กลาง:
+
+```text
+windup → cast → active/impact → recovery → completed
+```
+
+contract/scheduler รองรับ combo/cancel/interrupt, resource reserve/commit/refund,
+projectile spawn, guard window, movement lock, knockback/impulse proposal และ
+presentation-only hitstop โดย transition ที่ tick เดียวกันเรียงด้วย Server
+`authoritySequence` และ fixed priority; `requestId` ไม่มีสิทธิ์เปลี่ยนผลลัพธ์
+
+`combat-v91-pirate-dynamics-adapter.mjs` อ้าง Pirate Fruit commit
+`4df5721de8bdb20c28e53b6a8c933616e132c96d` และแปลงค่าจาก
+`CombatData.ts`, `PlayerCombat.ts` และ skill gameplay เป็น fixed tick 60 Hz
+โดยปัดเวลาเป็นจำนวน tick ขึ้นเสมอ เพื่อไม่ปล่อย hit/cast ก่อนค่า authoritative เดิม
+
+- `windup`, `castTime`, `recovery`, combo buffer ถูกนำมาใช้
+- `movementLock` แปลงเป็น basis points และ World locomotion owner ต้อง commit
+- `knockback` แปลงเป็น impulse candidate และ World ต้อง commit
+- projectile collision เป็น World authority
+- hitstop หยุดเฉพาะ presentation ห้ามหยุด CombatClock/WorldClock
+- Adapter ไม่มี HP writer, damage formula หรือ transform writer
+
+Action math, Dynamics definition และ source-provenance fingerprint ถูกผูกด้วย binding
+เดียวกัน Client shell มี `scheduleAction`, `advanceAction` และ `readActionDynamics` และ
+บังคับทุก prediction ต้องมี schedule โดยตรวจ action sequence, actor, target และ one-use
+impact key ตรงกัน พร้อมกัน action ซ้อนของ actor เดียวกัน
+
+Live resolution รอบนี้จงใจ **fail closed ที่ `single direct impact`** เพื่อให้ตรงกับ
+ธุรกรรม damage แบบหนึ่ง action ต่อหนึ่ง commit:
+
+- multi-hit ยังใช้ได้ใน pure rules/definition tests แต่ Client/Server live gate ไม่อนุญาต
+  จนกว่าจะมี per-impact transaction protocol
+- projectile definition/spawn เป็น proposal ได้ แต่ยัง resolve damage ไม่ได้จนมี World
+  collision receipt + expiry + Server verification
+- impulse/knockback และ hitstop ถูกปล่อยจาก internal Client integration hook หลังได้รับ
+  authoritative effect receipt ที่ binding ตรงกับ committed hit outcome เท่านั้น ปัจจุบัน
+  public shell ยังไม่เปิด response ingress และยังไม่มี World transform consumer จริง
+
+Server ใช้ `ServerDynamicsPermit` ผูก binding/provenance, start/impact/expiry CombatTick,
+actor/target/action, resource reservation และ dynamics/actor-occupancy state versions
+แล้ว CAS พร้อม HP/Status/resource/RNG ใน atomic transaction เดียว Client schedule เป็น
+เพียง prediction/presentation และไม่ใช่หลักฐาน authority
 
 ## Shared Runtime Status
 
-`combat-v91-status.mjs` reuse registry/resolver/lifecycle/runtime เดิมครบ 26 IDs:
+ใช้ lifecycle กลาง 26 statuses รวม Burn, Poison, Bleed, Freeze, Stun, Slow และ Fear
+โดย `ST_FEAR` เป็น Combat control เท่านั้น ไม่ใช่ World PsychologicalFear/Memory
+
+CombatClock ขับ status tick ส่วน WorldClock ขับชีวิต/สภาพโลกระยะยาว Authoritative DoT
+quantize ต่อ tick เป็น integer HP (`floor`, ขั้นต่ำ 1 เมื่อ damage เป็นบวก) แล้ว lethal-clamp
+ก่อน target owner commit จึงไม่ทำให้ CombatProfile12 กลับไปเป็น HP ทศนิยม
+
+ลำดับ authority คือ:
 
 ```text
-ST_BURN, ST_POISON, ST_BLEED, ST_SWARM, ST_SLOW, ST_FREEZE,
-ST_PARALYZE, ST_STUN, ST_ROOT, ST_FEAR, ST_CONFUSE, ST_BLIND,
-ST_WEAKEN, ST_ARMOR_BREAK, ST_VULNERABLE, ST_STAGGER,
-ST_ATK_UP, ST_DEF_UP, ST_SPATK_UP, ST_SPD_UP,
-ST_DAMAGE_REDUCE, ST_EVASION_UP, ST_CRIT_UP, ST_ATKDEF_UP,
-ST_FIRE_RESIST, ST_POISON_RESIST
+Validate → Calculate/Plan → HP Owner Commit → Status Commit
+  → CombatOutcome → World Event Interpretation
 ```
 
-Snapshot เป็น immutable และ exact-schema lifecycle ยังคง stack, potency, duration, tick, interaction, immunity และ hard-CC diminishing return เดิม: window 6 วินาที, multiplier `[1, 0.65, 0.4]` และ minimum `0.25`
+## Client Store, UI และ HTML Boundary
 
-CombatClock แยกจาก WorldClock โดย `planCombatStatusTick()` คำนวณ transition แบบ pure function ส่วนการลด HP, tick/expiry Status และเลื่อน clock ต้องเกิดใน Server transaction
-
-## Client Prediction, Store และ UI
-
-Client store แยกข้อมูลเป็น:
+Client store แยก:
 
 - `authoritativeBase`
 - authoritative Status snapshots
@@ -130,117 +225,99 @@ Client store แยกข้อมูลเป็น:
 - `pendingOverlay`
 - `displayProjection`
 
-รองรับ `pending`, `confirmed`, `corrected`, `rejected` พร้อม intent/action sequence, state-version และ fingerprint guards เพื่อกัน duplicate, stale, out-of-order และ cross-encounter response การ reject ยกเลิกเฉพาะ pending overlay และไม่กิน authoritative sequence
+รองรับ pending/confirmed/corrected/rejected พร้อม stale, duplicate, reorder และ
+fingerprint guards UI เป็น read-only และ Combat ใช้ `<aside id="combatV91Shell">`
+เพียงก้อนเดียวใน persistent parent document ไม่มี Combat HTML/iframe เพิ่ม
 
-UI เป็น read-only projection แสดง Base/Effective/Pending ครบ 12 stats, HP, pending damage/count และ Status รองรับ mobile breakpoint และ touch target 44px โดยไม่มี network, storage หรือ state writer
+อย่างไรก็ตาม **ทั้งเกมยังไม่เป็น one-document เต็มรูปแบบ** เพราะ architecture เดิมยังมี:
 
-## Single Combat Host ใน Persistent Parent Shell
+- `iframe#onlineWorldSceneFrame`
+- Pirate iframe ภายใน scene runtime
 
-Combat V9.1 ต้องไม่เพิ่มหน้า `.html`, iframe หรือ standalone document ของตัวเอง การเชื่อม live shell ใช้หลักนี้:
+มี `world-runtime-lifecycle-v910.mjs`, `one-document-world-runtime-host-v910.mjs`,
+`world-runtime-resource-scope-v912.mjs` และ `world-runtime-import-purity-v912.mjs`
+เป็น shadow foundation ที่ทดสอบ prepare/mount/pause/resume/unmount/dispose, single input
+owner, cancellation/rollback, aborted-prepare cleanup, listener/timer/RAF/observer resource
+scope และ import-pure deferred runtime factory แล้ว แต่ยังไม่ wire เข้าระบบจริงและถูกกัน
+ออกจาก Pages artifact เพื่อไม่อ้างสถานะเกินจริง
 
-- มี Combat container/controller เพียงหนึ่ง instance ใน parent shell ที่ active
-- `createCombatV91Shell({ container })` ใช้ container/controller instance เดิม; public facade เปิดเฉพาะ `openSession`, `predict`, `focus`, `closeSession` และ read-only state/diagnostics โดยไม่เปิด raw `reconcile`
-- scene/world switch ต้องไม่สร้าง Combat container, controller หรือ session ซ้ำ
-- Combat ใช้งานได้เฉพาะเมื่อ scene ปัจจุบันอยู่สถานะ `ready` และถือ active lease; การเปลี่ยน scene หรือ scene error ต้อง clear/hide state ส่วน logout จึงถอด host ออก
-- stylesheet และ module ถูกโหลดจาก parent shell เดิม
-- UI ใช้ `container.ownerDocument` และไม่สร้าง document/iframe/network writer
+## Server Authority Boundary
 
-`online-world-shell-v900.mjs` import Combat entry เพียงครั้งเดียวหลังผ่าน auth/Server gate แล้วสร้าง `<aside id="combatV91Shell">` และ controller เพียงหนึ่ง instance ใน parent document เดิม การเปลี่ยน scene ปิด session ที่ค้างแต่รักษา identity ของ container/controller ไว้ การ logout จึงค่อยปิดและถอด container ออก
+### Action Authority V3
 
-Public shell เปิดเฉพาะ prediction facade ผ่าน `POCKETMONSTER_ONLINE_SHELL.combat`; raw `reconcile` และ authoritative writer ไม่ถูกเปิดให้ scene/client เรียกเอง `index.html` กับ deploy mirror `v900.html` เป็น compatibility entry aliases ที่ byte-identical ไม่ใช่สอง shell ที่ทำงานพร้อมกัน และโหลด stylesheet/module จาก parent entry โดย Combat ไม่เพิ่มไฟล์ HTML, iframe, socket หรือ document ใหม่
+- โหลด trusted Pirate/Pocket source แล้ว derive profile ใหม่
+- ตรวจ action permit, optional ActionStatProjection, ServerDynamicsPermit, mode entitlement,
+  World/status snapshots และ RNG ticket
+- atomic CAS สำหรับ target-owner HP/Status, actor resource/sequence, dynamics state,
+  actor occupancy และ RNG ticket
+- terminal response/outbox อยู่ transaction เดียวกับ commit
+- Monster HP 0 = `fainted`; entity อื่น HP 0 = `defeated`
+- client prediction ทำได้เพียง confirm/correct/reject reconciliation
 
-ข้อจำกัดที่ต้องสื่อสารตรงกัน: V9 โดยรวมยังมี scene/Pirate iframe ในสถาปัตยกรรมเดิม การ lock นี้รับประกันว่า **Combat ไม่เพิ่ม HTML/iframe อีกก้อน** และมี Combat UI instance เดียวใน parent shell เท่านั้น การย้ายทั้งเกมให้เป็น one-document อย่างเคร่งครัดเป็น migration แยก ไม่ใช่สิ่งที่ควรซ่อนใน Combat V9.1
+### Status Tick Authority
 
-## Server Authority Boundary ที่สร้างแล้ว
+- pure status plan จาก Server CombatClock
+- exact CAS ของ profile source, Status และ clock
+- Pirate nested `currentHpOwnerState` เปลี่ยนได้เฉพาะ HP/state-version/fingerprint
+- Pocket เปลี่ยนได้เฉพาะ currentHp/stateVersion
+- Core6, ratings, proficiency และ provenance ต้องคงเดิม
+- outcome เผยแพร่หลัง commit เท่านั้น
 
-### Action Authority V2
+ทั้งสอง boundary ยังตั้ง `networkCreation: false` และ
+`productionWritesEnabled: false`
 
-`combat-v91-server-authority.mjs` เป็น transport-neutral transaction harness ที่กำหนด:
+SHA-256 fingerprints ใน contract ใช้ตรวจ identity/drift/replay เท่านั้น **ไม่ใช่ลายเซ็น
+หรือหลักฐานว่า Client เป็น Server** production transport ต้อง authenticate session,
+รับ response ผ่านช่องทางที่เชื่อถือได้ และ Server ต้อง reload definition/provenance/
+clock/owner state จาก storage ของตนเองก่อนออก permit ทุกครั้ง
 
-- Server action permit และ one-use RNG ticket
-- โหลด native Pirate/Pocket source แล้วคำนวณ base profile ซ้ำด้วย domain calculator
-- ตรวจ version/fingerprint/world snapshot/action entitlement แบบ fail closed
-- atomic compare-and-swap สำหรับ owner HP/Status, actor resource/sequence และ RNG ticket
-- terminal response/outbox ใน transaction เดียวกับ commit
-- idempotency ด้วย authority scope + combat + intent
-- Monster HP เป็นศูนย์ให้ `fainted`; non-Monster HP เป็นศูนย์ให้ `defeated`
+## Browser Artifact
 
-### Server Status Tick Authority
+Pages artifact ปัจจุบันมี Combat client modules 17 ไฟล์ + `combat-v91.css` รวม 18 assets:
 
-`combat-v91-server-status-authority.mjs` กำหนด transaction harness สำหรับ CombatClock status tick:
+- adapters, Core/Profile/action projections และ mode policy
+- contract, protocol, RNG, rules และ Status
+- Dynamics contract/scheduler/binding, authoritative effect receipt และ Pirate dynamics adapter
+- client store, entry และ UI
 
-- pure status-tick plan
-- exact CAS ของ profile, Status snapshot และ CombatClock
-- owner HP commit, Status tick/expiry และ clock commit ใน transaction เดียว
-- idempotent terminal response และ post-commit outcome
-- base-stat invariant: status damage เปลี่ยน HP/state version แต่ห้ามเปลี่ยน base stats
+Build บังคับว่า `combat-v91-server-*`, tests, docs และ one-document shadow runtime
+ทั้ง V9.10/V9.12 ต้องไม่ถูก publish เป็น browser assets
 
-ทั้งสองโมดูลตั้ง `networkCreation: false` และ `productionWritesEnabled: false` โดยตั้งใจ เป็น executable contract/test harness สำหรับ backend adapter ไม่ใช่ endpoint ที่ deploy แล้ว
+## Verification ล่าสุด
 
-## Browser Artifact Boundary
+ผ่านแล้ว:
 
-ในส่วนของ Combat V9.1, Pages artifact ส่ง client assets ต่อไปนี้:
+- `npm run ci` — full legacy + V8.x + V9.0 + V9.1 regression
+- `npm run test:v91:combat`
+- `npm run test:v91:runtime`
+- `npm run build:pages` — 226 public files; Combat closure 18 assets
+- `npm run test:hosting`
+- `node tests/v90-unified-pages-artifact.mjs`
 
-- client modules 9 ไฟล์: adapters, contract, protocol, RNG, rules, Status, store, UI และ entry
-- `combat-v91.css`
+ชุด Combat ครอบคลุม Profile12/Core6, level 1–60, proficiency projection, Ring mode,
+Status, STAB 1.5, RNG parity, mutants 21/21, fixed-tick Dynamics, mandatory entity-bound
+Client impact gate, Server timing/occupancy permit, Server action/status atomic authority
+และ Pirate/Pocket defeat semantics
 
-Build และ artifact test บังคับว่าไฟล์ prefix `combat-v91-server-`, V9.1 tests และเอกสารนี้ต้องไม่อยู่ใน public browser artifact พร้อมตรวจ static import closure ของ client modules
+## งานที่ยังเหลือ
 
-## สถานะ Slice
+1. ทำ production backend adapters สำหรับ auth/session, action/dynamics entitlement,
+   profile/status/resource stores, atomic DB transaction, ticket และ outbox
+2. ต่อ World spatial authority จริงสำหรับ target/range/LOS/safe-zone/terrain,
+   projectile collision receipt, movement/impulse commit และ authoritative snapshot
+3. ต่อ transport เดิมให้ส่ง prediction/authority response โดยไม่สร้าง connection ซ้ำ
+4. ทำ latency/reorder/duplicate/replay/soak tests กับ backend และ World จริง
+5. เพิ่ม per-impact transaction/receipt ก่อนเปิด multi-hit และ projectile ใน live resolver
+6. แปลง Living → Pocket → Pirate เป็น import-pure runtime factory ที่คืน resource ทุกชนิด,
+   แยก Pocket domain capability แบบ headless แล้วจึงถอด scene/Pirate iframe
+7. ผ่าน security/balance/release review ก่อนเปิด PvP, reward settlement หรือ production writes
+8. ฝั่ง Server ต้องโหลด trusted ActionStatProjection snapshot จาก Pirate domain แยกจาก
+   action permit และ CAS source state/fingerprint ใน transaction เดียวกัน
+9. เปลี่ยน authoritative version/tick/sequence counters ที่เหลือให้เป็น safe integer พร้อม
+   MAX_SAFE regression vectors และให้ dynamics registry ยืนยัน canonical direct-hit metadata
 
-| Slice | สถานะ | ผลลัพธ์ |
-|---|---|---|
-| C0 | DONE | regression baseline ที่เคยค้างถูกแก้ก่อน implementation และ merge main ล่าสุดแล้ว |
-| C1 Contract | DONE | 12 stats, exact validation, immutability, bounds, canonical SHA-256 |
-| C2 Calculators | DONE | Pirate/Pocket calculators เท่านั้น, parity/provenance/version guards, ไม่มี generic passthrough |
-| C3 Status | DONE | shared 26-status lifecycle, immutable snapshots, CombatClock plan |
-| C4 Rules/RNG | DONE | domain-independent resolver, deterministic cross-process RNG, vectors และ mutants 19/19 |
-| C5 Store/Protocol | DONE | pending/confirm/correct/reject, stale/idempotency guards, authority envelopes |
-| C6 UI/Shell API | DONE | read-only Base/Effective/Pending UI และ reusable single-shell controller |
-| C7A Action authority | DONE AS HARNESS | authoritative action/HP/Status/resource/sequence atomic boundary |
-| C7B Status authority | DONE AS HARNESS | atomic status tick/expiry/HP/clock boundary |
-| C7C Live backend | DEFERRED | ยังไม่มี endpoint, DB adapter, live spatial authority หรือ production writes |
-| C7D Parent-shell wiring | DONE | container/controller เดียวใน parent, prediction-only facade, reuse ข้าม scene และ teardown ตอน logout โดยไม่เพิ่ม Combat HTML/iframe |
-| C8 Client acceptance | DONE | focused V9.1, unified V9 regressions, full CI, Pages/Firebase artifact gates และ static boundary checks ผ่าน |
-
-## หลักฐาน Final Acceptance
-
-- `npm run ci` ผ่านบน merged working head ครบทั้ง typecheck, lint, integration, legacy/full regressions, V8.1–V8.11, V9.0 และ V9.1
-- `npm run test:v91:combat` ผ่าน contract, RNG parity, protocol, adapters, Status, rules, mutants `19/19`, store, UI, single Combat host/controller contract, Action Authority V2 และ Server Status Authority
-- V9 unified shell/scene/mobile/chat tests ผ่าน โดย runtime test พิสูจน์ว่า world switch 3 ครั้งยังใช้ Combat container/controller identity เดิม, Combat ไม่สร้าง global หรือ iframe เพิ่มจาก scene iframe เดิม, child เปิด Combat ซ้ำระหว่าง teardown/error ไม่ได้, เปิดใหม่ได้เมื่อ scene พร้อม และ logout ถอด container
-- `npm run build:pages` ผ่าน: public artifact 218 ไฟล์, V9.1 client closure 10 assets และไม่มี `combat-v91-server-*`
-- `node tests/v90-unified-pages-artifact.mjs`, `npm run test:hosting`, `npm run build:launcher` และ `node tests/production-launch-workflows.mjs` ผ่าน
-- `npm run check`, focused `oxlint --deny-warnings`, syntax/static boundary audit และ `git diff --check` ผ่าน
-
-หลักฐานนี้ปิด C8 เฉพาะ Client Combat foundation และ browser artifact เท่านั้น ไม่ตีความ transaction harness ว่าเป็น production server หรือถือว่า live writes ถูกเปิดแล้ว
-
-## Acceptance หลัก
-
-- CombatStats มี 12 ค่าตรง contract และ Base profile immutable
-- Pirate/Pocket progression ให้ parity เดิมและไม่ถูก mutate
-- ไม่มี World profile, generic passthrough หรือ domain/entity damage branch
-- Human/Monster/NPC/Boss/Ship ที่ผ่าน domain calculator ใช้ resolver เดียวกัน
-- World modifiers เปลี่ยนเฉพาะ effective values ไม่เขียนทับ base stats
-- Status ทั้ง 26 รายการใช้ lifecycle เดียว รวม stack/tick/expiry/interaction/immunity/DR
-- Client prediction ไม่เปลี่ยน authoritative HP/Status/resource/progression
-- confirm/correct/reject deterministic, idempotent และกัน stale/out-of-order response
-- Authority harness tests พิสูจน์ว่า outcome เกิดหลัง owner transaction commit เท่านั้น
-- Authority harness tests พิสูจน์ว่า status tick ทำให้ HP เปลี่ยนผ่าน owner transaction โดย base stats คงเดิม
-- Pirate/Pocket ใช้ defeat/faint semantics ถูกต้อง
-- Combat มี parent container/controller active เพียงหนึ่ง instance และไม่เพิ่ม HTML/iframe
-- public artifact มีเฉพาะ browser-safe Combat modules และไม่มี server authority code
-
-## งานที่ยังเหลือและอยู่นอกคำกล่าวอ้าง
-
-1. ทำ Combat V9.1 backend adapter จริงสำหรับ auth/session, action entitlement, profile/status/resource stores, atomic DB transaction, one-use ticket, terminal outbox และ replay storage
-2. ต่อ World spatial authority จริงสำหรับ target/range/LOS/safe-zone/terrain/permission และ authoritative world snapshot
-3. ต่อ Combat V9.1 เข้ากับ socket/HTTP transport เดิมให้ส่ง prediction envelope และคืน confirm/correct/reject โดยไม่สร้าง connection ซ้ำ
-4. ทำ Combat V9.1 latency/reorder/duplicate/cross-runtime integration tests กับ backend จริง
-5. ผ่าน security/release review ก่อนเปิด production writes, reward settlement, PvP หรือ publish
-6. หากต้องการให้ **ทั้งเกม** เป็น one-document จริง ให้ทำ migration แยกเพื่อถอด scene iframe และ Pirate iframe เดิม โดยสร้าง mount/unmount API, แยก CSS/input lifecycle และทดสอบ world switch ใหม่ งาน V9.1 รอบนี้รับประกันเฉพาะว่า Combat ใช้ parent container เดียวและไม่เพิ่ม HTML/iframe ก้อนใหม่
-
-สิ่งเหล่านี้ยังไม่มีใน repository ณ checkpoint นี้ จึงห้ามอ้างว่า Server writer ถูก deploy, spatial validation เป็น live authority หรือ writes เปิดใช้งานแล้ว
-
-## จุดรับช่วงถัดไป
-
-Client Combat V9.1 พร้อมส่งมอบบน persistent parent shell แล้ว จุดรับช่วงมีสองทางที่ต้องแยก scope: (1) live backend authority/World spatial adapter สำหรับเปิด confirm/correct/reject จริง หรือ (2) whole-game one-document migration เพื่อถอด iframe เดิมของ scene/Pirate โดยห้ามปะปนงานทั้งสองใน patch เดียว
+ดังนั้นคำกล่าวอ้างที่ถูกต้องตอนนี้คือ: **Shared Combat V9.1.2 ใช้ Pocket-based
+CombatProfile12, Pirate action proficiency และ Pirate fixed-tick dynamics ใน Client shell
+เดียวกันแล้ว พร้อม executable Server authority V3 ที่ fail closed สำหรับ timing; live
+resolution รองรับ single-direct action เท่านั้น ส่วน backend production, multi-hit/
+projectile receipt และ whole-game one-document migration ยังไม่เสร็จ**

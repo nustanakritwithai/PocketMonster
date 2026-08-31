@@ -14,9 +14,11 @@ import {
 import {
   TEST_RNG_SEEDS,
   TEST_STATS,
+  TEST_DYNAMICS_SOURCE_PROVENANCE_FINGERPRINT,
   fixtureAction,
   fixtureAuthorityResponse,
   fixtureCombat,
+  fixtureDirectDynamics,
   fixtureProfile,
   fixtureWorld,
 } from './v91-combat-fixtures.mjs';
@@ -92,12 +94,29 @@ assert.deepEqual(initialView.statuses, []);
 assert.equal(Object.isFrozen(initialView), true);
 assert.equal(client.view('missing:entity').reason, 'unknown_entity');
 
+const scheduled = client.scheduleAction({
+  actionSequence: 1,
+  actorEntityId: fixture.actor.entityId,
+  targetEntityId: fixture.target.entityId,
+  startTick: 0,
+  bindingVersion: 'test-ui-action-dynamics/v1',
+  sourceProvenanceFingerprint: TEST_DYNAMICS_SOURCE_PROVENANCE_FINGERPRINT,
+  action: fixture.action,
+  dynamics: fixtureDirectDynamics(fixture.action),
+});
+assert.equal(scheduled.ok, true, scheduled.reason);
+const advanced = client.advanceAction({ actionSequence: 1, throughTick: 2 });
+assert.equal(advanced.ok, true, advanced.reason);
+const impact = advanced.events.find(event => event.type === 'impact.requested');
+assert.ok(impact);
+
 const predicted = client.predict({
   intentId: 'intent:ui:self-buff',
   actionSequence: 1,
   actorEntityId: fixture.actor.entityId,
   targetEntityId: fixture.target.entityId,
   action: fixture.action,
+  dynamicsImpactKey: impact.payload.idempotencyKey,
   worldSnapshot: fixture.world,
 });
 assert.equal(predicted.ok, true, predicted.reason);

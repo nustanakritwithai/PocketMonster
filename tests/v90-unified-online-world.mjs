@@ -67,7 +67,7 @@ assert.match(entry, /POCKETMONSTER_SERVER_GATE_OBSERVATION/, 'parent publishes o
 assert.doesNotMatch(entry, /worlds-v900\.mjs|new WebSocket/, 'top-level entry never boots a scene or socket outside the shell');
 assert.match(shell, /createElement\('iframe'\)/, 'shell owns one active scene browsing context');
 assert.equal((shell.match(/createElement\('iframe'\)/g) || []).length, 1, 'shell creates exactly one scene iframe');
-assert.equal((shell.match(/from '\.\/combat-v91-entry\.mjs\?v=1'/g) || []).length, 1,
+assert.equal((shell.match(/from '\.\/combat-v91-entry\.mjs\?v=2'/g) || []).length, 1,
   'parent shell imports one Combat V9.1 controller module');
 assert.equal((shell.match(/createCombatV91Shell\(\{ container: combatHost \}\)/g) || []).length, 1,
   'parent shell creates one Combat controller in one host');

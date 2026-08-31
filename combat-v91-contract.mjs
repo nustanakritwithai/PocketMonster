@@ -1,7 +1,7 @@
 import { RUNTIME_TYPES } from './type-catalog.mjs';
 
-export const COMBAT_V91_CONTRACT_VERSION = 'combat-v91-contract/v1';
-export const COMBAT_V91_RULES_VERSION = 'combat-rules/v9.1';
+export const COMBAT_V91_CONTRACT_VERSION = 'combat-v91-contract/v2';
+export const COMBAT_V91_RULES_VERSION = 'combat-rules/v9.1.2';
 export const COMBAT_V91_PROFILE_SCHEMA = 'combat-profile/v9.1';
 export const COMBAT_V91_WORLD_SNAPSHOT_SCHEMA = 'world-combat-snapshot/v9.1';
 export const COMBAT_V91_ACTION_SCHEMA = 'combat-action/v9.1';
@@ -29,6 +29,16 @@ export const COMBAT_RATIO_KEYS = Object.freeze([
   'penetration',
 ]);
 
+export const COMBAT_INTEGER_STAT_KEYS = Object.freeze([
+  'hpMax',
+  'hpCurrent',
+  'atk',
+  'def',
+  'spAtk',
+  'spDef',
+  'spd',
+]);
+
 export const COMBAT_MULTIPLIER_KEYS = Object.freeze([
   'atk',
   'def',
@@ -53,7 +63,11 @@ export const COMBAT_V91_SAFETY_BOUNDS = Object.freeze({
   effectiveStatMax: 100_000_000,
   actionPowerMax: 10_000,
   hitCountMax: 32,
-  levelMax: 100_000,
+  // Shared combat math is Pocket-shaped and therefore uses the locked
+  // Monster Life combat-level range. Domain-native progression levels (for
+  // example Pirate's 1..2800 scale) are provenance only and must be
+  // normalized by their authoritative domain calculator before this point.
+  levelMax: 60,
 });
 
 const RUNTIME_TYPE_SET = new Set(RUNTIME_TYPES);
@@ -181,6 +195,10 @@ export function validateCombatStats(stats) {
     if (!Number.isFinite(stats[key]) || stats[key] < 0
       || stats[key] > COMBAT_V91_SAFETY_BOUNDS.statMax) return result(false, 'invalid_stat', { field: key });
   }
+  for (const key of COMBAT_INTEGER_STAT_KEYS) {
+    if (!Number.isSafeInteger(stats[key])) return result(false, 'invalid_integer_stat', { field: key });
+  }
+  if (stats.hpMax < 1) return result(false, 'invalid_stat', { field: 'hpMax' });
   for (const key of COMBAT_RATIO_KEYS) {
     if (stats[key] > 1) return result(false, 'ratio_out_of_range', { field: key });
   }

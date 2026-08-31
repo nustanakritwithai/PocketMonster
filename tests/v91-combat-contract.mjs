@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   COMBAT_ENTITY_KINDS,
+  COMBAT_INTEGER_STAT_KEYS,
   COMBAT_OWNER_DOMAINS,
   COMBAT_STAT_KEYS,
   COMBAT_V91_CONTRACT_VERSION,
@@ -19,11 +20,13 @@ import {
 import { COMBAT_V91_RNG_VERSION } from '../combat-v91-rng.mjs';
 import { TEST_RNG_SEEDS } from './v91-combat-fixtures.mjs';
 
-assert.equal(COMBAT_V91_CONTRACT_VERSION, 'combat-v91-contract/v1');
+assert.equal(COMBAT_V91_CONTRACT_VERSION, 'combat-v91-contract/v2');
 assert.deepEqual(COMBAT_STAT_KEYS, [
   'hpMax', 'hpCurrent', 'atk', 'def', 'spAtk', 'spDef', 'spd',
   'accuracy', 'crit', 'evasion', 'resistance', 'penetration',
 ]);
+assert.deepEqual(COMBAT_INTEGER_STAT_KEYS,
+  ['hpMax', 'hpCurrent', 'atk', 'def', 'spAtk', 'spDef', 'spd']);
 assert.deepEqual(COMBAT_ENTITY_KINDS, ['Human', 'Monster', 'Npc', 'Boss', 'Ship']);
 assert.deepEqual(COMBAT_OWNER_DOMAINS, ['Pirate', 'Pocket'], 'World supplies snapshots, not combat profiles');
 
@@ -38,6 +41,8 @@ const stats = {
   accuracy: 0.95, crit: 0.05, evasion: 0.02, resistance: 0.1, penetration: 0,
 };
 assert.equal(validateCombatStats(stats).ok, true);
+assert.equal(validateCombatStats({ ...stats, atk: 1.5 }).reason, 'invalid_integer_stat');
+assert.equal(validateCombatStats({ ...stats, hpMax: 0, hpCurrent: 0 }).reason, 'invalid_stat');
 assert.equal(validateCombatStats({ ...stats, atk: COMBAT_V91_SAFETY_BOUNDS.statMax }).ok, true);
 assert.equal(validateCombatStats({ ...stats, atk: COMBAT_V91_SAFETY_BOUNDS.statMax + 1 }).reason, 'invalid_stat');
 assert.equal(validateEffectiveCombatStats({
@@ -70,6 +75,8 @@ for (const [mutation, reason] of [
   [{ ...input, ownerDomain: 'World' }, 'invalid_owner_domain'],
   [{ ...input, entityKind: 'Player' }, 'invalid_entity_kind'],
   [{ ...input, level: 0 }, 'invalid_level'],
+  [{ ...input, level: 61 }, 'invalid_level'],
+  [{ ...input, level: 2_800 }, 'invalid_level'],
   [{ ...input, types: ['Fire', 'Fire'] }, 'invalid_types'],
   [{ ...input, stats: { ...stats, hpCurrent: 101 } }, 'hp_out_of_range'],
   [{ ...input, stats: { ...stats, crit: 1.1 } }, 'ratio_out_of_range'],

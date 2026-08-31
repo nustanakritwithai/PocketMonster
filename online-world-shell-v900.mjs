@@ -13,7 +13,9 @@ import {
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
-} from './combat-v91-entry.mjs?v=1';
+  createPirateComboDynamicsDefinition,
+  createPirateSkillDynamicsDefinition,
+} from './combat-v91-entry.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -121,18 +123,39 @@ function closeCombatSession() {
 }
 
 const publicCombatShell = Object.freeze({
-  kind: 'combat-v91-client-shell/v1',
+  kind: 'combat-v91-client-shell/v2',
   version: combatShell.version,
   authority: 'client_projection_only',
   serverReconcileExposed: false,
   calculateBaseProfile(source = {}) {
     return combatSessionAvailable() ? createCombatV91BaseProfile(source) : combatUnavailable();
   },
+  calculatePirateComboDynamics(input = {}) {
+    return combatSessionAvailable()
+      ? createPirateComboDynamicsDefinition(input)
+      : combatUnavailable();
+  },
+  calculatePirateSkillDynamics(input = {}) {
+    return combatSessionAvailable()
+      ? createPirateSkillDynamicsDefinition(input)
+      : combatUnavailable();
+  },
   openSession(options = {}) {
     return combatSessionAvailable() ? combatShell.openSession(options) : combatUnavailable();
   },
   predict(command = {}, options = {}) {
     return combatSessionAvailable() ? combatShell.predict(command, options) : combatUnavailable();
+  },
+  scheduleAction(command = {}) {
+    return combatSessionAvailable() ? combatShell.scheduleAction(command) : combatUnavailable();
+  },
+  advanceAction(command = {}) {
+    return combatSessionAvailable() ? combatShell.advanceAction(command) : combatUnavailable();
+  },
+  readActionDynamics(actionSequence) {
+    return combatSessionAvailable()
+      ? combatShell.readActionDynamics(actionSequence)
+      : combatUnavailable();
   },
   focus(entityId, options = {}) {
     return combatSessionAvailable() ? combatShell.focus(entityId, options) : combatUnavailable();
