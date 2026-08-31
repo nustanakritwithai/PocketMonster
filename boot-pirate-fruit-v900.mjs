@@ -58,6 +58,42 @@ function assignCombinedWorld(worldId) {
   }));
 }
 
+function syncPirateOnboardingActionProxies(onboarding, sendInput) {
+  const layerId = 'pirateOnboardingActionProxies';
+  let layer = document.getElementById(layerId);
+  if (!onboarding.active) {
+    layer?.remove();
+    return;
+  }
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = layerId;
+    document.body?.appendChild(layer);
+  }
+  const liveActions = new Set(Object.keys(onboarding.actions));
+  for (const stale of layer.querySelectorAll('[data-onboarding-action]')) {
+    if (!liveActions.has(stale.dataset.onboardingAction)) stale.remove();
+  }
+  for (const [action, rect] of Object.entries(onboarding.actions)) {
+    let proxy = layer.querySelector(`[data-onboarding-action="${action}"]`);
+    if (!proxy) {
+      proxy = document.createElement('button');
+      proxy.type = 'button';
+      proxy.className = 'pirate-onboarding-action-proxy';
+      proxy.dataset.onboardingAction = action;
+      proxy.setAttribute('aria-label', `บทสอน ${action}`);
+      proxy.addEventListener('click', () => sendInput({ kind: 'onboarding-action', action }));
+      layer.appendChild(proxy);
+    }
+    Object.assign(proxy.style, {
+      left: `${rect.x}px`,
+      top: `${rect.y}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    });
+  }
+}
+
 function bindPocketMonsterLink(frame) {
   const sendInput = payload => frame.contentWindow?.postMessage({
     type: PIRATE_UNIFIED_INPUT_MESSAGE,
@@ -104,9 +140,7 @@ function bindPocketMonsterLink(frame) {
     const message = event.data;
     const onboarding = readPirateOnboardingState(message);
     if (onboarding) {
-      const controls = document.getElementById('pirateUnifiedControls');
-      if (controls) controls.dataset.pirateOnboarding = onboarding.active ? 'active' : 'inactive';
-      if (onboarding.active) window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.('pirate-onboarding-active');
+      syncPirateOnboardingActionProxies(onboarding, sendInput);
       return;
     }
     const nextPose = sanitizePirateLocalPresence(message);

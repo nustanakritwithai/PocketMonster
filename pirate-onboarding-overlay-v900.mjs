@@ -30,5 +30,21 @@ export const PIRATE_ONBOARDING_COMPACT_CSS = `
 
 export function readPirateOnboardingState(message) {
   if (message?.type !== PIRATE_ONBOARDING_STATE_MESSAGE || typeof message.active !== 'boolean') return null;
-  return Object.freeze({ active: message.active });
+  const actions = {};
+  const source = message.actions ?? {};
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+  for (const action of ['prev', 'pause', 'next']) {
+    const rect = source[action];
+    if (rect === undefined) continue;
+    if (!rect || typeof rect !== 'object') return null;
+    const values = [rect.x, rect.y, rect.width, rect.height];
+    if (!values.every(Number.isFinite) || rect.width <= 0 || rect.height <= 0) return null;
+    actions[action] = Object.freeze({
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    });
+  }
+  return Object.freeze({ active: message.active, actions: Object.freeze(actions) });
 }
