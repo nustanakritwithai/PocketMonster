@@ -1,5 +1,12 @@
 export const PERSISTENT_FULLSCREEN_BRIDGE_KIND = 'monsterlife-persistent-fullscreen-bridge-v1';
 
+const FULLSCREEN_CONTROL_IDS = Object.freeze([
+  'enterImmersiveBtn',
+  'retryImmersiveBtn',
+  'fullscreenBtn',
+]);
+const boundFullscreenControls = new WeakSet();
+
 function defineRequest(root, name, request) {
   try {
     Object.defineProperty(root, name, {
@@ -56,6 +63,33 @@ export function installPersistentFullscreenBridge(windowLike = globalThis.window
     });
   } catch {}
   return bridge;
+}
+
+export function bindPersistentFullscreenControls(windowLike = globalThis.window, { signal } = {}) {
+  const documentLike = windowLike?.document;
+  const bridge = windowLike?.POCKETMONSTER_PERSISTENT_FULLSCREEN
+    || installPersistentFullscreenBridge(windowLike);
+  if (!documentLike || typeof bridge?.request !== 'function') return 0;
+
+  let bound = 0;
+  for (const id of FULLSCREEN_CONTROL_IDS) {
+    const control = documentLike.getElementById?.(id);
+    if (!control || boundFullscreenControls.has(control)) continue;
+    boundFullscreenControls.add(control);
+    control.addEventListener('click', async event => {
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      try {
+        await bridge.request({ navigationUI: 'hide' });
+        const orientationLock = windowLike.screen?.orientation?.lock?.('landscape');
+        if (orientationLock?.catch) orientationLock.catch(() => {});
+      } catch (error) {
+        windowLike.console?.warn?.('fullscreen rejected', error);
+      }
+    }, { capture: true, passive: false, signal });
+    bound += 1;
+  }
+  return bound;
 }
 
 if (typeof window !== 'undefined') installPersistentFullscreenBridge(window);

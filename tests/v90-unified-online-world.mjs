@@ -85,9 +85,10 @@ assert.doesNotMatch(rawLoadHandler, /classList\.add\('hidden'\)|online-scene-loa
 assert.match(shell, /POCKETMONSTER_WORLD_STATE = \(\) => presenceBridge\.readPose\(\)/, 'shell owns the stable pose provider');
 assert.match(shell, /POCKETMONSTER_WORLD_PRESENCE = payload => presenceBridge\.acceptSnapshot\(payload\)/, 'shell owns the stable snapshot consumer');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_LAUNCH_SESSION/, 'hosted scenes reuse the parent session object without redeeming it');
-assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=1/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
+assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=2/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
+assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: sceneLifetime\.signal \}\)/, 'scene entry binds visible fullscreen controls before any world runtime starts');
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=1[\s\S]*pocket-bootstrap\.mjs\?v=1/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=2[\s\S]*pocket-bootstrap\.mjs\?v=1/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
 assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-C3SJLfq8\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
