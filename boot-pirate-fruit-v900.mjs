@@ -2,6 +2,10 @@ import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v9
 import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=2';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
+import {
+  PIRATE_HUD_INIT_MESSAGE,
+  createPirateHudTelemetryCollector,
+} from './pirate-hud-telemetry-v900.mjs?v=1';
 import { publishWorldState } from './world-presence-v800.mjs';
 import {
   PIRATE_PRESENCE_ZONE,
@@ -11,7 +15,7 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=912', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=913', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=822&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -109,6 +113,21 @@ function bindPocketMonsterLink(frame) {
   }));
   let piratePose = null;
   let latestPresenceSnapshot = null;
+  let frameGeneration = 0;
+  const hudTelemetry = createPirateHudTelemetryCollector({
+    frameWindow: frame.contentWindow,
+    frameGeneration,
+    onSnapshot: (snapshot, metadata) => {
+      window.dispatchEvent(new CustomEvent('pocketmonster:pirate-hud-update-v1', {
+        detail: Object.freeze({ snapshot, metadata }),
+      }));
+    },
+  });
+  const activateHudTelemetry = reason => {
+    frameGeneration += 1;
+    hudTelemetry.reset({ frameWindow: frame.contentWindow, frameGeneration, reason });
+    frame.contentWindow?.postMessage({ type: PIRATE_HUD_INIT_MESSAGE, frameGeneration }, '*');
+  };
   const forwardPresence = snapshot => {
     frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), '*');
   };
@@ -116,6 +135,11 @@ function bindPocketMonsterLink(frame) {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
   frame.addEventListener('load', () => {
+    if (!pirateRuntimeActive) {
+      hudTelemetry.invalidate('load-after-teardown');
+      return;
+    }
+    activateHudTelemetry('reload');
     try { frame.contentWindow?.focus?.(); } catch {}
     forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
   });
@@ -137,6 +161,7 @@ function bindPocketMonsterLink(frame) {
   window.addEventListener('message', event => {
     if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
+    if (hudTelemetry.accept(event)) return;
     const message = event.data;
     const onboarding = readPirateOnboardingState(message);
     if (onboarding) {
@@ -159,6 +184,14 @@ function bindPocketMonsterLink(frame) {
   if (zoneLabel) zoneLabel.textContent = 'Pirate Fruit';
   const message = document.getElementById('message');
   if (message) message.textContent = 'โลก Pirate Fruit จริง • เดินเข้าประตูในโลกเพื่อเดินทาง';
+  window.addEventListener('pocketmonster:world-warp-v1', event => {
+    if (event.detail?.world !== 'pirate-fruit') hudTelemetry.invalidate('world-switch');
+  });
+  window.addEventListener('pagehide', () => hudTelemetry.invalidate('pagehide'), { once: true });
+  return Object.freeze({
+    activate: reason => activateHudTelemetry(reason),
+    invalidate: reason => hudTelemetry.invalidate(reason),
+  });
 }
 
 if (typeof window !== 'undefined') {
@@ -185,10 +218,11 @@ if (startup) {
 }
 
 const pirateFrame = mountPirateOffline();
-bindPocketMonsterLink(pirateFrame);
+const pirateHudTelemetry = bindPocketMonsterLink(pirateFrame);
 window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   mount:()=>{
     pirateRuntimeActive=true;
+    pirateHudTelemetry.activate('mount');
     requestAnimationFrame(()=>{
       try{pirateFrame.contentWindow?.focus?.();}catch{}
       window.dispatchEvent(new Event('resize'));
@@ -197,12 +231,14 @@ window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   },
   unmount:()=>{
     pirateRuntimeActive=false;
+    pirateHudTelemetry.invalidate('teardown');
     try{pirateFrame.contentWindow?.blur?.();}catch{}
     return true;
   },
   diagnostics:()=>Object.freeze({active:pirateRuntimeActive}),
 });
 pirateFrame.addEventListener('load', () => {
+  if (!pirateRuntimeActive) return;
   syncPirateFruitControlHud(pirateFrame);
   let tries = 0;
   const retry = setInterval(() => {

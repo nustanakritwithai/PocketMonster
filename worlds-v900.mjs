@@ -47,7 +47,25 @@ const routeController = createSceneRouteController({ initialRoute: resolveCombin
 const savedWorldGameNodes = new Map();
 const runtimeLifecycles = new Map();
 const runtimePreparations = new Map();
+const worldPresenceBindings = new Map();
 let activeRuntimeId = null;
+
+function capturePresenceBindings() {
+  return Object.freeze({
+    state: window.POCKETMONSTER_WORLD_STATE,
+    presence: window.POCKETMONSTER_WORLD_PRESENCE,
+  });
+}
+
+function applyPresenceBindings(bindings) {
+  for (const [key, value] of [
+    ['POCKETMONSTER_WORLD_STATE', bindings?.state],
+    ['POCKETMONSTER_WORLD_PRESENCE', bindings?.presence],
+  ]) {
+    if (typeof value === 'function') window[key] = value;
+    else delete window[key];
+  }
+}
 
 function preparePocketRuntime(world) {
   if (world?.id !== 'pocket-monster' || runtimeLifecycles.has(world.id)) return Promise.resolve(true);
@@ -57,11 +75,14 @@ function preparePocketRuntime(world) {
     mountTarget.hidden = true;
     window.POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget;
     window.POCKETMONSTER_SCENE_PREWARM = true;
+    const activePresenceBindings = capturePresenceBindings();
     try {
       await import(world.runtime);
       const lifecycle = window.POCKETMONSTER_SCENE_LIFECYCLE || null;
       if (!lifecycle) throw new Error('Pocket runtime did not register its scene lifecycle');
+      worldPresenceBindings.set(world.id, capturePresenceBindings());
       lifecycle.unmount?.();
+      applyPresenceBindings(activePresenceBindings);
       runtimeLifecycles.set(world.id, lifecycle);
       savedWorldGameNodes.set(world.id, [...mountTarget.childNodes]);
       return true;
@@ -86,8 +107,10 @@ for (const world of COMBINED_WORLDS) {
       if (!runtimeLifecycles.has(world.id)) {
         await import(world.runtime);
         runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
+        worldPresenceBindings.set(world.id, capturePresenceBindings());
       }
       runtimeLifecycles.get(world.id)?.mount?.();
+      applyPresenceBindings(worldPresenceBindings.get(world.id));
       activeRuntimeId = world.id;
     },
     async unmount() { runtimeLifecycles.get(world.id)?.unmount?.(); },
@@ -150,6 +173,7 @@ async function bootWorld(id) {
   }
   await import(world.runtime);
   runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
+  worldPresenceBindings.set(world.id, capturePresenceBindings());
   activeRuntimeId = world.id;
 }
 

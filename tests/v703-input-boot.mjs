@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { activeJs as js } from './active-assets.mjs';
+const unifiedControls=fs.readFileSync(new URL('../unified-mobile-controls-v900.mjs',import.meta.url),'utf8');
 const must=(s,m)=>assert.ok(js.includes(s),m||`missing ${s}`);
 must("function switchZone(zone,silent=false)",'switchZone definition missing');
 must("let cameraYaw=0,cameraPitch=.48",'camera state missing');
@@ -9,5 +11,8 @@ must("const unifiedMobileControls=window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS",
 must("unifiedMobileControls.registerAdapter('pocket-monster'",'Pocket mobile adapter missing');
 must("move:({x=0,z=0,active=false})",'shared joystick adapter missing');
 must("camera:({phase,dx=0,dy=0})",'shared camera adapter missing');
+assert.match(unifiedControls,/const joystickElement = documentLike\?\.getElementById\?\.\('joystick'\)/,'unified joystick binding missing');
+assert.match(unifiedControls,/const cameraElement = documentLike\?\.getElementById\?\.\('cameraPad'\)/,'unified camera binding missing');
+assert.match(unifiedControls,/bindMobileDualPointerInput\(\{[\s\S]*joystickElement,[\s\S]*cameraElement,/,'dual-pointer input does not own shared controls');
 must("healthyPartyCount()===0",'all-fainted gate missing');
 console.log('Active input/boot regression: PASS');

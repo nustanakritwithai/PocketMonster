@@ -125,6 +125,9 @@ assert.match(shell, /combined-worlds-v900\.mjs\?v=921/, 'persistent shell cache-
 assert.match(shell, /searchParams\.set\('shellRevision', '13'\)/, 'persistent shell cache-busts the changed scene HTML');
 assert.match(worlds, /combined-worlds-v900\.mjs\?v=921/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=923/, 'hosted scene cache-busts the three-world router');
+assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
+assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
+assert.match(worlds, /runtimeLifecycles\.get\(world\.id\)\?\.mount\?\.\(\)[\s\S]*applyPresenceBindings\(worldPresenceBindings\.get\(world\.id\)\)/, 'mount activates the selected world presence provider');
 const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=923')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');

@@ -91,7 +91,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=822');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=919');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=920');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=903');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
