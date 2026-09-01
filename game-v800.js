@@ -789,6 +789,7 @@ function makePirateFruitReturnPortal(){
 }
 const pirateFruitReturnPortal=makePirateFruitReturnPortal();
 let pirateFruitReturnPortalBusy=false;
+let pirateFruitReturnPortalNeedsExit=false;
 function updatePirateFruitReturnPortal(dt){
   const active=typeof window!=='undefined'&&window.POCKETMONSTER_COMBINED_BOOT?.worldId==='pocket-monster'&&state.currentZone==='hub';
   pirateFruitReturnPortal.group.visible=active;
@@ -798,7 +799,12 @@ function updatePirateFruitReturnPortal(dt){
   const pulse=.5+.5*Math.sin(performance.now()*.0032);
   pirateFruitReturnPortal.core.material.opacity=.2+pulse*.2;
   pirateFruitReturnPortal.light.intensity=1.7+pulse*1.1;
-  if(pirateFruitReturnPortalBusy||distXZ(player.position,pirateFruitReturnPortal.group.position)>2.25)return;
+  const distance=distXZ(player.position,pirateFruitReturnPortal.group.position);
+  if(pirateFruitReturnPortalNeedsExit){
+    if(distance>2.75)pirateFruitReturnPortalNeedsExit=false;
+    return;
+  }
+  if(pirateFruitReturnPortalBusy||distance>2.25)return;
   pirateFruitReturnPortalBusy=true;
   window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {
     detail: { type: 'pocketmonster:world-warp-v1', world: 'pirate-fruit', panel: 'human', source: 'pocket-monster-ranch-portal' },
@@ -7454,7 +7460,7 @@ function loop(now){
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 if(typeof window!=='undefined'){
-  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{pirateFruitReturnPortalBusy=false;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
+  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',
