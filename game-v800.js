@@ -8,6 +8,8 @@ import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeState
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
+import { buildPocketQuestHudFeature, createPocketQuestHudStore } from './pocket-quest-hud-view-model.mjs';
+import { createHudCommandResult } from './unified-hud-contract-v900.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
 import {
@@ -2596,7 +2598,37 @@ function setStageObjectiveDismissed(dismissed){
   syncStageObjectiveVisibility();
   return stageObjectiveDismissed;
 }
+// Unified HUD Task 4: quest state is published as immutable snapshots for the
+// MMORPG Dock; the legacy stageObjective panel stays a migration fallback.
+const pocketQuestHud=createPocketQuestHudStore();
+function publishPocketQuestHud(){
+  const zoneId=state.currentZone;
+  if(!STAGE_BY_ID[zoneId]){
+    pocketQuestHud.publish(buildPocketQuestHudFeature({hasStage:false}));
+    return;
+  }
+  const objective=currentStageObjective(zoneId);
+  const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
+  const speciesId=objective.speciesId||ZONES[zoneId]?.progressionBossSpeciesId;
+  const monsterName=speciesId?(spById[speciesId]?.displayName||spById[speciesId]?.name||speciesId):'';
+  const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName});
+  pocketQuestHud.publish(buildPocketQuestHudFeature({hasStage:true,tracker,summary:stageObjectiveText(objective,zoneId)}));
+}
+function toggleQuestHudPanel(open){
+  const dismissed=!(open===true);
+  setStageObjectiveDismissed(dismissed);
+  return createHudCommandResult({ok:true,reason:dismissed?'collapsed':'expanded'});
+}
+window.POCKETMONSTER_QUEST_HUD=Object.freeze({
+  subscribe:pocketQuestHud.subscribe,
+  snapshot:pocketQuestHud.snapshot,
+  togglePanel:toggleQuestHudPanel,
+  reset:pocketQuestHud.reset,
+});
+window.addEventListener('pocketmonster:world-warp-v1',()=>pocketQuestHud.reset());
+window.addEventListener('pocketmonster:session-ended',()=>pocketQuestHud.reset());
 function renderStarterJourney(){
+  publishPocketQuestHud();
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
   if(!STAGE_BY_ID[state.currentZone]){
