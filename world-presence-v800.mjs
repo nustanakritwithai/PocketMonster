@@ -106,7 +106,7 @@ export function createWorldPresenceController({
         }
         const avatar = scene ? createAvatar(id, item) : null;
         if (avatar) scene.add(avatar);
-        remote = { marker, avatar, targetX: item.x, targetY: 0, targetZ: item.z, targetDir: 0 };
+        remote = { marker, avatar, targetX: item.x, targetY: 0, targetZ: item.z, targetDir: 0, locomotion: 'idle', animation: null, animationPhase: 0 };
         remoteWorldPlayers.set(id, remote);
       }
       const y = Number(getHeightAt?.(item.x, item.z));
@@ -114,6 +114,8 @@ export function createWorldPresenceController({
       remote.targetY = Number.isFinite(y) ? y : 0;
       remote.targetZ = item.z;
       remote.targetDir = Number.isFinite(item.dir) ? item.dir : 0;
+      remote.locomotion = typeof item.locomotion === 'string' ? item.locomotion : 'idle';
+      remote.animation = item.animation && typeof item.animation === 'object' ? item.animation : null;
       if (remote.marker) {
         remote.marker.textContent = item.name || 'ผู้เล่นออนไลน์';
         remote.marker.dataset.x = item.x;
@@ -140,6 +142,15 @@ export function createWorldPresenceController({
         avatar.position.z += (remote.targetZ - avatar.position.z) * .35;
         const turn = Math.atan2(Math.sin(remote.targetDir - avatar.rotation.y), Math.cos(remote.targetDir - avatar.rotation.y));
         avatar.rotation.y += turn * .35;
+        remote.animationPhase += .1;
+        const moving = remote.locomotion === 'walk' || remote.locomotion === 'run' || remote.locomotion === 'swim' || remote.locomotion === 'dash';
+        const combatState = remote.animation?.combatState || 'idle';
+        avatar.userData.remoteLocomotion = remote.locomotion;
+        avatar.userData.remoteAnimation = remote.animation;
+        const bob = moving ? Math.sin(remote.animationPhase * 8) * .035 : 0;
+        avatar.position.y += (remote.targetY + bob - avatar.position.y) * .35;
+        const actionLean = combatState === 'attack' || combatState === 'skill' ? Math.sin(remote.animationPhase * 12) * .12 : combatState === 'hurt' ? -.12 : 0;
+        avatar.rotation.z += (actionLean - avatar.rotation.z) * .35;
       }
       if (!remote.marker || !camera || !THREE?.Vector3) continue;
       const x = avatar?.position?.x ?? remote.targetX;

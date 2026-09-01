@@ -164,6 +164,7 @@ const parentWindow = { location: { origin: 'https://game.example' }, POCKETMONST
 assert.equal(isHostedOnlineWorldScene({ parent: parentWindow, location: { origin: 'https://game.example' } }), true);
 assert.equal(isHostedOnlineWorldScene({ parent: parentWindow, location: { origin: 'https://evil.example' } }), false);
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25 })?.zone, 'pirate-fruit');
+assert.deepEqual(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25, locomotion: 'run', animation: { combatState: 'attack', attackProgress: .5, dashing: true } }), { zone: 'pirate-fruit', x: 1, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack', attackProgress: .5, dashing: true } });
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: Number.NaN, z: 0, dir: 0 }), null);
 assert.equal(sanitizeOnlineWorldPose({ zone: '../bad', x: 0, z: 0, dir: 0 }), null);
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [] }, 'pirate-fruit'), null);
@@ -177,7 +178,7 @@ const sanitized = sanitizeOnlineWorldSnapshot({
 }, 'pirate-fruit');
 assert.deepEqual(sanitized, {
   zone: 'pirate-fruit',
-  players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5 }],
+  players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5, locomotion: 'idle', animation: null }],
 });
 assert.equal(sanitizeOnlineWorldSnapshot({
   zone: 'pirate-fruit',
@@ -210,7 +211,7 @@ function fakeScene(pose) {
 
 let activeScene = fakeScene({ zone: 'pirate-fruit', x: 4, z: 5, dir: 0.2 });
 const sceneBridge = createOnlineScenePresenceBridge({ getSceneWindow: () => activeScene });
-assert.deepEqual(sceneBridge.readPose(), { zone: 'pirate-fruit', x: 4, z: 5, dir: 0.2 });
+assert.deepEqual(sceneBridge.readPose(), { zone: 'pirate-fruit', x: 4, z: 5, dir: 0.2, locomotion: 'idle', animation: null });
 assert.equal(sceneBridge.acceptSnapshot({ zone: 'hub', players: [] }), false, 'wrong-zone snapshot is discarded');
 assert.equal(sceneBridge.acceptSnapshot({ zone: 'pirate-fruit', players: [{ id: 'p1', x: 1, z: 1 }] }), true);
 assert.equal(activeScene.snapshots.length, 1);
