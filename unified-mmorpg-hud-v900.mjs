@@ -398,6 +398,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (shell) return shell;
     shell = buildShell();
     documentLike.body.append(shell);
+    documentLike.body.classList.add('unified-hud-active');
     subscribeFeature('chat', chatAdapter());
     subscribeFeature('minimap', minimapAdapter());
     subscribeFeature('quest', questAdapter());
@@ -423,6 +424,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (shell?.parentNode?.children) {
       shell.parentNode.children = shell.parentNode.children.filter(child => child !== shell);
     }
+    documentLike.body.classList.remove('unified-hud-active');
     nodes.clear();
     shell = null;
   }

@@ -168,3 +168,12 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-minimap-marker.warp{background:#f5c451}
 .mmorpg-minimap-marker.party{background:#86efac}
 .mmorpg-minimap-player{width:10px;height:10px;background:#fff;border:2px solid #22c55e;border-radius:2px}
+/* Unified HUD Task 8 — legacy Pocket HUD retirement under the capability flag */
+body.unified-hud-active #hud{display:none!important;pointer-events:none!important}
+body.unified-hud-active #stageObjective{display:none!important;pointer-events:none!important}
+body.unified-hud-active #stageObjectiveToggle{display:none!important;pointer-events:none!important}
+body.unified-hud-active #targetCard{display:none!important;pointer-events:none!important}
+body.unified-hud-active #party{display:none!important;pointer-events:none!important}
+body.unified-hud-active #message{display:none!important;pointer-events:none!important}
+body.unified-hud-active .game-chat{display:none!important;pointer-events:none!important}
+body.unified-hud-active .chat-toggle{display:none!important;pointer-events:none!important}

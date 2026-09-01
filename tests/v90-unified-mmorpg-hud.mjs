@@ -168,6 +168,7 @@ function bootWorld() {
   const { hud, documentLike } = bootWorld();
   assert.equal(hud.kind, UNIFIED_MMORPG_HUD_KIND);
   hud.mount();
+  assert.equal(documentLike.body.classList.contains('unified-hud-active'), true, 'mount raises the legacy-retirement capability flag');
   hud.mount();
   const shell = documentLike.getElementById('mmorpgHud');
   assert.ok(shell, 'mount creates the #mmorpgHud shell');
@@ -250,6 +251,7 @@ function bootWorld() {
   hud.unmount();
   assert.equal(feature.subscriberCount(), 0, 'unmount unsubscribes every feature');
   assert.equal(documentLike.getElementById('mmorpgHud'), null, 'unmount removes the shell');
+  assert.equal(documentLike.body.classList.contains('unified-hud-active'), false, 'unmount lowers the capability flag');
   feature.push({ revision: 99, available: true, title: 'หลัง teardown', summary: '', steps: Object.freeze([]), status: '' });
   assert.equal(documentLike.getElementById('mmorpgQuestPanel'), null, 'no DOM resurrects after teardown');
 }
