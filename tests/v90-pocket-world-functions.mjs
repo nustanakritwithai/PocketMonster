@@ -29,15 +29,15 @@ assert.equal(liveHtml, versionedHtml, 'live index.html stays byte-identical with
 assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hud">'), 'live chat toggle stays outside #hud');
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-top-right[\s\S]*game-v800\.js\?v=815/, 'legacy preload binds chat before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store/, 'live preload cache-busts the top-right chat');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store[\s\S]*game-v800\.js\?v=815/, 'legacy preload binds chat before game overlays');
 assert.doesNotMatch(liveJs, /bindMobileDualPointerInput\(/, 'Pocket runtime does not create a second pointer lifecycle');
 assert.match(liveJs, /registerAdapter\('pocket-monster'/, 'Pocket movement and camera register with the parent control lifecycle');
 assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent joystick and camera keep independent pointer channels');
 assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
 assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
 assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');
-assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-3'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
+assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-4'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
 assert.match(worldsJs, /POCKETMONSTER_SCENE_EMBEDDED !== true[\s\S]*chat-runtime/, 'standalone compatibility path may mount chat but hosted scenes skip it');
 assert.doesNotMatch(sceneEntryJs, /chat-runtime|new WebSocket|prepareLaunch/, 'hosted scene entry cannot create another socket or login bootstrap');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
