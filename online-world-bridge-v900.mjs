@@ -6,6 +6,8 @@ export const MAX_SNAPSHOT_CANDIDATES = 400;
 const MAX_PLAYER_ID_LENGTH = 80;
 const MAX_PLAYER_NAME_LENGTH = 32;
 const ZONE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const LOCOMOTION_VALUES = new Set(['idle', 'walk', 'run', 'swim', 'jump', 'dash']);
+const COMBAT_STATE_VALUES = new Set(['idle', 'attack', 'skill', 'hurt', 'dead', 'guard']);
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -17,6 +19,22 @@ function isFiniteNumber(value) {
 
 function safeZone(value) {
   return typeof value === 'string' && ZONE_PATTERN.test(value) ? value : null;
+}
+
+function sanitizeLocomotion(value) {
+  return typeof value === 'string' && LOCOMOTION_VALUES.has(value) ? value : 'idle';
+}
+
+function sanitizeAnimation(value) {
+  if (!isRecord(value)) return null;
+  const combatState = typeof value.combatState === 'string' && COMBAT_STATE_VALUES.has(value.combatState)
+    ? value.combatState : 'idle';
+  const animation = { combatState };
+  for (const key of ['onGround', 'dashing']) if (typeof value[key] === 'boolean') animation[key] = value[key];
+  for (const key of ['attackProgress', 'hitReactionAngle', 'skillAnimationProgress']) {
+    if (isFiniteNumber(value[key])) animation[key] = Math.max(0, Math.min(1, value[key]));
+  }
+  return Object.freeze(animation);
 }
 
 export function isHostedOnlineWorldScene(windowLike = globalThis.window) {
@@ -33,7 +51,7 @@ export function sanitizeOnlineWorldPose(value) {
   if (!isRecord(value)) return null;
   const zone = safeZone(value.zone);
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
-  return Object.freeze({ zone, x: value.x, z: value.z, dir: value.dir });
+  return Object.freeze({ zone, x: value.x, z: value.z, dir: value.dir, locomotion: sanitizeLocomotion(value.locomotion), animation: sanitizeAnimation(value.animation) });
 }
 
 export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
@@ -59,6 +77,8 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
       x: candidate.x,
       z: candidate.z,
       dir: isFiniteNumber(candidate.dir) ? candidate.dir : 0,
+      locomotion: sanitizeLocomotion(candidate.locomotion),
+      animation: sanitizeAnimation(candidate.animation),
     }));
   }
   return Object.freeze({ zone, players: Object.freeze(players) });
