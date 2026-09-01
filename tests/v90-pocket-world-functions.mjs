@@ -30,7 +30,7 @@ assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hu
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store[\s\S]*game-v800\.js\?v=817/, 'legacy preload binds chat before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store[\s\S]*game-v800\.js\?v=818/, 'legacy preload binds chat before game overlays');
 assert.doesNotMatch(liveJs, /bindMobileDualPointerInput\(/, 'Pocket runtime does not create a second pointer lifecycle');
 assert.match(liveJs, /registerAdapter\('pocket-monster'/, 'Pocket movement and camera register with the parent control lifecycle');
 assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent joystick and camera keep independent pointer channels');

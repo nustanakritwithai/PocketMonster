@@ -28,7 +28,7 @@ assert.match(css, /@media \(orientation:landscape\) and \(max-height:560px\)\{[^
 assert.match(css, /@media \(orientation:landscape\) and \(max-height:560px\)\{[^]*?transform:translateX\(-50%\)/, 'short landscape chat panel is centered');
 assert.match(chat, /@media \(orientation:landscape\) and \(max-height:560px\)\{\.game-chat\{left:50%!important/, 'runtime CSS must center the landscape panel even if stylesheet is cached');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store/, 'chat layout change must cache-bust');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store[\s\S]*game-v800\.js\?v=817/, 'chat must bind before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-chat-hud-store[\s\S]*game-v800\.js\?v=818/, 'chat must bind before game overlays');
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'chat stays outside #hud');
 
 console.log('Chat control-clearance layout: PASS');
