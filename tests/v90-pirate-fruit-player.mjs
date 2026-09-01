@@ -118,6 +118,7 @@ assert.match(worldsJs, /await preparePocketRuntime\(world\);[\s\S]*applyControlP
 assert.match(worldsJs, /POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget[\s\S]*savedWorldGameNodes\.set\(world\.id, \[\.\.\.mountTarget\.childNodes\]\)/, 'Pocket prewarm builds its canvas off-DOM for an instant mount');
 assert.match(liveJs, /POCKETMONSTER_SCENE_MOUNT_TARGET[\s\S]*sceneRuntimeActive=!sceneRuntimePrewarming/, 'Pocket prewarm remains inactive until scene mount');
 assert.match(liveJs, /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*for\(const code of Object\.keys\(keys\)\)keys\[code\]=false;[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms the shared control surface after every scene mount');
+assert.match(liveJs, /unmount:\(\)=>\{pirateFruitReturnPortalBusy=false;return setSceneRuntimeActive\(false\);\}/, 'Pocket return portal lock resets when the scene unmounts so repeated round trips remain possible');
 assert.doesNotMatch(liveJs, /\b(?:joyEnd|endCam)\s*\(/, 'Pocket lifecycle cannot call removed legacy pointer helpers');
 assert.match(boot, /pirateFrame\.contentWindow\?\.focus\?\.\(\)/, 'Pirate lifecycle restores iframe focus after returning without a document reload');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
