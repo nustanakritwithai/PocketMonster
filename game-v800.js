@@ -2613,7 +2613,7 @@ function publishPocketQuestHud(){
   const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
   const speciesId=objective.speciesId||ZONES[zoneId]?.progressionBossSpeciesId;
   const monsterName=speciesId?(spById[speciesId]?.displayName||spById[speciesId]?.name||speciesId):'';
-  const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName});
+  const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName,});
   pocketQuestHud.publish(buildPocketQuestHudFeature({hasStage:true,tracker,summary:stageObjectiveText(objective,zoneId)}));
 }
 function toggleQuestHudPanel(open){
