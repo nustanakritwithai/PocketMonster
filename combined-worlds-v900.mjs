@@ -40,7 +40,7 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'เกมเดิม',
     title: 'Pocket Monster',
     detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
-    runtime: './game-v800.js?v=822',
+    runtime: './game-v800.js?v=823',
   }),
   Object.freeze({
     id: 'pirate-fruit',
@@ -54,7 +54,7 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'โลกกลาง',
     title: 'World Layer',
     detail: 'ชั้นโลกกลาง (World) • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP',
-    runtime: './world-living-v900.mjs?v=903',
+    runtime: './world-living-v900.mjs?v=904',
   }),
 ]);
 
