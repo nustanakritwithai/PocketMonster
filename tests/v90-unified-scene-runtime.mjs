@@ -30,12 +30,12 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=822',
+    runtime: './game-v800.js?v=823',
   }),
   Object.freeze({
     world: 'living-world',
     panel: 'human',
-    runtime: './world-living-v900.mjs?v=903',
+    runtime: './world-living-v900.mjs?v=904',
   }),
 ]);
 const worldRuntimePaths = new Set(worldCases.map(item => new URL(item.runtime, 'https://game.example/').pathname));

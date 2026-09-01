@@ -52,6 +52,7 @@ import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
+import { createWorldPresenceController } from './world-presence-v800.mjs?v=2';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -2509,23 +2510,9 @@ const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],sele
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
 window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
-const remoteWorldPlayers=new Map();
-const remoteWorldLayer=document.createElement('div');
-remoteWorldLayer.id='remoteWorldPlayers';
-Object.assign(remoteWorldLayer.style,{position:'fixed',inset:'0',zIndex:'14000',pointerEvents:'none'});
-document.body.append(remoteWorldLayer);
-window.POCKETMONSTER_WORLD_PRESENCE=payload=>{
-  if(!payload||payload.zone!==state.currentZone)return;
-  const seen=new Set();
-  for(const item of payload.players||[]){
-    if(!item?.id||!Number.isFinite(item.x)||!Number.isFinite(item.z))continue;
-    seen.add(item.id); let marker=remoteWorldPlayers.get(item.id);
-    if(!marker){marker=document.createElement('div');marker.className='remote-world-player';Object.assign(marker.style,{position:'absolute',transform:'translate(-50%,-100%)',padding:'3px 7px',border:'1px solid #67e8f9',borderRadius:'999px',background:'#082f49e8',color:'#e0f2fe',font:'700 11px system-ui',whiteSpace:'nowrap',textShadow:'0 1px 2px #000'});remoteWorldLayer.append(marker);remoteWorldPlayers.set(item.id,marker);}
-    marker.textContent=item.name||'ผู้เล่นออนไลน์'; marker.dataset.x=item.x; marker.dataset.z=item.z;
-  }
-  for(const [id,marker] of remoteWorldPlayers){if(!seen.has(id)){marker.remove();remoteWorldPlayers.delete(id);}}
-};
-updateRemoteWorldMarkers=()=>{for(const marker of remoteWorldPlayers.values()){const x=Number(marker.dataset.x),z=Number(marker.dataset.z);const point=new THREE.Vector3(x,1.8,z).project(camera);const visible=point.z>-1&&point.z<1&&point.x>=-1.1&&point.x<=1.1&&point.y>=-1.1&&point.y<=1.1;marker.hidden=!visible;if(visible){marker.style.left=((point.x+1)*50)+'%';marker.style.top=((1-point.y)*50)+'%';}}};
+const worldPresence=createWorldPresenceController({THREE,scene,getCamera:()=>camera,getZone:()=>state.currentZone});
+window.POCKETMONSTER_WORLD_PRESENCE=payload=>worldPresence.acceptSnapshot(payload);
+updateRemoteWorldMarkers=()=>worldPresence.update();
 }
 attachCharacterUi(state);
 let characterUI=null;

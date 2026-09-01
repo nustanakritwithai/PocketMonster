@@ -57,7 +57,7 @@ assert.match(liveJs, /text\.textContent='1\/3 ไป Grass Meadow'/, 'Ranch Hub 
 assert.doesNotMatch(liveJs, /if\(!STAGE_BY_ID\[state\.currentZone\]\)\{panel\.classList\.add\('hidden'\);return;\}/, 'Ranch Hub no longer hides the quest tracker');
 assert.match(boot, /publishWorldState\(/, 'real pirate world publishes WORLD_STATE');
 assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'pirate presence uses the pirate-fruit zone id');
-assert.match(livingJs, /from '\.\/world-presence-v800\.mjs'/, 'living world uses the shared presence helper');
+assert.match(livingJs, /from '\.\/world-presence-v800\.mjs\?v=2'/, 'living world uses the cache-busted shared presence helper');
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
 assert.match(livingJs, /pocketmonster:world-warp-v1/, 'Living World returns directly to Pirate Fruit through the in-document route');
@@ -126,6 +126,11 @@ assert.doesNotMatch(chat, /vpsWrites|playerDataWrites/, 'chat runtime must not o
   } finally {
     dispose();
   }
+}
+
+for (const testFile of ['v90-world-presence-avatars.mjs', 'v90-two-client-world-presence.mjs']) {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL(testFile, import.meta.url))], { encoding: 'utf8' });
+  assert.equal(result.status, 0, `${testFile} failed\n${result.stdout}\n${result.stderr}`);
 }
 
 console.log('V9.0 Pocket Monster world functions port: PASS');

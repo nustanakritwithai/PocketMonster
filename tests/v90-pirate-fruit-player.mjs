@@ -90,9 +90,9 @@ assert.doesNotMatch(html, /id="pocketWorldWarpBtn"|data-combined-world=/, 'V9 wo
 assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
-assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=822');
+assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=823');
 assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=920');
-assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=903');
+assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=904');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
 assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit');
@@ -231,7 +231,7 @@ assert.match(boot, /remote: false/, 'pirate world is local, not a remote Pirate 
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
-assert.match(boot, /game-v800\.js\?v=822&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
+assert.match(boot, /game-v800\.js\?v=823&animalControl=pirate-fruit/, 'throw runtime is a dedicated pirate animal-control instance');
 assert.match(cssV900, /compact-topbar[\s\S]*display:none!important/, 'V9 removes the top status bar');
 assert.match(cssV900, /zone-travel\{display:none!important\}/, 'V9 removes the location travel bar');
 assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can request the animal-control runtime');
