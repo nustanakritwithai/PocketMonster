@@ -160,3 +160,11 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-bottom-strip{position:absolute;left:0;right:0;bottom:0;height:calc(max(var(--hud-control-gap),var(--safe-bottom)));background:linear-gradient(180deg,transparent,rgba(2,6,23,.5));z-index:29}
 @media (max-height:420px){:root{--hud-dock-expanded:140px}.mmorpg-minimap{display:none}.mmorpg-player-status,.mmorpg-quest-panel{width:min(160px,22vw);font-size:11px}}
 @media (max-height:320px){:root{--hud-dock-expanded:112px}.mmorpg-quest-panel,.mmorpg-companions{display:none}.mmorpg-dock{width:min(420px,48vw)}}
+/* Unified HUD Task 7A — minimap projection surface */
+.mmorpg-minimap{position:relative;overflow:hidden}
+.mmorpg-minimap.unavailable::after{content:'—';display:grid;place-items:center;height:100%;opacity:.4;font-size:18px}
+.mmorpg-minimap-marker,.mmorpg-minimap-player{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%)}
+.mmorpg-minimap-marker{background:#68d5ff}
+.mmorpg-minimap-marker.warp{background:#f5c451}
+.mmorpg-minimap-marker.party{background:#86efac}
+.mmorpg-minimap-player{width:10px;height:10px;background:#fff;border:2px solid #22c55e;border-radius:2px}

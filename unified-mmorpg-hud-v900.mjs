@@ -146,6 +146,10 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     return windowLike.POCKETMONSTER_POCKET_HUD || null;
   }
 
+  function minimapAdapter() {
+    return windowLike.POCKETMONSTER_MINIMAP_HUD || null;
+  }
+
   function subscribeFeature(featureName, adapter) {
     if (!adapter?.subscribe) return;
     const unsubscribe = adapter.subscribe(snapshot => renderFeature(featureName, snapshot));
@@ -164,6 +168,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     else if (featureName === 'target') renderRoster();
     else if (featureName === 'banner') renderBanner(snapshot);
     else if (featureName === 'utilities') renderUtilities(snapshot);
+    else if (featureName === 'minimap') renderMinimap(snapshot);
   }
 
   function renderChat(snapshot) {
@@ -318,6 +323,33 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     }
   }
 
+  function renderMinimap(snapshot) {
+    const map = node('mmorpgMinimap');
+    if (!map) return;
+    const available = snapshot?.available === true;
+    map.classList.toggle('unavailable', !available);
+    if (!available) {
+      map.replaceChildren();
+      return;
+    }
+    const dots = [];
+    for (const marker of snapshot.markers || []) {
+      const dot = el(documentLike, 'span', '', `mmorpg-minimap-marker ${marker.kind}`);
+      dot.dataset.markerId = marker.id;
+      dot.style.left = `${((marker.x + 1) / 2 * 100).toFixed(2)}%`;
+      dot.style.top = `${((marker.z + 1) / 2 * 100).toFixed(2)}%`;
+      dots.push(dot);
+    }
+    if (snapshot.player) {
+      const playerDot = el(documentLike, 'span', '', 'mmorpg-minimap-player');
+      playerDot.style.left = `${((snapshot.player.x + 1) / 2 * 100).toFixed(2)}%`;
+      playerDot.style.top = `${((snapshot.player.z + 1) / 2 * 100).toFixed(2)}%`;
+      playerDot.style.transform = `translate(-50%,-50%) rotate(${snapshot.player.heading}deg)`;
+      dots.push(playerDot);
+    }
+    map.replaceChildren(...dots);
+  }
+
   function renderBanner(snapshot) {
     const banner = node('mmorpgBanner');
     if (!banner) return;
@@ -367,6 +399,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     shell = buildShell();
     documentLike.body.append(shell);
     subscribeFeature('chat', chatAdapter());
+    subscribeFeature('minimap', minimapAdapter());
     subscribeFeature('quest', questAdapter());
     subscribeFeature('party', partyAdapter());
     const pocket = pocketAdapter();

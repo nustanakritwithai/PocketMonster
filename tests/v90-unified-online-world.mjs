@@ -47,7 +47,7 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=925/, 'active HTML cache-busts the persistent-shell entry');
-assert.match(indexHtml, /style-v900\.css\?v=914/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(indexHtml, /style-v900\.css\?v=915/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
 assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=15'\)/, 'top-level authenticates once before starting the cache-busted shell');
