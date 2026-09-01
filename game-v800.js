@@ -9,6 +9,7 @@ import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeState
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
 import { buildPocketQuestHudFeature, createPocketQuestHudStore } from './pocket-quest-hud-view-model.mjs';
+import { buildPocketPartyHudFeature, createPocketPartyHudStore } from './pocket-party-hud-view-model.mjs';
 import { createHudCommandResult } from './unified-hud-contract-v900.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
@@ -2627,6 +2628,61 @@ window.POCKETMONSTER_QUEST_HUD=Object.freeze({
 });
 window.addEventListener('pocketmonster:world-warp-v1',()=>pocketQuestHud.reset());
 window.addEventListener('pocketmonster:session-ended',()=>pocketQuestHud.reset());
+// Unified HUD Task 5: party state is published as immutable snapshots for the
+// MMORPG Dock; selection/switch mutations stay in the legacy gameplay path.
+const pocketPartyHud=createPocketPartyHudStore();
+function pocketPartyHudProjection(){
+  const activeInstanceId=activeSummon?.inst?.instanceId||'';
+  return {
+    selectedSlot:state.selectedSlot,
+    activeInstanceId,
+    canSwitch:characterUI?characterUI.canSwitchParty():false,
+    slots:state.party.map(id=>{
+      const inst=getInst(id);
+      if(!inst)return null;
+      return {
+        instanceId:inst.instanceId,
+        portraitKey:typeof inst.speciesId==='string'?inst.speciesId:'',
+        name:displayName(inst),
+        level:inst.level,
+        hp:inst.hp,
+        hpMax:inst.maxHp,
+        condition:deriveCondition(inst)||'normal',
+        fainted:inst.fainted===true||inst.hp<=0,
+      };
+    }),
+  };
+}
+function publishPocketPartyHud(){
+  pocketPartyHud.publish(buildPocketPartyHudFeature(pocketPartyHudProjection()));
+}
+function selectPartySlotCommand(slot){
+  const index=Number.isInteger(slot)?slot:-1;
+  if(index<0||index>=state.party.length)return createHudCommandResult({ok:false,reason:'invalid-slot'});
+  if(pirateThrowPanelPaused())return createHudCommandResult({ok:false,reason:'input-paused'});
+  if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
+  const gate=characterUI.requestSwitchParty(index);
+  if(!gate.ok)return createHudCommandResult({ok:false,reason:gate.reason||'switch-blocked',message:gate.reasonText||''});
+  switchPartySlot(index);
+  return createHudCommandResult({ok:true,reason:'slot-selected'});
+}
+function openCharacterCommand(slot){
+  if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
+  const index=Number.isInteger(slot)?slot:state.selectedSlot;
+  const result=characterUI.peekPartySlot(index);
+  if(!result?.ok)return createHudCommandResult({ok:false,reason:result?.reason||'open-failed'});
+  return createHudCommandResult({ok:true,reason:'character-opened'});
+}
+window.POCKETMONSTER_PARTY_HUD=Object.freeze({
+  subscribe:pocketPartyHud.subscribe,
+  snapshot:pocketPartyHud.snapshot,
+  selectPartySlot:selectPartySlotCommand,
+  switchPartySlot:selectPartySlotCommand,
+  openCharacter:openCharacterCommand,
+  reset:pocketPartyHud.reset,
+});
+window.addEventListener('pocketmonster:world-warp-v1',()=>pocketPartyHud.reset());
+window.addEventListener('pocketmonster:session-ended',()=>pocketPartyHud.reset());
 function renderStarterJourney(){
   publishPocketQuestHud();
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
@@ -6623,6 +6679,7 @@ function switchPartySlot(index){
   syncHubCompanion();renderParty();renderSkillButtons();renderHUD();renderCharacterAccess();
 }
 function renderParty(){
+  publishPocketPartyHud();
   const party=el('party'),activeInstanceId=activeSummon?.inst.instanceId||null;
   party.replaceChildren();
   state.party.forEach((id,index)=>{

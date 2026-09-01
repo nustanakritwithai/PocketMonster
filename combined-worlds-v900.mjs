@@ -40,7 +40,7 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'เกมเดิม',
     title: 'Pocket Monster',
     detail: 'โหมดปาจับมอน • ตัวละคร Pirate Fruit ใช้แผงจับมอนเท่านั้น ไม่ใช้แผงโจมตี',
-    runtime: './game-v800.js?v=824',
+    runtime: './game-v800.js?v=825',
   }),
   Object.freeze({
     id: 'pirate-fruit',

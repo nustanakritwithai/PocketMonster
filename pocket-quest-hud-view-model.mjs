@@ -8,6 +8,8 @@
  * game closures or legacy quest DOM.
  */
 
+import { createHudFeatureStore } from './unified-hud-feature-store.mjs';
+
 const QUEST_STEP_STATE = new Set(['done', 'current', 'todo', 'locked']);
 const QUEST_STEP_LIMIT = 32;
 const QUEST_TEXT_LIMIT = 160;
@@ -74,11 +76,6 @@ function unavailableQuestFeature() {
   });
 }
 
-function featureKey(feature) {
-  return JSON.stringify([feature.available, feature.title, feature.summary, feature.status,
-    feature.steps.map(step => [step.id, step.label, step.state])]);
-}
-
 function freezeQuestSnapshot(revision, feature) {
   const steps = [];
   for (const candidate of feature.steps || []) {
@@ -95,60 +92,16 @@ function freezeQuestSnapshot(revision, feature) {
   });
 }
 
+function normalizeQuestForStore(input, revision) {
+  const feature = input && typeof input === 'object' ? input : unavailableQuestFeature();
+  return freezeQuestSnapshot(revision, feature);
+}
+
 /**
  * Bounded quest store: monotonic revisions, dirty publish, subscriber
  * notification, and an explicit reset used when the player leaves the
  * Pocket world so the Dock never renders stale quest state.
  */
 export function createPocketQuestHudStore() {
-  let revision = 0;
-  let current = freezeQuestSnapshot(revision, unavailableQuestFeature());
-  let lastKey = featureKey(unavailableQuestFeature());
-  const subscribers = new Set();
-
-  function snapshot() {
-    return current;
-  }
-
-  function notify() {
-    for (const listener of [...subscribers]) {
-      try { listener(current); } catch {}
-    }
-  }
-
-  function publish(featureInput) {
-    const feature = featureInput && typeof featureInput === 'object'
-      ? featureInput
-      : unavailableQuestFeature();
-    const key = featureKey(feature);
-    if (key === lastKey) return current;
-    revision += 1;
-    lastKey = key;
-    current = freezeQuestSnapshot(revision, feature);
-    notify();
-    return current;
-  }
-
-  function reset() {
-    return publish(unavailableQuestFeature());
-  }
-
-  function subscribe(listener) {
-    if (typeof listener !== 'function') return null;
-    subscribers.add(listener);
-    try { listener(current); } catch {}
-    return () => { subscribers.delete(listener); };
-  }
-
-  return Object.freeze({
-    subscribe,
-    snapshot,
-    publish,
-    reset,
-    diagnostics: () => Object.freeze({
-      revision,
-      subscribers: subscribers.size,
-      available: current.available,
-    }),
-  });
+  return createHudFeatureStore(normalizeQuestForStore);
 }
