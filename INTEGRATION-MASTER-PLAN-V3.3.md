@@ -180,10 +180,6 @@ Base CombatStats
 
 ## 4. Base / Effective / Current Combat State
 
----
-
-## 4. Base / Effective / Current Combat State
-
 ต้องแยก semantic 3 ชั้น
 
 ### Base CombatStats
@@ -348,9 +344,59 @@ Shared ตรวจเฉพาะ structural/safety bounds ส่วน balance
 
 ## 9. Status Architecture
 
-ใช้ StatusEffect lifecycle protocol กลาง แต่ semantic definitions สามารถแยก namespace
+ใช้ StatusEffect lifecycle protocol กลาง แต่ semantic เฉพาะเป็นของโดเมน และสถานะในคอมแบตเป็น **server-authoritative เสมอ** (snapshot ต้องถือ `authority: 'server'`)
 
-ตัวอย่าง:
+### สัญญาที่ใช้จริง (V9.1)
+
+Status snapshot ที่แลกเปลี่ยนระหว่าง Client/Server (`combat-v91-status.mjs`):
+
+```text
+authority: 'server'
+combatId
+entityId
+ownerDomain
+statusStateVersion   // CAS — เปลี่ยนผ่านแบบ atomic เท่านั้น
+fingerprint
+state                // encounter status state
+```
+
+Runtime status แต่ละตัว (`status-lifecycle.mjs`):
+
+```text
+statusId                                  // แคตตาล็อก ST_* (status-catalog.mjs, 26 สถานะ)
+sourceSkillId / sourceLinkId / sourceInstanceId
+stacks
+appliedAtSec / expiresAtSec / nextTickAtSec
+stackRule / category
+```
+
+### Stacking rules และ interactions
+
+- Stack rules: `StrongestWinsRefresh`, `AddStackAndRefresh`, `ReplaceByLonger`, `Replace`
+- `STATUS_INTERACTIONS` กำหนดการแทนที่/ยกเลิกข้ามสถานะ
+- Hard-CC มี diminishing returns (`HARD_CC_DR_POLICY`) — ระยะเวลาถูกทอนลงเมื่อถูกควบคุมซ้ำในหน้าต่างเวลาเดียวกัน
+
+### ผลต่อ Effective CombatStats
+
+Status ห้ามเขียนทับ Base — ผลปรากฏเป็น modifier ในชั้น Effective เท่านั้น:
+
+```text
+ATK Up     → attackMultiplier
+DEF Up     → defenseMultiplier
+SPD Up     → speedMultiplier
+Crit Up    → critChancePct
+Evasion Up → evasionChancePct
+```
+
+Client แสดงค่ารวมจาก modifier ชุดเดียวกันกับการคำนวณคอมแบต — ทางเดียว ไม่มีค่าอีกชุดสำหรับแสดงผล
+
+### Server authority และ correction
+
+Client ทำนาย `predictedStatusSnapshots` ได้ แต่ commit จริงต้องมาจาก `authoritativeStatusSnapshots` ใน authority response — ผลเป็น `confirmed / corrected / rejected` ตามความตรงกันของผลสถานะและดาเมจกับการทำนาย
+
+### Namespace เป้าหมายเมื่อรวมโลก
+
+ตัวอย่างด้านล่างเป็นเป้าหมายเมื่อระบบโลกรวมกัน — ปัจจุบัน Pocket ใช้แคตตาล็อก `ST_*` ชุดเดียว:
 
 ```text
 shared.stun
@@ -360,17 +406,7 @@ world.exhausted
 world.hypothermia
 ```
 
-Shared contract รองรับ:
-
-- sourceId
-- targetId
-- duration
-- stacks
-- potency
-- sequence
-- version
-
-แต่ Armor / Type / Passive / Equipment และ domain-specific semantics ยังมาจาก rule definitions ของเจ้าของโดเมน และ Server เป็นผู้ execute
+Armor / Type / Passive / Equipment และ domain-specific semantics ยังมาจาก rule definitions ของเจ้าของโดเมน และ Server เป็นผู้ execute
 
 ### Fear Separation
 
@@ -601,6 +637,8 @@ Server resolve:
 - committed CombatOutcome only
 - no fake success
 
+สถานะ ณ ก.ย. 2026: เส้นทางนี้พิสูจน์แล้วผ่าน **opt-in QA authority เท่านั้น** (Client PR #351 + Server PR #18 — reconnect replay, confirmed/corrected, atomic commit) — production ยังเป็น fail-closed (`combat.enabled=false`, `shadowMode=true`) จนกว่าจะเปิด commit จริง
+
 ### Phase J — World Consequences
 
 CombatOutcome → Memory / Fear / Relationship / Situation / Goal / Injury / Ecology / Population
@@ -676,6 +714,8 @@ Living World 20.9.4 เป็นฐานที่เหมาะสำหรั
 - one tick = one WorldTickSnapshot สำหรับทุก actor
 - same seed/state/commands → same CombatStats fingerprint + CombatOutcome + World fingerprint
 - FearStatus หมดได้แต่ World Memory/PsychologicalFear ยังต่อเนื่อง
+- สถานะคอมแบตเปลี่ยนผ่านเฉพาะผ่าน server authority (`statusStateVersion` CAS) — Client ทำนายได้อย่างเดียว ห้ามคอมมิตเอง
+- ผลของสถานะปรากฏเป็น modifier ในชั้น Effective เท่านั้น ห้ามเขียนทับ Base CombatStats
 - combat exit คืน Entity เดิมกลับ World runtime
 - capture ใช้ EntityId เดิม
 - no UI success before authoritative commit
