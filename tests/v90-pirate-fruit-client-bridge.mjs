@@ -175,7 +175,16 @@ assert.doesNotMatch(bridgeSrc, /mergeGeometries/, 'bridge does not vendor Pirate
 assert.doesNotMatch(bridgeSrc, /ZONES|WARP_ROUTES|world-pirate-fruit-v900/, 'bridge does not add a hunt stage');
 assert.match(bridgeSrc, /createAssetEngine/, 'bridge uses the Pocket asset engine');
 assert.match(bridgeSrc, /character\.human\.pirate-fruit\.v1/, 'local player uses the pirate Pocket visual');
-assert.match(bridgeSrc, /character\.human\.blocky-bighead\.v1/, 'other people use the Pocket bighead visual');
+assert.match(
+  bridgeSrc,
+  /kind === 'remote'[\s\S]*?assets\.spawn\('character\.human\.pirate-fruit\.v1',[\s\S]*?role: 'player'[\s\S]*?appearanceId: 'appearance\.human\.player-orange\.v1'/,
+  'remote players use the exact same pirate character visual as the local player',
+);
+assert.match(
+  bridgeSrc,
+  /kind === 'npc'[\s\S]*?assets\.spawn\('character\.human\.blocky-bighead\.v1'/,
+  'NPCs keep their distinct Pocket bighead visual',
+);
 assert.match(bridgeSrc, /paintGroundGrid/, 'bridge paints Pocket ground on existing terrain');
 assert.match(bridgeSrc, /paintSkyGradient/, 'bridge paints Pocket sky on the existing scene');
 assert.match(bridgeSrc, /createPirateFruitActionTracker/, 'bridge imports and creates the live action adapter');
@@ -250,6 +259,9 @@ assert.equal(classifyPirateFruitNode(group.name), 'player');
 const playerFacingVisual = new kit.Group();
 orientPirateFruitVisual(playerFacingVisual, 'player');
 assert.equal(playerFacingVisual.rotation.y, Math.PI, 'player overlay converts Pocket -Z front to Pirate Fruit +Z front');
+const remoteFacingVisual = new kit.Group();
+orientPirateFruitVisual(remoteFacingVisual, 'remote');
+assert.equal(remoteFacingVisual.rotation.y, Math.PI, 'remote player uses the same facing conversion as the local player');
 const monsterFacingVisual = new kit.Group();
 orientPirateFruitVisual(monsterFacingVisual, 'monster');
 assert.equal(monsterFacingVisual.rotation.y, 0, 'non-player overlays keep their existing facing contract');

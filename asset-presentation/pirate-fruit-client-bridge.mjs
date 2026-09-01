@@ -291,7 +291,7 @@ function propColor(name, mesh) {
 
 /** Convert Pocket's -Z player front to Pirate Fruit's +Z facing convention. */
 export function orientPirateFruitVisual(root, kind) {
-  if (kind === 'player' && root?.rotation) root.rotation.y = Math.PI;
+  if ((kind === 'player' || kind === 'remote') && root?.rotation) root.rotation.y = Math.PI;
   return root;
 }
 
@@ -419,11 +419,18 @@ export async function installPirateFruitPocketPresentation({
       }), 'player');
       return;
     }
-    if ((kind === 'remote' || kind === 'npc') && !attached.has(root)) {
+    if (kind === 'remote' && !attached.has(root)) {
+      attachVisual(root, assets.spawn('character.human.pirate-fruit.v1', {
+        role: 'player',
+        appearanceId: 'appearance.human.player-orange.v1',
+      }), 'remote');
+      return;
+    }
+    if (kind === 'npc' && !attached.has(root)) {
       attachVisual(root, assets.spawn('character.human.blocky-bighead.v1', {
         role: 'trainer',
         appearanceId: appearanceFor(root.name || 'npc'),
-      }), kind);
+      }), 'npc');
       return;
     }
     if (kind === 'monster' && !attached.has(root)) {
