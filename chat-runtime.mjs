@@ -1,4 +1,5 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
+import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];
@@ -294,8 +295,9 @@ function connectSocket() {
       const sendWorld = () => {
         if (!activeRequestContext()) return;
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
-        if (!snapshot || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
-        socket.send(JSON.stringify({ type: 'world-pos', ...snapshot }));
+        const frame = buildWorldPosFrame(snapshot);
+        if (!frame || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(JSON.stringify({ type: 'world-pos', ...frame }));
       };
       sendWorld();
       if (state.worldPulse) clearInterval(state.worldPulse);
@@ -315,7 +317,10 @@ function connectSocket() {
         }
         if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
-          const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(message.payload);
+          const payload = worldSnapshotPayload(message);
+          if (!payload) return;
+          const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
+          const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(filtered);
           if (accepted !== false) setWorldConnected(true);
         }
       } catch {}

@@ -1,3 +1,5 @@
+import { buildWorldPosFrame, currentSelfPresenceId, isRemoteWorldPlayer } from './world-presence-protocol.mjs';
+
 const MAX_REMOTE_PLAYERS = 100;
 
 function disposeAvatar(root) {
@@ -57,6 +59,7 @@ export function createWorldPresenceController({
   getZone,
   getHeightAt = () => 0,
   createAvatar = id => createDefaultRemoteAvatar(THREE, id),
+  getSelfId,
 } = {}) {
   const remoteWorldPlayers = new Map();
   let remoteWorldLayer = null;
@@ -80,9 +83,10 @@ export function createWorldPresenceController({
 
   function acceptSnapshot(payload) {
     if (!payload || payload.zone !== getZone?.() || !Array.isArray(payload.players)) return false;
+    const selfId = getSelfId?.() ?? currentSelfPresenceId();
     const seen = new Set();
     for (const item of payload.players.slice(0, MAX_REMOTE_PLAYERS)) {
-      if (!item?.id || !Number.isFinite(item.x) || !Number.isFinite(item.z)) continue;
+      if (!isRemoteWorldPlayer(item, selfId)) continue;
       const id = String(item.id);
       seen.add(id);
       let remote = remoteWorldPlayers.get(id);
@@ -198,11 +202,8 @@ export function installWorldPresence(options = {}) {
 export function publishWorldState({ getZone, getPosition, getDir } = {}) {
   if (typeof window === 'undefined') return;
   window.POCKETMONSTER_WORLD_STATE = () => {
-    const zone = getZone?.();
     const pos = getPosition?.();
     const dir = getDir?.();
-    if (!zone || !pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return null;
-    if (dir !== undefined && !Number.isFinite(dir)) return null;
-    return { zone, x: pos.x, z: pos.z, dir: dir ?? 0 };
+    return buildWorldPosFrame({ zone: getZone?.(), x: pos?.x, z: pos?.z, dir: dir === undefined ? 0 : dir });
   };
 }
