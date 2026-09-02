@@ -6,6 +6,11 @@ import {
   createUnifiedMinimapStore,
   MINIMAP_MARKER_LIMIT,
 } from '../unified-minimap-v900.mjs';
+import {
+  PERSISTENT_MINIMAP_OWNER_KIND,
+  PIRATE_FRUIT_MINIMAP_BOUNDS,
+  pirateFruitMinimapFrame,
+} from '../persistent-minimap-owner-v900.mjs';
 
 // ---------- Projection geometry ----------
 {
@@ -64,6 +69,20 @@ import {
   assert.ok(!frame.markers.some(marker => marker.id === '<<bad>>'), 'unsafe marker ids are dropped');
 }
 
+// ---------- Persistent Pirate Fruit owner ----------
+{
+  assert.equal(PERSISTENT_MINIMAP_OWNER_KIND, 'pocketmonster:persistent-minimap-owner-v1');
+  assert.ok(PIRATE_FRUIT_MINIMAP_BOUNDS.minX < 0 && PIRATE_FRUIT_MINIMAP_BOUNDS.maxX > 500, 'Pirate bounds cover the island chain');
+  assert.ok(PIRATE_FRUIT_MINIMAP_BOUNDS.minZ < -150 && PIRATE_FRUIT_MINIMAP_BOUNDS.maxZ > 500, 'Pirate bounds cover north/south island extents');
+  const frame = pirateFruitMinimapFrame({ x: 0, z: 0, dir: Math.PI / 2, zone: 'pirate-fruit' });
+  assert.equal(frame.available, true, 'Pirate geography produces a real minimap frame');
+  assert.equal(frame.markers.length, 6, 'all six Pirate Fruit islands are projected');
+  assert.ok(frame.markers.some(marker => marker.id === 'island-starter-island'));
+  assert.ok(frame.markers.some(marker => marker.id === 'island-ember-volcano'));
+  assert.ok(frame.player, 'live player pose is projected');
+  assert.equal(frame.player.heading, 90, 'Pirate radians are converted to minimap degrees');
+}
+
 // ---------- Store semantics ----------
 {
   const store = createUnifiedMinimapStore();
@@ -91,10 +110,20 @@ import {
   assert.equal(store.diagnostics().subscribers, 0);
 }
 
-// ---------- Dock wiring ----------
+// ---------- Dock + runtime wiring ----------
 const dockSource = fs.readFileSync(new URL('../unified-mmorpg-hud-v900.mjs', import.meta.url), 'utf8');
+const ownerSource = fs.readFileSync(new URL('../persistent-minimap-owner-v900.mjs', import.meta.url), 'utf8');
+const mobileCss = fs.readFileSync(new URL('../unified-minimap-mobile-v900.css', import.meta.url), 'utf8');
+const entrySource = fs.readFileSync(new URL('../entry-preload-v900.mjs', import.meta.url), 'utf8');
 assert.match(dockSource, /subscribeFeature\('minimap',\s*minimapAdapter\(\)\)/, 'Dock subscribes the minimap adapter when present');
 assert.match(dockSource, /POCKETMONSTER_MINIMAP_HUD/, 'Dock discovers the minimap through the shared global');
 assert.match(dockSource, /function renderMinimap/, 'Dock renders minimap projections');
+assert.match(ownerSource, /POCKETMONSTER_WORLD_STATE/, 'persistent owner reads the authoritative parent pose');
+assert.match(ownerSource, /POCKETMONSTER_MINIMAP_HUD/, 'persistent owner exposes the Dock minimap adapter');
+assert.match(ownerSource, /pocketmonster:online-scene-ready/, 'persistent owner restores itself after scene HUD rebinding');
+assert.match(ownerSource, /PIRATE_FRUIT_ISLAND_CENTERS/, 'persistent owner uses real Pirate island geography');
+assert.match(mobileCss, /@media\s*\(max-height:420px\)/, 'short landscape screens have an explicit minimap override');
+assert.match(mobileCss, /\.mmorpg-hud \.mmorpg-minimap\{display:block!important\}/, 'short landscape screens keep the rectangular minimap visible');
+assert.match(entrySource, /installPersistentMinimapOwner/, 'V9 entry installs the persistent minimap owner');
 
 console.log('V9 unified minimap projection: PASS');
