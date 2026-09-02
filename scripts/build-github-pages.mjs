@@ -201,7 +201,10 @@ export function buildGitHubPages({ root = process.cwd(), output = path.join(root
   }
   fs.writeFileSync(path.join(output, '.nojekyll'), '', 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  const entries = files.map(relative => {
+  // Keep compatibility files published, but only force clients to prefetch the
+  // dependency closure that the active V9 entries can actually reach.
+  const patchFiles = [...dependencyClosure].sort();
+  const entries = patchFiles.map(relative => {
     const file = path.join(output, relative);
     return { path: relative, size: fs.statSync(file).size, sha256: sha256(file) };
   });
@@ -217,14 +220,14 @@ export function buildGitHubPages({ root = process.cwd(), output = path.join(root
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
   fs.writeFileSync(path.join(output, 'patch-manifest.json'), json, 'utf8');
   if (writeRootManifest) fs.writeFileSync(path.join(root, 'patch-manifest.json'), json, 'utf8');
-  return { output, manifest };
+  return { output, manifest, publicFileCount: files.length };
 }
 
 const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   const root = process.cwd();
   const writeRootManifest = process.argv.includes('--write-root-manifest');
-  const { output, manifest } = buildGitHubPages({ root, writeRootManifest });
-  console.log(`Built ${manifest.files.length} public files in ${output}`);
-  console.log(`Patch ${manifest.buildId}${writeRootManifest ? ' (root manifest updated)' : ''}`);
+  const { output, manifest, publicFileCount } = buildGitHubPages({ root, writeRootManifest });
+  console.log(`Built ${publicFileCount} public files in ${output}`);
+  console.log(`Patch ${manifest.buildId} (${manifest.files.length} active files)${writeRootManifest ? ' (root manifest updated)' : ''}`);
 }
