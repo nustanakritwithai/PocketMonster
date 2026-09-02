@@ -30,6 +30,10 @@ assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:4px!important;bottom:114px/
 assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:77px!important;bottom:130px/, 'skill 2 is redistributed between fixed endpoints');
 assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:129px!important;bottom:76px/, 'skill 3 is redistributed between fixed endpoints');
 assert.match(css, /#skill4Btn\.tc-ult\{[^}]*right:118px!important;bottom:2px/, 'ultimate remains the fixed arc end');
+assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill1Btn\.tc-skill1\{[^}]*bottom:calc\(var\(--arc-bottom\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat skill 1 on the attack top edge');
+assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill2Btn\.tc-skill2\{[^}]*right:54px!important;bottom:calc\(var\(--arc-bottom\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat skill 2 on the attack top edge');
+assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill3Btn\.tc-skill3\{[^}]*right:calc\(var\(--arc-right\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat skill 3 on the attack left edge');
+assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill4Btn\.tc-ult\{[^}]*right:calc\(var\(--arc-right\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat ultimate on the attack left edge');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
