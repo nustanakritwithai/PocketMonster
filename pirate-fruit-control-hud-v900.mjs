@@ -6,7 +6,8 @@ export const PIRATE_FRUIT_CONTROL_HUD_MESSAGE = 'pocketmonster:pirate-control-v1
  * the parent v900 document is the only visible/touchable mobile control surface. */
 export const PIRATE_FRUIT_CONTROL_HUD_CSS = `
 html[data-pirate-hud="pirate-primary-parent"] .tc-root,
-html[data-pirate-hud="pirate-primary-parent"] .hud-help {
+html[data-pirate-hud="pirate-primary-parent"] .hud-help,
+html[data-pirate-hud="pirate-primary-parent"] .game-minimap {
   visibility: hidden !important;
   pointer-events: none !important;
 }
