@@ -1,5 +1,4 @@
 import { bindPersistentFullscreenControls } from './persistent-fullscreen-v900.mjs?v=3';
-import { installNpcInteractionLayer } from './npc-interaction-layer-v900.mjs?v=2';
 import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
@@ -174,7 +173,14 @@ try {
     .filter(node => node.nodeName !== 'SCRIPT')
     .map(node => document.importNode(node, true));
   document.body.replaceChildren(...sceneNodes);
-  installNpcInteractionLayer(document);
+  // The NPC layer is a presentation enhancement. Do not let a stale or
+  // partially deployed hotfix prevent the authenticated scene from booting.
+  try {
+    const { installNpcInteractionLayer } = await import('./npc-interaction-layer-v900.mjs?v=2');
+    installNpcInteractionLayer(document);
+  } catch (error) {
+    console.warn('NPC interaction layer unavailable; continuing scene boot', error);
+  }
   document.getElementById('chatToggleBtn')?.remove();
   document.getElementById('gameChat')?.remove();
   document.getElementById('accountGate')?.classList.add('hidden');
