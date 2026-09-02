@@ -17,7 +17,7 @@ for (const id of ['captureBtn', 'summonBtn', 'recallBtn', 'skill1Btn', 'skill2Bt
 }
 
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-primary:72px/, 'primary center size is a CSS variable');
-assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:82px/, 'skill polar radius is a CSS variable');
+assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:64px/, 'skill polar radius is a CSS variable');
 assert.match(css, /#pirateUnifiedControls \.tc-btn\{[^}]*min-width:48px[^}]*min-height:48px/, 'transparent hit rect is at least 48px');
 assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/, 'the action cluster cannot use parent transform:scale()');
 assert.doesNotMatch(css, /@media\(max-height:420px\)\{[^}]*\.tc-actions\{[^}]*transform:scale\(/, 'compact tier cannot scale the whole arc');
@@ -40,8 +40,8 @@ const boxes = {
   summon: box(2, 44, 36),
   recall: box(44, 2, 36),
   skill1: box(4, 118, 48),
-  skill2: box(62, 136, 48),
-  skill3: box(126, 78, 48),
+  skill2: box(54, 118, 48),
+  skill3: box(118, 54, 48),
   skill4: box(118, 2, 48),
   block: box(172, 132, 48),
   potion1: box(224, 148, 48),

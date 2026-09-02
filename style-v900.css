@@ -71,7 +71,7 @@ body[data-combined-world="living-world"] .help{display:none!important}
 
 /* One persistent Pirate Fruit control surface. Pocket Monster only swaps the
    command/icon state of these same buttons; it never mounts a second HUD. */
-#pirateUnifiedControls{position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font-family:'Segoe UI',Tahoma,sans-serif;--arc-right:42px;--arc-bottom:42px;--arc-primary:72px;--arc-skill:48px;--arc-util:48px;--arc-cx:48px;--arc-cy:50px;--arc-r:82px}
+#pirateUnifiedControls{position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font-family:'Segoe UI',Tahoma,sans-serif;--arc-right:42px;--arc-bottom:42px;--arc-primary:72px;--arc-skill:48px;--arc-util:48px;--arc-cx:48px;--arc-cy:50px;--arc-r:64px}
 #pirateUnifiedControls #joystick.tc-joyzone{display:block!important;position:absolute!important;z-index:2;left:0!important;bottom:0!important;width:45%!important;height:75%!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;pointer-events:auto;touch-action:none}
 #pirateUnifiedControls #stick.tc-joybase{display:none;position:absolute;width:102px;height:102px;left:0;top:0;border-radius:50%;background:rgba(255,255,255,.10);border:2px solid rgba(255,255,255,.35);box-shadow:none;transform:translate(-50%,-50%);pointer-events:none}
 #pirateUnifiedControls #stick.tc-joybase.tc-visible{display:block}
@@ -93,8 +93,8 @@ body[data-combined-world="living-world"] .help{display:none!important}
 #pirateUnifiedControls #summonBtn.tc-dash{right:2px!important;bottom:44px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:16px;border-color:rgba(120,220,255,.8)!important}
 #pirateUnifiedControls #recallBtn.tc-jump{right:44px!important;bottom:2px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:16px}
 #pirateUnifiedControls #skill1Btn.tc-skill1{right:4px!important;bottom:118px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
-#pirateUnifiedControls #skill2Btn.tc-skill2{right:62px!important;bottom:136px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
-#pirateUnifiedControls #skill3Btn.tc-skill3{right:126px!important;bottom:78px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
+#pirateUnifiedControls #skill2Btn.tc-skill2{right:54px!important;bottom:118px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
+#pirateUnifiedControls #skill3Btn.tc-skill3{right:118px!important;bottom:54px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
 #pirateUnifiedControls .tc-skill{opacity:.55}
 #pirateUnifiedControls #skill4Btn.tc-ult{right:118px!important;bottom:2px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:13px;border-color:rgba(200,120,255,.85)!important;background-color:rgba(70,25,110,.55)!important;opacity:.65}
 #pirateUnifiedControls #pirateBlockBtn.tc-block{right:172px!important;bottom:132px!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:18px;border-color:rgba(150,200,255,.8)!important}
