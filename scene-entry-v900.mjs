@@ -1,5 +1,5 @@
 import { bindPersistentFullscreenControls } from './persistent-fullscreen-v900.mjs?v=3';
-import { installNpcInteractionLayer } from './npc-interaction-layer-v900.mjs?v=1';
+import { installNpcInteractionLayer } from './npc-interaction-layer-v900.mjs?v=2';
 import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
