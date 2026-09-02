@@ -262,33 +262,145 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (side) side.classList.toggle('hidden', !available);
   }
 
+  function padPartySlots(slots) {
+    const padded = Array.isArray(slots) ? slots.slice(0, 3) : [];
+    while (padded.length < 3) {
+      padded.push({
+        slot: padded.length, available: false, name: '', hp: 0, hpMax: 0,
+        fainted: false, selected: false, active: false, instanceId: '',
+      });
+    }
+    return padded;
+  }
+
+  function isDanger(entity) {
+    if (entity?.fainted === true) return true;
+    const hp = entity?.hp;
+    const hpMax = entity?.hpMax;
+    return typeof hp === 'number' && typeof hpMax === 'number' && hpMax > 0 && (hp / hpMax) <= 0.25;
+  }
+
+  function rosterGlyph(entity) {
+    return portraitGlyph({
+      portraitKey: entity?.portraitKey,
+      displayName: entity?.name || entity?.displayName || '',
+    });
+  }
+
+  function buildRosterEntries(partySnapshot) {
+    const target = pocketAdapter()?.target?.snapshot?.();
+    const partyAvailable = partySnapshot?.available === true;
+    const slots = padPartySlots(partyAvailable ? partySnapshot.slots : []);
+    const entries = [];
+    const used = new Set();
+    if (target?.available === true && (target.name || target.id)) {
+      entries.push({ kind: 'target', key: `target:${target.id || target.name}`, entity: target });
+      if (target.id) used.add(String(target.id));
+    }
+    for (const slot of slots) {
+      if (entries.length >= 3) break;
+      if (slot.available === true) {
+        const identity = slot.instanceId ? String(slot.instanceId) : '';
+        if (identity && used.has(identity)) continue;
+        if (identity) used.add(identity);
+        entries.push({ kind: 'party', key: `party:${slot.slot}`, entity: slot });
+      } else if (partyAvailable) {
+        entries.push({ kind: 'placeholder', key: `empty:${slot.slot}`, entity: slot });
+      }
+    }
+    while (entries.length < 3) {
+      entries.push({ kind: 'placeholder', key: `pad:${entries.length}`, entity: { slot: entries.length, available: false } });
+    }
+    return entries.slice(0, 3);
+  }
+
+  function renderRosterRow(entry) {
+    const entity = entry.entity || {};
+    const row = el(documentLike, 'div', '', 'mmorpg-roster-row');
+    row.dataset.rosterKey = entry.key;
+    if (entry.kind === 'target') {
+      row.classList.add('target');
+      row.classList.add('selected');
+    }
+    if (entity.selected === true) row.classList.add('selected');
+    if (isDanger(entity)) row.classList.add('danger');
+    if (entry.kind === 'placeholder' || entity.available === false && entry.kind !== 'target') {
+      row.classList.add('placeholder');
+    }
+    if (typeof entity.slot === 'number') row.dataset.partySlot = String(entity.slot);
+    const icon = el(documentLike, 'span', '', 'mmorpg-roster-icon');
+    icon.textContent = entry.kind === 'placeholder' || (entity.available === false && entry.kind !== 'target')
+      ? '＋'
+      : rosterGlyph(entity);
+    const meta = el(documentLike, 'div', '', 'mmorpg-roster-meta');
+    const name = el(documentLike, 'div', '', 'mmorpg-roster-name');
+    name.textContent = entity.name || (entry.kind === 'placeholder' ? '' : '—');
+    const state = el(documentLike, 'div', '', 'mmorpg-roster-state');
+    const bits = [];
+    if (entity.level) bits.push(`Lv.${entity.level}`);
+    if (entity.condition) bits.push(entity.condition);
+    if (Array.isArray(entity.states) && entity.states[0]) bits.push(entity.states[0]);
+    if (entity.active === true) bits.push('สู้');
+    if (entity.fainted === true) bits.push('Fainted');
+    state.textContent = bits.join(' • ');
+    meta.append(name, state);
+    const hp = fillBar(documentLike, 'mmorpg-roster-hp', entity.hp, entity.hpMax, 'HP');
+    row.append(icon, meta, hp);
+    return row;
+  }
+
+  function bindCompanion(portrait, slot) {
+    let pressTimer = 0;
+    let suppressClick = false;
+    const clearPress = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = 0;
+      }
+    };
+    portrait.addEventListener('pointerdown', () => {
+      suppressClick = false;
+      clearPress();
+      pressTimer = setTimeout(() => {
+        pressTimer = 0;
+        suppressClick = true;
+        partyAdapter()?.openCharacter?.(slot.slot);
+      }, 450);
+    });
+    portrait.addEventListener('pointerup', clearPress);
+    portrait.addEventListener('pointercancel', clearPress);
+    portrait.addEventListener('click', () => {
+      if (suppressClick) return;
+      partyAdapter()?.selectPartySlot?.(slot.slot);
+    });
+    portrait.addEventListener('contextmenu', event => {
+      event?.preventDefault?.();
+      clearPress();
+      partyAdapter()?.openCharacter?.(slot.slot);
+    });
+  }
+
   function renderParty(snapshot) {
-    const available = snapshot?.available === true;
-    const slots = available ? snapshot.slots || [] : [];
+    const slots = padPartySlots(snapshot?.available === true ? snapshot.slots : []);
     const roster = node('mmorpgRoster');
     if (roster) {
-      const rows = [];
-      const target = pocketAdapter()?.target?.snapshot?.();
-      if (target?.available === true && target.name) {
-        const row = el(documentLike, 'div', '', 'mmorpg-roster-row target');
-        row.textContent = `${target.name} • Lv.${target.level} • HP ${target.hp}/${target.hpMax}`;
-        rows.push(row);
-      }
-      for (const slot of slots) {
-        if (slot?.available !== true) continue;
-        const row = el(documentLike, 'div', '', 'mmorpg-roster-row');
-        row.dataset.partySlot = String(slot.slot);
-        row.textContent = `${slot.name} • Lv.${slot.level} • HP ${slot.hp}/${slot.hpMax}${slot.active ? ' • สู้' : ''}${slot.fainted ? ' • Fainted' : ''}`;
-        rows.push(row);
-      }
-      roster.replaceChildren(...rows);
+      roster.replaceChildren(...buildRosterEntries(snapshot).map(entry => renderRosterRow(entry)));
     }
     const companions = node('mmorpgCompanions');
     if (companions) {
       const portraits = slots.map(slot => {
-        const portrait = el(documentLike, 'div', '', 'mmorpg-companion');
+        const portrait = el(documentLike, 'button', '', 'mmorpg-companion');
+        portrait.setAttribute('type', 'button');
         portrait.dataset.partySlot = String(slot.slot);
-        portrait.textContent = slot.available === true ? (slot.name || '?').slice(0, 1) : '＋';
+        if (slot.available !== true) portrait.classList.add('empty');
+        if (slot.selected === true) portrait.classList.add('selected');
+        if (slot.active === true) portrait.classList.add('active');
+        if (slot.fainted === true) portrait.classList.add('fainted');
+        portrait.textContent = slot.available === true ? rosterGlyph(slot) : '＋';
+        portrait.setAttribute('aria-label', slot.available === true
+          ? `${slot.name || 'Party'} slot ${slot.slot + 1}`
+          : `Party ช่อง ${slot.slot + 1} ว่าง`);
+        bindCompanion(portrait, slot);
         return portrait;
       });
       companions.replaceChildren(...portraits);
@@ -320,8 +432,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   }
 
   function renderRoster() {
-    const snapshot = partyAdapter()?.snapshot?.();
-    if (snapshot) renderParty(snapshot);
+    renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
   }
 
   function renderPlayer(snapshot) {
