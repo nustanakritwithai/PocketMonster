@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-  <script type="module" src="./entry-preload-v900.mjs?v=926"></script>
+  <script type="module" src="./entry-preload-v900.mjs?v=927"></script>
   <link rel="stylesheet" href="./style-v800.css?v=813" />
   <link rel="stylesheet" href="./style-v900.css?v=921" />
   <link rel="stylesheet" href="./combat-v91.css?v=1" />
@@ -60,6 +60,29 @@
   </div>
   <div id="game"></div>
   <div id="monsterThrowStage"></div>
+
+  <div id="pirateUnifiedControls" class="tc-root pirate-primary-controls" data-control-mode="pirate" aria-label="แผงควบคุม Pirate Fruit">
+    <div id="joystick" class="controls-left tc-joyzone" aria-label="ลากเพื่อเดิน">
+      <div id="stick" class="tc-joybase"><div id="pirateJoyKnob" class="tc-joyknob"></div></div>
+    </div>
+    <div id="cameraPad" class="camera-pad tc-camzone" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
+    <div class="controls-right tc-actions mmorpg-combat-arc">
+      <button id="persistentFullscreenBtn" class="action tc-btn tc-fullscreen" data-pirate-icon="⛶" aria-label="เปิดเต็มจอ"></button>
+      <button id="skill1Btn" class="action skill skill1 tc-btn tc-skill tc-skill1" data-pirate-icon="1" aria-label="สกิล Pirate 1"></button>
+      <button id="skill2Btn" class="action skill skill2 tc-btn tc-skill tc-skill2" data-pirate-icon="2" aria-label="สกิล Pirate 2"></button>
+      <button id="skill3Btn" class="action skill skill3 tc-btn tc-skill tc-skill3" data-pirate-icon="3" aria-label="สกิล Pirate 3"></button>
+      <button id="skill4Btn" class="action skill skill4 tc-btn tc-ult" data-pirate-icon="ULT" aria-label="ท่าไม้ตาย Pirate"></button>
+      <button id="captureBtn" class="action capture tc-btn tc-attack" data-pirate-icon="⚔" aria-label="โจมตี"></button>
+      <button id="summonBtn" class="action summon tc-btn tc-dash" data-pirate-icon="💨" aria-label="แดช"></button>
+      <button id="recallBtn" class="action recall tc-btn tc-jump" data-pirate-icon="⬆" aria-label="กระโดด"></button>
+      <button id="pirateBlockBtn" class="action tc-btn tc-block pirate-only" data-pirate-icon="🛡" aria-label="ป้องกัน"></button>
+      <button id="pirateWeaponBtn" class="action tc-btn tc-weapon pirate-only" data-pirate-icon="👊" aria-label="เปลี่ยนอาวุธ"></button>
+      <button id="piratePotion1Btn" class="action tc-btn tc-potion tc-potion1 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 1"></button>
+      <button id="piratePotion2Btn" class="action tc-btn tc-potion tc-potion2 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 2"></button>
+      <button id="pirateZoomInBtn" class="action tc-btn tc-zoom tc-zoom-in pirate-only" data-pirate-icon="＋" aria-label="ซูมเข้า"></button>
+      <button id="pirateZoomOutBtn" class="action tc-btn tc-zoom tc-zoom-out pirate-only" data-pirate-icon="−" aria-label="ซูมออก"></button>
+    </div>
+  </div>
 
   <div id="versionBadge" style="position:fixed;right:8px;top:8px;z-index:9998;background:#0f766e;color:#fff;padding:4px 8px;border-radius:999px;font:700 10px system-ui;pointer-events:none">V9.0 • 3 โลก</div>
   <div id="saveIndicator" style="position:fixed;right:8px;top:34px;z-index:9998;background:#059669;color:#fff;padding:3px 8px;border-radius:999px;font:700 9px system-ui;pointer-events:none;opacity:0;transition:opacity .3s">บันทึกแล้ว</div>
@@ -152,29 +175,6 @@
         <button type="button" data-character-tab="training">ฝึก</button>
       </div>
       <div id="characterQuickTabBody" class="character-quick-tab hidden"></div>
-    </div>
-
-    <div id="pirateUnifiedControls" class="tc-root pirate-primary-controls" data-control-mode="pirate" aria-label="แผงควบคุม Pirate Fruit">
-      <div id="joystick" class="controls-left tc-joyzone" aria-label="ลากเพื่อเดิน">
-        <div id="stick" class="tc-joybase"><div id="pirateJoyKnob" class="tc-joyknob"></div></div>
-      </div>
-      <div id="cameraPad" class="camera-pad tc-camzone" aria-label="ลากเพื่อหมุนกล้อง"><div class="camera-hint">ลากพื้นที่ขวาเพื่อหมุนกล้อง</div></div>
-      <div class="controls-right tc-actions mmorpg-combat-arc">
-        <button id="persistentFullscreenBtn" class="action tc-btn tc-fullscreen" data-pirate-icon="⛶" aria-label="เปิดเต็มจอ"></button>
-        <button id="skill1Btn" class="action skill skill1 tc-btn tc-skill tc-skill1" data-pirate-icon="1" aria-label="สกิล Pirate 1"></button>
-        <button id="skill2Btn" class="action skill skill2 tc-btn tc-skill tc-skill2" data-pirate-icon="2" aria-label="สกิล Pirate 2"></button>
-        <button id="skill3Btn" class="action skill skill3 tc-btn tc-skill tc-skill3" data-pirate-icon="3" aria-label="สกิล Pirate 3"></button>
-        <button id="skill4Btn" class="action skill skill4 tc-btn tc-ult" data-pirate-icon="ULT" aria-label="ท่าไม้ตาย Pirate"></button>
-        <button id="captureBtn" class="action capture tc-btn tc-attack" data-pirate-icon="⚔" aria-label="โจมตี"></button>
-        <button id="summonBtn" class="action summon tc-btn tc-dash" data-pirate-icon="💨" aria-label="แดช"></button>
-        <button id="recallBtn" class="action recall tc-btn tc-jump" data-pirate-icon="⬆" aria-label="กระโดด"></button>
-        <button id="pirateBlockBtn" class="action tc-btn tc-block pirate-only" data-pirate-icon="🛡" aria-label="ป้องกัน"></button>
-        <button id="pirateWeaponBtn" class="action tc-btn tc-weapon pirate-only" data-pirate-icon="👊" aria-label="เปลี่ยนอาวุธ"></button>
-        <button id="piratePotion1Btn" class="action tc-btn tc-potion tc-potion1 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 1"></button>
-        <button id="piratePotion2Btn" class="action tc-btn tc-potion tc-potion2 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 2"></button>
-        <button id="pirateZoomInBtn" class="action tc-btn tc-zoom tc-zoom-in pirate-only" data-pirate-icon="＋" aria-label="ซูมเข้า"></button>
-        <button id="pirateZoomOutBtn" class="action tc-btn tc-zoom tc-zoom-out pirate-only" data-pirate-icon="−" aria-label="ซูมออก"></button>
-      </div>
     </div>
     <div id="actionReason" class="action-reason" role="status" aria-live="polite">อยู่ Ranch • ออกไป Wild Zone ก่อน</div>
     <button id="stageObjectiveToggle" class="quest-tracker-toggle hidden" type="button" aria-label="เปิดเควส">เควส</button>

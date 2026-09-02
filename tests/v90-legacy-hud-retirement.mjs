@@ -31,6 +31,7 @@ for (const selector of retiredSelectors) {
 assert.doesNotMatch(css, /body\.unified-hud-active[^{]*\.tc-btn/, 'unified touch-control buttons cannot be retired by the legacy sweep');
 assert.doesNotMatch(css, /body\.unified-hud-active[^{]*character-quick/, 'character overlay stays out of the legacy retirement scope');
 assert.doesNotMatch(css, /body\.unified-hud-active[^{]*pirateUnifiedControls/, 'Pirate control layer stays out of the legacy retirement scope');
+assert.ok(html.indexOf('id="pirateUnifiedControls"') < html.indexOf('<div id="hud">'), 'combat controls stay outside the retired #hud');
 
 // ---------- Dock owns the capability flag ----------
 assert.match(dockSource, /classList\.add\('unified-hud-active'\)/, 'mounting the Dock raises the capability flag');
