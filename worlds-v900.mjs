@@ -7,7 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
-import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=2';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=3';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {

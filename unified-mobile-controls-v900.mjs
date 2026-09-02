@@ -24,6 +24,20 @@ const CONTROL_MODES = Object.freeze({
   'living-world': 'travel',
 });
 
+const POCKET_ACTION_IDS = Object.freeze({
+  skill1: 'skill-1',
+  skill2: 'skill-2',
+  skill3: 'skill-3',
+  skill4: 'skill-4',
+  capture: 'capture',
+  summon: 'summon',
+  recall: 'recall',
+  block: 'block',
+  weapon: 'weapon',
+  potion1: 'potion1',
+  potion2: 'potion2',
+});
+
 export function createUnifiedMobileControls({
   windowLike = globalThis.window,
   documentLike = globalThis.document,
@@ -45,6 +59,83 @@ export function createUnifiedMobileControls({
 
   const activeAdapter = () => adapters.get(activeWorldId) || null;
 
+  let visualUnsubscribe = null;
+
+  const paintActionButton = (button, item) => {
+    if (!button) return;
+    const classList = button.classList;
+    if (!item) {
+      classList?.remove?.('cooling', 'pressed', 'unavailable');
+      classList?.add?.('empty');
+      button.removeAttribute?.('data-cd');
+      button.removeAttribute?.('data-count');
+      button.removeAttribute?.('data-reason');
+      button.removeAttribute?.('aria-disabled');
+      button.style?.removeProperty?.('--cooldown');
+      return;
+    }
+    classList?.remove?.('empty');
+    classList?.toggle?.('pressed', item.pressed === true);
+    const enabled = item.enabled !== false;
+    classList?.toggle?.('unavailable', !enabled);
+    if (enabled) button.removeAttribute?.('aria-disabled');
+    else button.setAttribute?.('aria-disabled', 'true');
+    if (item.reason) {
+      button.setAttribute?.('title', item.reason);
+      button.setAttribute?.('data-reason', item.reason);
+    } else {
+      button.removeAttribute?.('title');
+      button.removeAttribute?.('data-reason');
+    }
+    const remaining = typeof item.cooldownRemaining === 'number' && Number.isFinite(item.cooldownRemaining) ? item.cooldownRemaining : 0;
+    const total = typeof item.cooldownTotal === 'number' && Number.isFinite(item.cooldownTotal) ? item.cooldownTotal : 0;
+    const pct = total > 0 ? Math.max(0, Math.min(100, (remaining / total) * 100)) : 0;
+    classList?.toggle?.('cooling', pct > 0);
+    button.style?.setProperty?.('--cooldown', `${pct}%`);
+    if (pct > 0) button.setAttribute?.('data-cd', String(Math.ceil(remaining)));
+    else button.removeAttribute?.('data-cd');
+    if (typeof item.count === 'number' && item.count > 0) button.setAttribute?.('data-count', String(item.count));
+    else button.removeAttribute?.('data-count');
+    if (item.state) button.setAttribute?.('data-state', item.state);
+    else button.removeAttribute?.('data-state');
+  };
+
+  const applyActionVisuals = snapshot => {
+    const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+    const byId = new Map(items.map(item => [item.id, item]));
+    for (const [buttonId, action] of Object.entries(ACTION_BUTTONS)) {
+      const button = documentLike.getElementById(buttonId);
+      if (!button) continue;
+      const pocketId = POCKET_ACTION_IDS[action];
+      paintActionButton(button, byId.get(pocketId) || byId.get(action) || null);
+    }
+  };
+
+  const bindActionVisuals = () => {
+    if (typeof visualUnsubscribe === 'function') {
+      try { visualUnsubscribe(); } catch {}
+      visualUnsubscribe = null;
+    }
+    const mode = controlSurface.dataset.controlMode;
+    const actions = windowLike?.POCKETMONSTER_POCKET_HUD?.actions;
+    if (mode === 'capture' && actions?.subscribe) {
+      visualUnsubscribe = actions.subscribe(applyActionVisuals);
+      return;
+    }
+    applyActionVisuals({ items: [] });
+    if (mode === 'pirate') {
+      for (const buttonId of Object.keys(ACTION_BUTTONS)) {
+        const button = documentLike.getElementById(buttonId);
+        if (!button) continue;
+        button.classList?.remove?.('empty', 'cooling', 'pressed', 'unavailable');
+        button.removeAttribute?.('data-cd');
+        button.removeAttribute?.('data-count');
+        button.removeAttribute?.('data-reason');
+        button.style?.removeProperty?.('--cooldown');
+      }
+    }
+  };
+
   const setControlMode = worldId => {
     const mode = CONTROL_MODES[worldId] || 'travel';
     controlSurface.dataset.controlMode = mode;
@@ -63,6 +154,7 @@ export function createUnifiedMobileControls({
         }
       }
     }
+    bindActionVisuals();
     return mode;
   };
 
@@ -183,6 +275,7 @@ export function createUnifiedMobileControls({
       if (typeof worldId !== 'string' || !adapter || typeof adapter !== 'object') return false;
       adapters.set(worldId, adapter);
       if (worldId === activeWorldId) adapter.activate?.();
+      bindActionVisuals();
       return true;
     },
     activate(worldId) {
