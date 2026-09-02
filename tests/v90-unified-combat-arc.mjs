@@ -26,9 +26,19 @@ assert.match(css, /#pirateOnboardingActionProxies\{[^}]*pointer-events:none/, 'o
 assert.doesNotMatch(css, /#pirateUnifiedControls\[data-pirate-onboarding/, 'onboarding cannot hide or disable the whole arc');
 assert.match(css, /#pirateUnifiedControls\[data-control-mode="travel"\] \.controls-right\{display:none/, 'Living World hides the unsupported action cluster');
 assert.match(css, /#pirateUnifiedControls\[data-control-mode="capture"\] \.pirate-only/, 'Pocket hides Pirate-only actions instead of duplicating buttons');
+assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:4px!important;bottom:114px/, 'skill 1 remains the fixed arc start');
+assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:77px!important;bottom:130px/, 'skill 2 is redistributed between fixed endpoints');
+assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:129px!important;bottom:76px/, 'skill 3 is redistributed between fixed endpoints');
+assert.match(css, /#skill4Btn\.tc-ult\{[^}]*right:118px!important;bottom:2px/, 'ultimate remains the fixed arc end');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
+}
+function center(rect) {
+  return { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+}
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 function overlapArea(a, b) {
   const x = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1));
@@ -40,17 +50,17 @@ const boxes = {
   summon: box(2, 44, 36),
   recall: box(44, 2, 36),
   skill1: box(4, 114, 48),
-  skill2: box(54, 114, 48),
-  skill3: box(114, 54, 48),
+  skill2: box(77, 130, 48),
+  skill3: box(129, 76, 48),
   skill4: box(118, 2, 48),
   block: box(172, 132, 48),
   potion1: box(224, 148, 48),
   potion2: box(224, 88, 48),
 };
-assert.equal(boxes.skill2.y1, boxes.capture.y2, 'skill 2 touches the attack top edge with 0px gap');
-assert.equal(boxes.skill3.x1, boxes.capture.x2, 'skill 3 touches the attack left edge with 0px gap');
-assert.equal(overlapArea(boxes.capture, boxes.skill2), 0, 'skill 2 hit box does not overlap attack');
-assert.equal(overlapArea(boxes.capture, boxes.skill3), 0, 'skill 3 hit box does not overlap attack');
+const skillCenters = ['skill1', 'skill2', 'skill3', 'skill4'].map(name => center(boxes[name]));
+const skillDistances = skillCenters.slice(0, -1).map((point, index) => distance(point, skillCenters[index + 1]));
+assert.ok(Math.max(...skillDistances) - Math.min(...skillDistances) <= 0.3, `skill center spacing must stay equal within 0.3px; got ${skillDistances.map(value => value.toFixed(2)).join(', ')}`);
+assert.ok(skillDistances.every(value => value > 74 && value < 76), 'equalized skill spacing stays near the intended 75px chord');
 const names = Object.keys(boxes);
 for (let i = 0; i < names.length; i += 1) {
   for (let j = i + 1; j < names.length; j += 1) {
