@@ -5,6 +5,7 @@ const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.ur
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 const hud = fs.readFileSync(new URL('../unified-mmorpg-hud-v900.mjs', import.meta.url), 'utf8');
+const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scene-v900.html', import.meta.url), 'utf8');
 const runtimeConfig = JSON.parse(fs.readFileSync(new URL('../runtime-config.json', import.meta.url), 'utf8'));
@@ -36,7 +37,8 @@ for (const flag of ['vpsWrites', 'playerDataWrites']) {
 
 assert.match(css, /\.mmorpg-player-status\{[^}]*left:0\.4%/, 'player status keeps the top-left golden anchor');
 assert.match(css, /\.mmorpg-dock\{[^}]*left:32\.5%/, 'chat console keeps the bottom-center golden anchor');
-assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%/, 'minimap keeps the top-right golden anchor');
+assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%[^}]*top:0[^}]*width:15\.4%[^}]*height:28\.1%[^}]*border-radius:4px/, 'rectangular unified minimap owns the top-right box');
+assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is retired');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
 
