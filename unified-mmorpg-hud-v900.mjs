@@ -145,6 +145,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       void adapter.sendChat(text).catch(() => {});
     });
     chatPanel.append(form);
+    const extras = register('mmorpgChatExtras', el(documentLike, 'div', '', 'mmorpg-chat-extras'));
+    extras.setAttribute('aria-hidden', 'true');
+    for (const kind of ['mic', 'mail', 'friends']) {
+      const slot = el(documentLike, 'span', '', 'mmorpg-chat-extra');
+      slot.dataset.extra = kind;
+      extras.append(slot);
+    }
+    chatPanel.append(extras);
     dock.append(chatPanel);
 
     const questPanel = register('mmorpgQuestDockPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
@@ -226,6 +234,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     }
     const select = node('mmorpgChatChannel');
     if (select && snapshot?.channel && select.value !== snapshot.channel) select.value = snapshot.channel;
+    renderStrip(snapshot);
   }
 
   function renderQuest(snapshot) {
@@ -547,26 +556,198 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     map.replaceChildren(...dots);
   }
 
+  const UTILITY_COMMANDS = Object.freeze(['fullscreen', 'menu', 'character', 'audio', 'map', 'home', 'world', 'save']);
+  const BANNER_DEFAULT_MS = 8000;
+  let bannerTimer = 0;
+  let bannerArmedAt = 0;
+  let bannerRemainMs = 0;
+  let bannerText = '';
+  let sessionStartedAt = 0;
+  let stripTimer = 0;
+  let lastChatSnapshot = null;
+
+  function commandResult(value, fallbackReason = 'ok') {
+    if (value && typeof value === 'object' && 'ok' in value) {
+      return {
+        ok: value.ok === true,
+        reason: String(value.reason || (value.ok === true ? fallbackReason : 'failed')),
+        message: String(value.message || ''),
+      };
+    }
+    return { ok: true, reason: fallbackReason, message: '' };
+  }
+
+  function showCommandFailure(result) {
+    const banner = node('mmorpgBanner');
+    if (!banner) return;
+    banner.textContent = result?.message || result?.reason || 'ทำรายการไม่สำเร็จ';
+    banner.classList.remove('hidden');
+    banner.classList.add('error');
+  }
+
+  function clickExisting(id) {
+    const control = documentLike.getElementById?.(id);
+    if (!control) return { ok: false, reason: 'missing', message: '' };
+    try { control.click?.(); } catch (error) {
+      return { ok: false, reason: 'failed', message: String(error?.message || error) };
+    }
+    return { ok: true, reason: 'clicked', message: '' };
+  }
+
+  function utilitySupported(id) {
+    if (!UTILITY_COMMANDS.includes(id)) return false;
+    if (typeof pocketAdapter()?.utilities?.invokeUtility === 'function') return true;
+    if (id === 'character' && typeof partyAdapter()?.openCharacter === 'function') return true;
+    if (id === 'fullscreen' && documentLike.getElementById?.('persistentFullscreenBtn')) return true;
+    if (id === 'audio' && documentLike.getElementById?.('muteBtn')) return true;
+    if (id === 'save' && documentLike.getElementById?.('saveBtn')) return true;
+    if (id === 'map' && (typeof minimapAdapter()?.toggleMap === 'function' || typeof minimapAdapter()?.expand === 'function')) return true;
+    return false;
+  }
+
+  async function runUtility(id) {
+    try {
+      const invoke = pocketAdapter()?.utilities?.invokeUtility;
+      if (typeof invoke === 'function') return commandResult(await invoke(id), 'invoked');
+      if (id === 'character') return commandResult(partyAdapter()?.openCharacter?.(), 'opened');
+      if (id === 'fullscreen') return clickExisting('persistentFullscreenBtn');
+      if (id === 'audio') return clickExisting('muteBtn');
+      if (id === 'save') return clickExisting('saveBtn');
+      if (id === 'map') {
+        const adapter = minimapAdapter();
+        const fn = adapter?.toggleMap || adapter?.expand;
+        return commandResult(fn?.(), 'map');
+      }
+      return { ok: false, reason: 'unsupported', message: `ไม่มีคำสั่ง ${id}` };
+    } catch (error) {
+      return { ok: false, reason: 'failed', message: String(error?.message || error) };
+    }
+  }
+
+  function clearBannerTimer() {
+    if (bannerTimer) {
+      clearTimeout(bannerTimer);
+      bannerTimer = 0;
+    }
+  }
+
+  function hideBanner() {
+    clearBannerTimer();
+    bannerRemainMs = 0;
+    bannerText = '';
+    const banner = node('mmorpgBanner');
+    if (!banner) return;
+    banner.textContent = '';
+    banner.classList.add('hidden');
+    banner.classList.remove('error');
+  }
+
+  function armBannerTimer(ms) {
+    clearBannerTimer();
+    bannerRemainMs = ms;
+    if (!(ms > 0)) return;
+    if (documentLike.hidden === true || documentLike.visibilityState === 'hidden') return;
+    bannerArmedAt = Date.now();
+    bannerTimer = setTimeout(() => {
+      bannerTimer = 0;
+      bannerRemainMs = 0;
+      hideBanner();
+    }, ms);
+  }
+
+  function onDocumentVisibility() {
+    const hidden = documentLike.hidden === true || documentLike.visibilityState === 'hidden';
+    if (hidden) {
+      if (bannerTimer) {
+        bannerRemainMs = Math.max(0, bannerRemainMs - (Date.now() - bannerArmedAt));
+        clearTimeout(bannerTimer);
+        bannerTimer = 0;
+      }
+      return;
+    }
+    if (bannerText && bannerRemainMs > 0) armBannerTimer(bannerRemainMs);
+  }
+
   function renderBanner(snapshot) {
     const banner = node('mmorpgBanner');
     if (!banner) return;
     const text = snapshot?.text || '';
+    if (!text) {
+      hideBanner();
+      return;
+    }
+    banner.classList.remove('error');
+    if (text === bannerText) {
+      banner.textContent = text;
+      banner.classList.remove('hidden');
+      return;
+    }
+    bannerText = text;
     banner.textContent = text;
-    banner.classList.toggle('hidden', !text);
+    banner.classList.remove('hidden');
+    const expiresAt = Number(snapshot?.expiresAt) || 0;
+    const ms = expiresAt > Date.now() ? expiresAt - Date.now() : BANNER_DEFAULT_MS;
+    armBannerTimer(ms);
   }
 
   function renderUtilities(snapshot) {
     const utilities = node('mmorpgUtilities');
     if (!utilities) return;
-    const buttons = (snapshot?.items || []).map(item => {
+    const buttons = [];
+    for (const item of snapshot?.items || []) {
+      if (!item?.id || !utilitySupported(item.id)) continue;
       const button = el(documentLike, 'button', '', 'mmorpg-utility');
       button.setAttribute('type', 'button');
       button.dataset.utility = item.id;
-      button.textContent = item.label || item.id;
-      button.disabled = item.enabled !== true;
-      return button;
-    });
+      button.textContent = (item.label || item.id).slice(0, 2);
+      button.setAttribute('aria-label', item.label || item.id);
+      if (item.reason) button.setAttribute('title', item.reason);
+      if (item.enabled !== true) {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+      } else {
+        button.addEventListener('click', () => {
+          void Promise.resolve(runUtility(item.id)).then(result => {
+            if (result && result.ok === false) showCommandFailure(result);
+          }).catch(() => {});
+        });
+      }
+      if (item.badge) {
+        const badge = el(documentLike, 'span', '', 'mmorpg-utility-badge');
+        badge.textContent = item.badge;
+        button.append(badge);
+      }
+      buttons.push(button);
+    }
     utilities.replaceChildren(...buttons);
+  }
+
+  function formatSessionClock(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function renderStrip(chatSnapshot = lastChatSnapshot) {
+    lastChatSnapshot = chatSnapshot || lastChatSnapshot;
+    const strip = node('mmorpgBottomStrip');
+    if (!strip) return;
+    const connection = lastChatSnapshot?.status || 'offline';
+    const gate = windowLike.POCKETMONSTER_SERVER_GATE;
+    const transport = (gate && typeof gate.state === 'string' && gate.state) || connection;
+    const ping = Number(lastChatSnapshot?.ping);
+    const parts = [
+      el(documentLike, 'span', '', 'mmorpg-strip-connection'),
+      el(documentLike, 'span', '', 'mmorpg-strip-transport'),
+      el(documentLike, 'span', '', 'mmorpg-strip-time'),
+    ];
+    parts[0].textContent = connection;
+    parts[1].textContent = Number.isFinite(ping) ? `${transport} ${Math.round(ping)}ms` : transport;
+    parts[2].textContent = formatSessionClock(Date.now() - sessionStartedAt);
+    strip.replaceChildren(...parts);
   }
 
   // ---------- Tab control ----------
@@ -615,9 +796,13 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     shell = buildShell();
     documentLike.body.append(shell);
     documentLike.body.classList.add('unified-hud-active');
+    sessionStartedAt = Date.now();
+    documentLike.addEventListener?.('visibilitychange', onDocumentVisibility);
+    stripTimer = setInterval(() => renderStrip(), 1000);
     bindFeatures();
     setTab(activeTab);
     setExpanded(expanded);
+    renderStrip(chatAdapter()?.snapshot?.());
     return shell;
   }
 
@@ -633,6 +818,12 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       try { unsubscribe(); } catch {}
     }
     lastRevisions.clear();
+    hideBanner();
+    if (stripTimer) {
+      clearInterval(stripTimer);
+      stripTimer = 0;
+    }
+    documentLike.removeEventListener?.('visibilitychange', onDocumentVisibility);
     try { shell?.remove?.(); } catch {}
     if (Array.isArray(shell?.parentNode?.children)) {
       shell.parentNode.children = shell.parentNode.children.filter(child => child !== shell);
@@ -640,6 +831,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     documentLike.body.classList.remove('unified-hud-active');
     nodes.clear();
     shell = null;
+    lastChatSnapshot = null;
   }
 
   return Object.freeze({
