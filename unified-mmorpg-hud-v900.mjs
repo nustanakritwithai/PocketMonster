@@ -392,6 +392,39 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     });
   }
 
+  function paintOverlayMonsterSlots(slots) {
+    for (const slot of slots) {
+      const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
+      if (!button) continue;
+      const glyph = slot.available === true ? rosterGlyph(slot) : '＋';
+      button.textContent = glyph;
+      button.setAttribute('data-pirate-icon', glyph);
+      button.classList.toggle('empty', slot.available !== true);
+      button.classList.toggle('selected', slot.selected === true);
+      button.classList.toggle('active-monster', slot.active === true);
+      button.classList.toggle('fainted-slot', slot.fainted === true);
+      button.setAttribute('aria-label', slot.available === true
+        ? `${slot.name || 'Party'} slot ${slot.slot + 1}`
+        : `Party ช่อง ${slot.slot + 1} ว่าง`);
+      if (slot.available === true) {
+        button.setAttribute('title', `${slot.name || 'Party'} • Lv.${slot.level || 0}`);
+      } else {
+        button.removeAttribute('title');
+      }
+      if (button.dataset.partyBound === '1') continue;
+      button.dataset.partyBound = '1';
+      button.addEventListener('pointerdown', event => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        partyAdapter()?.selectPartySlot?.(slot.slot);
+      });
+      button.addEventListener('contextmenu', event => {
+        event?.preventDefault?.();
+        partyAdapter()?.openCharacter?.(slot.slot);
+      });
+    }
+  }
+
   function renderParty(snapshot) {
     const slots = padPartySlots(snapshot?.available === true ? snapshot.slots : []);
     const roster = node('mmorpgRoster');
@@ -441,6 +474,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
         ? `${active.name} • HP ${active.hp}/${active.hpMax}`
         : 'Party ว่าง';
     }
+    paintOverlayMonsterSlots(slots);
   }
 
   function renderRoster() {
