@@ -38,5 +38,6 @@ assert.match(css, /\.mmorpg-player-status\{[^}]*left:0\.4%/, 'player status keep
 assert.match(css, /\.mmorpg-dock\{[^}]*left:32\.5%/, 'chat console keeps the bottom-center golden anchor');
 assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%/, 'minimap keeps the top-right golden anchor');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:96px/, 'combat cluster stays an arc');
+assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
 
 console.log('V9 HUD Phase B verification gates: PASS');

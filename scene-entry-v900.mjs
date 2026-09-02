@@ -162,7 +162,7 @@ try {
   window.POCKETMONSTER_SCENE_EMBEDDED = true;
 
   bootStage = 'template';
-  const templateUrl = new URL('./v900.html?v=915', import.meta.url);
+  const templateUrl = new URL('./v900.html?v=916', import.meta.url);
   const templateResponse = await fetch(templateUrl, { cache: 'no-store', signal: sceneLifetime.signal });
   requireLiveScene();
   if (!templateResponse.ok) throw new Error(`โหลดโครงฉาก V9 ไม่สำเร็จ (${templateResponse.status})`);

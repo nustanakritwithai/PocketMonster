@@ -265,7 +265,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     metrics.timeline.push('fetch:template');
     assert.equal(url.origin, 'https://game.example');
     assert.equal(url.pathname, '/v900.html');
-    assert.equal(url.search, '?v=915');
+    assert.equal(url.search, '?v=916');
     assert.equal(options.cache, 'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     return {
