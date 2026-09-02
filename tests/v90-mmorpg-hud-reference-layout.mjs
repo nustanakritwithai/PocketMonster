@@ -113,16 +113,16 @@ for (const region of fixture.regions) {
   let actual;
   if (region.id === 'combatCluster') {
     actual = union([
-      insetBox(1, 1, 72),
-      insetBox(88, 14, 48),
-      insetBox(88, 98, 48),
-      insetBox(6, 132, 48),
-      insetBox(58, 198, 48),
-      insetBox(154, 124, 48),
-      insetBox(154, 8, 48),
-      insetBox(216, 88, 48),
-      insetBox(264, 186, 48),
-      insetBox(264, 122, 48),
+      insetBox(84, 28, 72),
+      insetBox(8, 68, 48),
+      insetBox(4, 4, 56),
+      insetBox(160, 104, 48),
+      insetBox(96, 104, 48),
+      insetBox(176, 40, 48),
+      insetBox(228, 28, 48),
+      insetBox(228, 92, 48),
+      insetBox(276, 148, 48),
+      insetBox(276, 88, 48),
       { x1: VW - 16 - 48, y1: 0.551 * VH, x2: VW - 16, y2: 0.551 * VH + 48 },
     ]);
   } else {
@@ -138,12 +138,12 @@ assert.equal(props('.mmorpg-minimap').left, '84.4%', 'minimap stays top-right');
 assert.equal(props('.mmorpg-roster').left, '62.5%', 'roster stays right-middle');
 assert.equal(props('.mmorpg-dock').left, '32.5%', 'chat console stays bottom-center');
 
-assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:148px/, 'combat cluster is an arc radius, not a grid');
+assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:90px/, 'combat cluster is an arc radius, not a grid');
 assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/, 'arc cannot be a scaled grid');
-assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:6px/, 'skills keep distinct polar anchors');
-assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:58px/);
-assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:154px/);
-const rights = [6, 58, 154, 88, 1];
+assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:160px/, 'skills keep distinct polar anchors');
+assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:96px/);
+assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:176px/);
+const rights = [160, 96, 176, 8, 84];
 assert.equal(new Set(rights).size, rights.length, 'action anchors are not a shared grid column');
 
 for (const layer of fixture.zOrder) {
