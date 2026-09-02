@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+const mobileMinimapCss = fs.readFileSync(new URL('../unified-minimap-mobile-v900.css', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 const hud = fs.readFileSync(new URL('../unified-mmorpg-hud-v900.mjs', import.meta.url), 'utf8');
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
@@ -46,6 +47,8 @@ for (const [property, value] of [
 ]) {
   assert.match(css, new RegExp(`\\.mmorpg-minimap\\{[^}]*${property}:${value}`), `rectangular unified minimap keeps ${property}`);
 }
+assert.match(mobileMinimapCss, /@media\s*\(max-height:420px\)/, 'mobile minimap override targets short landscape phones');
+assert.match(mobileMinimapCss, /\.mmorpg-hud \.mmorpg-minimap\{display:block!important\}/, 'short landscape phones keep the unified minimap visible');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is retired');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');

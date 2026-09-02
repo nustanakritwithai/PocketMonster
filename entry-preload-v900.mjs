@@ -5,6 +5,7 @@ import {
 } from './launch-bootstrap.mjs?v=912';
 import { applyPendingPatch } from './patch-updater.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
+import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=1';
 import {
   healthVersionGate,
   publishServerGateTelemetry,
@@ -43,4 +44,5 @@ await applyPendingPatch();
 document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
+installPersistentMinimapOwner({ windowLike: window, documentLike: document });
 await import('./online-world-shell-v900.mjs?v=20');
