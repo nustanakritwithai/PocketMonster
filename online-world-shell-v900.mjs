@@ -96,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '22');
+  url.searchParams.set('shellRevision', '23');
   return url.href;
 }
 

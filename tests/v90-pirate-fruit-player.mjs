@@ -152,7 +152,8 @@ assert.doesNotMatch(cssV900, /#controlPanelSwitcher/, 'switcher CSS is gone with
 assert.match(cssV900, /#recallBtn\.tc-jump\{[^}]*bottom:2px/, 'jump sits on the bottom edge');
 assert.match(cssV900, /#summonBtn\.tc-dash\{[^}]*right:2px/, 'dash sits on the right edge');
 assert.match(cssV900, /--arc-right:42px/, 'attack sits against dash and jump');
-assert.match(cssV900, /#skill2Btn\.tc-skill2\{[^}]*bottom:116px/, 'skills pack around attack');
+assert.match(cssV900, /#skill1Btn\.tc-skill1\{[^}]*right:4px/, 'skill 1 sits on the right edge');
+assert.match(cssV900, /#skill4Btn\.tc-ult\{[^}]*bottom:2px/, 'ult sits on the bottom edge');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="pirate-primary-parent"/, 'iframe uses the Pirate-primary parent control surface');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !important/, 'vendored touch HUD is not visible');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
