@@ -118,7 +118,7 @@ socket.emit('message', { data: JSON.stringify({
   combatId: 'combat:chat-runtime',
 }) });
 assert.equal(responses.length, 1, 'raw authority response reaches the private listener');
-socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { players: [] } }) });
+socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'hub', players: [] } }) });
 assert.equal(worldSnapshots, 1, 'Combat routing preserves World handling on the same socket');
 
 window.dispatchEvent(new Event('pagehide'));
