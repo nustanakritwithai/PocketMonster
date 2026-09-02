@@ -118,8 +118,8 @@ const npcInteractionStyle = installNpcInteractionLayer(npcLayerDocument);
 assert.equal(npcInteractionStyle.id, NPC_INTERACTION_LAYER_STYLE_ID);
 assert.match(
   npcInteractionStyle.textContent,
-  /body\.unified-hud-active #npcBtn\.npc-btn:not\(\.hidden\)[\s\S]*display:\s*block\s*!important[\s\S]*position:\s*fixed\s*!important[\s\S]*z-index:\s*30\s*!important[\s\S]*pointer-events:\s*auto\s*!important[\s\S]*touch-action:\s*manipulation\s*!important/,
-  'Pocket NPC talk CTA escapes the retired legacy HUD and remains tappable',
+  /body\.unified-hud-active #npcBtn\.npc-btn:not\(\.hidden\)[\s\S]*display:\s*block\s*!important[\s\S]*position:\s*fixed\s*!important[\s\S]*z-index:\s*1000\s*!important[\s\S]*pointer-events:\s*auto\s*!important[\s\S]*touch-action:\s*manipulation\s*!important/,
+  'Pocket NPC talk CTA stays above every unified group panel and remains tappable',
 );
 assert.equal(
   installNpcInteractionLayer(npcLayerDocument),
