@@ -15,6 +15,8 @@ const closure = collectPublicDependencyClosure(root);
 const required = new Set([
   ...REQUIRED_V9_ENTRY_FILES,
   'entry-preload-v900.mjs',
+  'persistent-minimap-owner-v900.mjs',
+  'unified-minimap-mobile-v900.css',
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
   'combat-v91-entry.mjs',
@@ -53,8 +55,10 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900\.mjs\?v=929/);
+assert.match(index, /entry-preload-v900\.mjs\?v=930/);
 assert.match(index, /style-v900\.css\?v=932/);
+const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
+assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=932/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
