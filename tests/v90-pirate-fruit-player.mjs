@@ -149,8 +149,8 @@ assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.doesNotMatch(cssV900, /#controlPanelSwitcher/, 'switcher CSS is gone with the control');
-assert.match(cssV900, /#recallBtn\.tc-jump\{[^}]*right:4px/, 'jump sits in the bottom-right corner');
-assert.match(cssV900, /#summonBtn\.tc-dash\{[^}]*right:8px/, 'dash stacks above jump on the right edge');
+assert.match(cssV900, /#recallBtn\.tc-jump\{[^}]*bottom:2px/, 'jump sits on the bottom edge');
+assert.match(cssV900, /#summonBtn\.tc-dash\{[^}]*right:2px/, 'dash sits on the right edge');
 assert.match(cssV900, /--arc-right:84px/, 'attack is the center of the skill ring');
 assert.match(cssV900, /#skill2Btn\.tc-skill2\{[^}]*bottom:104px/, 'skills stay tight around attack');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="pirate-primary-parent"/, 'iframe uses the Pirate-primary parent control surface');

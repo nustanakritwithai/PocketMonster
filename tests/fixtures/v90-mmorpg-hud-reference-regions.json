@@ -18,6 +18,6 @@
     { "id": "companions", "selector": ".mmorpg-companions", "x1": 904, "y1": 287, "x2": 1078, "y2": 354, "anchor": "right" },
     { "id": "chatConsole", "selector": ".mmorpg-dock", "x1": 351, "y1": 512, "x2": 704, "y2": 608, "anchor": "bottom-center" },
     { "id": "bottomStrip", "selector": ".mmorpg-bottom-strip", "x1": 0, "y1": 576, "x2": 350, "y2": 608, "anchor": "bottom-left" },
-    { "id": "combatCluster", "selector": "#pirateUnifiedControls .controls-right.tc-actions", "x1": 756, "y1": 335, "x2": 1076, "y2": 604, "anchor": "bottom-right", "kind": "arc" }
+    { "id": "combatCluster", "selector": "#pirateUnifiedControls .controls-right.tc-actions", "x1": 756, "y1": 335, "x2": 1078, "y2": 606, "anchor": "bottom-right", "kind": "arc" }
   ]
 }

@@ -37,8 +37,8 @@ function overlapArea(a, b) {
 }
 const boxes = {
   capture: box(84, 28, 72),
-  summon: box(8, 68, 48),
-  recall: box(4, 4, 56),
+  summon: box(2, 44, 36),
+  recall: box(44, 2, 36),
   skill1: box(160, 104, 48),
   skill2: box(96, 104, 48),
   skill3: box(176, 40, 48),
