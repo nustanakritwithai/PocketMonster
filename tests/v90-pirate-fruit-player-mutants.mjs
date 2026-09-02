@@ -28,10 +28,10 @@ const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-co
 assert.equal(liveHtml, html, 'mutant 0: active entry stays byte-identical with v900.html');
 assert.notEqual(liveHtml, versionedHtml, 'mutant 0b: legacy v800.html stays isolated from the active V9 entry');
 assert.doesNotMatch(html, /data-combined-world=/, 'mutant 0c: V9 does not hard-code a world before routing');
-assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts in the real Pirate Fruit world');
+assert.equal(DEFAULT_COMBINED_WORLD, 'pocket-monster', 'mutant 0c2: V9 starts in the Pocket Monster world with NPC interaction');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'mutant 0c2b: Pocket-block pirate island stage is deleted');
-assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit', 'mutant 0c3: missing ?world= resolves to pirate-fruit');
-assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
+assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pocket-monster', 'mutant 0c3: missing ?world= resolves to Pocket Monster');
+assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default Pocket Monster world');
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=826', 'mutant 0e: original game runtime is game-v800.js');
