@@ -36,16 +36,16 @@ function overlapArea(a, b) {
   return x * y;
 }
 const boxes = {
-  capture: box(12, 14, 72),
-  summon: box(92, 22, 48),
-  recall: box(92, 78, 48),
-  skill1: box(14, 100, 48),
-  skill2: box(62, 142, 48),
-  skill3: box(148, 96, 48),
-  skill4: box(148, 16, 48),
-  block: box(204, 72, 48),
-  potion1: box(252, 136, 48),
-  potion2: box(252, 80, 48),
+  capture: box(1, 1, 72),
+  summon: box(81, 9, 48),
+  recall: box(81, 65, 48),
+  skill1: box(3, 87, 48),
+  skill2: box(51, 129, 48),
+  skill3: box(137, 83, 48),
+  skill4: box(137, 3, 48),
+  block: box(193, 59, 48),
+  potion1: box(241, 123, 48),
+  potion2: box(241, 67, 48),
 };
 const names = Object.keys(boxes);
 for (let i = 0; i < names.length; i += 1) {

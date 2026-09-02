@@ -92,6 +92,9 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const quick = register('mmorpgQuickIndicators', el(documentLike, 'div', '', 'mmorpg-quick-indicators'));
     quick.setAttribute('aria-label', 'Quick actions');
     root.append(quick);
+    const rail = register('mmorpgQuestRail', el(documentLike, 'div', '', 'mmorpg-quest-rail'));
+    rail.setAttribute('aria-hidden', 'true');
+    root.append(rail);
     root.append(register('mmorpgQuestPanel', el(documentLike, 'aside', '', 'mmorpg-quest-panel')));
 
     const minimap = register('mmorpgMinimap', el(documentLike, 'div', '', 'mmorpg-minimap'));
