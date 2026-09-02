@@ -16,8 +16,37 @@ const TABS = Object.freeze(['chat', 'quest', 'party']);
 function el(documentLike, tag, id = '', className = '') {
   const node = documentLike.createElement(tag);
   if (id) node.id = id;
-  if (className) node.classList.add(className);
+  if (className) for (const name of String(className).split(/\s+/).filter(Boolean)) node.classList.add(name);
   return node;
+}
+
+function clampPercent(value, maximum) {
+  if (!(typeof maximum === 'number' && Number.isFinite(maximum) && maximum > 0)) return 0;
+  if (!(typeof value === 'number' && Number.isFinite(value))) return 0;
+  return Math.max(0, Math.min(100, (value / maximum) * 100));
+}
+
+function portraitGlyph(snapshot) {
+  const key = typeof snapshot?.portraitKey === 'string' ? snapshot.portraitKey.trim() : '';
+  const remote = !key || /^https?:/i.test(key) || key.startsWith('//') || key.includes('://');
+  const source = remote
+    ? (typeof snapshot?.displayName === 'string' ? snapshot.displayName : '')
+    : key;
+  const glyph = source.trim().slice(0, 1).toUpperCase();
+  return glyph || '?';
+}
+
+function fillBar(documentLike, className, value, maximum, label) {
+  const bar = el(documentLike, 'div', '', className);
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-label', label);
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', String(Number.isFinite(maximum) ? maximum : 0));
+  bar.setAttribute('aria-valuenow', String(Number.isFinite(value) ? value : 0));
+  const fill = el(documentLike, 'span', '', 'mmorpg-bar-fill');
+  fill.style.width = `${clampPercent(value, maximum)}%`;
+  bar.append(fill);
+  return bar;
 }
 
 export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
@@ -60,6 +89,9 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     root.append(player);
 
     root.append(register('mmorpgBuffRow', el(documentLike, 'div', '', 'mmorpg-buff-row')));
+    const quick = register('mmorpgQuickIndicators', el(documentLike, 'div', '', 'mmorpg-quick-indicators'));
+    quick.setAttribute('aria-label', 'Quick actions');
+    root.append(quick);
     root.append(register('mmorpgQuestPanel', el(documentLike, 'aside', '', 'mmorpg-quest-panel')));
 
     const minimap = register('mmorpgMinimap', el(documentLike, 'div', '', 'mmorpg-minimap'));
@@ -165,6 +197,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     else if (featureName === 'quest') renderQuest(snapshot);
     else if (featureName === 'party') renderParty(snapshot);
     else if (featureName === 'player') renderPlayer(snapshot);
+    else if (featureName === 'actions') renderQuickIndicators(snapshot);
     else if (featureName === 'target') renderRoster();
     else if (featureName === 'banner') renderBanner(snapshot);
     else if (featureName === 'utilities') renderUtilities(snapshot);
@@ -295,32 +328,85 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const panel = node('mmorpgPlayerStatus');
     if (!panel) return;
     if (snapshot?.available !== true) {
+      panel.classList.add('skeleton');
       panel.replaceChildren();
+      const status = el(documentLike, 'div', '', 'mmorpg-player-connecting');
+      status.textContent = 'กำลังเชื่อมต่อ…';
+      panel.append(status);
+      node('mmorpgBuffRow')?.replaceChildren();
       return;
     }
+    panel.classList.remove('skeleton');
+    const portrait = el(documentLike, 'div', '', 'mmorpg-player-portrait');
+    portrait.textContent = portraitGlyph(snapshot);
+    portrait.setAttribute('aria-hidden', 'true');
+    const identity = el(documentLike, 'div', '', 'mmorpg-player-identity');
+    const level = el(documentLike, 'span', '', 'mmorpg-player-level');
+    level.textContent = snapshot.level ? `Lv.${snapshot.level}` : '';
     const name = el(documentLike, 'div', '', 'mmorpg-player-name');
-    name.textContent = `${snapshot.displayName || 'ผู้เล่น'}${snapshot.level ? ` • Lv.${snapshot.level}` : ''}`;
-    const hp = el(documentLike, 'div', '', 'mmorpg-player-hp');
-    hp.setAttribute('role', 'progressbar');
-    hp.setAttribute('aria-valuemin', '0');
-    hp.setAttribute('aria-valuemax', String(snapshot.hpMax));
-    hp.setAttribute('aria-valuenow', String(snapshot.hp));
-    hp.textContent = `HP ${snapshot.hp}/${snapshot.hpMax}`;
-    const resource = el(documentLike, 'div', '', 'mmorpg-player-resource');
-    resource.textContent = snapshot.resourceKind ? `${snapshot.resourceKind}: ${snapshot.resource}/${snapshot.resourceMax}` : '';
+    name.textContent = snapshot.displayName || 'ผู้เล่น';
+    const title = el(documentLike, 'div', '', 'mmorpg-player-title');
+    title.textContent = snapshot.title || '';
+    identity.append(level, name, title);
+    const hpText = el(documentLike, 'div', '', 'mmorpg-player-hp-text');
+    hpText.textContent = `HP ${snapshot.hp}/${snapshot.hpMax}`;
+    const hp = fillBar(documentLike, 'mmorpg-player-hp', snapshot.hp, snapshot.hpMax, 'HP');
+    const resourceText = el(documentLike, 'div', '', 'mmorpg-player-resource-text');
+    resourceText.textContent = snapshot.resourceKind
+      ? `${snapshot.resourceKind} ${snapshot.resource}/${snapshot.resourceMax}`
+      : '';
+    const resource = fillBar(
+      documentLike, 'mmorpg-player-resource', snapshot.resource, snapshot.resourceMax,
+      snapshot.resourceKind || 'resource',
+    );
     const mode = el(documentLike, 'div', '', 'mmorpg-player-mode');
-    mode.textContent = snapshot.modeLabel || '';
-    panel.replaceChildren(name, hp, resource, mode);
+    const percent = Number.isFinite(snapshot.modePercent) ? ` ${Math.round(snapshot.modePercent)}%` : '';
+    mode.textContent = `${snapshot.modeLabel || ''}${percent}`.trim();
+    panel.replaceChildren(portrait, identity, hpText, hp, resourceText, resource, mode);
     const buffRow = node('mmorpgBuffRow');
     if (buffRow) {
-      const buffs = (snapshot.buffs || []).map(buff => {
-        const icon = el(documentLike, 'span', '', `mmorpg-buff ${buff.visualKey || ''}`);
-        icon.textContent = buff.label || '?';
-        icon.setAttribute('title', buff.description || buff.label || '');
+      const all = Array.isArray(snapshot.buffs) ? snapshot.buffs : [];
+      const shown = all.slice(0, 7);
+      const nodes = shown.map(buff => {
+        const icon = el(documentLike, 'button', '', 'mmorpg-buff');
+        icon.setAttribute('type', 'button');
+        icon.textContent = (buff.label || buff.visualKey || '?').slice(0, 2);
+        const detail = [buff.label, buff.description, buff.expiresAt ? `หมดอายุ ${buff.expiresAt}` : '']
+          .filter(Boolean).join(' — ');
+        icon.setAttribute('aria-label', detail || buff.id || 'buff');
+        icon.setAttribute('title', detail);
         return icon;
       });
-      buffRow.replaceChildren(...buffs);
+      if (all.length > 7) {
+        const extra = el(documentLike, 'button', '', 'mmorpg-buff mmorpg-buff-more');
+        extra.setAttribute('type', 'button');
+        extra.textContent = `+${all.length - 7}`;
+        extra.setAttribute('aria-label', `บัฟเพิ่มอีก ${all.length - 7}`);
+        extra.setAttribute('title', all.slice(7).map(buff => buff.label || buff.id).join(', '));
+        nodes.push(extra);
+      }
+      buffRow.replaceChildren(...nodes);
     }
+  }
+
+  function renderQuickIndicators(snapshot) {
+    const row = node('mmorpgQuickIndicators');
+    if (!row) return;
+    const items = Array.isArray(snapshot?.items) ? snapshot.items.slice(0, 5) : [];
+    row.classList.toggle('hidden', items.length === 0);
+    const nodes = items.map(item => {
+      const badge = el(documentLike, 'div', '', 'mmorpg-quick-indicator');
+      badge.setAttribute('role', 'img');
+      badge.setAttribute('aria-label', item.label || item.id || 'action');
+      if (item.pressed === true || item.state === 'selected') badge.classList.add('selected');
+      if (item.enabled === false) badge.classList.add('disabled');
+      const cooldown = clampPercent(item.cooldownRemaining, item.cooldownTotal);
+      if (cooldown > 0) badge.classList.add('cooling');
+      badge.style?.setProperty?.('--cooldown', `${cooldown}%`);
+      badge.textContent = (item.label || item.id || '?').slice(0, 2);
+      return badge;
+    });
+    row.replaceChildren(...nodes);
   }
 
   function renderMinimap(snapshot) {

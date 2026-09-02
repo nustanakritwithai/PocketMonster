@@ -174,7 +174,7 @@ function bootWorld() {
   assert.ok(shell, 'mount creates the #mmorpgHud shell');
   assert.equal(documentLike.body.children.filter(child => child.id === 'mmorpgHud').length, 1, 'a second mount cannot duplicate the shell');
   for (const id of [
-    'mmorpgPlayerStatus', 'mmorpgBuffRow', 'mmorpgQuestPanel', 'mmorpgMinimap',
+    'mmorpgPlayerStatus', 'mmorpgBuffRow', 'mmorpgQuickIndicators', 'mmorpgQuestPanel', 'mmorpgMinimap',
     'mmorpgRoster', 'mmorpgCompanions', 'mmorpgUtilities', 'mmorpgBanner',
     'mmorpgDock', 'mmorpgBottomStrip',
   ]) {
