@@ -806,6 +806,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     setTab(activeTab);
     setExpanded(expanded);
     renderStrip(chatAdapter()?.snapshot?.());
+    renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
     return shell;
   }
 
