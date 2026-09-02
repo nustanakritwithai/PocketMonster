@@ -24,7 +24,7 @@ assert.deepEqual(sanitizePirateLocalPresence({
   x: 7,
   z: 11.5,
   dir: 0.4,
-}), { x: 7, z: 11.5, dir: 0.4 });
+}), { x: 7, z: 11.5, dir: 0.4, locomotion: 'idle', animation: null });
 assert.equal(sanitizePirateLocalPresence({
   type: PIRATE_LOCAL_PRESENCE_MESSAGE,
   zone: 'hub',
@@ -50,7 +50,7 @@ const snapshot = sanitizePirateWorldSnapshot({
 });
 assert.deepEqual(snapshot, {
   zone: 'pirate-fruit',
-  players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5 }],
+  players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5, locomotion: 'idle', animation: null }],
 });
 assert.equal(sanitizePirateWorldSnapshot({ zone: 'hub', players: [] }), null);
 assert.deepEqual(createPirateSnapshotMessage(snapshot), {
@@ -78,7 +78,7 @@ publishWorldState({
 assert.equal(window.POCKETMONSTER_WORLD_STATE(), null, 'Pirate presence fails closed until a real iframe pose arrives');
 pose = { x: 2, z: 3, dir: 0.25 };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
-  zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25,
+  zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'idle', animation: null,
 });
 
 assert.match(boot, /event\.source !== frame\.contentWindow \|\| event\.origin !== 'null'/, 'frame source and opaque sandbox origin are checked before accepting pose');
@@ -98,5 +98,68 @@ assert.match(pirateStatus, /typeof message\.connected !== 'boolean'/, 'status sh
 assert.match(pirateStatus, /WORLD ONLINE · SAVE LOCAL/, 'online label distinguishes ephemeral presence from local gameplay saves');
 assert.match(pirateStatus, /กำลังเชื่อม WORLD ONLINE · SAVE LOCAL/, 'connecting label no longer claims that the game is temporarily local');
 assert.doesNotMatch(boot + bridge + pirateStatus, /new WebSocket|vpsWrites|playerDataWrites|firebaseFallback/, 'bridge and status shim open no socket and no persistent write flags');
+
+
+assert.deepEqual(sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE,
+  zone: 'pirate-fruit',
+  x: 7,
+  z: 11.5,
+  dir: 0.4,
+  locomotion: 'jump',
+  animation: { combatState: 'attack', attackProgress: 1.4, onGround: false },
+}), {
+  x: 7,
+  z: 11.5,
+  dir: 0.4,
+  locomotion: 'jump',
+  animation: { combatState: 'attack', attackProgress: 1, onGround: false },
+});
+assert.deepEqual(sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE,
+  zone: 'pirate-fruit',
+  x: 7,
+  z: 11.5,
+  dir: 0.4,
+  locomotion: 'teleport',
+  animation: { combatState: 'explode' },
+}), {
+  x: 7,
+  z: 11.5,
+  dir: 0.4,
+  locomotion: 'idle',
+  animation: { combatState: 'idle' },
+});
+
+const actionSnapshot = sanitizePirateWorldSnapshot({
+  zone: 'pirate-fruit',
+  players: [{
+    id: 'bob',
+    name: 'Bob',
+    x: 3,
+    z: 4,
+    dir: 1,
+    locomotion: 'dash',
+    animation: { combatState: 'skill', skillAnimationProgress: 0.25, dashing: true },
+  }],
+});
+assert.deepEqual(actionSnapshot.players[0], {
+  id: 'bob',
+  name: 'Bob',
+  x: 3,
+  z: 4,
+  dir: 1,
+  locomotion: 'dash',
+  animation: { combatState: 'skill', skillAnimationProgress: 0.25, dashing: true },
+});
+
+pose = { x: 2, z: 3, dir: 0.25, locomotion: 'run', animation: { combatState: 'guard' } };
+assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
+  zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'run',
+  animation: { combatState: 'guard' },
+});
+
+assert.doesNotMatch(bridge, /PIRATE_PRESENCE_LOCOMOTION_VALUES|PIRATE_PRESENCE_COMBAT_STATES/,
+  'pirate bridge must not copy protocol locomotion/combat enums');
 
 console.log('V9.0 Pirate Fruit read-only presence bridge: PASS');
