@@ -2,7 +2,10 @@ import {
   createUnifiedMinimapStore,
   projectMinimapFrame,
 } from './unified-minimap-v900.mjs';
-import { PIRATE_FRUIT_ISLAND_CENTERS } from './pirate-fruit-island-map-v900.mjs';
+import {
+  PIRATE_FRUIT_ISLAND_CENTERS,
+  PIRATE_FRUIT_ISLAND_LAYOUT_OFFSETS,
+} from './pirate-fruit-island-map-v900.mjs';
 
 export const PERSISTENT_MINIMAP_OWNER_KIND = 'pocketmonster:persistent-minimap-owner-v2';
 export const PIRATE_FRUIT_MINIMAP_NEAR_PADDING = 18;
@@ -39,14 +42,7 @@ export const PIRATE_FRUIT_MINIMAP_BOUNDS = Object.freeze({
 });
 
 function translatedPoi(islandId, poi) {
-  const offset = {
-    'starter-island': { x: 0, z: 0 },
-    'mist-jungle': { x: 0, z: -80 },
-    'sunscar-desert': { x: 190, z: -165 },
-    'azure-frost': { x: 465, z: -100 },
-    'tempest-sky': { x: 555, z: 120 },
-    'ember-volcano': { x: 455, z: 400 },
-  }[islandId] || { x: 0, z: 0 };
+  const offset = PIRATE_FRUIT_ISLAND_LAYOUT_OFFSETS[islandId] || { x: 0, z: 0 };
   return Object.freeze({
     ...poi,
     islandId,
