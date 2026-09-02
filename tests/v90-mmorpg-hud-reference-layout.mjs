@@ -114,8 +114,8 @@ for (const region of fixture.regions) {
   if (region.id === 'combatCluster') {
     actual = union([
       insetBox(84, 28, 72),
-      insetBox(8, 68, 48),
-      insetBox(4, 4, 56),
+      insetBox(2, 44, 36),
+      insetBox(44, 2, 36),
       insetBox(160, 104, 48),
       insetBox(96, 104, 48),
       insetBox(176, 40, 48),
@@ -143,7 +143,7 @@ assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/,
 assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:160px/, 'skills keep distinct polar anchors');
 assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:96px/);
 assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:176px/);
-const rights = [160, 96, 176, 8, 84];
+const rights = [160, 96, 176, 2, 84];
 assert.equal(new Set(rights).size, rights.length, 'action anchors are not a shared grid column');
 
 for (const layer of fixture.zOrder) {

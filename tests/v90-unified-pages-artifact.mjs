@@ -52,9 +52,9 @@ for (const relative of closure) {
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
 assert.match(index, /entry-preload-v900\.mjs\?v=927/);
-assert.match(index, /style-v900\.css\?v=925/);
+assert.match(index, /style-v900\.css\?v=926/);
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
-assert.match(scene, /style-v900\.css\?v=925/, 'scene entry loads the same HUD stylesheet revision as the parent');
+assert.match(scene, /style-v900\.css\?v=926/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');

@@ -90,8 +90,8 @@ body[data-combined-world="living-world"] .help{display:none!important}
 #pirateUnifiedControls #persistentFullscreenBtn.tc-fullscreen{left:50%!important;right:auto!important;top:8px!important;bottom:auto!important;width:48px!important;height:36px!important;border-radius:999px!important;font-size:20px!important;transform:translateX(-50%)!important;z-index:4}
 #persistentFullscreenBtn.tc-fullscreen::after{content:'⛶'!important;position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:20px;line-height:1;text-shadow:0 2px 4px #0009}
 #pirateUnifiedControls #captureBtn.tc-attack{right:var(--arc-right)!important;bottom:var(--arc-bottom)!important;width:var(--arc-primary)!important;height:var(--arc-primary)!important;font-size:28px;border-color:rgba(255,120,90,.8)!important;background-color:rgba(120,35,20,.55)!important}
-#pirateUnifiedControls #summonBtn.tc-dash{right:8px!important;bottom:68px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:21px;border-color:rgba(120,220,255,.8)!important}
-#pirateUnifiedControls #recallBtn.tc-jump{right:4px!important;bottom:4px!important;width:56px!important;height:56px!important;font-size:20px}
+#pirateUnifiedControls #summonBtn.tc-dash{right:2px!important;bottom:44px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:16px;border-color:rgba(120,220,255,.8)!important}
+#pirateUnifiedControls #recallBtn.tc-jump{right:44px!important;bottom:2px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:16px}
 #pirateUnifiedControls #skill1Btn.tc-skill1{right:160px!important;bottom:104px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
 #pirateUnifiedControls #skill2Btn.tc-skill2{right:96px!important;bottom:104px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
 #pirateUnifiedControls #skill3Btn.tc-skill3{right:176px!important;bottom:40px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
