@@ -151,6 +151,8 @@ assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-mon
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
 assert.match(cssV900, /body\[data-combined-world\] #controlPanelSwitcher\{display:flex/, 'V9 reveals the human/throw switcher in combined worlds');
+assert.match(cssV900, /#controlPanelSwitcher\{[^}]*bottom:188px/, 'switcher sits with the combat cluster');
+assert.match(html, /mmorpg-combat-arc[\s\S]*id="controlPanelSwitcher"/, 'switcher lives with the shared combat buttons');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="pirate-primary-parent"/, 'iframe uses the Pirate-primary parent control surface');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !important/, 'vendored touch HUD is not visible');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
