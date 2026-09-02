@@ -149,8 +149,8 @@ assert.match(styleSource, /#pirateUnifiedControls\[data-control-mode="capture"\]
 assert.match(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background-color:/);
 assert.doesNotMatch(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background:/, 'Pocket mode must be able to paint capture icons on the shared Pirate buttons');
 assert.doesNotMatch(styleSource, /pirate-fruit"\]\[data-control-panel="human"\] #hud,/, 'shared control ancestors cannot be display:none');
-assert.match(sceneEntrySource, /await import\('\.\/npc-interaction-layer-v900\.mjs\?v=2'\)/, 'NPC interaction layer is loaded dynamically so it cannot block scene boot');
-assert.match(sceneEntrySource, /document\.body\.replaceChildren\(\.\.\.sceneNodes\);[\s\S]*await import\('\.\/npc-interaction-layer-v900\.mjs\?v=2'\)[\s\S]*installNpcInteractionLayer\(document\);/, 'NPC interaction layer installs after the V9 scene template is mounted');
+assert.match(sceneEntrySource, /import \{ installNpcInteractionLayer \} from '\.\/npc-interaction-layer-v900\.mjs\?v=2'/);
+assert.match(sceneEntrySource, /document\.body\.replaceChildren\(\.\.\.sceneNodes\);\s*installNpcInteractionLayer\(document\);/, 'NPC interaction layer installs after the V9 scene template is mounted');
 assert.match(sceneHtmlSource, /scene-entry-v900\.mjs\?v=18/, 'online scene cache-busts the NPC interaction hotfix');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
