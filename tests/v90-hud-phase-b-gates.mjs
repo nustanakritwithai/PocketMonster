@@ -42,7 +42,7 @@ for (const [property, value] of [
   ['top', '0'],
   ['width', '15\\.4%'],
   ['height', '28\\.1%'],
-  ['border-radius', '4px'],
+  ['border-radius', '10px'],
 ]) {
   assert.match(css, new RegExp(`\\.mmorpg-minimap\\{[^}]*${property}:${value}`), `rectangular unified minimap keeps ${property}`);
 }
