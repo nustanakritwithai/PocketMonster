@@ -82,7 +82,7 @@ assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
   'scene code cannot access a second Combat global or forge Server reconciliation');
 assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
   'scene teardown closes pending Combat state without destroying the persistent host');
-assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-4'\)/, 'shell owns the one chat transport');
+assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-5'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");

@@ -41,6 +41,7 @@ const REQUIRED_BOOTSTRAP_FILES = [
   'runtime-config.mjs',
   'startup-errors.mjs',
   'chat-runtime.mjs',
+  'world-presence-protocol.mjs',
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
   'pirate-save-bridge-v900.mjs',

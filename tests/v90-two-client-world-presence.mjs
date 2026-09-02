@@ -171,13 +171,12 @@ async function runScenario({ usernames }) {
             data: JSON.stringify({ type: 'world-snapshot', payload: {
               zone: receiverFrame.zone,
               players,
-              testEpoch: 2,
             } }),
           });
         }
         return;
       }
-      if (message?.type === 'presence' && message.snapshot?.testEpoch === 2) {
+      if (message?.type === 'presence' && message.snapshot?.zone === 'pirate-fruit') {
         observed.set(clientId, message.snapshot);
       }
     });

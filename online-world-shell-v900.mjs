@@ -518,7 +518,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-4');
+await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
 const combatTransportStarted = combatTransport.start({
   runtime: window.POCKETMONSTER_CHAT_RUNTIME,
 });
