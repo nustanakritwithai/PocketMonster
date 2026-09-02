@@ -17,7 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=936';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=937';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -96,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '25');
+  url.searchParams.set('shellRevision', '26');
   return url.href;
 }
 
