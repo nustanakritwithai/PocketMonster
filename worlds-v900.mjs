@@ -162,11 +162,6 @@ function selectPanel(id) {
   if (`${location.pathname}${location.search}` !== url) history.replaceState(null, '', url);
 }
 
-const panelSwitcher = document.getElementById('controlPanelSwitcher');
-panelSwitcher?.querySelectorAll('[data-control-panel]').forEach(button => {
-  button.addEventListener('click', () => selectPanel(button.dataset.controlPanel));
-});
-
 async function bootWorld(id) {
   const world = worldById(id);
   if (!world) return;

@@ -17,7 +17,7 @@ for (const id of ['captureBtn', 'summonBtn', 'recallBtn', 'skill1Btn', 'skill2Bt
 }
 
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-primary:72px/, 'primary center size is a CSS variable');
-assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:96px/, 'skill polar radius is a CSS variable');
+assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:148px/, 'skill polar radius is a CSS variable');
 assert.match(css, /#pirateUnifiedControls \.tc-btn\{[^}]*min-width:48px[^}]*min-height:48px/, 'transparent hit rect is at least 48px');
 assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/, 'the action cluster cannot use parent transform:scale()');
 assert.doesNotMatch(css, /@media\(max-height:420px\)\{[^}]*\.tc-actions\{[^}]*transform:scale\(/, 'compact tier cannot scale the whole arc');
@@ -37,15 +37,15 @@ function overlapArea(a, b) {
 }
 const boxes = {
   capture: box(1, 1, 72),
-  summon: box(81, 9, 48),
-  recall: box(81, 65, 48),
-  skill1: box(3, 87, 48),
-  skill2: box(51, 129, 48),
-  skill3: box(137, 83, 48),
-  skill4: box(137, 3, 48),
-  block: box(193, 59, 48),
-  potion1: box(241, 123, 48),
-  potion2: box(241, 67, 48),
+  summon: box(88, 14, 48),
+  recall: box(88, 98, 48),
+  skill1: box(6, 132, 48),
+  skill2: box(58, 198, 48),
+  skill3: box(154, 124, 48),
+  skill4: box(154, 8, 48),
+  block: box(216, 88, 48),
+  potion1: box(264, 186, 48),
+  potion2: box(264, 122, 48),
 };
 const names = Object.keys(boxes);
 for (let i = 0; i < names.length; i += 1) {
