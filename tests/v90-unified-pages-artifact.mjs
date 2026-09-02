@@ -7,6 +7,10 @@ import {
   REQUIRED_V9_ENTRY_FILES,
   collectPublicDependencyClosure,
 } from '../scripts/build-github-pages.mjs';
+import {
+  NPC_OVERHEAD_ACTION_KIND,
+  installNpcOverheadAction,
+} from '../npc-overhead-action-v900.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.join(root, 'dist-pages');
@@ -23,6 +27,7 @@ const required = new Set([
   'combat-v91-transport.mjs',
   'combat-v91.css',
   'scene-entry-v900.mjs',
+  'npc-overhead-action-v900.mjs',
   'style-v900.css',
   'unified-mmorpg-hud-v900.mjs',
   'worlds-v900.mjs',
@@ -61,9 +66,34 @@ const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=932/, 'scene entry loads the same HUD stylesheet revision as the parent');
+assert.match(scene, /npc-overhead-action-v900\.mjs\?v=1/, 'online scene loads the NPC overhead action adapter');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
+
+{
+  const body = { append(node) { node.parentNode = body; } };
+  const hud = {};
+  const style = {};
+  const attrs = new Map();
+  const button = {
+    parentNode: hud,
+    style,
+    setAttribute(name, value) { attrs.set(name, value); },
+  };
+  const documentLike = {
+    body,
+    getElementById(id) { return id === 'npcBtn' ? button : null; },
+  };
+  const binding = installNpcOverheadAction(documentLike);
+  assert.equal(binding.kind, NPC_OVERHEAD_ACTION_KIND);
+  assert.equal(button.parentNode, body, 'NPC action leaves the retired legacy HUD');
+  assert.equal(style.position, 'fixed');
+  assert.equal(style.bottom, 'auto', 'legacy bottom docking is removed');
+  assert.match(style.transform, /-100% - 10px/, 'screen-space head coordinate anchors the action above the NPC');
+  assert.equal(attrs.get('data-npc-overhead-action'), 'true');
+}
+
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
 assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'public V9 artifact requires the one Monster Life launch session');
 for (const flag of ['vpsWrites', 'playerDataWrites', 'firebaseFallback']) {
