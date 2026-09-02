@@ -37,7 +37,15 @@ for (const flag of ['vpsWrites', 'playerDataWrites']) {
 
 assert.match(css, /\.mmorpg-player-status\{[^}]*left:0\.4%/, 'player status keeps the top-left golden anchor');
 assert.match(css, /\.mmorpg-dock\{[^}]*left:32\.5%/, 'chat console keeps the bottom-center golden anchor');
-assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%[^}]*top:0[^}]*width:15\.4%[^}]*height:28\.1%[^}]*border-radius:4px/, 'rectangular unified minimap owns the top-right box');
+for (const [property, value] of [
+  ['left', '84\\.4%'],
+  ['top', '0'],
+  ['width', '15\\.4%'],
+  ['height', '28\\.1%'],
+  ['border-radius', '4px'],
+]) {
+  assert.match(css, new RegExp(`\\.mmorpg-minimap\\{[^}]*${property}:${value}`), `rectangular unified minimap keeps ${property}`);
+}
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is retired');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
