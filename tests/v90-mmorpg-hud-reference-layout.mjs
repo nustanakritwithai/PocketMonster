@@ -117,8 +117,8 @@ for (const region of fixture.regions) {
       insetBox(2, 44, 36),
       insetBox(44, 2, 36),
       insetBox(4, 114, 48),
-      insetBox(54, 114, 48),
-      insetBox(114, 54, 48),
+      insetBox(77, 130, 48),
+      insetBox(129, 76, 48),
       insetBox(118, 2, 48),
       insetBox(172, 132, 48),
       insetBox(224, 148, 48),
@@ -140,10 +140,11 @@ assert.equal(props('.mmorpg-dock').left, '32.5%', 'chat console stays bottom-cen
 
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster is an arc radius, not a grid');
 assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/, 'arc cannot be a scaled grid');
-assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:4px/, 'skills keep distinct polar anchors');
-assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:54px/);
-assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:114px/);
-const rights = [4, 54, 114, 2, 42];
+assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:4px[^}]*bottom:114px/, 'skill 1 keeps the fixed start anchor');
+assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:77px[^}]*bottom:130px/);
+assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:129px[^}]*bottom:76px/);
+assert.match(css, /#skill4Btn\.tc-ult\{[^}]*right:118px[^}]*bottom:2px/, 'ultimate keeps the fixed end anchor');
+const rights = [4, 77, 129, 2, 42];
 assert.equal(new Set(rights).size, rights.length, 'action anchors are not a shared grid column');
 
 for (const layer of fixture.zOrder) {
