@@ -114,15 +114,15 @@ for (const region of fixture.regions) {
   if (region.id === 'combatCluster') {
     actual = union([
       insetBox(1, 1, 72),
-      insetBox(81, 9, 48),
-      insetBox(81, 65, 48),
-      insetBox(3, 87, 48),
-      insetBox(51, 129, 48),
-      insetBox(137, 83, 48),
-      insetBox(137, 3, 48),
-      insetBox(193, 59, 48),
-      insetBox(241, 123, 48),
-      insetBox(241, 67, 48),
+      insetBox(88, 14, 48),
+      insetBox(88, 98, 48),
+      insetBox(6, 132, 48),
+      insetBox(58, 198, 48),
+      insetBox(154, 124, 48),
+      insetBox(154, 8, 48),
+      insetBox(216, 88, 48),
+      insetBox(264, 186, 48),
+      insetBox(264, 122, 48),
       { x1: VW - 16 - 48, y1: 0.551 * VH, x2: VW - 16, y2: 0.551 * VH + 48 },
     ]);
   } else {
@@ -138,12 +138,12 @@ assert.equal(props('.mmorpg-minimap').left, '84.4%', 'minimap stays top-right');
 assert.equal(props('.mmorpg-roster').left, '62.5%', 'roster stays right-middle');
 assert.equal(props('.mmorpg-dock').left, '32.5%', 'chat console stays bottom-center');
 
-assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:96px/, 'combat cluster is an arc radius, not a grid');
+assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:148px/, 'combat cluster is an arc radius, not a grid');
 assert.doesNotMatch(css, /\.controls-right\.tc-actions\{[^}]*transform:scale\(/, 'arc cannot be a scaled grid');
-assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:3px/, 'skills keep distinct polar anchors');
-assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:51px/);
-assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:137px/);
-const rights = [3, 51, 137, 81, 1];
+assert.match(css, /#skill1Btn\.tc-skill1\{[^}]*right:6px/, 'skills keep distinct polar anchors');
+assert.match(css, /#skill2Btn\.tc-skill2\{[^}]*right:58px/);
+assert.match(css, /#skill3Btn\.tc-skill3\{[^}]*right:154px/);
+const rights = [6, 58, 154, 88, 1];
 assert.equal(new Set(rights).size, rights.length, 'action anchors are not a shared grid column');
 
 for (const layer of fixture.zOrder) {

@@ -26,8 +26,8 @@ assert.match(shell, /createUnifiedMmorpgHud/, 'production shell owns one Dock');
 assert.match(shell, /unifiedHud\?\.unmount/, 'session end tears the Dock down');
 assert.match(hud, /UNIFIED_MMORPG_HUD_KIND/, 'Dock exports a single kind');
 assert.doesNotMatch(css, /viewer-annotation|black-arrow-overlay/, 'reference viewer overlay is not a game HUD');
-assert.match(index, /style-v900\.css\?v=923/);
-assert.match(scene, /style-v900\.css\?v=923/);
+assert.match(index, /style-v900\.css\?v=924/);
+assert.match(scene, /style-v900\.css\?v=924/);
 assert.equal(index, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'));
 
 for (const flag of ['vpsWrites', 'playerDataWrites']) {
@@ -37,7 +37,7 @@ for (const flag of ['vpsWrites', 'playerDataWrites']) {
 assert.match(css, /\.mmorpg-player-status\{[^}]*left:0\.4%/, 'player status keeps the top-left golden anchor');
 assert.match(css, /\.mmorpg-dock\{[^}]*left:32\.5%/, 'chat console keeps the bottom-center golden anchor');
 assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%/, 'minimap keeps the top-right golden anchor');
-assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:96px/, 'combat cluster stays an arc');
+assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:148px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
 
 console.log('V9 HUD Phase B verification gates: PASS');
