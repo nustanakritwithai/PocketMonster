@@ -1,6 +1,7 @@
 export const NPC_OVERHEAD_ACTION_KIND = 'pocketmonster:npc-overhead-action-v1';
 
 const PROMOTED_ATTR = 'data-npc-overhead-action';
+const OWNER_KEY = '__POCKETMONSTER_NPC_OVERHEAD_ACTION__';
 
 function applyOverheadPresentation(button) {
   if (!button?.style) return false;
@@ -43,4 +44,46 @@ export function installNpcOverheadAction(documentLike = globalThis.document) {
     button,
     refresh() { return applyOverheadPresentation(button); },
   });
+}
+
+export function watchNpcOverheadAction({
+  documentLike = globalThis.document,
+  windowLike = globalThis.window,
+} = {}) {
+  if (!documentLike || !windowLike) return null;
+  const existing = windowLike[OWNER_KEY];
+  if (existing?.kind === NPC_OVERHEAD_ACTION_KIND) return existing;
+
+  let observer = null;
+  let binding = null;
+  const bind = () => {
+    binding = installNpcOverheadAction(documentLike) || binding;
+    if (binding && observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    return binding;
+  };
+
+  bind();
+  if (!binding && typeof windowLike.MutationObserver === 'function') {
+    observer = new windowLike.MutationObserver(bind);
+    observer.observe(documentLike.documentElement || documentLike, { childList: true, subtree: true });
+  }
+
+  const owner = Object.freeze({
+    kind: NPC_OVERHEAD_ACTION_KIND,
+    refresh: bind,
+    stop() {
+      observer?.disconnect?.();
+      observer = null;
+      return true;
+    },
+  });
+  try { windowLike[OWNER_KEY] = owner; } catch {}
+  return owner;
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  watchNpcOverheadAction({ windowLike: window, documentLike: document });
 }
