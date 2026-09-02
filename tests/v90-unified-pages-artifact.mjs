@@ -40,6 +40,8 @@ const required = new Set([
 for (const relative of required) assert.ok(closure.has(relative), `${relative} must be reachable from a shipped V9 entry`);
 
 const manifestFiles = new Map(manifest.files.map(item => [item.path, item]));
+assert.equal(manifestFiles.size, closure.size, 'patch manifest must not force-download public compatibility files outside the active V9 closure');
+assert.deepEqual([...manifestFiles.keys()].sort(), [...closure].sort(), 'patch manifest must equal the active V9 dependency closure exactly');
 for (const relative of closure) {
   const entry = manifestFiles.get(relative);
   assert.ok(entry, `${relative} must ship in the Pages manifest`);
