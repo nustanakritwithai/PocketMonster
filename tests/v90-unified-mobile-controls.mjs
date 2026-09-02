@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
+  NPC_INTERACTION_LAYER_STYLE_ID,
+  installNpcInteractionLayer,
+} from '../npc-interaction-layer-v900.mjs';
+import {
   UNIFIED_MOBILE_CONTROLS_KIND,
   createUnifiedMobileControls,
 } from '../unified-mobile-controls-v900.mjs';
@@ -96,11 +100,40 @@ windowLike.dispatchEvent(pointer('pointermove', 55, 10, 50));
 assert.ok(pocketCalls.some(([kind, payload]) => kind === 'move' && payload.active === true));
 assert.equal(pirateCalls.filter(([kind]) => kind === 'move').at(-1)[1].active, false, 'old world receives neutral input before adapter switch');
 
+const npcLayerElements = new Map();
+const npcLayerDocument = {
+  head: {
+    append(node) {
+      if (node?.id) npcLayerElements.set(node.id, node);
+    },
+  },
+  createElement(tag) {
+    return { tagName: String(tag).toUpperCase(), id: '', textContent: '' };
+  },
+  getElementById(id) {
+    return npcLayerElements.get(id) || null;
+  },
+};
+const npcInteractionStyle = installNpcInteractionLayer(npcLayerDocument);
+assert.equal(npcInteractionStyle.id, NPC_INTERACTION_LAYER_STYLE_ID);
+assert.match(
+  npcInteractionStyle.textContent,
+  /body\[data-combined-world="pocket-monster"\] #npcBtn\.npc-btn[\s\S]*z-index:\s*30\s*!important[\s\S]*pointer-events:\s*auto\s*!important[\s\S]*touch-action:\s*manipulation\s*!important/,
+  'Pocket NPC talk CTA is explicitly above the persistent V9 touch surface and remains tappable',
+);
+assert.equal(
+  installNpcInteractionLayer(npcLayerDocument),
+  npcInteractionStyle,
+  'NPC interaction layer installs idempotently across scene remounts',
+);
+
 const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const bootSource = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const bridgeSource = fs.readFileSync(new URL('../pirate-fruit-offline/unified-input-bridge-v900.mjs', import.meta.url), 'utf8');
 const styleSource = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 const htmlSource = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
+const sceneEntrySource = fs.readFileSync(new URL('../scene-entry-v900.mjs', import.meta.url), 'utf8');
+const sceneHtmlSource = fs.readFileSync(new URL('../scene-v900.html', import.meta.url), 'utf8');
 assert.doesNotMatch(gameSource, /bindMobileDualPointerInput/, 'Pocket runtime no longer creates a second pointer lifecycle');
 assert.match(gameSource, /registerAdapter\('pocket-monster'/);
 assert.match(gameSource, /registerAdapter\('pocket-monster',[\s\S]*interceptActions:true[\s\S]*beginCaptureAim\(\)[\s\S]*executeCaptureThrow\(\)[\s\S]*summonThrow\(\)[\s\S]*recall\(true\)[\s\S]*dispatchSkill/);
@@ -110,10 +143,14 @@ assert.match(bridgeSource, /event\.source !== window\.parent \|\| event\.origin 
 assert.match(bridgeSource, /\.tc-joyzone/);
 assert.match(bridgeSource, /block: '\.tc-block'/);
 assert.match(htmlSource, /id="pirateUnifiedControls"[\s\S]*id="pirateJoyKnob"[\s\S]*id="captureBtn"[^>]*tc-attack/);
+assert.match(styleSource, /#pirateUnifiedControls\{[^}]*z-index:20[^}]*pointer-events:none/);
 assert.match(styleSource, /#pirateUnifiedControls #joystick\.tc-joyzone/);
 assert.match(styleSource, /#pirateUnifiedControls\[data-control-mode="capture"\] \.pirate-only/);
 assert.match(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background-color:/);
 assert.doesNotMatch(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background:/, 'Pocket mode must be able to paint capture icons on the shared Pirate buttons');
 assert.doesNotMatch(styleSource, /pirate-fruit"\]\[data-control-panel="human"\] #hud,/, 'shared control ancestors cannot be display:none');
+assert.match(sceneEntrySource, /import \{ installNpcInteractionLayer \} from '\.\/npc-interaction-layer-v900\.mjs\?v=1'/);
+assert.match(sceneEntrySource, /document\.body\.replaceChildren\(\.\.\.sceneNodes\);\s*installNpcInteractionLayer\(document\);/, 'NPC interaction layer installs after the V9 scene template is mounted');
+assert.match(sceneHtmlSource, /scene-entry-v900\.mjs\?v=17/, 'online scene cache-busts the NPC interaction hotfix');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
