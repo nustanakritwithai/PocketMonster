@@ -1,7 +1,7 @@
 export const NPC_INTERACTION_LAYER_STYLE_ID = 'npcInteractionLayerV900';
 
 const NPC_INTERACTION_LAYER_CSS = `
-body.unified-hud-active #npcBtn.npc-btn:not(.hidden) {
+#npcBtn.npc-btn:not(.hidden) {
   display: block !important;
   position: fixed !important;
   z-index: 1000 !important;
