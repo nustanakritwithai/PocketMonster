@@ -130,9 +130,11 @@ assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persi
 assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=3/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
-assert.doesNotMatch(html, /id="controlPanelSwitcher"|data-control-panel=/, 'V9 exposes no clickable human/throw switcher');
+assert.match(html, /id="controlPanelSwitcher"/, 'V9 has the human/throw control-panel switcher');
+assert.match(html, /data-control-panel="human"/, 'switcher includes the Pirate Fruit human panel');
+assert.match(html, /data-control-panel="throw"/, 'switcher includes the Pocket throw panel');
 assert.match(html, /id="monsterThrowStage"/, 'V9 has a dedicated Pocket animal-control stage for pirate throw');
-assert.doesNotMatch(liveHtml, /id="controlPanelSwitcher"|data-control-panel=/, 'live V9 exposes no clickable human/throw switcher');
+assert.match(liveHtml, /id="controlPanelSwitcher"/, 'live V9 includes the control-panel switcher');
 assert.match(liveHtml, /id="monsterThrowStage"/, 'live V9 includes the Pocket throw stage');
 assert.equal(defaultPanelForWorld('pocket-monster'), 'throw');
 assert.equal(defaultPanelForWorld('pirate-fruit'), 'human');
@@ -148,7 +150,7 @@ assert.equal(combinedLocationQuery('pocket-monster', 'bogus'), 'world=pocket-mon
 assert.equal(combinedLocationQuery('pocket-monster', 'human'), 'world=pocket-monster&panel=throw');
 assert.match(cssV900, /data-control-panel="human"/, 'human panel CSS hides the throw HUD');
 assert.match(cssV900, /data-control-panel="throw"/, 'throw panel CSS can overlay Pocket capture controls');
-assert.match(cssV900, /#controlPanelSwitcher\{display:none!important\}/, 'V9 stylesheet defensively hides stale panel switchers');
+assert.match(cssV900, /body\[data-combined-world\] #controlPanelSwitcher\{display:flex/, 'V9 reveals the human/throw switcher in combined worlds');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /data-pirate-hud="pirate-primary-parent"/, 'iframe uses the Pirate-primary parent control surface');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /\.tc-root[\s\S]*visibility: hidden !important/, 'vendored touch HUD is not visible');
 assert.match(PIRATE_FRUIT_CONTROL_HUD_CSS, /pointer-events: none !important/, 'vendored touch HUD cannot steal parent touches');
@@ -170,7 +172,7 @@ assert.match(cssV900, /pirate-fruit"\]\[data-control-panel="human"\] \.message/,
 assert.doesNotMatch(cssV900, /\.combined-world-warp|#worldSwitcher/, 'clickable world warp controls have no live CSS');
 assert.match(cssV900, /#pirateUnifiedControls \.controls-right\.tc-actions\{[^}]*background:none/, 'the shared Pirate control surface keeps a circular action cluster, not a rectangular tray');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'pirate throw keeps hunt so animal control can leave Ranch');
-assert.doesNotMatch(cssV900, /body\[data-combined-world\][^\n]*#controlPanelSwitcher\{display:flex/, 'V9 never reveals the removed panel switcher');
+assert.match(cssV900, /pocket-monster"\] #controlPanelSwitcher \[data-control-panel="human"\]\{display:none/, 'Pocket Monster world hides the Pirate Fruit attack panel');
 
 {
   const humanBtn = { dataset: { controlPanel: 'human' }, current: '', setAttribute(name, value) { if (name === 'aria-current') this.current = value; } };

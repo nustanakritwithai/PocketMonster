@@ -137,7 +137,10 @@ export function createUnifiedMobileControls({
   };
 
   const setControlMode = worldId => {
-    const mode = CONTROL_MODES[worldId] || 'travel';
+    const panelId = documentLike?.body?.dataset?.controlPanel;
+    const mode = (panelId === 'throw' || worldId === 'pocket-monster')
+      ? 'capture'
+      : (CONTROL_MODES[worldId] || 'travel');
     controlSurface.dataset.controlMode = mode;
     if (documentLike?.body?.dataset) documentLike.body.dataset.mobileControlMode = mode;
     if (mode === 'pirate') {
