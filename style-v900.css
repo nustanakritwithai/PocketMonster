@@ -72,7 +72,7 @@ body[data-combined-world="living-world"] .help{display:none!important}
 
 /* One persistent Pirate Fruit control surface. Pocket Monster only swaps the
    command/icon state of these same buttons; it never mounts a second HUD. */
-#pirateUnifiedControls{position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font-family:'Segoe UI',Tahoma,sans-serif;--arc-right:12px;--arc-bottom:14px;--arc-primary:72px;--arc-skill:48px;--arc-util:48px;--arc-cx:48px;--arc-cy:50px;--arc-r:96px}
+#pirateUnifiedControls{position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font-family:'Segoe UI',Tahoma,sans-serif;--arc-right:1px;--arc-bottom:1px;--arc-primary:72px;--arc-skill:48px;--arc-util:48px;--arc-cx:48px;--arc-cy:50px;--arc-r:96px}
 #pirateUnifiedControls #joystick.tc-joyzone{display:block!important;position:absolute!important;z-index:2;left:0!important;bottom:0!important;width:45%!important;height:75%!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;pointer-events:auto;touch-action:none}
 #pirateUnifiedControls #stick.tc-joybase{display:none;position:absolute;width:102px;height:102px;left:0;top:0;border-radius:50%;background:rgba(255,255,255,.10);border:2px solid rgba(255,255,255,.35);box-shadow:none;transform:translate(-50%,-50%);pointer-events:none}
 #pirateUnifiedControls #stick.tc-joybase.tc-visible{display:block}
@@ -91,18 +91,18 @@ body[data-combined-world="living-world"] .help{display:none!important}
 #pirateUnifiedControls #persistentFullscreenBtn.tc-fullscreen{left:50%!important;right:auto!important;top:8px!important;bottom:auto!important;width:48px!important;height:36px!important;border-radius:999px!important;font-size:20px!important;transform:translateX(-50%)!important;z-index:4}
 #persistentFullscreenBtn.tc-fullscreen::after{content:'⛶'!important;position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:20px;line-height:1;text-shadow:0 2px 4px #0009}
 #pirateUnifiedControls #captureBtn.tc-attack{right:var(--arc-right)!important;bottom:var(--arc-bottom)!important;width:var(--arc-primary)!important;height:var(--arc-primary)!important;font-size:28px;border-color:rgba(255,120,90,.8)!important;background-color:rgba(120,35,20,.55)!important}
-#pirateUnifiedControls #summonBtn.tc-dash{right:92px!important;bottom:22px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:21px;border-color:rgba(120,220,255,.8)!important}
-#pirateUnifiedControls #recallBtn.tc-jump{right:92px!important;bottom:78px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:20px}
-#pirateUnifiedControls #skill1Btn.tc-skill1{right:14px!important;bottom:100px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
-#pirateUnifiedControls #skill2Btn.tc-skill2{right:62px!important;bottom:142px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
-#pirateUnifiedControls #skill3Btn.tc-skill3{right:148px!important;bottom:96px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
+#pirateUnifiedControls #summonBtn.tc-dash{right:81px!important;bottom:9px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:21px;border-color:rgba(120,220,255,.8)!important}
+#pirateUnifiedControls #recallBtn.tc-jump{right:81px!important;bottom:65px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:20px}
+#pirateUnifiedControls #skill1Btn.tc-skill1{right:3px!important;bottom:87px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
+#pirateUnifiedControls #skill2Btn.tc-skill2{right:51px!important;bottom:129px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
+#pirateUnifiedControls #skill3Btn.tc-skill3{right:137px!important;bottom:83px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
 #pirateUnifiedControls .tc-skill{opacity:.55}
-#pirateUnifiedControls #skill4Btn.tc-ult{right:148px!important;bottom:16px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:13px;border-color:rgba(200,120,255,.85)!important;background-color:rgba(70,25,110,.55)!important;opacity:.65}
-#pirateUnifiedControls #pirateBlockBtn.tc-block{right:204px!important;bottom:72px!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:18px;border-color:rgba(150,200,255,.8)!important}
-#pirateUnifiedControls #pirateWeaponBtn.tc-weapon{right:16px!important;top:52%!important;bottom:auto!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:17px;opacity:.9;border-color:rgba(255,215,140,.8)!important}
+#pirateUnifiedControls #skill4Btn.tc-ult{right:137px!important;bottom:3px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:13px;border-color:rgba(200,120,255,.85)!important;background-color:rgba(70,25,110,.55)!important;opacity:.65}
+#pirateUnifiedControls #pirateBlockBtn.tc-block{right:193px!important;bottom:59px!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:18px;border-color:rgba(150,200,255,.8)!important}
+#pirateUnifiedControls #pirateWeaponBtn.tc-weapon{right:16px!important;top:55.1%!important;bottom:auto!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:17px;opacity:.9;border-color:rgba(255,215,140,.8)!important}
 #pirateUnifiedControls .tc-potion{width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:17px}
-#pirateUnifiedControls #piratePotion1Btn.tc-potion1{right:252px!important;bottom:136px!important}
-#pirateUnifiedControls #piratePotion2Btn.tc-potion2{right:252px!important;bottom:80px!important}
+#pirateUnifiedControls #piratePotion1Btn.tc-potion1{right:241px!important;bottom:123px!important}
+#pirateUnifiedControls #piratePotion2Btn.tc-potion2{right:241px!important;bottom:67px!important}
 #pirateUnifiedControls .tc-zoom{left:8px!important;right:auto!important;width:24px!important;height:24px!important;min-width:24px!important;min-height:24px!important;font-size:14px;opacity:.3}
 #pirateUnifiedControls #pirateZoomInBtn.tc-zoom-in{bottom:42px!important}
 #pirateUnifiedControls #pirateZoomOutBtn.tc-zoom-out{bottom:10px!important}
@@ -122,34 +122,35 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .quest-tracker-close{position:absolute;right:3px;top:2px;z-index:2;width:20px;height:20px;min-width:20px;min-height:20px;padding:0;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(2,6,23,.72);color:#fff;font:800 15px/18px system-ui;pointer-events:auto;touch-action:none}
 .quest-tracker-toggle{position:absolute;z-index:8;top:calc(var(--safe-top) + var(--touch-min) + 20px);left:var(--safe-left);min-height:32px;padding:5px 9px;border:1px solid rgba(134,239,172,.38);border-radius:8px;background:rgba(5,16,22,.82);color:#dcfce7;font:800 10px system-ui;pointer-events:auto;touch-action:none}
 /* Unified HUD Task 7 — MMORPG Monitor Dock layout tokens + regions */
-:root{--hud-hit-min:48px;--hud-top-budget:56px;--hud-side-budget:200px;--hud-dock-collapsed:56px;--hud-dock-expanded:180px;--hud-control-gap:10px;--hud-glass:rgba(5,16,22,.82);--hud-line:rgba(255,255,255,.16);--hud-text:#e2e8f0;--hud-accent:#86efac}
+:root{--hud-hit-min:48px;--hud-top-budget:56px;--hud-side-budget:200px;--hud-dock-collapsed:56px;--hud-dock-expanded:96px;--hud-control-gap:10px;--hud-glass:rgba(5,16,22,.82);--hud-line:rgba(255,255,255,.16);--hud-text:#e2e8f0;--hud-accent:#86efac}
 .mmorpg-hud{position:absolute;inset:0;pointer-events:none;z-index:30;font:600 12px/1.35 system-ui;color:var(--hud-text)}
 .mmorpg-hud .mmorpg-dock,.mmorpg-hud .mmorpg-player-status,.mmorpg-hud .mmorpg-quest-panel,.mmorpg-hud .mmorpg-minimap,.mmorpg-hud .mmorpg-roster,.mmorpg-hud .mmorpg-utilities,.mmorpg-hud .mmorpg-banner,.mmorpg-hud .mmorpg-companions,.mmorpg-hud .mmorpg-bottom-strip,.mmorpg-hud .mmorpg-buff-row{pointer-events:auto}
-.mmorpg-player-status{position:absolute;left:max(10px,var(--safe-left));top:max(var(--hud-top-budget),calc(var(--safe-top) + 44px));width:min(var(--hud-side-budget),24vw);padding:8px 10px;border:1px solid var(--hud-line);border-radius:10px;background:var(--hud-glass)}
+.mmorpg-player-status{position:absolute;left:0.4%;top:0.7%;width:38.3%;height:13.1%;padding:8px 10px;border:1px solid var(--hud-line);border-radius:4px;background:var(--hud-glass);overflow:hidden}
 .mmorpg-player-status.skeleton{min-height:72px;opacity:.7}
 .mmorpg-player-connecting{color:#94a3b8}
-.mmorpg-player-portrait{float:left;width:36px;height:36px;margin:0 8px 8px 0;display:grid;place-items:center;border-radius:8px;background:#0f172a;border:1px solid var(--hud-line);font-size:16px}
+.mmorpg-player-portrait{float:left;width:60px;height:60px;margin:0 8px 8px 0;display:grid;place-items:center;border-radius:4px;background:#0f172a;border:1px solid var(--hud-line);font-size:16px}
 .mmorpg-player-identity{overflow:hidden}
 .mmorpg-player-level{display:inline-block;margin-right:6px;color:var(--hud-accent)}
 .mmorpg-player-hp-text,.mmorpg-player-resource-text{clear:both;font-size:10px;margin-top:4px}
 .mmorpg-player-hp[role="progressbar"],.mmorpg-player-resource[role="progressbar"]{display:block;height:8px;border-radius:5px;background:#0f172a;overflow:hidden}
 .mmorpg-bar-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#86efac)}
 .mmorpg-player-resource .mmorpg-bar-fill{background:linear-gradient(90deg,#38bdf8,#7dd3fc)}
-.mmorpg-quick-indicators{position:absolute;left:50%;top:max(var(--hud-top-budget),calc(var(--safe-top) + 8px));transform:translateX(-50%);display:flex;gap:6px;z-index:31}
+.mmorpg-quick-indicators{position:absolute;left:50%;top:1.3%;transform:translateX(-50%);display:flex;gap:6px;z-index:31}
 .mmorpg-quick-indicators.hidden{display:none}
 .mmorpg-quick-indicator{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--hud-line);border-radius:50%;background:var(--hud-glass);font-size:10px;pointer-events:none}
 .mmorpg-quick-indicator.selected{border-color:var(--hud-accent)}
 .mmorpg-quick-indicator.disabled{opacity:.45}
 .mmorpg-quick-indicator.cooling{box-shadow:inset 0 calc(var(--cooldown,0%) - 36px) 0 #020617aa}
 .mmorpg-buff-more{min-width:28px}
-.mmorpg-buff-row{position:absolute;left:max(10px,var(--safe-left));top:calc(max(var(--hud-top-budget),calc(var(--safe-top) + 44px)) + 86px);display:flex;gap:4px}
+.mmorpg-buff-row{position:absolute;left:8%;top:10.5%;display:flex;gap:4px;z-index:31}
 .mmorpg-buff{min-width:22px;min-height:22px;padding:2px 5px;border:1px solid var(--hud-line);border-radius:6px;background:var(--hud-glass);font-size:10px}
-.mmorpg-quest-panel{position:absolute;left:max(10px,var(--safe-left));top:calc(max(var(--hud-top-budget),calc(var(--safe-top) + 44px)) + 122px);width:min(var(--hud-side-budget),24vw);padding:8px 10px;border:1px solid var(--hud-line);border-radius:10px;background:var(--hud-glass)}
+.mmorpg-quest-rail{position:absolute;left:0;top:20.2%;width:3.1%;height:28.8%;pointer-events:none;background:rgba(15,20,16,.35)}
+.mmorpg-quest-panel{position:absolute;left:2.6%;top:14.5%;width:20.8%;height:38.3%;padding:8px 10px;border:1px solid var(--hud-line);border-radius:4px;background:var(--hud-glass);overflow:hidden}
 .mmorpg-quest-step{padding:1px 0}
 .mmorpg-quest-step.done{opacity:.55;text-decoration:line-through}
 .mmorpg-quest-step.current{color:var(--hud-accent)}
-.mmorpg-minimap{position:absolute;right:max(10px,var(--safe-right));top:max(var(--hud-top-budget),calc(var(--safe-top) + 44px));width:min(180px,20vw);aspect-ratio:1/1;border:1px solid var(--hud-line);border-radius:10px;background:var(--hud-glass)}
-.mmorpg-roster{position:absolute;right:max(10px,var(--safe-right));top:calc(max(var(--hud-top-budget),calc(var(--safe-top) + 44px)) + 200px);width:min(var(--hud-side-budget),24vw);display:flex;flex-direction:column;gap:4px}
+.mmorpg-minimap{position:absolute;left:84.4%;top:0;width:15.4%;height:28.1%;border:1px solid var(--hud-line);border-radius:4px;background:var(--hud-glass)}
+.mmorpg-roster{position:absolute;left:62.5%;top:25.8%;width:14.6%;height:17.6%;display:flex;flex-direction:column;gap:4px}
 .mmorpg-roster-row{display:flex;align-items:center;gap:6px;min-height:32px;height:34px;padding:2px 6px;border:1px solid var(--hud-line);border-radius:8px;background:var(--hud-glass);overflow:hidden}
 .mmorpg-roster-row.target{border-color:rgba(248,113,113,.5)}
 .mmorpg-roster-row.selected{border-color:#fbbf24}
@@ -161,23 +162,23 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-roster-state{font-size:10px;opacity:.8}
 .mmorpg-roster-hp[role="progressbar"]{flex:0 0 48px;height:6px;border-radius:4px;background:#0f172a;overflow:hidden}
 .mmorpg-roster-row.danger .mmorpg-bar-fill{background:linear-gradient(90deg,#ef4444,#fca5a5)}
-.mmorpg-companions{position:absolute;right:max(10px,var(--safe-right));bottom:calc(var(--hud-dock-expanded) + var(--hud-control-gap) + 14px);display:flex;gap:6px}
-.mmorpg-companion{width:40px;height:40px;display:grid;place-items:center;border:2px solid var(--hud-line);border-radius:50%;background:var(--hud-glass);color:var(--hud-text);padding:0}
+.mmorpg-companions{position:absolute;left:83.7%;top:47.2%;width:16.1%;height:11%;display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.mmorpg-companion{width:54px;height:54px;min-width:var(--hud-hit-min);min-height:var(--hud-hit-min);display:grid;place-items:center;border:2px solid var(--hud-line);border-radius:50%;background:var(--hud-glass);color:var(--hud-text);padding:0}
 .mmorpg-companion.selected{border-color:#fbbf24}
 .mmorpg-companion.active{box-shadow:0 0 0 2px #86efac}
 .mmorpg-companion.fainted{opacity:.45;border-color:#f87171}
 .mmorpg-companion.empty{opacity:.55}
-.mmorpg-utilities{position:absolute;right:max(10px,var(--safe-right));top:calc(max(var(--hud-top-budget),calc(var(--safe-top) + 44px)) + 188px);display:flex;flex-direction:column;gap:6px;align-items:flex-end;z-index:32}
+.mmorpg-utilities{position:absolute;left:88.4%;top:30.6%;width:11.4%;height:15%;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:flex-start;justify-content:flex-end;z-index:32}
 .mmorpg-utility{position:relative;min-height:var(--hud-hit-min);min-width:var(--hud-hit-min);width:48px;height:48px;border:1px solid var(--hud-line);border-radius:50%;background:var(--hud-glass);color:var(--hud-text);padding:0}
 .mmorpg-utility-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f43f5e;color:#fff;font-size:10px}
-.mmorpg-banner{position:absolute;left:50%;top:max(var(--hud-top-budget),calc(var(--safe-top) + 52px));bottom:auto;transform:translateX(-50%);max-width:min(480px,60vw);padding:6px 12px;border:1px solid var(--hud-line);border-radius:8px;background:var(--hud-glass);text-align:center;z-index:32}
+.mmorpg-banner{position:absolute;left:29.4%;top:10.2%;width:42.2%;height:11.5%;bottom:auto;transform:none;max-width:none;padding:6px 12px;border:1px solid var(--hud-line);border-radius:4px;background:var(--hud-glass);text-align:center;z-index:32;overflow:hidden}
 .mmorpg-banner.hidden{display:none}
 .mmorpg-banner.error{border-color:#f87171;color:#fecaca}
 .mmorpg-chat-extras{display:flex;gap:4px;margin-top:4px;pointer-events:none}
 .mmorpg-chat-extra{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.08)}
-.mmorpg-bottom-strip{position:absolute;left:max(8px,var(--safe-left));bottom:0;display:flex;gap:8px;padding:4px 8px;font-size:10px;opacity:.9}
+.mmorpg-bottom-strip{position:absolute;left:0;bottom:0;width:32.4%;height:5.3%;display:flex;gap:8px;padding:4px 8px;font-size:10px;opacity:.9;align-items:center}
 .mmorpg-strip-time{font-variant-numeric:tabular-nums}
-.mmorpg-dock{position:absolute;left:50%;bottom:max(var(--hud-control-gap),var(--safe-bottom));transform:translateX(-50%);width:min(560px,52vw);height:var(--hud-dock-expanded);display:flex;flex-direction:column;border:1px solid var(--hud-line);border-radius:12px;background:var(--hud-glass);overflow:hidden}
+.mmorpg-dock{position:absolute;left:32.5%;bottom:0;transform:none;width:32.7%;height:var(--hud-dock-expanded);display:flex;flex-direction:column;border:1px solid var(--hud-line);border-radius:4px;background:var(--hud-glass);overflow:hidden}
 .mmorpg-dock.collapsed{height:var(--hud-dock-collapsed)}
 .mmorpg-dock.collapsed .mmorpg-panel{display:none}
 .mmorpg-dock-summary{flex:0 0 auto;padding:4px 10px;font-size:11px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -196,11 +197,11 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-chat-send{min-width:var(--hud-hit-min);min-height:var(--hud-hit-min);border:1px solid rgba(134,239,172,.4);border-radius:8px;background:rgba(20,83,45,.5);color:#dcfce7;font:700 13px system-ui}
 .mmorpg-party-slot{display:block;width:100%;min-height:40px;margin:2px 0;padding:4px 8px;border:1px solid var(--hud-line);border-radius:8px;background:rgba(2,6,23,.4);color:var(--hud-text);text-align:left}
 .mmorpg-party-slot.selected{border-color:var(--hud-accent)}
-.mmorpg-bottom-strip{position:absolute;left:0;right:0;bottom:0;height:calc(max(var(--hud-control-gap),var(--safe-bottom)));background:linear-gradient(180deg,transparent,rgba(2,6,23,.5));z-index:29}
-@media (max-height:420px){:root{--hud-dock-expanded:140px}.mmorpg-minimap{display:none}.mmorpg-player-status,.mmorpg-quest-panel{width:min(160px,22vw);font-size:11px}}
-@media (max-height:320px){:root{--hud-dock-expanded:112px}.mmorpg-quest-panel,.mmorpg-companions{display:none}.mmorpg-dock{width:min(420px,48vw)}}
+.mmorpg-dock-summary{height:0;padding:0;overflow:hidden}
+@media (max-height:420px){:root{--hud-dock-expanded:80px}.mmorpg-minimap{display:none}.mmorpg-player-status,.mmorpg-quest-panel{font-size:11px}}
+@media (max-height:320px){:root{--hud-dock-expanded:64px}.mmorpg-quest-panel,.mmorpg-companions{display:none}}
 /* Unified HUD Task 7A — minimap projection surface */
-.mmorpg-minimap{position:relative;overflow:hidden}
+.mmorpg-minimap{overflow:hidden}
 .mmorpg-minimap.unavailable::after{content:'—';display:grid;place-items:center;height:100%;opacity:.4;font-size:18px}
 .mmorpg-minimap-marker,.mmorpg-minimap-player{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%)}
 .mmorpg-minimap-marker{background:#68d5ff}

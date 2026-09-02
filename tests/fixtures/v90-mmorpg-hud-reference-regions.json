@@ -1,0 +1,23 @@
+{
+  "viewport": { "width": 1080, "height": 608 },
+  "tolerancePx": 4,
+  "zOrder": [
+    { "id": "controls", "selector": "#pirateUnifiedControls", "z": 20, "layer": "input" },
+    { "id": "hud", "selector": ".mmorpg-hud", "z": 30, "layer": "information" },
+    { "id": "onboarding", "selector": "#pirateOnboardingActionProxies", "z": 31, "layer": "onboarding" },
+    { "id": "banner", "selector": ".mmorpg-banner", "z": 32, "layer": "transient" }
+  ],
+  "regions": [
+    { "id": "playerStatus", "selector": ".mmorpg-player-status", "x1": 4, "y1": 4, "x2": 418, "y2": 84, "anchor": "top-left" },
+    { "id": "questPanel", "selector": ".mmorpg-quest-panel", "x1": 28, "y1": 88, "x2": 253, "y2": 321, "anchor": "left" },
+    { "id": "questRail", "selector": ".mmorpg-quest-rail", "x1": 0, "y1": 123, "x2": 33, "y2": 298, "anchor": "left" },
+    { "id": "banner", "selector": ".mmorpg-banner", "x1": 317, "y1": 62, "x2": 773, "y2": 132, "anchor": "top-center" },
+    { "id": "roster", "selector": ".mmorpg-roster", "x1": 675, "y1": 157, "x2": 833, "y2": 264, "anchor": "right-middle" },
+    { "id": "minimap", "selector": ".mmorpg-minimap", "x1": 911, "y1": 0, "x2": 1078, "y2": 171, "anchor": "top-right" },
+    { "id": "utilities", "selector": ".mmorpg-utilities", "x1": 955, "y1": 186, "x2": 1078, "y2": 277, "anchor": "right" },
+    { "id": "companions", "selector": ".mmorpg-companions", "x1": 904, "y1": 287, "x2": 1078, "y2": 354, "anchor": "right" },
+    { "id": "chatConsole", "selector": ".mmorpg-dock", "x1": 351, "y1": 512, "x2": 704, "y2": 608, "anchor": "bottom-center" },
+    { "id": "bottomStrip", "selector": ".mmorpg-bottom-strip", "x1": 0, "y1": 576, "x2": 350, "y2": 608, "anchor": "bottom-left" },
+    { "id": "combatCluster", "selector": "#pirateUnifiedControls .controls-right.tc-actions", "x1": 789, "y1": 335, "x2": 1079, "y2": 607, "anchor": "bottom-right", "kind": "arc" }
+  ]
+}

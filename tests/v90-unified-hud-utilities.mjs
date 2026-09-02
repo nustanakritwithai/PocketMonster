@@ -99,7 +99,7 @@ function feature(snapshot) {
 
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 assert.match(css, /\.mmorpg-utility\{[^}]*border-radius:50%/, 'right utilities are circles');
-assert.match(css, /\.mmorpg-banner\{[^}]*top:max\(var\(--hud-top-budget\)/, 'system banner sits top-center');
+assert.match(css, /\.mmorpg-banner\{[^}]*top:10\.2%/, 'system banner sits top-center');
 assert.match(css, /\.mmorpg-bottom-strip\{[^}]*bottom:0/, 'status strip hugs the bottom-left');
 assert.doesNotMatch(css, /battery|GMT|device-memory/i, 'strip cannot invent device values');
 
