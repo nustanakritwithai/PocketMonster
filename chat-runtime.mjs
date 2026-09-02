@@ -1,4 +1,5 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
+import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];
@@ -44,6 +45,174 @@ const state = {
 };
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
+
+// Unified HUD chat store (Task 3): transport/lifecycle stay authoritative here,
+// while the Dock consumes immutable snapshots instead of owning chat DOM.
+const CHAT_CHANNELS = Object.freeze(['WORLD', 'ZONE']);
+const chatStore = {
+  revision: 0,
+  channel: 'WORLD',
+  rows: Object.freeze([]),
+  unread: 0,
+  status: 'unavailable',
+  canSend: false,
+};
+const chatSubscribers = new Set();
+
+function chatHudSnapshot() {
+  return Object.freeze({
+    revision: chatStore.revision,
+    channel: chatStore.channel,
+    channels: CHAT_CHANNELS,
+    rows: chatStore.rows,
+    unread: chatStore.unread,
+    status: chatStore.status,
+    canSend: chatStore.canSend,
+  });
+}
+
+function publishChatHud(patch = {}) {
+  Object.assign(chatStore, patch);
+  chatStore.revision += 1;
+  const snapshot = chatHudSnapshot();
+  for (const listener of [...chatSubscribers]) {
+    try { listener(snapshot); } catch {}
+  }
+  return snapshot;
+}
+
+function subscribeChatHud(listener) {
+  if (typeof listener !== 'function') return null;
+  chatSubscribers.add(listener);
+  try { listener(chatHudSnapshot()); } catch {}
+  return () => { chatSubscribers.delete(listener); };
+}
+
+function clampChatText(value) {
+  return typeof value === 'string' ? value.trim().slice(0, HUD_LIMITS.string) : '';
+}
+
+function normalizeChatMessage(message, channel, index) {
+  const id = Number(message?.id);
+  return Object.freeze({
+    id: Number.isFinite(id) && id > 0 ? `msg-${Math.trunc(id)}` : `msg-local-${index}`,
+    channel,
+    author: clampChatText(message?.displayName) || clampChatText(message?.username) || 'ผู้เล่น',
+    text: clampChatText(message?.message),
+    timestamp: Number.isFinite(Number(message?.timestamp))
+      ? Math.min(Math.max(0, Number(message.timestamp)), HUD_LIMITS.timestampMax)
+      : 0,
+    kind: 'message',
+  });
+}
+
+function appendChatRows(channel, messages) {
+  if (!Array.isArray(messages) || !messages.length) return;
+  const rows = [...chatStore.rows];
+  for (const message of messages) {
+    rows.push(normalizeChatMessage(message, channel, rows.length));
+  }
+  while (rows.length > HUD_LIMITS.chatRows) rows.shift();
+  publishChatHud({
+    rows: Object.freeze(rows),
+    unread: chatStore.unread + messages.length,
+    status: 'connected',
+  });
+}
+
+function upsertChatErrorRow(messageText) {
+  const rows = [...chatStore.rows];
+  const errorRow = Object.freeze({
+    id: 'system-error',
+    channel: chatStore.channel,
+    author: 'ระบบ',
+    text: clampChatText(messageText),
+    timestamp: 0,
+    kind: 'error',
+  });
+  const index = rows.findIndex(row => row.kind === 'error');
+  if (index >= 0) rows[index] = errorRow;
+  else rows.push(errorRow);
+  while (rows.length > HUD_LIMITS.chatRows) rows.shift();
+  publishChatHud({ rows: Object.freeze(rows), status: 'error' });
+}
+
+function clearChatErrorRow() {
+  if (!chatStore.rows.some(row => row.kind === 'error')) return;
+  publishChatHud({
+    rows: Object.freeze(chatStore.rows.filter(row => row.kind !== 'error')),
+    status: 'connected',
+  });
+}
+
+function markChatRead() {
+  if (!chatStore.unread) return;
+  publishChatHud({ unread: 0 });
+}
+
+function applyChatChannel(nextChannel) {
+  state.chatViewGeneration += 1;
+  state.after = 0;
+  document.querySelector('#chatMessages')?.replaceChildren();
+  publishChatHud({ channel: nextChannel, rows: Object.freeze([]), unread: 0 });
+  safelyPullMessages();
+}
+
+function setChatChannelCommand(channel) {
+  if (state.stopped || !state.token) {
+    return createHudCommandResult({ ok: false, reason: 'session-unavailable' });
+  }
+  const requested = typeof channel === 'string' ? channel.trim().toUpperCase() : '';
+  if (!CHAT_CHANNELS.includes(requested)) {
+    return createHudCommandResult({ ok: false, reason: 'unsupported-channel' });
+  }
+  const select = document.querySelector('#chatChannel');
+  if (select && select.value !== requested) select.value = requested;
+  if (requested === chatStore.channel) {
+    return createHudCommandResult({ ok: true, reason: 'already-active' });
+  }
+  applyChatChannel(requested);
+  return createHudCommandResult({ ok: true, reason: 'channel-changed' });
+}
+
+async function postChatMessage(textValue, context) {
+  const response = await fetch(api('/api/chat/send'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${context.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: textValue, channel: chatStore.channel }),
+    signal: state.restAbortController.signal,
+  });
+  if (!requestIsCurrent(context)) return createHudCommandResult({ ok: false, reason: 'session-expired' });
+  const payload = await readResponsePayload(response);
+  if (!requestIsCurrent(context)) return createHudCommandResult({ ok: false, reason: 'session-expired' });
+  if (response.status === 401 || isExplicitSessionRejection(payload)) {
+    invalidateSession('session-rejected');
+    return createHudCommandResult({ ok: false, reason: 'session-rejected' });
+  }
+  if (response.ok) {
+    clearChatErrorRow();
+    return createHudCommandResult({ ok: true, reason: 'sent' });
+  }
+  return createHudCommandResult({ ok: false, reason: 'send-failed' });
+}
+
+function sendChatCommand(rawText) {
+  const textValue = clampChatText(rawText);
+  if (!textValue) {
+    return Promise.resolve(createHudCommandResult({ ok: false, reason: 'empty-message' }));
+  }
+  const context = activeRequestContext();
+  if (!context) {
+    return Promise.resolve(createHudCommandResult({ ok: false, reason: 'session-unavailable' }));
+  }
+  return postChatMessage(textValue, context)
+    .then(result => {
+      if (result.ok) safelyPullMessages();
+      else if (result.reason === 'send-failed') upsertChatErrorRow('ส่งข้อความไม่สำเร็จ');
+      return result;
+    })
+    .catch(() => createHudCommandResult({ ok: false, reason: 'session-unavailable' }));
+}
 
 function combatStatus() {
   return Object.freeze({
@@ -166,7 +335,7 @@ async function readResponsePayload(response) {
   try { return await response.json(); } catch { return null; }
 }
 function currentChatChannel() {
-  return document.querySelector('#chatChannel')?.value === 'ZONE' ? 'ZONE' : 'WORLD';
+  return chatStore.channel;
 }
 function pullRequestIsCurrent(context) {
   return requestIsCurrent(context)
@@ -201,8 +370,15 @@ async function pullMessagesOnce() {
   const payload = await readResponsePayload(response);
   if (!pullRequestIsCurrent(context)) return;
   if (response.status === 401 || isExplicitSessionRejection(payload)) { invalidateSession('session-rejected'); return; }
-  if (!response.ok) { const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ'; return; }
-  for (const message of payload?.messages || []) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
+  if (!response.ok) {
+    const error = document.querySelector('#chatError'); if (error) error.textContent = 'เชื่อมต่อแชทไม่สำเร็จ';
+    upsertChatErrorRow('เชื่อมต่อแชทไม่สำเร็จ');
+    return;
+  }
+  const incoming = Array.isArray(payload?.messages) ? payload.messages : [];
+  for (const message of incoming) { state.after = Math.max(state.after, Number(message.id) || 0); addMessage(message); }
+  if (incoming.length) appendChatRows(context.channel, incoming);
+  clearChatErrorRow();
 }
 async function drainPullMessages() {
   if (state.pullInFlight) return;
@@ -221,13 +397,15 @@ async function sendMessage() {
   const input = document.querySelector('#chatInput'); const message = input?.value.trim();
   const context = activeRequestContext();
   if (!message || !context) return;
-  const channel = document.querySelector('#chatChannel')?.value || 'WORLD';
-  const response = await fetch(api('/api/chat/send'), { method: 'POST', headers: { Authorization: `Bearer ${context.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, channel }), signal: state.restAbortController.signal });
+  const result = await postChatMessage(clampChatText(message), context);
   if (!requestIsCurrent(context)) return;
-  const payload = await readResponsePayload(response);
-  if (!requestIsCurrent(context)) return;
-  if (response.status === 401 || isExplicitSessionRejection(payload)) { invalidateSession('session-rejected'); return; }
-  if (response.ok && input) { input.value = ''; safelyPullMessages(); } else { const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ'; }
+  if (result.ok) {
+    if (input) input.value = '';
+    safelyPullMessages();
+  } else if (result.reason === 'send-failed') {
+    const error = document.querySelector('#chatError'); if (error) error.textContent = 'ส่งข้อความไม่สำเร็จ';
+    upsertChatErrorRow('ส่งข้อความไม่สำเร็จ');
+  }
 }
 function safelyPullMessages() {
   if (state.stopped || state.paused || !state.token) return;
@@ -361,6 +539,7 @@ function suspend() {
   state.pullQueued = false;
   abortRestRequests();
   closeTransport('page hidden');
+  publishChatHud({ status: 'unavailable', canSend: false });
 }
 function resume() {
   if (state.stopped || !state.paused) return;
@@ -376,6 +555,7 @@ function resume() {
   ensurePolling();
   safelyPullMessages();
   connectSocket();
+  publishChatHud({ status: 'connected', canSend: true });
 }
 function stop(reason = 'session-ended') {
   if (state.stopped) return;
@@ -389,8 +569,12 @@ function stop(reason = 'session-ended') {
   state.token = null;
   state.after = 0;
   closeTransport('session ended');
+  publishChatHud({ rows: Object.freeze([]), unread: 0, status: 'unavailable', canSend: false });
 }
 function ensureChatMarkup() {
+  // Migration fallback only: once the unified MMORPG Dock owns chat, the
+  // legacy floating panel must not be created alongside it.
+  if (document.querySelector('#mmorpgDock')) return;
   ensureChatStyles();
   if (document.querySelector('#gameChat')) return;
   const root = document.createElement('div');
@@ -402,14 +586,11 @@ function mount() {
   const panel = document.querySelector('#gameChat'); if (!panel || panel.dataset.bound) return;
   panel.dataset.bound = 'true';
   const headerNote = panel.querySelector('header span'); const channel = document.createElement('select'); channel.id = 'chatChannel'; channel.className = 'chat-channel'; channel.innerHTML = '<option value="WORLD">🌍 โลก</option><option value="ZONE">📍 พื้นที่</option>'; headerNote?.after(channel);
-  document.querySelector('#chatToggleBtn')?.addEventListener('click', () => { panel.classList.toggle('hidden'); if (!panel.classList.contains('hidden')) { const unread = document.querySelector('#chatUnread'); if (unread) { unread.textContent = '0'; unread.dataset.count = '0'; } document.querySelector('#chatInput')?.focus(); } });
+  document.querySelector('#chatToggleBtn')?.addEventListener('click', () => { panel.classList.toggle('hidden'); if (!panel.classList.contains('hidden')) { const unread = document.querySelector('#chatUnread'); if (unread) { unread.textContent = '0'; unread.dataset.count = '0'; } markChatRead(); document.querySelector('#chatInput')?.focus(); } });
   document.querySelector('#chatCloseBtn')?.addEventListener('click', () => panel.classList.add('hidden'));
   document.querySelector('#chatForm')?.addEventListener('submit', event => { event.preventDefault(); void sendMessage().catch(() => {}); });
   channel.addEventListener('change', () => {
-    state.chatViewGeneration += 1;
-    state.after = 0;
-    document.querySelector('#chatMessages')?.replaceChildren();
-    safelyPullMessages();
+    applyChatChannel(channel.value === 'ZONE' ? 'ZONE' : 'WORLD');
   });
 }
 async function start() {
@@ -423,6 +604,7 @@ async function start() {
       return;
     }
     state.token = currentToken;
+    publishChatHud({ status: 'connected', canSend: true });
     ensurePolling();
     safelyPullMessages();
     connectSocket();
@@ -437,6 +619,13 @@ async function start() {
 const runtime = Object.freeze({
   mount,
   stop,
+  chat: Object.freeze({
+    subscribe: subscribeChatHud,
+    snapshot: chatHudSnapshot,
+    sendChat: sendChatCommand,
+    setChatChannel: setChatChannelCommand,
+    markRead: markChatRead,
+  }),
   combat: Object.freeze({
     sendPrediction: sendCombatPrediction,
     subscribeAuthority: subscribeCombatAuthority,
@@ -469,6 +658,9 @@ const runtime = Object.freeze({
     chatViewGeneration: state.chatViewGeneration,
     pullInFlight: state.pullInFlight,
     pullQueued: state.pullQueued,
+    chatSubscribers: chatSubscribers.size,
+    chatRevision: chatStore.revision,
+    chatRows: chatStore.rows.length,
   }),
 });
 Object.defineProperty(window, CHAT_RUNTIME_SLOT, { value: runtime });
