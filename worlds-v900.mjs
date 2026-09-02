@@ -72,19 +72,7 @@ function preparePocketRuntime(world) {
   if (runtimePreparations.has(world.id)) return runtimePreparations.get(world.id);
   const preparation = (async () => {
     const mountTarget = document.createElement('div');
-    // Prewarm needs a real layout box. `hidden` (and a detached node) makes
-    // WebGL/canvas sizing resolve to zero and can abort the scene boot.
-    Object.assign(mountTarget.style, {
-      position: 'fixed',
-      left: '-100000px',
-      top: '0',
-      width: '100vw',
-      height: '100vh',
-      opacity: '0',
-      pointerEvents: 'none',
-      overflow: 'hidden',
-    });
-    document.body?.append?.(mountTarget);
+    mountTarget.hidden = true;
     window.POCKETMONSTER_SCENE_MOUNT_TARGET = mountTarget;
     window.POCKETMONSTER_SCENE_PREWARM = true;
     const activePresenceBindings = capturePresenceBindings();
@@ -101,7 +89,6 @@ function preparePocketRuntime(world) {
     } finally {
       if (window.POCKETMONSTER_SCENE_MOUNT_TARGET === mountTarget) delete window.POCKETMONSTER_SCENE_MOUNT_TARGET;
       delete window.POCKETMONSTER_SCENE_PREWARM;
-      mountTarget.remove?.();
     }
   })();
   runtimePreparations.set(world.id, preparation);
