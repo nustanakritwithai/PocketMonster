@@ -8,6 +8,10 @@ import { SAVE_SCHEMA_VERSION, normalizeSavedState, readStoredSave, sanitizeState
  import { STAGE_CATALOG, STAGE_BY_ID, createStageProgress, encounterVariantFromFlags, normalizeStageProgress, recordStageClear, resolveEncounterProfile, stageCurrencyRewards, stageLevelRange, stageRewards, stageUnlockReason, validateStageLevelProgression, validateZoneEncounterConfig } from './stage-catalog.mjs';
 import { nearestRoute, routesFrom, validateWarpRoutes, warpAvailability } from './warp-routes.mjs';
 import { resolveStageObjective, runStageClearReconciliation, stageObjectiveTracker } from './stage-objectives.mjs';
+import { buildPocketQuestHudFeature, createPocketQuestHudStore } from './pocket-quest-hud-view-model.mjs';
+import { buildPocketPartyHudFeature, createPocketPartyHudStore } from './pocket-party-hud-view-model.mjs';
+import { buildPocketActionsHudFeature, buildPocketBannerFeature, buildPocketPlayerHudFeature, buildPocketTargetHudFeature, buildPocketUtilitiesHudFeature, createPocketActionsHudStore, createPocketBannerHudStore, createPocketPlayerHudStore, createPocketTargetHudStore, createPocketUtilitiesHudStore } from './pocket-hud-view-model.mjs';
+import { createHudCommandResult } from './unified-hud-contract-v900.mjs';
 import { createCombatHudViewModel, createPartySlotViewModel } from './combat-ui-view-model.mjs';
 import { createCharacterSkillsViewModel } from './character-skills-view-model.mjs';
 import {
@@ -2596,7 +2600,188 @@ function setStageObjectiveDismissed(dismissed){
   syncStageObjectiveVisibility();
   return stageObjectiveDismissed;
 }
+// Unified HUD Task 4: quest state is published as immutable snapshots for the
+// MMORPG Dock; the legacy stageObjective panel stays a migration fallback.
+const pocketQuestHud=createPocketQuestHudStore();
+function publishPocketQuestHud(){
+  const zoneId=state.currentZone;
+  if(!STAGE_BY_ID[zoneId]){
+    pocketQuestHud.publish(buildPocketQuestHudFeature({hasStage:false}));
+    return;
+  }
+  const objective=currentStageObjective(zoneId);
+  const stageName=STAGE_BY_ID[zoneId]?.displayName||ZONES[zoneId]?.label||zoneId;
+  const speciesId=objective.speciesId||ZONES[zoneId]?.progressionBossSpeciesId;
+  const monsterName=speciesId?(spById[speciesId]?.displayName||spById[speciesId]?.name||speciesId):'';
+  const tracker=stageObjectiveTracker(objective,{stageId:zoneId,stageName,monsterName,});
+  pocketQuestHud.publish(buildPocketQuestHudFeature({hasStage:true,tracker,summary:stageObjectiveText(objective,zoneId)}));
+}
+function toggleQuestHudPanel(open){
+  const dismissed=!(open===true);
+  setStageObjectiveDismissed(dismissed);
+  return createHudCommandResult({ok:true,reason:dismissed?'collapsed':'expanded'});
+}
+window.POCKETMONSTER_QUEST_HUD=Object.freeze({
+  subscribe:pocketQuestHud.subscribe,
+  snapshot:pocketQuestHud.snapshot,
+  togglePanel:toggleQuestHudPanel,
+  reset:pocketQuestHud.reset,
+});
+window.addEventListener('pocketmonster:world-warp-v1',()=>pocketQuestHud.reset());
+window.addEventListener('pocketmonster:session-ended',()=>pocketQuestHud.reset());
+// Unified HUD Task 5: party state is published as immutable snapshots for the
+// MMORPG Dock; selection/switch mutations stay in the legacy gameplay path.
+const pocketPartyHud=createPocketPartyHudStore();
+function pocketPartyHudProjection(){
+  const activeInstanceId=activeSummon?.inst?.instanceId||'';
+  return {
+    selectedSlot:state.selectedSlot,
+    activeInstanceId,
+    canSwitch:characterUI?characterUI.canSwitchParty():false,
+    slots:state.party.map(id=>{
+      const inst=getInst(id);
+      if(!inst)return null;
+      return {
+        instanceId:inst.instanceId,
+        portraitKey:typeof inst.speciesId==='string'?inst.speciesId:'',
+        name:displayName(inst),
+        level:inst.level,
+        hp:inst.hp,
+        hpMax:inst.maxHp,
+        condition:deriveCondition(inst)||'normal',
+        fainted:inst.fainted===true||inst.hp<=0,
+      };
+    }),
+  };
+}
+function publishPocketPartyHud(){
+  pocketPartyHud.publish(buildPocketPartyHudFeature(pocketPartyHudProjection()));
+}
+function selectPartySlotCommand(slot){
+  const index=Number.isInteger(slot)?slot:-1;
+  if(index<0||index>=state.party.length)return createHudCommandResult({ok:false,reason:'invalid-slot'});
+  if(pirateThrowPanelPaused())return createHudCommandResult({ok:false,reason:'input-paused'});
+  if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
+  const gate=characterUI.requestSwitchParty(index);
+  if(!gate.ok)return createHudCommandResult({ok:false,reason:gate.reason||'switch-blocked',message:gate.reasonText||''});
+  switchPartySlot(index);
+  return createHudCommandResult({ok:true,reason:'slot-selected'});
+}
+function openCharacterCommand(slot){
+  if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
+  const index=Number.isInteger(slot)?slot:state.selectedSlot;
+  const result=characterUI.peekPartySlot(index);
+  if(!result?.ok)return createHudCommandResult({ok:false,reason:result?.reason||'open-failed'});
+  return createHudCommandResult({ok:true,reason:'character-opened'});
+}
+window.POCKETMONSTER_PARTY_HUD=Object.freeze({
+  subscribe:pocketPartyHud.subscribe,
+  snapshot:pocketPartyHud.snapshot,
+  selectPartySlot:selectPartySlotCommand,
+  switchPartySlot:selectPartySlotCommand,
+  openCharacter:openCharacterCommand,
+  reset:pocketPartyHud.reset,
+});
+window.addEventListener('pocketmonster:world-warp-v1',()=>pocketPartyHud.reset());
+window.addEventListener('pocketmonster:session-ended',()=>pocketPartyHud.reset());
+// Unified HUD Task 5A: the remaining legacy HUD data (player/target/actions/
+// utilities/banner) is published as immutable snapshots for the Dock too.
+const pocketPlayerHud=createPocketPlayerHudStore();
+const pocketTargetHud=createPocketTargetHudStore();
+const pocketActionsHud=createPocketActionsHudStore();
+const pocketUtilitiesHud=createPocketUtilitiesHudStore();
+const pocketBannerHud=createPocketBannerHudStore();
+function pocketPlayerHudProjection(){
+  const balls=state.inventory.captureBalls||0;
+  const profile=window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile;
+  const descriptors=combatStatusDescriptors(activeSummon?.statusState);
+  return {
+    available:true,
+    portraitKey:'keeper',
+    displayName:profile?.character?.name||profile?.displayName||'ผู้ดูแล',
+    level:0,
+    title:'',
+    hp:playerData.hp,
+    hpMax:playerData.maxHp,
+    resourceKind:'capture-balls',
+    resource:balls,
+    resourceMax:balls,
+    modeLabel:`${ZONES[state.currentZone]?.label||state.currentZone} • Gold ${state.wallet?.gold??0} • EXP ${Math.floor(state.exp)}`,
+    modePercent:0,
+    buffs:descriptors.map(status=>({
+      id:status.statusId,
+      label:status.nameTH,
+      visualKey:status.polarity==='Positive'?'positive':'negative',
+      description:`${status.nameEN||''} • ${status.remainingText} วินาที${status.stacks>1?` • ${status.stacks} ชั้น`:''}`.trim(),
+      expiresAt:0,
+    })),
+  };
+}
+function publishPocketPlayerHud(){
+  pocketPlayerHud.publish(buildPocketPlayerHudFeature(pocketPlayerHudProjection()));
+  pocketUtilitiesHud.publish(buildPocketUtilitiesHudFeature({audioMuted:isMuted()}));
+}
+function pocketTargetHudProjection(){
+  const target=activeSummon?.target&&!activeSummon.target.dead?activeSummon.target:(aimedWild(10,1.8)||nearestWild(10));
+  if(!target)return null;
+  const species=spById[target.speciesId];
+  const states=[...(species?.types||[])];
+  if(target.boss)states.push('boss');
+  else if(target.elite)states.push('elite');
+  for(const status of combatStatusDescriptors(target.statusState))states.push(status.statusId);
+  return {
+    id:target.instanceId||`wild-${target.speciesId}-${target.level||0}`,
+    portraitKey:String(target.speciesId||''),
+    name:`${species?.name||'Monster'}${target.boss?' ★ BOSS':target.elite?' ★ ELITE':''}`,
+    level:target.level,
+    hp:target.hp,
+    hpMax:target.maxHp,
+    states,
+  };
+}
+function publishPocketTargetHud(){
+  pocketTargetHud.publish(buildPocketTargetHudFeature(pocketTargetHudProjection()));
+}
+function pocketActionsHudProjection(){
+  const presentation=combatHudPresentation();
+  const skillOwner=activeSummon?.inst||selectedInstance();
+  const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[];
+  return {
+    captureBalls:state.inventory.captureBalls||0,
+    core:{capture:presentation.actions.capture,summon:presentation.actions.summon,recall:presentation.actions.recall},
+    skills:MANUAL_SKILL_SLOTS.map((_,index)=>{
+      const skill=skillDefs[index];
+      const view=presentation.skills[index];
+      return {
+        name:skill?.name||`สกิล ${index+1}`,
+        state:view?.state||'unavailable',
+        disabled:view?.disabled!==false,
+        reason:view?.reason||'',
+        cooldownRemaining:activeSummon?.skillCds?.[index]||0,
+        cooldownTotal:0,
+        currentUses:skill?.currentUses,
+      };
+    }),
+  };
+}
+function publishPocketActionsHud(){
+  pocketActionsHud.publish(buildPocketActionsHudFeature(pocketActionsHudProjection()));
+}
+function publishPocketBannerHud(text){
+  pocketBannerHud.publish(buildPocketBannerFeature(text));
+}
+window.POCKETMONSTER_POCKET_HUD=Object.freeze({
+  player:Object.freeze({subscribe:pocketPlayerHud.subscribe,snapshot:pocketPlayerHud.snapshot}),
+  target:Object.freeze({subscribe:pocketTargetHud.subscribe,snapshot:pocketTargetHud.snapshot}),
+  actions:Object.freeze({subscribe:pocketActionsHud.subscribe,snapshot:pocketActionsHud.snapshot}),
+  utilities:Object.freeze({subscribe:pocketUtilitiesHud.subscribe,snapshot:pocketUtilitiesHud.snapshot}),
+  banner:Object.freeze({subscribe:pocketBannerHud.subscribe,snapshot:pocketBannerHud.snapshot}),
+  resetAll(){pocketPlayerHud.reset();pocketTargetHud.reset();pocketActionsHud.reset();pocketUtilitiesHud.reset();pocketBannerHud.reset();},
+});
+window.addEventListener('pocketmonster:world-warp-v1',()=>window.POCKETMONSTER_POCKET_HUD.resetAll());
+window.addEventListener('pocketmonster:session-ended',()=>window.POCKETMONSTER_POCKET_HUD.resetAll());
 function renderStarterJourney(){
+  publishPocketQuestHud();
   const panel=el('stageObjective'),stepEl=el('stageObjectiveStep'),listEl=el('stageObjectiveList'),titleEl=el('stageObjectiveTitle');
   if(!panel||!stepEl)return;
   if(!STAGE_BY_ID[state.currentZone]){
@@ -2643,7 +2828,7 @@ function getInst(id){return state.collection.find(m=>m.instanceId===id)||null;}
 function selectedInstance(){return getInst(state.party[state.selectedSlot]);}
 function distXZ(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
 function hpPct(v){return Math.max(0,Math.min(1,v));}
-function msg(t){el('message').textContent=t;}
+function msg(t){el('message').textContent=t;publishPocketBannerHud(t);}
 function setManagerTab(tab='collection'){
   if(tab==='breeding'&&!(isNearNpc()||isNearBreeding())){
     msg(FULL_MANAGER_NPC_REASON);
@@ -6529,6 +6714,7 @@ function syncSkillButtonResourceUi(button,skill,cooldownSeconds=0){
   setClassTokenIfChanged(button,'on-cooldown',remaining>0);
 }
 function renderCombatPresentation(){
+  publishPocketActionsHud();
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
   const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
   const statusControl=activeSummon?resolveCombatStatusRuntime(activeSummon.statusState):null;
@@ -6561,6 +6747,7 @@ function renderCombatPresentation(){
   setTextIfChanged(activeLabel,!activeSummon&&!pendingSummon&&hubCompanion?`${displayName(hubCompanion.inst)} • Ranch`:presentation.activeLabel);
 }
 function renderHUD(){
+  publishPocketPlayerHud();
   setTextIfChanged(el('playerHp'),`${fmt(playerData.hp)}/${playerData.maxHp}`);
   setTextIfChanged(el('collectionCount'),state.collection.length);
   const balls=state.inventory.captureBalls||0;
@@ -6591,6 +6778,7 @@ function switchPartySlot(index){
   syncHubCompanion();renderParty();renderSkillButtons();renderHUD();renderCharacterAccess();
 }
 function renderParty(){
+  publishPocketPartyHud();
   const party=el('party'),activeInstanceId=activeSummon?.inst.instanceId||null;
   party.replaceChildren();
   state.party.forEach((id,index)=>{
@@ -6830,6 +7018,7 @@ function handleCharacterUiHardwareBack(event){
 }
 function renderSkillButtons(){renderCombatPresentation();}
 function updateTarget(){
+  publishPocketTargetHud();
   const target=activeSummon?.target&&!activeSummon.target.dead?activeSummon.target:(aimedWild(10,1.8)||nearestWild(10)),card=el('targetCard');
   if(!target){setClassTokenIfChanged(card,'hidden',true);renderCombatStatusList(el('targetStatusStrip'),null);return;}
   setClassTokenIfChanged(card,'hidden',false);

@@ -47,7 +47,7 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=925/, 'active HTML cache-busts the persistent-shell entry');
-assert.match(indexHtml, /style-v900\.css\?v=913/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(indexHtml, /style-v900\.css\?v=916/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
 assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=15'\)/, 'top-level authenticates once before starting the cache-busted shell');
@@ -82,7 +82,7 @@ assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
   'scene code cannot access a second Combat global or forge Server reconciliation');
 assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
   'scene teardown closes pending Combat state without destroying the persistent host');
-assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-3'\)/, 'shell owns the one chat transport');
+assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-4'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");

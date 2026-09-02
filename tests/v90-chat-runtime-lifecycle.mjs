@@ -17,6 +17,7 @@ if (!scenario) {
     'suspend-pull-resume',
     'suspend-send-resume',
     'closing-resume',
+    'store-auth-rejection-resets',
   ]) {
     const result = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name], { encoding: 'utf8' });
     assert.equal(result.status, 0, `${name} failed\n${result.stdout}\n${result.stderr}`);
@@ -437,6 +438,29 @@ if (scenario === 'stop-during-config') {
   assert.equal(FakeWebSocket.instances.length, 2, 'one replacement starts only after the prior socket is fully closed');
   assert.ok(FakeWebSocket.instances.filter(socket => socket.readyState !== FakeWebSocket.CLOSED).length <= 1);
   window.dispatchEvent(new Event('pocketmonster:session-ended'));
+} else if (scenario === 'store-auth-rejection-resets') {
+  window.POCKETMONSTER_RUNTIME_CONFIG = {
+    apiBaseUrl: 'https://server.example',
+    webSocketUrl: 'wss://server.example/ws/chat',
+  };
+  globalThis.fetch = async () => reply({ success: false }, 401);
+  await import(`../chat-runtime.mjs?store-auth-rejection=${Date.now()}`);
+  await wait();
+  const chat = window.POCKETMONSTER_CHAT_RUNTIME.chat;
+  assert.ok(chat, 'chat adapter API exists on the runtime singleton');
+  const seen = [];
+  const unsubscribe = chat.subscribe(snapshot => seen.push(snapshot));
+  const snapshot = chat.snapshot();
+  assert.equal(snapshot.canSend, false, 'a REST 401 leaves the store unable to send');
+  assert.equal(snapshot.status, 'unavailable');
+  assert.deepEqual(snapshot.rows, []);
+  assert.equal(seen[seen.length - 1].canSend, false, 'subscribers hear the terminal auth reset');
+  const send = await chat.sendChat('ควรถูกปฏิเสธ');
+  assert.equal(send.ok, false, 'send commands fail closed after an auth rejection');
+  assert.equal(send.reason, 'session-unavailable');
+  const channel = chat.setChatChannel('ZONE');
+  assert.equal(channel.ok, false, 'channel commands fail closed after an auth rejection');
+  unsubscribe();
 } else {
   assert.fail(`Unknown lifecycle scenario: ${scenario}`);
 }
