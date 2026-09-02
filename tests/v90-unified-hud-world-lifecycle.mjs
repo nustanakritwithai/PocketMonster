@@ -9,6 +9,7 @@ class FakeNode {
     this.children = [];
     this.parentNode = null;
     this.dataset = {};
+    this.style = {};
     this.textContent = '';
     this.value = '';
     const classes = new Set();
