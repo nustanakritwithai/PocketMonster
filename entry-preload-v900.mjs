@@ -5,7 +5,7 @@ import {
 } from './launch-bootstrap.mjs?v=912';
 import { applyPendingPatch } from './patch-updater.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=1';
+import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=2';
 import {
   healthVersionGate,
   publishServerGateTelemetry,

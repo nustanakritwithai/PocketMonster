@@ -9,8 +9,13 @@ import {
 import {
   PERSISTENT_MINIMAP_OWNER_KIND,
   PIRATE_FRUIT_MINIMAP_BOUNDS,
+  PIRATE_FRUIT_MINIMAP_LOCAL_SCALE,
+  PIRATE_FRUIT_MINIMAP_NEAR_PADDING,
+  PIRATE_FRUIT_MINIMAP_OCEAN_VIEW,
+  PIRATE_FRUIT_MINIMAP_POIS,
   createPersistentMinimapOwner,
   pirateFruitMinimapFrame,
+  pirateFruitMinimapView,
 } from '../persistent-minimap-owner-v900.mjs';
 
 // ---------- Projection geometry ----------
@@ -70,18 +75,46 @@ import {
   assert.ok(!frame.markers.some(marker => marker.id === '<<bad>>'), 'unsafe marker ids are dropped');
 }
 
-// ---------- Persistent Pirate Fruit owner ----------
+// ---------- Legacy Pirate Fruit map image + near/far views ----------
 {
-  assert.equal(PERSISTENT_MINIMAP_OWNER_KIND, 'pocketmonster:persistent-minimap-owner-v1');
+  assert.equal(PERSISTENT_MINIMAP_OWNER_KIND, 'pocketmonster:persistent-minimap-owner-v2');
+  assert.equal(PIRATE_FRUIT_MINIMAP_NEAR_PADDING, 18, 'legacy local-view padding stays 18 world units');
+  assert.equal(PIRATE_FRUIT_MINIMAP_LOCAL_SCALE, 1.3, 'legacy local view keeps island radius × 1.3');
+  assert.equal(PIRATE_FRUIT_MINIMAP_POIS.length, 35, 'legacy Pirate map POI catalog is restored');
   assert.ok(PIRATE_FRUIT_MINIMAP_BOUNDS.minX < 0 && PIRATE_FRUIT_MINIMAP_BOUNDS.maxX > 500, 'Pirate bounds cover the island chain');
   assert.ok(PIRATE_FRUIT_MINIMAP_BOUNDS.minZ < -150 && PIRATE_FRUIT_MINIMAP_BOUNDS.maxZ > 500, 'Pirate bounds cover north/south island extents');
+  assert.equal(PIRATE_FRUIT_MINIMAP_OCEAN_VIEW.id, 'ocean-overview');
+  assert.equal(PIRATE_FRUIT_MINIMAP_OCEAN_VIEW.scale, 'far');
+
+  const localView = pirateFruitMinimapView({ x: 0, z: 0 }, 'auto');
+  assert.equal(localView.id, 'starter-island', 'AUTO zoom uses the nearby island view');
+  assert.equal(localView.scale, 'near');
+  assert.equal(localView.radius, 60 * 1.3);
+
+  const seaView = pirateFruitMinimapView({ x: 300, z: 200 }, 'auto');
+  assert.equal(seaView.id, 'ocean-overview', 'AUTO zoom returns to ocean overview away from islands');
+  assert.equal(seaView.scale, 'far');
+
+  const forcedFar = pirateFruitMinimapView({ x: 0, z: 0 }, 'far');
+  assert.equal(forcedFar.id, 'ocean-overview', 'manual far zoom can show the whole island chain from land');
+  const forcedNear = pirateFruitMinimapView({ x: 300, z: 200 }, 'near');
+  assert.equal(forcedNear.scale, 'near', 'manual near zoom selects the nearest island even while at sea');
+}
+
+{
   const frame = pirateFruitMinimapFrame({ x: 0, z: 0, dir: Math.PI / 2, zone: 'pirate-fruit' });
   assert.equal(frame.available, true, 'Pirate geography produces a real minimap frame');
-  assert.equal(frame.markers.length, 6, 'all six Pirate Fruit islands are projected');
-  assert.ok(frame.markers.some(marker => marker.id === 'island-starter-island'));
-  assert.ok(frame.markers.some(marker => marker.id === 'island-ember-volcano'));
+  assert.equal(frame.mapView.id, 'starter-island');
+  assert.equal(frame.mapView.scale, 'near');
+  assert.equal(frame.markers.length, 5, 'local starter map exposes the five legacy starter POIs');
+  assert.ok(frame.markers.some(marker => marker.id === 'poi-starter-village'));
+  assert.ok(frame.markers.some(marker => marker.id === 'poi-hill-shrine'));
   assert.ok(frame.player, 'live player pose is projected');
   assert.equal(frame.player.heading, 90, 'Pirate radians are converted to minimap degrees');
+
+  const far = pirateFruitMinimapFrame({ x: 300, z: 200, dir: 0, zone: 'pirate-fruit' });
+  assert.equal(far.mapView.scale, 'far');
+  assert.equal(far.markers.length, 18, 'ocean overview keeps village/harbor/boss anchor POIs like the old minimap');
 }
 
 {
@@ -92,6 +125,7 @@ import {
   const documentLike = {
     head: { append(node) { links.push(node); } },
     querySelector() { return null; },
+    getElementById() { return null; },
     createElement(tag) { return { tagName: tag.toUpperCase(), dataset: {} }; },
   };
   const pose = { x: 170, z: -120, dir: Math.PI, zone: 'pirate-fruit' };
@@ -107,10 +141,20 @@ import {
   const owner = createPersistentMinimapOwner({ windowLike, documentLike, intervalMs: 125 });
   assert.equal(windowLike.POCKETMONSTER_MINIMAP_HUD, owner.api, 'owner exposes the parent minimap global');
   assert.equal(owner.api.snapshot().available, true, 'owner publishes Pirate geography immediately');
-  assert.equal(owner.api.snapshot().markers.length, 6);
+  assert.equal(owner.api.snapshot().markers.length, 6, 'Mist Jungle local view exposes its six POIs');
   assert.ok(owner.api.snapshot().player, 'owner publishes the live player pose');
+  assert.equal(owner.api.diagnostics().zoomMode, 'auto');
+  assert.equal(owner.api.diagnostics().mapView, 'mist-jungle');
+  owner.api.zoomOut();
+  assert.equal(owner.api.diagnostics().zoomMode, 'far');
+  assert.equal(owner.api.diagnostics().mapView, 'ocean-overview');
+  owner.api.zoomIn();
+  assert.equal(owner.api.diagnostics().zoomMode, 'near');
+  assert.equal(owner.api.diagnostics().mapView, 'mist-jungle');
+  owner.api.autoZoom();
+  assert.equal(owner.api.diagnostics().zoomMode, 'auto');
   assert.equal(links.length, 1, 'owner attaches one external mobile visibility stylesheet');
-  assert.match(links[0].href, /unified-minimap-mobile-v900\.css\?v=1$/);
+  assert.match(links[0].href, /unified-minimap-mobile-v900\.css\?v=2$/);
   assert.equal(scheduled.ms, 125, 'owner refreshes parent world state at a bounded cadence');
   windowLike.POCKETMONSTER_MINIMAP_HUD = null;
   listeners.get('pocketmonster:online-scene-ready')?.();
@@ -158,11 +202,16 @@ assert.match(dockSource, /subscribeFeature\('minimap',\s*minimapAdapter\(\)\)/, 
 assert.match(dockSource, /POCKETMONSTER_MINIMAP_HUD/, 'Dock discovers the minimap through the shared global');
 assert.match(dockSource, /function renderMinimap/, 'Dock renders minimap projections');
 assert.match(ownerSource, /POCKETMONSTER_WORLD_STATE/, 'persistent owner reads the authoritative parent pose');
-assert.match(ownerSource, /POCKETMONSTER_MINIMAP_HUD/, 'persistent owner exposes the Dock minimap adapter');
-assert.match(ownerSource, /pocketmonster:online-scene-ready/, 'persistent owner restores itself after scene HUD rebinding');
 assert.match(ownerSource, /PIRATE_FRUIT_ISLAND_CENTERS/, 'persistent owner uses real Pirate island geography');
+assert.match(ownerSource, /createImageData\(MAP_RASTER_SIZE, MAP_RASTER_SIZE\)/, 'legacy 160px terrain raster is restored');
+assert.match(ownerSource, /terrainHeightAt/, 'legacy height-based terrain coloring is restored');
+assert.match(ownerSource, /PIRATE_FRUIT_MINIMAP_LOCAL_SCALE/, 'legacy local island scale is explicit');
+assert.match(ownerSource, /PIRATE_FRUIT_MINIMAP_NEAR_PADDING/, 'legacy near/far switch padding is explicit');
+assert.match(ownerSource, /pocketmonster:online-scene-ready/, 'persistent owner restores itself after scene HUD rebinding');
 assert.match(mobileCss, /@media\s*\(max-height:420px\)/, 'short landscape screens have an explicit minimap override');
 assert.match(mobileCss, /\.mmorpg-hud \.mmorpg-minimap\{display:block!important\}/, 'short landscape screens keep the rectangular minimap visible');
+assert.match(mobileCss, /\.mmorpg-minimap-map-image/, 'map raster fills the new rectangular minimap');
+assert.match(mobileCss, /\.mmorpg-minimap-marker\.static-poi\{display:none\}/, 'legacy raster POIs are not double-painted by DOM markers');
 assert.match(entrySource, /installPersistentMinimapOwner/, 'V9 entry installs the persistent minimap owner');
 
 console.log('V9 unified minimap projection: PASS');

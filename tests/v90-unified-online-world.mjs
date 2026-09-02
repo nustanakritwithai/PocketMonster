@@ -21,6 +21,7 @@ const entry = read('entry-preload-v900.mjs');
 const shell = read('online-world-shell-v900.mjs');
 const bridgeSource = read('online-world-bridge-v900.mjs');
 const fullscreenBridge = read('persistent-fullscreen-v900.mjs');
+const minimapOwner = read('persistent-minimap-owner-v900.mjs');
 const shellCss = read('style-v900.css');
 const sceneEntry = read('scene-entry-v900.mjs');
 const sceneHtml = read('scene-v900.html');
@@ -37,6 +38,7 @@ for (const file of [
   'online-world-bridge-v900.mjs',
   'online-world-shell-v900.mjs',
   'persistent-fullscreen-v900.mjs',
+  'persistent-minimap-owner-v900.mjs',
   'scene-entry-v900.mjs',
   'worlds-v900.mjs',
   'chat-runtime.mjs',
@@ -46,12 +48,17 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=929/, 'active HTML cache-busts the persistent-shell entry');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=930/, 'active HTML cache-busts the restored minimap entry');
 assert.match(indexHtml, /style-v900\.css\?v=932/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
 assert.match(sceneHtml, /style-v900\.css\?v=932/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
+assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'top-level entry loads the restored raster/near-far minimap owner revision');
+assert.match(minimapOwner, /pocketmonster:persistent-minimap-owner-v2/, 'production minimap owner exposes the v2 capability');
+assert.match(minimapOwner, /MAP_RASTER_SIZE = 160/, 'production minimap owner restores the legacy 160px terrain raster');
+assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_NEAR_PADDING = 18/, 'production minimap owner restores legacy near-range padding');
+assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_LOCAL_SCALE = 1\.3/, 'production minimap owner restores legacy local island scale');
 assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=20'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');

@@ -1,3 +1,10 @@
 @media (max-height:420px){
   .mmorpg-hud .mmorpg-minimap{display:block!important}
 }
+
+.mmorpg-hud .mmorpg-minimap{isolation:isolate;background:#174a69;overflow:hidden}
+.mmorpg-minimap-map-image{position:absolute;inset:0;z-index:0;width:100%;height:100%;display:block;pointer-events:none;object-fit:fill}
+.mmorpg-hud .mmorpg-minimap-marker{z-index:2}
+.mmorpg-hud .mmorpg-minimap-marker.static-poi{display:none}
+.mmorpg-hud .mmorpg-minimap-player{z-index:3!important;width:14px!important;height:14px!important;border:1px solid rgba(0,0,0,.65)!important;border-radius:0!important;background:#fff!important;clip-path:polygon(50% 0,92% 92%,50% 70%,8% 92%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));transform-origin:center}
+.mmorpg-hud .mmorpg-minimap:not(.unavailable)::after{content:attr(data-map-scale);position:absolute;right:5px;bottom:5px;z-index:4;padding:2px 5px;border-radius:999px;background:rgba(4,20,27,.72);color:#e9f8ed;font:700 8px/1 system-ui;pointer-events:none}
