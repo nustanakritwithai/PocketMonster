@@ -343,6 +343,13 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
         },
       });
     }
+    if (pathname === '/npc-interaction-layer-v900.mjs') {
+      return makeSynthetic(resolvedUrl, {
+        installNpcInteractionLayer() {
+          metrics.timeline.push('module:npc-interaction-layer');
+        },
+      });
+    }
     if (pathname === '/startup-errors.mjs') {
       metrics.timeline.push('module:startup-errors');
       return makeSynthetic(resolvedUrl, {});
