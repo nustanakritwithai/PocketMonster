@@ -17,6 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=931';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -40,6 +41,33 @@ let activeSceneLease = null;
 let sessionEnding = false;
 let sessionEndReason = null;
 let sessionExpiryTimer = null;
+let unifiedHud = null;
+const SCENE_HUD_ADAPTERS = Object.freeze([
+  'POCKETMONSTER_QUEST_HUD',
+  'POCKETMONSTER_PARTY_HUD',
+  'POCKETMONSTER_POCKET_HUD',
+  'POCKETMONSTER_MINIMAP_HUD',
+]);
+
+function clearSceneHudAdapters() {
+  for (const name of SCENE_HUD_ADAPTERS) {
+    try { delete window[name]; } catch { window[name] = undefined; }
+  }
+  unifiedHud?.rebind?.();
+}
+
+function bindSceneHudAdapters(sceneWindow) {
+  for (const name of SCENE_HUD_ADAPTERS) {
+    try { window[name] = sceneWindow?.[name]; } catch { window[name] = undefined; }
+  }
+  unifiedHud?.rebind?.();
+}
+
+function installUnifiedHud() {
+  if (sessionEnding || !unifiedHud) return;
+  unifiedHud.mount();
+  window.POCKETMONSTER_UNIFIED_HUD = unifiedHud;
+}
 
 function requireHealthyParentServerGate() {
   const gate = window.POCKETMONSTER_SERVER_GATE;
@@ -68,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '13');
+  url.searchParams.set('shellRevision', '14');
   return url.href;
 }
 
@@ -205,6 +233,7 @@ function showSceneLoading(message = 'กำลังเปิดโลกออ�
 
 function invalidateSceneBoot({ showLoading = false, message } = {}) {
   activeSceneLease = null;
+  clearSceneHudAdapters();
   if (showLoading && !sessionEnding) showSceneLoading(message);
 }
 
@@ -294,6 +323,9 @@ function endSession(reason = 'session-ended') {
   teardownSceneRealm(sessionEndReason);
   destroyCombatShell();
   presenceBridge.reset();
+  clearSceneHudAdapters();
+  unifiedHud?.unmount?.();
+  try { delete window.POCKETMONSTER_UNIFIED_HUD; } catch { window.POCKETMONSTER_UNIFIED_HUD = undefined; }
   window.POCKETMONSTER_CHAT_RUNTIME?.stop?.(sessionEndReason);
   clearLaunchSession(window.sessionStorage);
   shellStatus.classList.remove('hidden');
@@ -382,6 +414,8 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
       sceneReadyCount,
       sceneBootGeneration: lease.generation,
     });
+    bindSceneHudAdapters(sceneWindow);
+    unifiedHud?.setExpanded?.(true);
     window.dispatchEvent(new CustomEvent('pocketmonster:online-scene-ready', { detail }));
     window.dispatchEvent(new CustomEvent('pocketmonster:online-scene-loaded', { detail }));
     return true;
@@ -519,6 +553,9 @@ window.addEventListener('pageshow', event => {
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
 await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
+unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
+installUnifiedHud();
+unifiedHud.setExpanded(false);
 const combatTransportStarted = combatTransport.start({
   runtime: window.POCKETMONSTER_CHAT_RUNTIME,
 });

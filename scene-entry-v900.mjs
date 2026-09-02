@@ -173,6 +173,11 @@ try {
     .filter(node => node.nodeName !== 'SCRIPT')
     .map(node => document.importNode(node, true));
   document.body.replaceChildren(...sceneNodes);
+  try {
+    if (window.parent?.document?.body?.classList?.contains('unified-hud-active')) {
+      document.body.classList.add('unified-hud-active');
+    }
+  } catch {}
   document.getElementById('chatToggleBtn')?.remove();
   document.getElementById('gameChat')?.remove();
   document.getElementById('accountGate')?.classList.add('hidden');

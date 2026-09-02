@@ -50,7 +50,7 @@ assert.match(indexHtml, /entry-preload-v900\.mjs\?v=925/, 'active HTML cache-bus
 assert.match(indexHtml, /style-v900\.css\?v=916/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=15'\)/, 'top-level authenticates once before starting the cache-busted shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=16'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -58,7 +58,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=15')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=16')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -122,7 +122,7 @@ assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSessio
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
 assert.match(shell, /combined-worlds-v900\.mjs\?v=921/, 'persistent shell cache-busts the changed world catalog');
-assert.match(shell, /searchParams\.set\('shellRevision', '13'\)/, 'persistent shell cache-busts the changed scene HTML');
+assert.match(shell, /searchParams\.set\('shellRevision', '14'\)/, 'persistent shell cache-busts the changed scene HTML');
 assert.match(worlds, /combined-worlds-v900\.mjs\?v=921/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=923/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');

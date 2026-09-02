@@ -394,11 +394,11 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
   // ---------- Lifecycle ----------
 
-  function mount() {
-    if (shell) return shell;
-    shell = buildShell();
-    documentLike.body.append(shell);
-    documentLike.body.classList.add('unified-hud-active');
+  function bindFeatures() {
+    for (const unsubscribe of unsubscribers.splice(0)) {
+      try { unsubscribe(); } catch {}
+    }
+    lastRevisions.clear();
     subscribeFeature('chat', chatAdapter());
     subscribeFeature('minimap', minimapAdapter());
     subscribeFeature('quest', questAdapter());
@@ -411,8 +411,23 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       subscribeFeature('utilities', pocket.utilities);
       subscribeFeature('banner', pocket.banner);
     }
+  }
+
+  function mount() {
+    if (shell) return shell;
+    shell = buildShell();
+    documentLike.body.append(shell);
+    documentLike.body.classList.add('unified-hud-active');
+    bindFeatures();
     setTab(activeTab);
     setExpanded(expanded);
+    return shell;
+  }
+
+  function rebind() {
+    if (!shell) return null;
+    bindFeatures();
+    setTab(activeTab);
     return shell;
   }
 
@@ -421,7 +436,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       try { unsubscribe(); } catch {}
     }
     lastRevisions.clear();
-    if (shell?.parentNode?.children) {
+    try { shell?.remove?.(); } catch {}
+    if (Array.isArray(shell?.parentNode?.children)) {
       shell.parentNode.children = shell.parentNode.children.filter(child => child !== shell);
     }
     documentLike.body.classList.remove('unified-hud-active');
@@ -432,6 +448,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   return Object.freeze({
     kind: UNIFIED_MMORPG_HUD_KIND,
     mount,
+    rebind,
     unmount,
     setTab,
     setExpanded,
