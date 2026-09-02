@@ -7,7 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
-import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=3';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=4';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
@@ -153,12 +153,26 @@ function handlePocketMonsterWorldWarp(event) {
 
 window.addEventListener('pocketmonster:world-warp-v1', handlePocketMonsterWorldWarp);
 
+function selectPanel(id) {
+  const worldId = document.body.dataset.combinedWorld;
+  if (!worldId) return;
+  const panel = applyControlPanel(id, worldId);
+  unifiedMobileControls?.activate(worldId);
+  const url = combinedWorldLocation(worldId, panel.id);
+  if (`${location.pathname}${location.search}` !== url) history.replaceState(null, '', url);
+}
+
+const panelSwitcher = document.getElementById('controlPanelSwitcher');
+panelSwitcher?.querySelectorAll('[data-control-panel]').forEach(button => {
+  button.addEventListener('click', () => selectPanel(button.dataset.controlPanel));
+});
+
 async function bootWorld(id) {
   const world = worldById(id);
   if (!world) return;
   document.body.dataset.combinedWorld = world.id;
-  unifiedMobileControls.activate(world.id);
   const panel = applyControlPanel(panelIdFromLocation(location, world.id), world.id);
+  unifiedMobileControls.activate(world.id);
   const canonical = combinedWorldLocation(world.id, panel.id);
   if (`${location.pathname}${location.search}` !== canonical) history.replaceState(null, '', canonical);
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({

@@ -13,7 +13,12 @@
 body[data-combined-world="pirate-fruit"][data-control-panel="throw"] #pirateFruitFrame{visibility:hidden;pointer-events:none}
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #controlPanelHint{display:none!important}
 body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateFruitFrame{z-index:5}
-#controlPanelSwitcher{display:none!important}
+#controlPanelSwitcher{position:fixed;left:8px;top:40px;z-index:16010;display:none;gap:6px;flex-wrap:wrap;max-width:70vw;pointer-events:auto}
+body[data-combined-world] #controlPanelSwitcher{display:flex}
+body[data-combined-world="pocket-monster"] #controlPanelSwitcher [data-control-panel="human"]{display:none!important}
+#controlPanelSwitcher button{pointer-events:auto;border:0;border-radius:999px;padding:6px 10px;font:700 11px system-ui;background:#1e293b;color:#e2e8f0;cursor:pointer}
+#controlPanelSwitcher button[aria-current="page"]{background:#0f766e;color:#fff}
+#controlPanelSwitcher button[data-control-panel="throw"][aria-current="page"]{background:#b45309}
 .control-panel-hint{position:fixed;left:8px;top:72px;z-index:9998;max-width:70vw;padding:4px 8px;border-radius:8px;background:#0f172acc;color:#cbd5e1;font:600 11px system-ui;pointer-events:none}
 body[data-combined-world] .control-panel-hint{display:block}
 .control-panel-hint.hidden{display:none!important}

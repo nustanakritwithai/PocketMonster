@@ -47,8 +47,8 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=927/, 'active HTML cache-busts the persistent-shell entry');
-assert.match(indexHtml, /style-v900\.css\?v=921/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
-assert.match(sceneHtml, /style-v900\.css\?v=921/, 'hosted scene cache-busts the same V9 stylesheet');
+assert.match(indexHtml, /style-v900\.css\?v=922/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(sceneHtml, /style-v900\.css\?v=922/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
@@ -124,13 +124,13 @@ assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSessio
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
 assert.match(shell, /combined-worlds-v900\.mjs\?v=921/, 'persistent shell cache-busts the changed world catalog');
-assert.match(shell, /searchParams\.set\('shellRevision', '16'\)/, 'persistent shell cache-busts the changed scene HTML');
+assert.match(shell, /searchParams\.set\('shellRevision', '17'\)/, 'persistent shell cache-busts the changed scene HTML');
 assert.match(worlds, /combined-worlds-v900\.mjs\?v=921/, 'scene router cache-busts the changed world catalog');
-assert.match(sceneEntry, /worlds-v900\.mjs\?v=924/, 'hosted scene cache-busts the three-world router');
+assert.match(sceneEntry, /worlds-v900\.mjs\?v=925/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
 assert.match(worlds, /runtimeLifecycles\.get\(world\.id\)\?\.mount\?\.\(\)[\s\S]*applyPresenceBindings\(worldPresenceBindings\.get\(world\.id\)\)/, 'mount activates the selected world presence provider');
-const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=924')");
+const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=925')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');
 assert.doesNotMatch(sceneEntry, /prepareLaunch|redeemLaunchTicket|chat-runtime|new WebSocket|sessionStorage/, 'scene entry cannot redeem, persist, or create another transport');
