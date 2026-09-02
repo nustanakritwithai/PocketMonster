@@ -4,7 +4,7 @@ const NPC_INTERACTION_LAYER_CSS = `
 body.unified-hud-active #npcBtn.npc-btn:not(.hidden) {
   display: block !important;
   position: fixed !important;
-  z-index: 1000 !important;
+  z-index: 30 !important;
   pointer-events: auto !important;
   touch-action: manipulation !important;
 }
