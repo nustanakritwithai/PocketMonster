@@ -32,6 +32,7 @@ assert.equal(readPirateOnboardingState({
 assert.equal(readPirateOnboardingState({ type: PIRATE_ONBOARDING_STATE_MESSAGE, active: 'yes' }), null);
 assert.equal(readPirateOnboardingState({ type: 'other', active: true }), null);
 
+// Standalone Pirate Fruit may still use the compact tutorial presentation.
 assert.match(PIRATE_ONBOARDING_COMPACT_CSS, /max-height:\s*500px/);
 assert.match(PIRATE_ONBOARDING_COMPACT_CSS, /pointer:\s*coarse/);
 assert.match(PIRATE_ONBOARDING_COMPACT_CSS, /\.onboarding-root\s*\{[^}]*width:\s*min\(260px/);
@@ -42,27 +43,30 @@ const childBridge = fs.readFileSync(new URL('../pirate-fruit-offline/unified-inp
 const childEntry = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const parentBoot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', import.meta.url), 'utf8');
-const parentCss = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
 assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=923/);
 
+// Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
+// owns the visible interaction UI through the parent HUD policy.
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
-assert.match(childBridge, /\.onboarding-prev/);
-assert.match(childBridge, /\.onboarding-pause/);
-assert.match(childBridge, /\.onboarding-next/);
 assert.match(childBridge, /window\.parent\.postMessage\([\s\S]*PIRATE_ONBOARDING_STATE_MESSAGE[\s\S]*allowedParentOrigin/);
 assert.match(childBridge, /PIRATE_ONBOARDING_COMPACT_CSS/);
-assert.match(childBridge, /message\.kind === 'onboarding-action'/);
 assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
 assert.match(parentBoot, /event\.source !== frame\.contentWindow \|\| event\.origin !== 'null'/);
-assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding, sendInput\)/);
-assert.match(parentBoot, /pirateOnboardingActionProxies/);
-assert.doesNotMatch(parentCss, /#pirateUnifiedControls\[data-pirate-onboarding="active"\]/);
-assert.match(parentCss, /#pirateOnboardingActionProxies\{[^}]*pointer-events:none/);
-assert.match(parentCss, /\.pirate-onboarding-action-proxy\{[^}]*pointer-events:auto/);
+assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'integrated shell consumes onboarding state without creating tutorial action buttons');
+assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated onboarding proxy layer is kept empty');
+assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell creates no invisible tutorial action buttons');
+assert.match(parentBoot, /createPirateNpcNameParentProxy/, 'NPC-name interaction is owned by the dedicated transparent name hit target');
+assert.match(parentBoot, /npcNameProxy\?\.accept\(event\)/, 'parent accepts NPC-name hit-target state from the opaque child');
+assert.match(
+  pirateHud,
+  /\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*display:\s*none\s*!important/,
+  'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
+);
 
-console.log('V9 Pirate onboarding overlay bridge: PASS');
+console.log('V9 Pirate onboarding retirement bridge: PASS');
