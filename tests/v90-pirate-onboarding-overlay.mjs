@@ -54,7 +54,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=926/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=927/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -65,7 +65,14 @@ assert.match(childBridge, /PIRATE_ONBOARDING_COMPACT_CSS/);
 assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
-assert.match(parentBoot, /event\.source !== frame\.contentWindow \|\| event\.origin !== 'null'/);
+assert.match(parentBoot, /event\.source !== frame\.contentWindow/);
+assert.match(parentBoot, /npcNameProxy\?\.accept\(event\)/, 'NPC-name accept runs before the opaque-origin HUD/presence gate');
+assert.ok(
+  parentBoot.indexOf('npcNameProxy?.accept(event)') < parentBoot.indexOf("if (event.origin !== 'null') return;"),
+  'same-origin hosted scene NPC-name posts are accepted before origin===null HUD filtering',
+);
+assert.match(parentBoot, /parentOrigin: location\.origin/, 'parent proxy trusts the hosted scene origin in addition to opaque null');
+assert.match(parentBoot, /event\.origin !== 'null'/);
 assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'integrated shell consumes onboarding state without creating tutorial action buttons');
 assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated onboarding proxy layer is kept empty');
 assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell creates no invisible tutorial action buttons');
@@ -77,11 +84,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=5/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=9/, 'Pirate child HTML cache-busts presentation after the pointerdown fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=6/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=10/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=5/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=6/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -201,13 +208,33 @@ function createPrompt(name = 'หัวหน้ามะลิ') {
       return el;
     },
   };
-  const proxy = createPirateNpcNameParentProxy({ frame, documentLike });
+  const proxy = createPirateNpcNameParentProxy({
+    frame,
+    documentLike,
+    parentOrigin: 'https://nustanakritwithai.github.io',
+  });
   assert.ok(proxy, 'parent hit-target proxy mounts');
+  const activeState = { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: true, name: 'หัวหน้ามะลิ', x: 0.5, y: 0.4, width: 0.2, height: 0.1 };
   assert.equal(proxy.accept({
     source: frameWindow,
     origin: 'null',
-    data: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: true, name: 'หัวหน้ามะลิ', x: 0.5, y: 0.4, width: 0.2, height: 0.1 },
-  }), true);
+    data: activeState,
+  }), true, 'accept() trusts opaque sandbox origin null');
+  assert.equal(proxy.accept({
+    source: {},
+    origin: 'https://nustanakritwithai.github.io',
+    data: activeState,
+  }), false, 'accept() still requires event.source === frame.contentWindow');
+  assert.equal(proxy.accept({
+    source: frameWindow,
+    origin: 'https://evil.example',
+    data: activeState,
+  }), false, 'accept() rejects a foreign non-null origin');
+  assert.equal(proxy.accept({
+    source: frameWindow,
+    origin: 'https://nustanakritwithai.github.io',
+    data: activeState,
+  }), true, 'accept() trusts the hosted scene/parent origin when source is the pirate frame');
   const button = nodes.get(PIRATE_NPC_NAME_PROXY_ID);
   assert.ok(button, 'visible talk chip exists on the projected NPC name');
   assert.equal(button.style.display, 'block');
@@ -233,7 +260,7 @@ function createPrompt(name = 'หัวหน้ามะลิ') {
   proxy.destroy();
 }
 
-function installChild(prompt, parentOrigin = 'https://example.test') {
+function installChild(prompt, parentOrigin = 'https://example.test', { pirateHud = 'pirate-primary-parent' } = {}) {
   class Object3D {
     constructor() {
       this.children = [];
@@ -272,7 +299,7 @@ function installChild(prompt, parentOrigin = 'https://example.test') {
   const scene = new Object3D();
   scene.children = [npcGroup];
   const documentLike = {
-    documentElement: { dataset: { pirateHud: 'pirate-primary-parent' } },
+    documentElement: { dataset: pirateHud ? { pirateHud } : {} },
     querySelector: selector => (selector === '.interaction-prompt' ? prompt : null),
   };
   const child = installPirateNpcNameChild({
@@ -372,7 +399,7 @@ function createSpecializedCtor(flag) {
   return Specialized;
 }
 
-function installCapturedSceneChild(prompt, { withSprite = true } = {}) {
+function installCapturedSceneChild(prompt, { withSprite = true, pirateHud = 'pirate-primary-parent', groupName = '' } = {}) {
   class Object3D {
     constructor() {
       this.children = [];
@@ -407,7 +434,7 @@ function installCapturedSceneChild(prompt, { withSprite = true } = {}) {
   windowLike.Event = Event;
   windowLike.__combat = { attacking: false };
   const documentLike = {
-    documentElement: { dataset: { pirateHud: 'pirate-primary-parent' } },
+    documentElement: { dataset: pirateHud ? { pirateHud } : {} },
     querySelector: selector => (selector === '.interaction-prompt' ? prompt : null),
   };
   const child = installPirateNpcNameChild({
@@ -433,6 +460,7 @@ function installCapturedSceneChild(prompt, { withSprite = true } = {}) {
     const npcGroup = new Object3D();
     npcGroup.children = [sprite];
     npcGroup.position = { x: 2, y: 0, z: 2 };
+    if (groupName) npcGroup.name = groupName;
     scene.children = [npcGroup];
   }
   scene.updateMatrixWorld();
@@ -465,6 +493,47 @@ function installCapturedSceneChild(prompt, { withSprite = true } = {}) {
   assert.equal(state.y, 0.32);
   assert.ok(state.width > 0 && state.width <= 0.5, 'fallback chip width stays inside the parent proxy contract');
   assert.ok(state.height > 0 && state.height <= 0.3, 'fallback chip height stays inside the parent proxy contract');
+  child.stop();
+}
+
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  const { child } = installChild(prompt, 'https://example.test', { pirateHud: '' });
+  assert.equal(child.sync().active, true, 'parentOrigin enables integrated sync before dataset.pirateHud is set');
+  assert.equal(child.currentName(), 'หัวหน้ามะลิ');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child } = installCapturedSceneChild(prompt, { withSprite: true, pirateHud: '', groupName: 'หลิน' });
+  const state = child.sync();
+  assert.equal(state.active, true, 'nearest projected name sprite still posts the talk chip when the prompt is hidden');
+  assert.equal(state.name, 'หลิน');
+  assert.equal(state.x, 0.5);
+  assert.equal(state.y, 0.4);
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child, windowLike } = installCapturedSceneChild(prompt, { withSprite: true, pirateHud: '', groupName: 'เถ้าแก่เปา' });
+  assert.equal(child.sync().active, true);
+  assert.equal(child.currentName(), 'เถ้าแก่เปา');
+  activate(windowLike, { name: 'เถ้าแก่เปา' });
+  assert.equal(prompt.pointerdowns, 1, 'activate still pointerdowns the original prompt when present');
+  assert.equal(prompt.clickCount, 0, 'activate still does not click the original prompt');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child } = installCapturedSceneChild(prompt, { withSprite: false, pirateHud: '' });
+  assert.equal(child.sync().active, false, 'chip stays hidden when inactive: no in-range prompt and no nearby name sprite');
   child.stop();
 }
 

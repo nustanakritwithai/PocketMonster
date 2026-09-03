@@ -19,6 +19,24 @@ function safeName(value) {
   return value.trim().replace(/\s+/g, ' ').slice(0, NAME_LIMIT);
 }
 
+function resolveOrigin(value) {
+  if (typeof value !== 'string' || !value) return '';
+  try { return new URL(value).origin; } catch { return ''; }
+}
+
+function trustedNpcNameOrigin(origin, parentOrigin) {
+  if (origin === 'null') return true;
+  return Boolean(parentOrigin) && origin === parentOrigin;
+}
+
+function pirateNpcNameFromAnchor(anchor) {
+  return safeName(anchor?.group?.userData?.name)
+    || safeName(anchor?.group?.name)
+    || safeName(anchor?.sprite?.userData?.name)
+    || safeName(anchor?.sprite?.name)
+    || 'NPC';
+}
+
 function ownProto(value, name) {
   try { return !!Object.getOwnPropertyDescriptor(value?.prototype || {}, name); } catch { return false; }
 }
@@ -202,8 +220,13 @@ function styleParentProxy(button) {
   });
 }
 
-export function createPirateNpcNameParentProxy({ frame, documentLike = globalThis.document } = {}) {
+export function createPirateNpcNameParentProxy({ frame, documentLike = globalThis.document, parentOrigin } = {}) {
   if (!frame || !documentLike?.createElement) return null;
+  const trustedParentOrigin = resolveOrigin(parentOrigin)
+    || resolveOrigin(documentLike?.defaultView?.location?.href)
+    || resolveOrigin(documentLike?.defaultView?.location?.origin)
+    || resolveOrigin(globalThis.location?.href)
+    || resolveOrigin(globalThis.location?.origin);
   let state = inactiveState();
   let button = documentLike.getElementById?.(PIRATE_NPC_NAME_PROXY_ID) || null;
 
@@ -252,7 +275,8 @@ export function createPirateNpcNameParentProxy({ frame, documentLike = globalThi
   }
 
   function accept(event) {
-    if (event?.source !== frame.contentWindow || event?.origin !== 'null') return false;
+    if (event?.source !== frame.contentWindow) return false;
+    if (!trustedNpcNameOrigin(event.origin, trustedParentOrigin)) return false;
     const message = event.data;
     if (message?.type !== PIRATE_NPC_NAME_MESSAGE || message.kind !== 'state') return false;
     state = sanitizeChildState(message);
@@ -333,23 +357,27 @@ export function installPirateNpcNameChild({
 
   function sync() {
     if (stopped) return inactiveState();
-    if (documentLike.documentElement?.dataset?.pirateHud !== 'pirate-primary-parent') {
+    const integrated = Boolean(trustedParentOrigin)
+      || documentLike.documentElement?.dataset?.pirateHud === 'pirate-primary-parent';
+    if (!integrated) {
       currentName = '';
       post(inactiveState());
       return inactiveState();
     }
     const prompt = documentLike.querySelector?.('.interaction-prompt');
-    const name = readPirateNpcPromptName(prompt);
-    if (!name) {
+    const promptName = readPirateNpcPromptName(prompt);
+    const camera = getCamera();
+    const capturedScene = typeof getCamera.getScene === 'function' ? getCamera.getScene() : null;
+    const scene = capturedScene || sceneFromCamera(camera);
+    const nearby = findNearestPirateNpcNameAnchor(scene, camera?.position, PIRATE_NPC_NAME_MAX_DISTANCE);
+    if (!promptName && !nearby) {
       currentName = '';
       post(inactiveState());
       return inactiveState();
     }
-    const camera = getCamera();
-    const capturedScene = typeof getCamera.getScene === 'function' ? getCamera.getScene() : null;
-    const scene = capturedScene || sceneFromCamera(camera);
+    const name = promptName || pirateNpcNameFromAnchor(nearby);
     const vectorSeed = projectionSeed(camera);
-    const anchor = findNearestPirateNpcNameAnchor(scene, camera?.position, 48);
+    const anchor = nearby || (promptName ? findNearestPirateNpcNameAnchor(scene, camera?.position, 48) : null);
     const projected = anchor ? projectPirateNpcNameAnchor({
       sprite: anchor.sprite,
       camera,
@@ -378,9 +406,9 @@ export function installPirateNpcNameChild({
     const message = event.data;
     if (message?.type !== PIRATE_NPC_NAME_MESSAGE || message.kind !== 'activate') return;
     const requestedName = safeName(message.name);
+    if (!currentName || requestedName !== currentName) return;
     const prompt = documentLike.querySelector?.('.interaction-prompt');
-    const liveName = readPirateNpcPromptName(prompt);
-    if (!currentName || requestedName !== currentName || liveName !== currentName) return;
+    if (!prompt) return;
     requestOriginalPirateInteraction(prompt, windowLike);
   }
 
