@@ -1,10 +1,45 @@
-# HANDOFF — Pirate NPC name interaction
+# HANDOFF — Pirate NPC คุย chip / name tap
 
-Status: **runtime bug confirmed; implementation handoff only**
+Status: **live bug still not accepted.** Several layered fixes already shipped on `main`. Do **not** re-implement those. Do **not** squash-merge this docs PR as the runtime fix. Use it only as context.
 
-Base when this handoff was created:
-- Repository: `nustanakritwithai/PocketMonster`
-- `main`: `e5fdc5af8ea3ebd9bf4b3a36a48938341fa0a375`
+- Repo: `nustanakritwithai/PocketMonster`
+- Latest `main` when this was updated: `71fa602` (`fix(pirate): accept same-origin scene messages for คุย chip (#464)`)
+- Live: GitHub Pages `https://nustanakritwithai.github.io/PocketMonster/` and Firebase `https://pocketmonster-game.web.app/` (web.app redirects to Pages)
+- Guest login → Pirate Fruit (`?world=pirate-fruit&panel=human`)
+- Write flags stay closed. One-task-one-PR. Squash-merge only when the user says `merge`.
+
+## สรุปภาษาไทย (อ่านอันนี้ก่อน)
+
+เป้าหมายของผู้ใช้: **ปุ่ม `คุย` โผล่บน/ใต้ชื่อ NPC แบบ 3D** แล้วแตะแล้วเปิดบทพูด Pirate เดิม ไม่ใช่ระบบคุยชุดใหม่
+
+ห้ามทำ:
+
+- แถบ `คุยกับ...` ด้านล่าง
+- แถบ onboarding
+- `allow-same-origin` บน iframe Pirate ที่ nest ไว้
+- ย้ายปุ่ม combat HUD
+- สร้างระบบบทพูดซ้ำ
+
+สิ่งที่ลง `main` แล้ว (อย่าทำซ้ำ):
+
+| PR | SHA | แก้ชั้นไหน | ทำไมยังไม่จบ |
+|---|---|---|---|
+| [#455](https://github.com/nustanakritwithai/PocketMonster/pull/455) | `f2a8783` | child ส่ง `pointerdown` แทน `prompt.click()` | overlay ยังผูกผิดที่ |
+| [#458](https://github.com/nustanakritwithai/PocketMonster/pull/458) | `e932658` | overlay ตาม camera ที่ capture ไม่ใช่ `window.__combat` | ชิปมองไม่เห็น |
+| [#460](https://github.com/nustanakritwithai/PocketMonster/pull/460) | `c0a8f6f` | ปุ่ม `คุย` ทึบใต้ชื่อ (opacity 1) | ชิปถูกสร้างแต่ `display:none` |
+| [#461](https://github.com/nustanakritwithai/PocketMonster/pull/461) | `aef1e16` | capture `Object3D`/`Scene` + fallback 0.5/0.32 | ยังไม่โชว์ เพราะ message ถูกทิ้ง / sync ไม่ยิง |
+| [#464](https://github.com/nustanakritwithai/PocketMonster/pull/464) | `71fa602` | รับ origin `null` **และ** scene origin, ไม่รอ `pirateHud`, โชว์จากชื่อใกล้ๆ | ผู้ใช้สั่ง merge ก่อนตรวจไลฟ์รอบนี้ — **ต้องฮาร์ดรีเฟรชแล้วยืนยันก่อนเขียนโค้ดชั้นใหม่** |
+
+ไลฟ์ล่าสุดก่อน #464 (guest, ~18:38 ICT 2026-09-03):
+
+- ชื่อ NPC (`หลิน` / `หัวหน้ามะลิ` / `เถ้าแก่เปา`) เห็น
+- `#pirateNpcNameHitProxy` **ไม่อยู่บน top document**
+- ปุ่มอยู่ **ใน** `iframe#onlineWorldSceneFrame` (`scene-v900.html?...&shellRevision=40` ตอนนั้น) ซึ่ง **ไม่มี sandbox** (same-origin กับ Pages)
+- ปุ่มมี `textContent` `คุย` แต่ `display:none`, left/top ไม่ถูกเซ็ต, rect 0×0
+- top ไม่มี `#pirateFruitFrame` — เฟรม Pirate nest อยู่ใน scene iframe
+- scene โหลด `boot-pirate-fruit-v900.mjs?v=926` และ `pirate-npc-name-interaction-v900.mjs?v=5`
+
+อย่า merge PR นี้ (#453) เป็นตัวแก้เกม
 
 ## User-visible requirement
 
@@ -13,183 +48,185 @@ In the integrated Pirate Fruit scene:
 1. Do not show the bottom tutorial/onboarding strip.
 2. Do not show the bottom `คุยกับ ...` interaction button.
 3. Keep the existing 3D NPC name sprite above the NPC.
-4. Tapping the 3D NPC name must open the same original NPC dialogue/service flow.
+4. A visible `คุย` chip on/under that name must open the **original** Pirate dialogue/service flow.
 5. Do not create a duplicate NPC interaction system.
-6. Preserve the opaque iframe sandbox; do not add `allow-same-origin`.
+6. Preserve the opaque nested Pirate iframe sandbox; do not add `allow-same-origin`.
+7. Do not change combat HUD layout.
 
-## Existing implementation
+## Frame topology (easy to get wrong)
 
-The previous work is already merged:
+```
+top document  (online-world-shell)
+  └── iframe#onlineWorldSceneFrame   scene-v900.html
+        • NO sandbox → same-origin with Pages
+        • boot-pirate-fruit-v900.mjs runs HERE
+        • #pirateNpcNameHitProxy is created on THIS document
+        └── iframe#pirateFruitFrame  pirate-fruit-offline/index.html?parentOrigin=...
+              • sandbox = allow-scripts allow-pointer-lock allow-fullscreen
+              • NO allow-same-origin → opaque, postMessage origin is "null"
+              • pocket-presentation.mjs installs the child projector + camera capture
+              • original .interaction-prompt lives HERE (HUD CSS hides it)
+```
 
-- PR #436 — `feat(pirate): retire bottom prompts and tap NPC names`
-- PR #441 — deployment gate alignment
+`window.__combat` is the **combat/attack** system, not the Pirate scene/player/camera. Binding the name overlay to it was a real bug (#458).
 
-Relevant files:
+Vendor prompt (minified `pirate-fruit-offline/assets/index-C3SJLfq8.js`):
 
-- `pirate-npc-name-interaction-v900.mjs`
-- `boot-pirate-fruit-v900.mjs`
-- `pirate-fruit-offline/pocket-presentation.mjs`
-- `pirate-fruit-control-hud-v900.mjs`
+- `.interaction-prompt` **is** `this.element`
+- listener is `pointerdown` → `requested = true`
+- NPC loop: `consumeInteract() || consumeRequested()`
+- interact range `ka = 4.2`
+- names visible around `m < 125`
+- HUD CSS `.interaction-prompt { display: none !important }` and `.onboarding-root` hidden
+- `readPirateNpcPromptName()` reads **inline** `prompt.style.display === 'block'`, not computed CSS
+
+## Architecture to preserve
+
+Pirate child (opaque iframe)
+→ captures live camera/scene via `Object3D.prototype.updateMatrixWorld`
+→ finds nearest 384×96 name sprite at y≈3.55 within ~4.6 units
+→ posts sanitized `{ type, kind:'state', active, name, x, y, width, height }`
+→ parent proxy in the **scene** document (`#pirateNpcNameHitProxy`)
+→ `pointerdown`/`click` on the chip posts `{ kind:'activate', name }`
+→ child `requestOriginalPirateInteraction(prompt)` dispatches `pointerdown` on `.interaction-prompt`
+
+Protocol: `pocketmonster:pirate-npc-name-v1`. Proxy id: `pirateNpcNameHitProxy`.
+
+Relevant files (on current `main`):
+
+- `pirate-npc-name-interaction-v900.mjs` (imported as `?v=6`)
+- `boot-pirate-fruit-v900.mjs` (`?v=927`, pirate HTML `?v=919`)
+- `pirate-fruit-offline/pocket-presentation.mjs` (`?v=10`)
+- `pirate-fruit-control-hud-v900.mjs` (`?v=5`)
 - `tests/v90-pirate-onboarding-overlay.mjs`
 
-Current architecture is correct and should be preserved:
+Cache chain after #464 (bump from here, do not copy older numbers):
 
-Pirate child
-→ projects the nearest NPC name sprite to normalized screen coordinates
-→ sends sanitized state via `postMessage`
-→ parent owns a transparent hit target over the visible 3D name
-→ parent sends an `activate` message back to the Pirate child
-→ child must invoke the original Pirate interaction path.
+- interaction `v=6`
+- presentation `v=10` in `pirate-fruit-offline/index.html`
+- pirate HTML `v=919` in `PIRATE_FRUIT_OFFLINE_ENTRY`
+- boot `v=927` in `combined-worlds-v900.mjs`
+- combined-worlds `v=929` in `online-world-shell-v900.mjs` and `worlds-v900.mjs`
+- worlds `v=934` in `scene-entry-v900.mjs`
+- `shellRevision` `41`
+- Do **not** bump `style-v900.css` for this bug. Update every test pin of those strings.
 
-## Confirmed root cause
+## What we tried, in order, and what it actually proved
 
-The final child activation currently does this in `pirate-npc-name-interaction-v900.mjs`:
+### Layer 0 — original handoff on this PR (stale)
 
-```js
-prompt.click?.();
-```
+The first version of this document only named `prompt.click()` vs `pointerdown`. That was real, and it is **already fixed**. The live failure after that was not “activate never fires”; it was “chip never becomes visible / state never accepted.”
 
-That is the bug.
+### Layer 1 — #455 `f2a8783` — pointerdown
 
-The original Pirate Fruit interaction prompt does **not** use a `click` handler.
+- Replaced `prompt.click?.()` with `requestOriginalPirateInteraction` (`PointerEvent('pointerdown')`).
+- Tests forbid `prompt.click?.()`.
+- Live after merge: tapping the 3D name still did not open dialogue.
 
-From `pirate-fruit-offline/assets/index-C3SJLfq8.js`, the prompt class creates a button and registers:
+### Layer 2 — #458 `e932658` — camera, not `__combat`
 
-```js
-this.element.addEventListener('pointerdown', event => {
-  event.preventDefault();
-  this.requested = true;
-});
-```
+- Overlay had been bound to `window.__combat` (combat system). Retargeted to the captured Pirate camera.
+- Safari opacity 0.01 hit target, module `v=3`.
+- Live after merge: tap still failed; chip still not a useful visible control.
 
-The NPC system then opens dialogue from:
+### Layer 3 — #460 `c0a8f6f` — visible `คุย` chip
 
-```js
-this.input.consumeInteract() || this.prompt.consumeRequested()
-```
+- User asked for a real `คุย` button under the NPC name, not an invisible overlay.
+- Chip styled opaque, `textContent` `คุย`.
+- User confirmed after refresh it was **not a cache miss**: still no chip on screen.
 
-Therefore `prompt.click()` never sets `requested=true`, so the NPC system sees no interaction request.
+### Layer 4 — live DOM (guest, Pages) after #460
 
-This explains the exact live symptom:
+Inspected `pocketmonster-game.web.app` → Pages. Guest. Pirate Fruit HUD loaded.
 
-- transparent name hit target can be present
-- parent can send `activate`
-- child can receive it
-- but the menu/dialogue still does not open
+Findings (do not ignore these):
 
-## Required fix
+1. Chip **is created** inside the **scene iframe document**, not the top page.
+2. It stays `display:none`; `left`/`top` never set; client rect 0×0.
+3. That means `state.active` never became true in the parent proxy (or render bailed because the nested `frame.getBoundingClientRect()` was empty — check both).
+4. Capture originally hooked Camera/Mesh prototypes, not base `Object3D`; camera was not parented to scene so `sceneFromCamera` failed.
 
-Keep the existing validation and bridge, but replace the `prompt.click()` activation with the same event type the original game actually consumes: `pointerdown`.
+### Layer 5 — #461 `aef1e16` — Object3D/Scene capture + fallback
 
-Recommended implementation pattern:
+- Wrap base `Object3D.updateMatrixWorld` plus specialized ctors; record `isCamera` and `isScene`.
+- If projection fails, still activate at fallback `(0.5, 0.32)`.
+- Live after merge: chip **still** `display:none`. So capture/fallback was not the remaining live blocker.
 
-```js
-function requestOriginalPirateInteraction(prompt, windowLike = globalThis.window) {
-  if (!prompt?.dispatchEvent) return false;
-  const PointerEventCtor = windowLike?.PointerEvent || globalThis.PointerEvent;
-  if (typeof PointerEventCtor === 'function') {
-    return prompt.dispatchEvent(new PointerEventCtor('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'touch',
-      isPrimary: true,
-    }));
-  }
+### Layer 6 — live root cause that #464 addressed
 
-  const EventCtor = windowLike?.Event || globalThis.Event;
-  if (typeof EventCtor !== 'function') return false;
-  return prompt.dispatchEvent(new EventCtor('pointerdown', {
-    bubbles: true,
-    cancelable: true,
-  }));
-}
-```
+Three independent gates were keeping the chip hidden even when names were on screen:
 
-Then in the child `activate` handler, after the existing name checks:
+1. **`accept()` required `event.origin === 'null'`.** Production **scene** iframe is same-origin. Any child/state message whose origin is the Pages origin was dropped. Nested Pirate is *supposed* to be opaque (`origin === 'null'`), but live traffic that needed to show the chip was also arriving with a non-null origin. #464 accepts `'null'` **or** `parentOrigin` / scene origin. Source must still be `frame.contentWindow`. Type/kind still required.
+2. **Child `sync()` no-op’d unless `documentElement.dataset.pirateHud === 'pirate-primary-parent'`.** If the HUD postMessage never stuck, the chip never activated. #464 treats `parentOrigin` as enough to enter integrated mode.
+3. **Chip was gated on the hidden bottom prompt** (`style.display === 'block'` / `readPirateNpcPromptName`). HUD CSS forces `.interaction-prompt { display:none !important }`. Names can show while that prompt read fails. #464 shows `คุย` from projected nearby name sprites **or** in-range prompt name.
 
-```js
-requestOriginalPirateInteraction(prompt, windowLike);
-```
+#464 also moved the scene boot listener so **NPC proxy `accept` runs before the remaining `origin === 'null'` HUD/telemetry filter**. HUD telemetry still requires opaque origin.
 
-Do **not** call `prompt.click()` as the primary interaction trigger.
+Activate still `pointerdown` on `.interaction-prompt`. Nested Pirate sandbox unchanged. No bottom talk bar. No combat HUD edits.
 
-## Important validation already present
+Cache-bust as listed above. Tests in `tests/v90-pirate-onboarding-overlay.mjs` cover: accept null **and** non-null origin; sync without `pirateHud`; inactive stays hidden; pointerdown; no `allow-same-origin`; no `prompt.click?.()`.
 
-Do not remove these checks without a replacement:
+#464 was squash-merged after rebasing over #463 (HUD toast). **No live proof yet that the chip appears after this merge.** First job for the next agent is a hard-refresh live check, not another code patch.
 
-- event source must be `window.parent`
-- event origin must match `trustedParentOrigin`
-- message type/kind must match the NPC-name protocol
-- requested name must equal the current validated NPC name
-- current NPC must still be in interaction range
+## What to do next
 
-The hidden `.interaction-prompt` remains useful as the original gameplay interaction owner. It is only visually retired by the integrated HUD CSS.
+1. Hard-refresh live Pirate Fruit as guest. Approach `หัวหน้ามะลิ` / `เถ้าแก่เปา` / `หลิน`.
+2. If the `คุย` chip is visible under the name and tap opens original dialogue: stop. Tell the user. Do not keep patching.
+3. If it is still missing, inspect **inside** `iframe#onlineWorldSceneFrame` (not only the top document):
 
-## About `display:none`
+   ```js
+   const scene = document.querySelector('#onlineWorldSceneFrame')?.contentDocument
+   const btn = scene?.getElementById('pirateNpcNameHitProxy')
+   const pirate = scene?.getElementById('pirateFruitFrame')
+   // btn.style.display, btn.getBoundingClientRect()
+   // pirate sandbox, pirate.getBoundingClientRect()
+   // listen for message type pocketmonster:pirate-npc-name-v1
+   // log event.origin, event.source === pirate.contentWindow
+   ```
 
-The integrated HUD applies `display:none !important` to `.interaction-prompt`, while the Pirate runtime still writes inline `style.display = 'block'` when an NPC is in range.
+4. Decide which remaining gate failed; ship **one** PR for that gate only; bump the cache chain from the #464 numbers; do not touch `style-v900.css` unless the bug is CSS.
 
-The current `readPirateNpcPromptName()` reads `prompt.style.display`, i.e. the runtime inline state, not computed CSS. That allows the bridge to know whether the original Pirate gameplay prompt is logically active while keeping it visually hidden. Preserve this distinction unless tests prove otherwise.
+Likely leftover suspects **only if #464 did not show the chip**:
 
-## Tests to add/update
+- `frame.getBoundingClientRect()` of `#pirateFruitFrame` is 0×0 so `render()` hides even when `state.active`.
+- Camera/scene capture still never fires in the vendor bundle, **and** nearby-sprite walk finds nothing (sprite size/y heuristic 384×96 / y≈3.55).
+- Child `postMessage` target origin vs parent `accept` origin still mismatched (opaque `null` vs Pages origin vs `parentOrigin` query).
+- Activate reaches the child but `.interaction-prompt` is missing / name mismatch after #464 stopped requiring `liveName === currentName`.
+- Pages/Firebase still serving a stale `shellRevision` (must be 41 after deploy). User self-checks with ฮาร์ดรีเฟรช.
 
-Update `tests/v90-pirate-onboarding-overlay.mjs` or add a focused NPC-name interaction test that proves:
+## Tests
 
-1. Parent hit target still sends `activate`.
-2. Child rejects wrong origin/source/name.
-3. Correct activation dispatches `pointerdown`, not `click`.
-4. A fake original prompt with only a `pointerdown` listener receives the request.
-5. The fake listener sets a `requested` flag, proving parity with the Pirate runtime.
-6. Bottom onboarding and interaction prompt remain visually retired.
-7. No `allow-same-origin` is added to the iframe.
+- Overlay: `node tests/v90-pirate-onboarding-overlay.mjs`
+- Pins if you bump versions: `node tests/v90-pirate-save-integration.mjs`, `node tests/v90-pirate-fruit-player.mjs`, `node tests/v90-unified-online-world.mjs`, `node tests/v90-pirate-fruit-client-bridge.mjs`, `node tests/v90-pirate-fruit-player-mutants.mjs`
+- Keep: no `prompt.click?.()`, require `pointerdown`, no `allow-same-origin` on `#pirateFruitFrame`.
 
-A regression assertion should explicitly forbid the old broken path:
+## Manual acceptance
 
-```js
-assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
-```
+On `https://pocketmonster-game.web.app/` after deploy:
 
-and require the pointer path:
-
-```js
-assert.match(source, /pointerdown/);
-```
-
-## Cache / deployment checklist
-
-After changing the interaction module:
-
-1. bump the cache query for `pirate-npc-name-interaction-v900.mjs` in both parent and Pirate presentation imports;
-2. follow the current cache chain on latest `main` rather than copying old version numbers from PR #436;
-3. update any deployment/version assertions affected by those bumps;
-4. run the same production verification gates used by the Pages/Firebase workflow;
-5. merge only after the branch is rebased/synced with latest `main` because HUD work is moving quickly;
-6. verify GitHub Pages and Firebase Hosting both succeed.
-
-## Manual acceptance test
-
-On `https://pocketmonster-game.web.app/`:
-
-1. fully close/reopen the page after deployment;
-2. enter the Pirate Fruit scene;
-3. approach `หัวหน้ามะลิ` or `เถ้าแก่เปา` until the NPC is within normal interaction range;
-4. confirm no bottom `คุยกับ...` prompt is visible;
-5. tap directly on the visible name sprite above the NPC;
-6. the original Pirate dialogue must open;
-7. if the NPC has a service action, its original action button must still work;
-8. walking out of range must remove the transparent name hit target.
+1. Fully close/reopen (or hard-refresh) after Pages is on `71fa602` / `shellRevision=41`.
+2. Guest → Pirate Fruit.
+3. Approach `หัวหน้ามะลิ` or `เถ้าแก่เปา` in normal talk range.
+4. No bottom `คุยกับ...`, no onboarding strip.
+5. Visible `คุย` chip under the 3D name.
+6. Tap opens original Pirate dialogue; service buttons still work.
+7. Walking out of range hides the chip.
 
 ## Do not regress
 
 Do not:
 
-- reintroduce the bottom talk prompt;
-- create a second visible NPC name;
-- replace the original Pirate dialogue/service logic;
-- directly manipulate child DOM from the parent;
-- weaken the iframe sandbox;
-- touch unrelated combat, throw/summon, chat, minimap, or HUD positioning work.
+- reintroduce the bottom talk prompt or onboarding strip;
+- add `allow-same-origin`;
+- bind anything NPC-talk to `window.__combat`;
+- wait on `dataset.pirateHud` before showing the chip;
+- require prompt `display:block` before showing the chip;
+- create a second dialogue system;
+- manipulate child DOM from the parent;
+- change combat / throw / summon / chat / minimap / HUD positions;
+- merge this docs PR as if it were the runtime fix;
+- redo #455 / #458 / #460 / #461 / #464.
 
-## One-line diagnosis for the next agent
+## One-line for the next agent
 
-**The name tap currently reaches the bridge, but the bridge calls `prompt.click()` while the original Pirate prompt only sets its interaction request on `pointerdown`; switch activation to the original `pointerdown` path, test it, bump caches, and deploy.**
+**Live chip was created in the same-origin scene iframe and stayed `display:none` because state messages / sync were gated on opaque origin + `pirateHud` + the hidden bottom prompt; those gates shipped in #464 (`71fa602`). Hard-refresh and verify before writing another layer.**
