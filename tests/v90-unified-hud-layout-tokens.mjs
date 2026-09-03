@@ -16,6 +16,10 @@ assert.match(css, /\.mmorpg-hud\{position:absolute;inset:0;pointer-events:none;z
 assert.match(css, /\.mmorpg-player-status\{[^}]*top:0\.7%/, 'player status sits top-left');
 assert.match(css, /\.mmorpg-player-status\{[^}]*left:0\.4%/, 'player status anchors to the left edge');
 assert.match(css, /\.mmorpg-quest-panel\{[^}]*left:2\.6%/, 'quest side panel keeps the left rail');
+assert.match(css, /\.mmorpg-side-drawer\{[^}]*left:0\.4%/, 'quest/party window sits under HP on the left');
+assert.match(css, /\.mmorpg-side-tabs\{[^}]*flex-direction:column/, 'เควส/Party tabs are a left frame');
+assert.match(css, /\.mmorpg-side-detail\{[^}]*flex:1/, 'detail pane fills the side window');
+assert.match(css, /\.mmorpg-dock-tabs\{display:none/, 'bottom dock has no tab picker');
 assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%/, 'minimap anchors to the right edge');
 assert.match(css, /\.mmorpg-roster\{[^}]*left:62\.5%/, 'target/party roster keeps the right-middle stack');
 assert.match(css, /\.mmorpg-dock\{position:absolute;left:32\.5%;bottom:0;transform:none/, 'dock is the bottom-center chat console');

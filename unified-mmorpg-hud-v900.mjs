@@ -11,7 +11,7 @@
 
 export const UNIFIED_MMORPG_HUD_KIND = 'pocketmonster:unified-mmorpg-hud-v1';
 
-const TABS = Object.freeze(['chat', 'quest', 'party']);
+const SIDE_TABS = Object.freeze(['quest', 'party']);
 
 function el(documentLike, tag, id = '', className = '') {
   const node = documentLike.createElement(tag);
@@ -56,6 +56,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
   let shell = null;
   let activeTab = 'chat';
+  let sideTab = 'quest';
   let expanded = true;
   let chatKeyboardDismiss = null;
   const unsubscribers = [];
@@ -96,7 +97,28 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const rail = register('mmorpgQuestRail', el(documentLike, 'div', '', 'mmorpg-quest-rail'));
     rail.setAttribute('aria-hidden', 'true');
     root.append(rail);
-    root.append(register('mmorpgQuestPanel', el(documentLike, 'aside', '', 'mmorpg-quest-panel')));
+
+    const drawer = register('mmorpgSideDrawer', el(documentLike, 'section', '', 'mmorpg-side-drawer'));
+    const sideTabs = register('mmorpgSideTabs', el(documentLike, 'div', '', 'mmorpg-side-tabs'));
+    sideTabs.setAttribute('role', 'tablist');
+    sideTabs.setAttribute('aria-label', 'เควส Party');
+    for (const tab of SIDE_TABS) {
+      const tabNode = register(`mmorpgTab${tab[0].toUpperCase()}${tab.slice(1)}`, el(documentLike, 'button', '', 'mmorpg-side-tab'));
+      tabNode.setAttribute('role', 'tab');
+      tabNode.setAttribute('type', 'button');
+      tabNode.setAttribute('aria-controls', `mmorpg${tab[0].toUpperCase()}${tab.slice(1)}Panel`);
+      tabNode.textContent = tab === 'quest' ? 'เควส' : 'Party';
+      tabNode.addEventListener('click', () => setSideTab(tab));
+      sideTabs.append(tabNode);
+    }
+    const detail = register('mmorpgSideDetail', el(documentLike, 'div', '', 'mmorpg-side-detail'));
+    const questPanel = register('mmorpgQuestPanel', el(documentLike, 'aside', '', 'mmorpg-quest-panel'));
+    const partyPanel = register('mmorpgPartyPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
+    partyPanel.setAttribute('role', 'tabpanel');
+    questPanel.setAttribute('role', 'tabpanel');
+    detail.append(questPanel, partyPanel);
+    drawer.append(sideTabs, detail);
+    root.append(drawer);
 
     const minimap = register('mmorpgMinimap', el(documentLike, 'div', '', 'mmorpg-minimap'));
     minimap.setAttribute('aria-label', 'Minimap');
@@ -109,21 +131,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
     const dock = register('mmorpgDock', el(documentLike, 'section', '', 'mmorpg-dock'));
     dock.append(register('mmorpgDockSummary', el(documentLike, 'div', '', 'mmorpg-dock-summary')));
-
-    const tabs = register('mmorpgDockTabs', el(documentLike, 'div', '', 'mmorpg-dock-tabs'));
-    tabs.setAttribute('role', 'tablist');
-    tabs.setAttribute('aria-label', 'Chat Quest Party');
-    for (const tab of TABS) {
-      const tabNode = register(`mmorpgTab${tab[0].toUpperCase()}${tab.slice(1)}`, el(documentLike, 'button', '', 'mmorpg-tab'));
-      tabNode.setAttribute('role', 'tab');
-      tabNode.setAttribute('type', 'button');
-      tabNode.setAttribute('aria-controls', `mmorpg${tab[0].toUpperCase()}${tab.slice(1)}Panel`);
-      tabNode.textContent = tab === 'chat' ? 'แชท' : tab === 'quest' ? 'เควส' : 'Party';
-      if (tab === 'chat') tabNode.append(register('mmorpgChatUnread', el(documentLike, 'span', '', 'mmorpg-unread')));
-      tabNode.addEventListener('click', () => setTab(tab));
-      tabs.append(tabNode);
-    }
-    dock.append(tabs);
+    dock.append(register('mmorpgChatUnread', el(documentLike, 'span', '', 'mmorpg-unread hidden')));
 
     const chatPanel = register('mmorpgChatPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
     chatPanel.setAttribute('role', 'tabpanel');
@@ -186,14 +194,6 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     }
     chatPanel.append(extras);
     dock.append(chatPanel);
-
-    const questPanel = register('mmorpgQuestDockPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
-    questPanel.setAttribute('role', 'tabpanel');
-    dock.append(questPanel);
-
-    const partyPanel = register('mmorpgPartyPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
-    partyPanel.setAttribute('role', 'tabpanel');
-    dock.append(partyPanel);
     dock.append(form);
 
     root.append(dock);
@@ -273,7 +273,6 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   function renderQuest(snapshot) {
     const available = snapshot?.available === true;
     const side = node('mmorpgQuestPanel');
-    const dockPanel = node('mmorpgQuestDockPanel');
     const build = target => {
       if (!target) return;
       const children = [];
@@ -300,8 +299,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       target.replaceChildren(...children);
     };
     build(side);
-    build(dockPanel);
-    if (side) side.classList.toggle('hidden', !available);
+    setSideTab(sideTab);
   }
 
   function padPartySlots(slots) {
@@ -849,16 +847,23 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   // ---------- Tab control ----------
 
   function setTab(tab) {
-    if (!TABS.includes(tab) || !shell) return;
-    activeTab = tab;
-    for (const candidate of TABS) {
+    if (tab === 'chat') {
+      chatAdapter()?.markRead?.();
+      return;
+    }
+    setSideTab(tab);
+  }
+
+  function setSideTab(tab) {
+    if (!SIDE_TABS.includes(tab) || !shell) return;
+    sideTab = tab;
+    for (const candidate of SIDE_TABS) {
       const tabNode = node(`mmorpgTab${candidate[0].toUpperCase()}${candidate.slice(1)}`);
-      const panelNode = node(`mmorpg${candidate[0].toUpperCase()}${candidate.slice(1)}Panel`);
+      const panelNode = candidate === 'quest' ? node('mmorpgQuestPanel') : node('mmorpgPartyPanel');
       const selected = candidate === tab;
       if (tabNode) tabNode.setAttribute('aria-selected', String(selected));
       if (panelNode) panelNode.classList.toggle('hidden', !selected);
     }
-    if (tab === 'chat') chatAdapter()?.markRead?.();
   }
 
   function setExpanded(next) {
@@ -898,6 +903,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     stripTimer = setInterval(() => renderStrip(), 1000);
     bindFeatures();
     setTab(activeTab);
+    setSideTab(sideTab);
     setExpanded(expanded);
     renderStrip(chatAdapter()?.snapshot?.());
     renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
@@ -908,6 +914,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (!shell) return null;
     bindFeatures();
     setTab(activeTab);
+    setSideTab(sideTab);
     renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
     return shell;
   }
