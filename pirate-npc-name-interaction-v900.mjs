@@ -1,6 +1,6 @@
 export const PIRATE_NPC_NAME_MESSAGE = 'pocketmonster:pirate-npc-name-v1';
 export const PIRATE_NPC_NAME_PROXY_ID = 'pirateNpcNameHitProxy';
-export const PIRATE_NPC_NAME_MAX_DISTANCE = 4.6;
+export const PIRATE_NPC_NAME_MAX_DISTANCE = 12;
 
 const NAME_LIMIT = 40;
 const STATE_INTERVAL_MS = 80;
@@ -142,26 +142,51 @@ function projectionSeed(camera) {
   return position;
 }
 
+function nodeChildren(node) {
+  const children = node?.children;
+  if (Array.isArray(children)) return children;
+  if (children && typeof children[Symbol.iterator] === 'function') return [...children];
+  return [];
+}
+
+function groupWorldXz(group) {
+  if (typeof group?.getWorldPosition === 'function') {
+    const world = { x: 0, y: 0, z: 0 };
+    group.getWorldPosition(world);
+    const gx = finite(world.x);
+    const gz = finite(world.z);
+    if (gx !== null && gz !== null) return { x: gx, z: gz };
+  }
+  const gx = finite(group?.position?.x);
+  const gz = finite(group?.position?.z);
+  if (gx === null || gz === null) return null;
+  return { x: gx, z: gz };
+}
+
 export function findNearestPirateNpcNameAnchor(scene, playerPosition, maxDistance = PIRATE_NPC_NAME_MAX_DISTANCE) {
-  if (!Array.isArray(scene?.children) || !playerPosition) return null;
+  if (!scene || !playerPosition) return null;
   const px = finite(playerPosition.x);
   const pz = finite(playerPosition.z);
   if (px === null || pz === null) return null;
   const limit = Number.isFinite(maxDistance) && maxDistance > 0 ? maxDistance : PIRATE_NPC_NAME_MAX_DISTANCE;
   let best = null;
   let bestDistance = limit;
-  for (const group of scene.children) {
-    if (group?.visible === false) continue;
-    const sprite = npcNameSprite(group);
-    if (!sprite) continue;
-    const gx = finite(group.position?.x);
-    const gz = finite(group.position?.z);
-    if (gx === null || gz === null) continue;
-    const distance = Math.hypot(gx - px, gz - pz);
-    if (distance >= bestDistance) continue;
-    bestDistance = distance;
-    best = Object.freeze({ group, sprite, distance });
-  }
+  const visit = (node) => {
+    if (!node || node.visible === false) return;
+    const sprite = npcNameSprite(node);
+    if (sprite) {
+      const xz = groupWorldXz(node);
+      if (xz) {
+        const distance = Math.hypot(xz.x - px, xz.z - pz);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = Object.freeze({ group: node, sprite, distance });
+        }
+      }
+    }
+    for (const child of nodeChildren(node)) visit(child);
+  };
+  visit(scene);
   return best;
 }
 
