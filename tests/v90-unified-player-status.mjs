@@ -117,6 +117,8 @@ assert.match(css, /\.mmorpg-player-vitals\{[^}]*flex-direction:column/, 'HP MP e
 assert.match(css, /\.mmorpg-player-vital\{[^}]*width:100%/, 'each tube fills the remaining slot width');
 assert.match(css, /\.mmorpg-player-vital\{[^}]*height:6px/, 'vital tubes stay short enough to fit the golden slot');
 assert.doesNotMatch(css, /\.mmorpg-player-status\{height:22%/, 'the golden slot stays short; tubes are long not tall');
+assert.match(css, /\.mmorpg-player-status\{[^}]*transform-origin:0 0/, 'the player frame shrinks from the top-left corner');
+assert.match(css, /\.mmorpg-player-status\{[^}]*transform:scale\(0\.65\)/, 'the whole player frame scales down on the diagonal');
 assert.match(css, /\.mmorpg-player-energy\[role="progressbar"\]/, 'energy is a third vital bar');
 assert.doesNotMatch(css, /\.mmorpg-player-hp-text[^}]*clear:both/, 'HP text cannot clear below the portrait');
 assert.match(css, /\.mmorpg-quick-indicators\{[^}]*left:50%/, 'quick indicators sit top-center');
