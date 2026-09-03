@@ -114,6 +114,8 @@ assert.match(css, /\.mmorpg-player-status\{[^}]*display:flex/, 'player status pa
 assert.match(css, /\.mmorpg-player-status\{[^}]*flex-wrap:nowrap/, 'player status cannot wrap out of the golden box');
 assert.match(css, /\.mmorpg-player-vital\{[^}]*width:100%/, 'each vital row fills the remaining slot width');
 assert.match(css, /\.mmorpg-player-hp\[role="progressbar"\][^}]*width:100%/, 'HP bar cannot overflow sideways');
+assert.match(css, /\.mmorpg-player-vital\{[^}]*height:6px/, 'vital tubes stay short enough to fit the slot');
+assert.match(css, /@media \(max-height:420px\)[\s\S]*\.mmorpg-player-status\{height:22%/, 'short landscape phones grow the slot just enough to keep three tubes on screen');
 assert.match(css, /\.mmorpg-player-energy\[role="progressbar"\]/, 'energy is a third vital bar');
 assert.doesNotMatch(css, /\.mmorpg-player-hp-text[^}]*clear:both/, 'HP text cannot clear below the portrait');
 assert.match(css, /\.mmorpg-quick-indicators\{[^}]*left:50%/, 'quick indicators sit top-center');
