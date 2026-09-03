@@ -517,6 +517,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const title = el(documentLike, 'div', '', 'mmorpg-player-title');
     title.textContent = snapshot.title || '';
     identity.append(level, name, title);
+    const body = el(documentLike, 'div', '', 'mmorpg-player-body');
     const hpText = el(documentLike, 'div', '', 'mmorpg-player-hp-text');
     hpText.textContent = `HP ${snapshot.hp}/${snapshot.hpMax}`;
     const hp = fillBar(documentLike, 'mmorpg-player-hp', snapshot.hp, snapshot.hpMax, 'HP');
@@ -531,7 +532,12 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const mode = el(documentLike, 'div', '', 'mmorpg-player-mode');
     const percent = Number.isFinite(snapshot.modePercent) ? ` ${Math.round(snapshot.modePercent)}%` : '';
     mode.textContent = `${snapshot.modeLabel || ''}${percent}`.trim();
-    panel.replaceChildren(portrait, identity, hpText, hp, resourceText, resource, mode);
+    const energy = fillBar(
+      documentLike, 'mmorpg-player-energy', snapshot.modePercent, 100,
+      snapshot.modeLabel || 'Energy',
+    );
+    body.append(identity, hp, resource, energy, hpText, resourceText, mode);
+    panel.replaceChildren(portrait, body);
     const buffRow = node('mmorpgBuffRow');
     if (buffRow) {
       const all = Array.isArray(snapshot.buffs) ? snapshot.buffs : [];

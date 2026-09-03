@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=925';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=926';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -17,7 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=938';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=939';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -96,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '34');
+  url.searchParams.set('shellRevision', '35');
   return url.href;
 }
 
