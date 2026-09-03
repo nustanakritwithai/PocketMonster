@@ -37,7 +37,8 @@ assert.match(offlineHtml, /pocket-presentation\.mjs\?v=6/, 'offline HTML cache-b
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation keeps the current static-batch classification bridge');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=4/, 'presentation loads the HUD policy that retires legacy Pirate overlays');
 assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=1/, 'presentation loads the child NPC-name hit-target bridge');
-assert.match(pirateHud, /\.game-minimap,[\s\S]*\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child minimap, onboarding bar and bottom interaction prompt are retired together');
+assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap remains retired');
+assert.match(pirateHud, /\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*display:\s*none\s*!important/, 'Pirate child onboarding bar and bottom interaction prompt are removed from integrated layout');
 assert.match(npcNameInteraction, /installPirateNpcCameraCapture/, 'NPC name interaction captures the live Pirate camera without same-origin access');
 assert.match(npcNameInteraction, /PIRATE_NPC_NAME_PROXY_ID/, 'NPC name interaction owns a dedicated transparent parent hit target');
 
