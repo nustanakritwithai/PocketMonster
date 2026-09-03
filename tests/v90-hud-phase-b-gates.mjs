@@ -28,8 +28,8 @@ assert.match(shell, /createUnifiedMmorpgHud/, 'production shell owns one Dock');
 assert.match(shell, /unifiedHud\?\.unmount/, 'session end tears the Dock down');
 assert.match(hud, /UNIFIED_MMORPG_HUD_KIND/, 'Dock exports a single kind');
 assert.doesNotMatch(css, /viewer-annotation|black-arrow-overlay/, 'reference viewer overlay is not a game HUD');
-assert.match(index, /style-v900\.css\?v=945/);
-assert.match(scene, /style-v900\.css\?v=945/);
+assert.match(index, /style-v900\.css\?v=946/);
+assert.match(scene, /style-v900\.css\?v=946/);
 assert.equal(index, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'));
 
 for (const flag of ['vpsWrites', 'playerDataWrites']) {
