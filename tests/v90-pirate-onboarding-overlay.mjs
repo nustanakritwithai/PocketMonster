@@ -58,6 +58,6 @@ assert.match(parentBoot, /event\.source !== frame\.contentWindow \|\| event\.ori
 assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/);
 assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated shell keeps the onboarding proxy layer structurally empty');
 assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell no longer creates invisible tutorial action buttons');
-assert.match(pirateHud, /\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'integrated Pirate HUD hides the bottom tutorial and interaction prompt');
+assert.match(pirateHud, /\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*display:\s*none\s*!important/, 'integrated Pirate HUD removes the bottom tutorial and interaction prompt from layout');
 
 console.log('V9 Pirate onboarding retirement bridge: PASS');
