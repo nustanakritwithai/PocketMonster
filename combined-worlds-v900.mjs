@@ -4,34 +4,10 @@ export const COMBINED_WORLD_COUNT = 3;
 export const DEFAULT_COMBINED_WORLD = 'pirate-fruit';
 
 export const COMBINED_WORLD_LINKS = Object.freeze([
-  Object.freeze({
-    id: 'pirate-to-pocket-monster',
-    from: 'pirate-fruit',
-    to: 'pocket-monster',
-    label: 'เกมเดิม • Pocket Monster',
-    kind: 'world-link',
-  }),
-  Object.freeze({
-    id: 'pocket-monster-to-pirate',
-    from: 'pocket-monster',
-    to: 'pirate-fruit',
-    label: 'Pirate Fruit',
-    kind: 'world-link',
-  }),
-  Object.freeze({
-    id: 'pirate-to-living-world',
-    from: 'pirate-fruit',
-    to: 'living-world',
-    label: 'Living World',
-    kind: 'world-link',
-  }),
-  Object.freeze({
-    id: 'living-world-to-pirate',
-    from: 'living-world',
-    to: 'pirate-fruit',
-    label: 'Pirate Fruit',
-    kind: 'world-link',
-  }),
+  Object.freeze({ id: 'pirate-to-pocket-monster', from: 'pirate-fruit', to: 'pocket-monster', label: 'เกมเดิม • Pocket Monster', kind: 'world-link' }),
+  Object.freeze({ id: 'pocket-monster-to-pirate', from: 'pocket-monster', to: 'pirate-fruit', label: 'Pirate Fruit', kind: 'world-link' }),
+  Object.freeze({ id: 'pirate-to-living-world', from: 'pirate-fruit', to: 'living-world', label: 'Living World', kind: 'world-link' }),
+  Object.freeze({ id: 'living-world-to-pirate', from: 'living-world', to: 'pirate-fruit', label: 'Pirate Fruit', kind: 'world-link' }),
 ]);
 
 export const COMBINED_WORLDS = Object.freeze([
@@ -47,7 +23,7 @@ export const COMBINED_WORLDS = Object.freeze([
     label: 'Pirate Fruit',
     title: 'Pirate Fruit',
     detail: 'โลก Pirate Fruit จริงจากไคลเอนต์ offline • Pocket วาดภาพทับ • วาปเชื่อมเข้าเกมเดิม',
-    runtime: './boot-pirate-fruit-v900.mjs?v=924',
+    runtime: './boot-pirate-fruit-v900.mjs?v=925',
   }),
   Object.freeze({
     id: 'living-world',
