@@ -135,6 +135,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     });
     const input = register('mmorpgChatInput', el(documentLike, 'input', '', 'mmorpg-chat-input'));
     input.setAttribute('maxlength', '160');
+    input.setAttribute('placeholder', 'พิมพ์ข้อความ');
+    input.setAttribute('aria-label', 'ข้อความแชท');
     const send = el(documentLike, 'button', '', 'mmorpg-chat-send');
     send.setAttribute('type', 'submit');
     send.textContent = 'ส่ง';
@@ -147,7 +149,6 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       input.value = '';
       void adapter.sendChat(text).catch(() => {});
     });
-    chatPanel.append(form);
     const extras = register('mmorpgChatExtras', el(documentLike, 'div', '', 'mmorpg-chat-extras'));
     extras.setAttribute('aria-hidden', 'true');
     for (const kind of ['mic', 'mail', 'friends']) {
@@ -165,6 +166,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const partyPanel = register('mmorpgPartyPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
     partyPanel.setAttribute('role', 'tabpanel');
     dock.append(partyPanel);
+    dock.append(form);
 
     root.append(dock);
     root.append(register('mmorpgBottomStrip', el(documentLike, 'div', '', 'mmorpg-bottom-strip')));

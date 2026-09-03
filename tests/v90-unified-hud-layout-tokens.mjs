@@ -29,8 +29,11 @@ assert.match(css, /\.mmorpg-banner\{[^}]*left:29\.4%/, 'system banner sits top-c
 assert.match(css, /\.mmorpg-tab\{[^}]*min-width:var\(--hud-hit-min\)/, 'dock tabs keep a 48px wide hit strip');
 assert.match(css, /\.mmorpg-tab\{[^}]*min-height:0/, 'dock tabs hug แชท/เควส/Party with no extra height');
 assert.doesNotMatch(css, /\.mmorpg-tab\{[^}]*min-height:var\(--hud-hit-min\)/, 'dock tabs are not 48px tall');
-assert.match(css, /\.mmorpg-chat-input\{[^}]*min-height:var\(--hud-hit-min\)/, 'chat input keeps a 48px touch height');
-assert.match(css, /\.mmorpg-chat-send\{[^}]*min-width:var\(--hud-hit-min\)[^}]*min-height:var\(--hud-hit-min\)/, 'chat send keeps a 48px touch target');
+assert.match(css, /\.mmorpg-chat-form\{[^}]*flex:0 0 auto/, 'chat compose sits on the dock bottom');
+assert.match(css, /\.mmorpg-chat-input\{[^}]*min-height:0/, 'chat input hugs the text row');
+assert.match(css, /\.mmorpg-chat-send\{[^}]*min-height:0/, 'chat send hugs the text row');
+assert.match(css, /\.mmorpg-dock\{[^}]*rgba\(36,24,12,\.38\)/, 'dock glass is transparent');
+assert.doesNotMatch(css, /\.mmorpg-chat-input\{[^}]*min-height:var\(--hud-hit-min\)/, 'chat input is not a 48px bar');
 assert.match(css, /\.mmorpg-party-slot\{[^}]*min-height:40px/, 'party slot rows stay readable and tappable');
 assert.match(css, /\.mmorpg-utility\{[^}]*min-height:var\(--hud-hit-min\)/, 'utility buttons keep 48px touch targets');
 assert.match(css, /\.mmorpg-hud [^,{]*\{[^}]*pointer-events:auto/, 'HUD regions re-enable pointer events on purpose');

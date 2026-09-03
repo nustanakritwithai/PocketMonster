@@ -206,6 +206,7 @@ function bootWorld() {
   assert.equal(chatTab.getAttribute('aria-selected'), 'true');
   assert.equal(documentLike.getElementById('mmorpgTabQuest').getAttribute('aria-selected'), 'false');
   const input = documentLike.getElementById('mmorpgChatInput');
+  assert.equal(input.getAttribute('placeholder'), 'พิมพ์ข้อความ', 'chat compose is visible at the dock bottom');
   input.value = 'ตอบกลับ';
   documentLike.getElementById('mmorpgChatForm').dispatch('submit', { preventDefault() {} });
   await new Promise(resolve => setTimeout(resolve, 5));
