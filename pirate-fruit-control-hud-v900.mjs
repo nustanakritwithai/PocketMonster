@@ -11,6 +11,10 @@ html[data-pirate-hud="pirate-primary-parent"] .game-minimap {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+html[data-pirate-hud="pirate-primary-parent"] .progression-hud {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 html[data-pirate-hud="pirate-primary-parent"] .fullscreen-prompt-root,
 html[data-pirate-hud="pirate-primary-parent"] .onboarding-root,
 html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt {

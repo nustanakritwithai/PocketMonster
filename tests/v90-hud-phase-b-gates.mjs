@@ -50,6 +50,7 @@ for (const [property, value] of [
 assert.match(mobileMinimapCss, /@media\s*\(max-height:420px\)/, 'mobile minimap override targets short landscape phones');
 assert.match(mobileMinimapCss, /\.mmorpg-hud \.mmorpg-minimap\{display:block!important\}/, 'short landscape phones keep the unified minimap visible');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is retired');
+assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
 
