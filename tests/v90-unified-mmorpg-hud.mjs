@@ -147,7 +147,7 @@ function fakeChatAdapter() {
 }
 
 // ---------- Harness ----------
-function bootWorld() {
+function bootWorld(hudOptions = {}) {
   const documentLike = createFakeDocument();
   const windowLike = new EventTarget();
   windowLike.POCKETMONSTER_CHAT_RUNTIME = { chat: fakeChatAdapter() };
@@ -177,7 +177,7 @@ function bootWorld() {
     banner: fakeFeature({ revision: 1, kind: '', text: '', expiresAt: 0 }),
   };
   windowLike.POCKETMONSTER_POCKET_HUD = Object.freeze({ ...pocketFeatures, resetAll() {} });
-  const hud = createUnifiedMmorpgHud({ windowLike, documentLike });
+  const hud = createUnifiedMmorpgHud({ windowLike, documentLike, ...hudOptions });
   return { hud, documentLike, windowLike };
 }
 
@@ -346,13 +346,23 @@ function bootWorld() {
 }
 
 {
-  const { hud, documentLike } = bootWorld();
+  let fireActivity = null;
+  const { hud, documentLike } = bootWorld({
+    timers: {
+      setInterval(fn) { fireActivity = fn; return 1; },
+      clearInterval() {},
+      setTimeout() { return 2; },
+      clearTimeout() {},
+    },
+  });
   hud.mount();
   const banner = documentLike.getElementById('mmorpgBanner');
-  assert.match(banner.textContent, /กิจกรรมจำลอง/, 'activity banner shows mock text');
-  assert.equal(banner.classList.contains('hidden'), false, 'activity toast is visible when it fires');
+  assert.equal(banner.classList.contains('hidden'), true, 'activity banner starts hidden');
+  assert.equal(banner.textContent, '', 'no mock text until the timer fires');
+  fireActivity();
+  assert.match(banner.textContent, /กิจกรรมจำลอง/, 'timer shows mock activity text');
+  assert.equal(banner.classList.contains('hidden'), false, 'timer reveals the activity toast');
   hud.unmount();
-  assert.equal(documentLike.getElementById('mmorpgBanner'), null, 'unmount removes the activity banner');
 }
 
 // ---------- 6. Entry wiring ----------

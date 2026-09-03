@@ -28,7 +28,8 @@ assert.match(css, /\.mmorpg-dock\{[^}]*width:32\.7%/, 'dock width matches the go
 assert.match(css, /\.mmorpg-dock\.collapsed\{height:var\(--hud-dock-collapsed\)/, 'collapsed dock uses the token height');
 assert.match(css, /\.mmorpg-dock\{[^}]*height:var\(--hud-dock-expanded\)/, 'expanded dock uses the token height');
 assert.match(css, /\.mmorpg-bottom-strip\{[^}]*bottom:0/, 'bottom strip hugs the viewport bottom');
-assert.match(css, /\.mmorpg-banner\{[^}]*left:29\.4%/, 'system banner sits top-center');
+assert.match(css, /\.mmorpg-banner\{[^}]*display:none/, 'activity banner is hidden until a toast fires');
+assert.match(css, /\.mmorpg-banner:empty\{display:none/, 'an empty pink activity box cannot paint at boot');
 assert.match(css, /\.mmorpg-banner\{[^}]*height:auto/, 'activity banner hugs the text height');
 assert.match(css, /\.mmorpg-banner\{[^}]*padding:2px 8px/, 'activity banner has no extra chrome around the text');
 

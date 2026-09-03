@@ -49,10 +49,14 @@ function fillBar(documentLike, className, value, maximum, label) {
   return bar;
 }
 
-export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
+export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}) {
   if (!windowLike || !documentLike) {
     throw new TypeError('createUnifiedMmorpgHud requires windowLike and documentLike');
   }
+  const scheduleTimeout = timers?.setTimeout || setTimeout;
+  const cancelTimeout = timers?.clearTimeout || clearTimeout;
+  const scheduleInterval = timers?.setInterval || setInterval;
+  const cancelInterval = timers?.clearInterval || clearInterval;
 
   let shell = null;
   let activeTab = 'chat';
@@ -736,7 +740,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
   function clearBannerTimer() {
     if (bannerTimer) {
-      clearTimeout(bannerTimer);
+      cancelTimeout(bannerTimer);
       bannerTimer = 0;
     }
   }
@@ -758,7 +762,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (!(ms > 0)) return;
     if (documentLike.hidden === true || documentLike.visibilityState === 'hidden') return;
     bannerArmedAt = Date.now();
-    bannerTimer = setTimeout(() => {
+    bannerTimer = scheduleTimeout(() => {
       bannerTimer = 0;
       bannerRemainMs = 0;
       hideBanner();
@@ -770,7 +774,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (hidden) {
       if (bannerTimer) {
         bannerRemainMs = Math.max(0, bannerRemainMs - (Date.now() - bannerArmedAt));
-        clearTimeout(bannerTimer);
+        cancelTimeout(bannerTimer);
         bannerTimer = 0;
       }
       return;
@@ -783,6 +787,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (!banner) return;
     const text = snapshot?.text || '';
     if (!text) {
+      hideBanner();
       return;
     }
     banner.classList.remove('error');
@@ -807,15 +812,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
   function stopActivityTicker() {
     if (activityTimer) {
-      clearInterval(activityTimer);
+      cancelInterval(activityTimer);
       activityTimer = 0;
     }
   }
 
   function startActivityTicker() {
     stopActivityTicker();
-    showActivityToast();
-    activityTimer = setInterval(showActivityToast, ACTIVITY_INTERVAL_MS);
+    activityTimer = scheduleInterval(showActivityToast, ACTIVITY_INTERVAL_MS);
   }
 
   function renderUtilities(snapshot) {
