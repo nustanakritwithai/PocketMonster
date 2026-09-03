@@ -310,7 +310,10 @@ export function installPirateNpcNameChild({
     const prompt = documentLike.querySelector?.('.interaction-prompt');
     const liveName = readPirateNpcPromptName(prompt);
     if (!currentName || requestedName !== currentName || liveName !== currentName) return;
-    prompt.click?.();
+    const PointerCtor = windowLike.PointerEvent || windowLike.Event;
+    if (typeof PointerCtor === 'function') {
+      prompt.dispatchEvent?.(new PointerCtor('pointerdown', { bubbles: true, cancelable: true }));
+    }
   }
 
   windowLike.addEventListener?.('message', onMessage);
