@@ -146,8 +146,6 @@ try {
   config = window.parent.POCKETMONSTER_RUNTIME_CONFIG || null;
   requireLiveScene();
   const trustedSceneNavigation = window.parent.POCKETMONSTER_ONLINE_SHELL?.sceneNavigationTrusted === true;
-  // The parent shell authenticates once at entry. Reused in-tab scene
-  // navigation trusts that owner instead of repeating the visible checks.
   if (!trustedSceneNavigation) {
     requireActiveOnlineLaunchSession(config, launchSession);
     requireHealthyParentServerGate();
@@ -188,7 +186,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=931');
+  await import('./worlds-v900.mjs?v=932');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
