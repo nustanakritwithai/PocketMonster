@@ -57,6 +57,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   let shell = null;
   let activeTab = 'chat';
   let sideTab = 'quest';
+  let drawerCollapsed = false;
   let expanded = true;
   let chatKeyboardDismiss = null;
   const unsubscribers = [];
@@ -111,6 +112,13 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       tabNode.addEventListener('click', () => setSideTab(tab));
       sideTabs.append(tabNode);
     }
+    const collapseTab = register('mmorpgTabCollapse', el(documentLike, 'button', '', 'mmorpg-side-tab'));
+    collapseTab.setAttribute('role', 'tab');
+    collapseTab.setAttribute('type', 'button');
+    collapseTab.setAttribute('aria-controls', 'mmorpgSideDetail');
+    collapseTab.textContent = 'ย่อ';
+    collapseTab.addEventListener('click', () => collapseSideDrawer());
+    sideTabs.append(collapseTab);
     const detail = register('mmorpgSideDetail', el(documentLike, 'div', '', 'mmorpg-side-detail'));
     const questPanel = register('mmorpgQuestPanel', el(documentLike, 'aside', '', 'mmorpg-quest-panel'));
     const partyPanel = register('mmorpgPartyPanel', el(documentLike, 'div', '', 'mmorpg-panel'));
@@ -299,7 +307,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       target.replaceChildren(...children);
     };
     build(side);
-    setSideTab(sideTab);
+    applySideDrawer();
   }
 
   function padPartySlots(slots) {
@@ -854,16 +862,30 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     setSideTab(tab);
   }
 
-  function setSideTab(tab) {
-    if (!SIDE_TABS.includes(tab) || !shell) return;
-    sideTab = tab;
+  function applySideDrawer() {
+    node('mmorpgSideDrawer')?.classList.toggle('collapsed', drawerCollapsed);
+    node('mmorpgSideDetail')?.classList.toggle('hidden', drawerCollapsed);
+    node('mmorpgTabCollapse')?.setAttribute('aria-selected', String(drawerCollapsed));
     for (const candidate of SIDE_TABS) {
       const tabNode = node(`mmorpgTab${candidate[0].toUpperCase()}${candidate.slice(1)}`);
       const panelNode = candidate === 'quest' ? node('mmorpgQuestPanel') : node('mmorpgPartyPanel');
-      const selected = candidate === tab;
+      const selected = !drawerCollapsed && candidate === sideTab;
       if (tabNode) tabNode.setAttribute('aria-selected', String(selected));
       if (panelNode) panelNode.classList.toggle('hidden', !selected);
     }
+  }
+
+  function collapseSideDrawer() {
+    if (!shell) return;
+    drawerCollapsed = true;
+    applySideDrawer();
+  }
+
+  function setSideTab(tab) {
+    if (!SIDE_TABS.includes(tab) || !shell) return;
+    sideTab = tab;
+    drawerCollapsed = false;
+    applySideDrawer();
   }
 
   function setExpanded(next) {
