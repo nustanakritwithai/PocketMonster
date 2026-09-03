@@ -36,6 +36,7 @@ class FakeNode {
   }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
   getAttribute(name) { return this.attributes.has(name) ? this.attributes.get(name) : null; }
+  removeAttribute(name) { this.attributes.delete(name); }
   append(...nodes) {
     for (const node of nodes) {
       node.parentNode = this;
@@ -256,7 +257,54 @@ function bootWorld() {
   assert.equal(documentLike.getElementById('mmorpgQuestPanel'), null, 'no DOM resurrects after teardown');
 }
 
-// ---------- 5. Entry wiring ----------
+// ---------- 5. Overlay monster slots paint and arm summon ----------
+{
+  const { hud, documentLike, windowLike } = bootWorld();
+  windowLike.POCKETMONSTER_PARTY_HUD.armSummon = slot => {
+    windowLike.lastPartyCommand = ['arm', slot];
+    return { ok: true, reason: 'summon-aimed', message: '' };
+  };
+  for (const id of ['monsterSlot1Btn', 'monsterSlot2Btn', 'monsterSlot3Btn']) {
+    const button = new FakeNode('button', id);
+    button.classList.add('tc-btn', 'tc-monster');
+    documentLike.body.append(button);
+  }
+  hud.mount();
+  const slot1 = documentLike.getElementById('monsterSlot1Btn');
+  assert.equal(slot1.textContent, 'M', 'overlay slot paints the owned monster glyph');
+  assert.equal(slot1.getAttribute('data-pirate-icon'), 'M', 'pirate icon follows the owned glyph');
+  slot1.dispatch('pointerdown', { preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(windowLike.lastPartyCommand, ['arm', 0], 'overlay press arms the Pocket summon for that slot');
+  hud.unmount();
+}
+
+{
+  const documentLike = createFakeDocument();
+  for (const id of ['monsterSlot1Btn', 'monsterSlot2Btn', 'monsterSlot3Btn']) {
+    const button = new FakeNode('button', id);
+    button.textContent = '🐾';
+    documentLike.body.append(button);
+  }
+  const windowLike = new EventTarget();
+  windowLike.POCKETMONSTER_CHAT_RUNTIME = { chat: fakeChatAdapter() };
+  const hud = createUnifiedMmorpgHud({ windowLike, documentLike });
+  hud.mount();
+  assert.equal(documentLike.getElementById('monsterSlot1Btn').textContent, '＋', 'empty overlay slots seed before party exists');
+  windowLike.POCKETMONSTER_PARTY_HUD = fakeFeature({
+    revision: 4, available: true, selectedSlot: 0, activeInstanceId: 'mon-a', canSwitch: true,
+    slots: Object.freeze([
+      Object.freeze({ id: 'slot-1', slot: 0, available: true, instanceId: 'mon-a', portraitKey: 'mossbun', name: 'Mossbun', level: 5, hp: 20, hpMax: 40, condition: 'normal', fainted: false, selected: true, active: true }),
+      Object.freeze({ id: 'slot-2', slot: 1, available: false, instanceId: '', portraitKey: '', name: '', level: 0, hp: 0, hpMax: 0, condition: '', fainted: false, selected: false, active: false }),
+      Object.freeze({ id: 'slot-3', slot: 2, available: false, instanceId: '', portraitKey: '', name: '', level: 0, hp: 0, hpMax: 0, condition: '', fainted: false, selected: false, active: false }),
+    ]),
+  });
+  windowLike.POCKETMONSTER_PARTY_HUD.selectPartySlot = slot => { windowLike.lastPartyCommand = ['select', slot]; return { ok: true }; };
+  hud.rebind();
+  assert.equal(documentLike.getElementById('monsterSlot1Btn').textContent, 'M', 'rebind paints overlay slots from the scene party adapter');
+  hud.unmount();
+}
+
+// ---------- 6. Entry wiring ----------
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 assert.match(preload, /unified-mmorpg-hud-v900\.mjs/, 'entry preload owns the unified HUD module');
 assert.ok(

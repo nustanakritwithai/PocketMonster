@@ -403,6 +403,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       button.classList.toggle('selected', slot.selected === true);
       button.classList.toggle('active-monster', slot.active === true);
       button.classList.toggle('fainted-slot', slot.fainted === true);
+      button.dataset.partySlot = String(slot.slot);
       button.setAttribute('aria-label', slot.available === true
         ? `${slot.name || 'Party'} slot ${slot.slot + 1}`
         : `Party ช่อง ${slot.slot + 1} ว่าง`);
@@ -416,7 +417,18 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       button.addEventListener('pointerdown', event => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
-        partyAdapter()?.selectPartySlot?.(slot.slot);
+        const slotIndex = Number(button.dataset.partySlot);
+        const party = partyAdapter();
+        if (party?.armSummon) party.armSummon(slotIndex);
+        else party?.selectPartySlot?.(slotIndex);
+      });
+      button.addEventListener('pointerup', event => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        partyAdapter()?.executeArmedSummon?.();
+      });
+      button.addEventListener('pointercancel', () => {
+        partyAdapter()?.cancelArmedSummon?.();
       });
       button.addEventListener('contextmenu', event => {
         event?.preventDefault?.();
@@ -848,6 +860,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (!shell) return null;
     bindFeatures();
     setTab(activeTab);
+    renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
     return shell;
   }
 
