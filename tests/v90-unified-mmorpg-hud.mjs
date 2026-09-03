@@ -194,16 +194,17 @@ function bootWorld() {
   for (const id of [
     'mmorpgPlayerStatus', 'mmorpgBuffRow', 'mmorpgQuickIndicators', 'mmorpgQuestPanel', 'mmorpgMinimap',
     'mmorpgRoster', 'mmorpgCompanions', 'mmorpgUtilities', 'mmorpgBanner',
-    'mmorpgDock', 'mmorpgBottomStrip', 'mmorpgSideDrawer', 'mmorpgSideTabs',
+    'mmorpgDock', 'mmorpgBottomStrip', 'mmorpgSideDrawer', 'mmorpgSideTabs', 'mmorpgTabCollapse',
   ]) {
     assert.ok(shell.byId(id), `region #${id} exists exactly once`);
   }
   const tablist = shell.byId('mmorpgSideTabs');
   assert.equal(tablist?.getAttribute('role'), 'tablist', 'side window exposes เควส/Party tabs');
-  for (const tabId of ['mmorpgTabQuest', 'mmorpgTabParty']) {
+  for (const tabId of ['mmorpgTabQuest', 'mmorpgTabParty', 'mmorpgTabCollapse']) {
     const tab = shell.byId(tabId);
     assert.equal(tab?.getAttribute('role'), 'tab', `${tabId} is a tab`);
   }
+  assert.equal(shell.byId('mmorpgTabCollapse').textContent, 'ย่อ', 'collapse control sits with เควส/Party');
   assert.equal(shell.byId('mmorpgDockTabs'), null, 'bottom dock has no chat/quest/party tab picker');
   assert.equal(shell.byId('mmorpgTabChat'), null, 'chat has no tab; the dock is chat-only');
   hud.unmount();
@@ -268,6 +269,14 @@ function bootWorld() {
   assert.ok(slotButtons.length >= 1, 'party panel exposes slot controls');
   slotButtons[0].dispatch('click', {});
   assert.deepEqual(windowLike.lastPartyCommand, ['select', 0], 'slot click routes through the party adapter command');
+  documentLike.getElementById('mmorpgTabCollapse').dispatch('click', {});
+  assert.equal(documentLike.getElementById('mmorpgSideDrawer').classList.contains('collapsed'), true, 'ย่อ collapses the side window');
+  assert.equal(documentLike.getElementById('mmorpgSideDetail').classList.contains('hidden'), true, 'ย่อ hides the detail pane');
+  assert.equal(documentLike.getElementById('mmorpgTabCollapse').getAttribute('aria-selected'), 'true');
+  documentLike.getElementById('mmorpgTabQuest').dispatch('click', {});
+  assert.equal(documentLike.getElementById('mmorpgSideDrawer').classList.contains('collapsed'), false, 'เควส reopens the detail pane');
+  assert.equal(documentLike.getElementById('mmorpgSideDetail').classList.contains('hidden'), false);
+  assert.equal(documentLike.getElementById('mmorpgQuestPanel').classList.contains('hidden'), false);
   hud.unmount();
 }
 

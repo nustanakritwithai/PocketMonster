@@ -19,6 +19,7 @@ assert.match(css, /\.mmorpg-quest-panel\{[^}]*left:2\.6%/, 'quest side panel kee
 assert.match(css, /\.mmorpg-side-drawer\{[^}]*left:0\.4%/, 'quest/party window sits under HP on the left');
 assert.match(css, /\.mmorpg-side-tabs\{[^}]*flex-direction:column/, 'เควส/Party tabs are a left frame');
 assert.match(css, /\.mmorpg-side-detail\{[^}]*flex:1/, 'detail pane fills the side window');
+assert.match(css, /\.mmorpg-side-drawer\.collapsed \.mmorpg-side-detail\{display:none/, 'collapse tab hides the quest/party detail pane');
 assert.match(css, /\.mmorpg-dock-tabs\{display:none/, 'bottom dock has no tab picker');
 assert.match(css, /\.mmorpg-minimap\{[^}]*left:84\.4%/, 'minimap anchors to the right edge');
 assert.match(css, /\.mmorpg-roster\{[^}]*left:62\.5%/, 'target/party roster keeps the right-middle stack');
