@@ -57,6 +57,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
   let shell = null;
   let activeTab = 'chat';
   let expanded = true;
+  let chatKeyboardDismiss = null;
   const unsubscribers = [];
   const lastRevisions = new Map();
   const nodes = new Map();
@@ -148,7 +149,34 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       if (!text || !adapter?.sendChat) return;
       input.value = '';
       void adapter.sendChat(text).catch(() => {});
+      try { input.blur?.(); } catch {}
     });
+    const dismiss = register('mmorpgChatDismiss', el(documentLike, 'div', '', 'mmorpg-chat-dismiss hidden'));
+    dismiss.setAttribute('aria-hidden', 'true');
+    const formContains = target => {
+      let node = target;
+      while (node) {
+        if (node === form || node.id === 'mmorpgChatForm') return true;
+        node = node.parentNode;
+      }
+      return false;
+    };
+    const hideChatKeyboard = () => {
+      try { input.blur?.(); } catch {}
+      dismiss.classList.add('hidden');
+    };
+    const onAwayPointer = event => {
+      if (formContains(event?.target)) return;
+      hideChatKeyboard();
+    };
+    input.addEventListener('focus', () => dismiss.classList.remove('hidden'));
+    input.addEventListener('blur', () => dismiss.classList.add('hidden'));
+    dismiss.addEventListener('pointerdown', event => {
+      event?.preventDefault?.();
+      hideChatKeyboard();
+    });
+    documentLike.addEventListener?.('pointerdown', onAwayPointer, true);
+    chatKeyboardDismiss = { node: dismiss, onAwayPointer };
     const extras = register('mmorpgChatExtras', el(documentLike, 'div', '', 'mmorpg-chat-extras'));
     extras.setAttribute('aria-hidden', 'true');
     for (const kind of ['mic', 'mail', 'friends']) {
@@ -863,6 +891,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (shell) return shell;
     shell = buildShell();
     documentLike.body.append(shell);
+    if (chatKeyboardDismiss?.node) documentLike.body.append(chatKeyboardDismiss.node);
     documentLike.body.classList.add('unified-hud-active');
     sessionStartedAt = Date.now();
     documentLike.addEventListener?.('visibilitychange', onDocumentVisibility);
@@ -894,6 +923,16 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       stripTimer = 0;
     }
     documentLike.removeEventListener?.('visibilitychange', onDocumentVisibility);
+    if (chatKeyboardDismiss?.onAwayPointer) {
+      documentLike.removeEventListener?.('pointerdown', chatKeyboardDismiss.onAwayPointer, true);
+    }
+    try { chatKeyboardDismiss?.node?.remove?.(); } catch {}
+    if (Array.isArray(chatKeyboardDismiss?.node?.parentNode?.children)) {
+      chatKeyboardDismiss.node.parentNode.children = chatKeyboardDismiss.node.parentNode.children.filter(
+        child => child !== chatKeyboardDismiss.node,
+      );
+    }
+    chatKeyboardDismiss = null;
     try { shell?.remove?.(); } catch {}
     if (Array.isArray(shell?.parentNode?.children)) {
       shell.parentNode.children = shell.parentNode.children.filter(child => child !== shell);
