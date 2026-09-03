@@ -4,6 +4,7 @@ export const PIRATE_NPC_NAME_MAX_DISTANCE = 4.6;
 
 const NAME_LIMIT = 40;
 const STATE_INTERVAL_MS = 80;
+const CAMERA_GETTER_PROP = '__pocketNpcNameCameraGetter';
 
 function finite(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -16,6 +17,59 @@ function clamp(value, min, max) {
 function safeName(value) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/\s+/g, ' ').slice(0, NAME_LIMIT);
+}
+
+function srcOf(value) {
+  try { return Function.prototype.toString.call(value); } catch { return ''; }
+}
+
+function ownProto(value, name) {
+  try { return !!Object.getOwnPropertyDescriptor(value?.prototype || {}, name); } catch { return false; }
+}
+
+function pirateObject3DFromVendor(vendor) {
+  for (const value of Object.values(vendor || {})) {
+    if (typeof value !== 'function') continue;
+    if (ownProto(value, 'updateMatrixWorld') && ownProto(value, 'traverse') && ownProto(value, 'add')) return value;
+  }
+  return null;
+}
+
+/**
+ * Pirate Fruit does not expose its perspective camera as a public runtime global.
+ * The presentation layer already wraps Object3D.updateMatrixWorld, so we add one
+ * tiny read-only capture on top of that hook. Cameras pass through this method
+ * every render frame and the opaque iframe sandbox remains unchanged.
+ */
+export function installPirateNpcCameraCapture(vendor) {
+  const Object3D = pirateObject3DFromVendor(vendor);
+  if (!Object3D?.prototype) return null;
+  const original = Object3D.prototype.updateMatrixWorld;
+  if (typeof original !== 'function') return null;
+  if (typeof original[CAMERA_GETTER_PROP] === 'function') return original[CAMERA_GETTER_PROP];
+
+  let camera = null;
+  const getCamera = () => camera;
+  function updateMatrixWorld(force) {
+    if (this?.isCamera === true) camera = this;
+    return original.call(this, force);
+  }
+  Object.defineProperty(updateMatrixWorld, CAMERA_GETTER_PROP, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: getCamera,
+  });
+  if (original.__pocketPirateBridge) {
+    Object.defineProperty(updateMatrixWorld, '__pocketPirateBridge', {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: original.__pocketPirateBridge,
+    });
+  }
+  Object3D.prototype.updateMatrixWorld = updateMatrixWorld;
+  return getCamera;
 }
 
 function inactiveState() {
@@ -67,13 +121,16 @@ export function findNearestPirateNpcNameAnchor(scene, playerPosition, maxDistanc
   return best;
 }
 
-export function projectPirateNpcNameAnchor({ sprite, camera, three, width, height } = {}) {
-  if (!sprite?.getWorldPosition || !camera || !three?.Vector3) return null;
+export function projectPirateNpcNameAnchor({ sprite, camera, three, vectorSeed, width, height } = {}) {
+  if (!sprite?.getWorldPosition || !camera) return null;
   const viewportWidth = finite(width);
   const viewportHeight = finite(height);
   if (!(viewportWidth > 0) || !(viewportHeight > 0)) return null;
+  const point = typeof vectorSeed?.clone === 'function'
+    ? vectorSeed.clone()
+    : (typeof three?.Vector3 === 'function' ? new three.Vector3() : null);
+  if (!point?.project) return null;
   camera.updateMatrixWorld?.();
-  const point = new three.Vector3();
   sprite.getWorldPosition(point);
   point.project(camera);
   if (![point.x, point.y, point.z].every(Number.isFinite)) return null;
@@ -208,9 +265,11 @@ export function installPirateNpcNameChild({
   parentOrigin,
   intervalMs = STATE_INTERVAL_MS,
 } = {}) {
-  if (!windowLike || !documentLike || !three?.Vector3) return null;
+  if (!windowLike || !documentLike) return null;
   let trustedParentOrigin = '';
   try { trustedParentOrigin = new URL(parentOrigin).origin; } catch { return null; }
+  const getCamera = installPirateNpcCameraCapture(three);
+  if (typeof getCamera !== 'function') return null;
   let currentName = '';
   let lastSerialized = '';
   let stopped = false;
@@ -242,12 +301,13 @@ export function installPirateNpcNameChild({
     const name = readPirateNpcPromptName(prompt);
     const scene = windowLike.__combat?.scene;
     const playerPosition = windowLike.__combat?.controller?.position;
-    const camera = windowLike.__boat?.camera?.camera;
+    const camera = getCamera();
     const anchor = name ? findNearestPirateNpcNameAnchor(scene, playerPosition) : null;
     const projected = anchor ? projectPirateNpcNameAnchor({
       sprite: anchor.sprite,
       camera,
       three,
+      vectorSeed: playerPosition,
       width: windowLike.innerWidth,
       height: windowLike.innerHeight,
     }) : null;
