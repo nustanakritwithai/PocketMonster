@@ -78,6 +78,20 @@ function npcNameSprite(group) {
   return null;
 }
 
+function sceneFromCamera(camera) {
+  let node = camera || null;
+  while (node?.parent) node = node.parent;
+  return node;
+}
+
+function projectionSeed(camera) {
+  const position = camera?.position;
+  if (typeof position?.clone !== 'function') return null;
+  const point = position.clone();
+  if (typeof point?.project !== 'function') return null;
+  return position;
+}
+
 export function findNearestPirateNpcNameAnchor(scene, playerPosition, maxDistance = PIRATE_NPC_NAME_MAX_DISTANCE) {
   if (!Array.isArray(scene?.children) || !playerPosition) return null;
   const px = finite(playerPosition.x);
@@ -143,7 +157,7 @@ function styleParentProxy(button) {
     background: 'transparent',
     color: 'transparent',
     boxShadow: 'none',
-    opacity: '0',
+    opacity: '0.01',
     pointerEvents: 'auto',
     touchAction: 'manipulation',
     transform: 'translate(-50%,-50%)',
@@ -162,13 +176,14 @@ export function createPirateNpcNameParentProxy({ frame, documentLike = globalThi
     button.type = 'button';
     button.dataset.pirateNpcNameProxy = 'true';
     styleParentProxy(button);
-    button.addEventListener('pointerdown', event => event.stopPropagation?.());
-    button.addEventListener('click', event => {
+    const sendActivate = event => {
       event.preventDefault?.();
       event.stopPropagation?.();
       if (!state.active) return;
       frame.contentWindow?.postMessage({ type: PIRATE_NPC_NAME_MESSAGE, kind: 'activate', name: state.name }, '*');
-    });
+    };
+    button.addEventListener('pointerdown', sendActivate);
+    button.addEventListener('click', sendActivate);
     documentLike.body?.appendChild(button);
     return button;
   }
@@ -289,14 +304,14 @@ export function installPirateNpcNameChild({
     }
     const prompt = documentLike.querySelector?.('.interaction-prompt');
     const name = readPirateNpcPromptName(prompt);
-    const scene = windowLike.__combat?.scene;
-    const playerPosition = windowLike.__combat?.controller?.position;
     const camera = getCamera();
-    const anchor = name ? findNearestPirateNpcNameAnchor(scene, playerPosition) : null;
+    const scene = name ? sceneFromCamera(camera) : null;
+    const vectorSeed = name ? projectionSeed(camera) : null;
+    const anchor = name ? findNearestPirateNpcNameAnchor(scene, camera?.position, 48) : null;
     const projected = anchor ? projectPirateNpcNameAnchor({
       sprite: anchor.sprite,
       camera,
-      vectorSeed: playerPosition,
+      vectorSeed,
       width: windowLike.innerWidth,
       height: windowLike.innerHeight,
     }) : null;

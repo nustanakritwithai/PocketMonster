@@ -1,7 +1,7 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=5';
-import { createPirateNpcNameParentProxy } from './pirate-npc-name-interaction-v900.mjs?v=2';
+import { createPirateNpcNameParentProxy } from './pirate-npc-name-interaction-v900.mjs?v=3';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
   PIRATE_HUD_INIT_MESSAGE,
