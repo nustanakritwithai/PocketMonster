@@ -23,17 +23,19 @@ assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-bu
 assert.match(boot, /bindPirateSaveHost/, 'parent owns the isolated Pirate save persistence host');
 assert.match(boot, /pirate-save-bridge-v900\.mjs\?v=1/, 'parent cache-busts the save bridge');
 assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=5/, 'parent boot cache-busts the child HUD retirement contract');
+assert.match(boot, /pirate-npc-name-interaction-v900\.mjs\?v=2/, 'parent boot cache-busts the NPC-name activation gesture bridge');
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=916/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=924/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=32/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=33/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
-assert.match(sceneHtml, /style-v900\.css\?v=940/, 'scene HTML cache-busts the persistent fullscreen control layout');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=7/, 'offline HTML cache-busts presentation integration after child minimap retirement');
+assert.match(boot, /index\.html\?v=917/, 'parent cache-busts the Pirate child HTML with NPC-name activation');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=925/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=32/, 'top-level entry keeps the current persistent shell revision');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=34/, 'scene HTML cache-busts the Pirate world dependency chain');
+assert.match(sceneHtml, /style-v900\.css\?v=940/, 'scene HTML keeps the current persistent fullscreen control layout');
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=8/, 'offline HTML cache-busts NPC-name gesture presentation');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=5/, 'presentation loads the HUD policy that retires the circular child minimap');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=2/, 'presentation loads NPC-name gesture activation v2');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is hidden by the parent-primary HUD policy');
 assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired by parent-primary HUD policy');
 
