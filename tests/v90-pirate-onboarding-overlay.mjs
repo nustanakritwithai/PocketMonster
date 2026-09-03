@@ -54,7 +54,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=925/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=926/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -77,11 +77,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=4/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=8/, 'Pirate child HTML cache-busts presentation after the pointerdown fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=5/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=9/, 'Pirate child HTML cache-busts presentation after the pointerdown fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=4/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=5/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -332,6 +332,139 @@ function activate(windowLike, { origin, source, name } = {}) {
   assert.equal(prompt.pointerdowns, 1, 'correct activation dispatches pointerdown');
   assert.equal(prompt.requested, true, 'original-style pointerdown listener sets requested=true');
   assert.equal(prompt.clickCount, 0, 'correct activation does not dispatch click');
+  child.stop();
+}
+
+function projectingCameraPosition() {
+  return {
+    x: 2,
+    y: 1.6,
+    z: 2,
+    clone() {
+      return {
+        x: 0,
+        y: 0,
+        z: 0,
+        project() {
+          this.x = 0;
+          this.y = 0.2;
+          this.z = 0;
+          return this;
+        },
+      };
+    },
+  };
+}
+
+function createSpecializedCtor(flag) {
+  class Specialized {
+    constructor() {
+      this.children = [];
+      this.parent = null;
+      this.position = { x: 0, y: 0, z: 0 };
+      this[flag] = true;
+    }
+    updateMatrixWorld() {}
+    traverse() {}
+    add() {}
+  }
+  Specialized.prototype[flag] = true;
+  return Specialized;
+}
+
+function installCapturedSceneChild(prompt, { withSprite = true } = {}) {
+  class Object3D {
+    constructor() {
+      this.children = [];
+      this.position = { x: 0, y: 0, z: 0 };
+      this.visible = true;
+      this.parent = null;
+    }
+    updateMatrixWorld() {}
+    traverse() {}
+    add() {}
+  }
+  class Scene {
+    constructor() {
+      this.isScene = true;
+      this.children = [];
+      this.position = { x: 0, y: 0, z: 0 };
+      this.visible = true;
+      this.parent = null;
+    }
+    updateMatrixWorld() {}
+  }
+  const Camera = createSpecializedCtor('isCamera');
+  const Mesh = createSpecializedCtor('isMesh');
+  const Group = createSpecializedCtor('isGroup');
+  const windowLike = new EventTarget();
+  windowLike.parent = {};
+  windowLike.innerWidth = 800;
+  windowLike.innerHeight = 450;
+  windowLike.setInterval = () => 0;
+  windowLike.clearInterval = () => {};
+  windowLike.PointerEvent = FakePointerEvent;
+  windowLike.Event = Event;
+  windowLike.__combat = { attacking: false };
+  const documentLike = {
+    documentElement: { dataset: { pirateHud: 'pirate-primary-parent' } },
+    querySelector: selector => (selector === '.interaction-prompt' ? prompt : null),
+  };
+  const child = installPirateNpcNameChild({
+    three: { Camera, Mesh, Group, Object3D, Scene },
+    windowLike,
+    documentLike,
+    parentOrigin: 'https://example.test',
+    intervalMs: 10_000,
+  });
+  const scene = new Scene();
+  if (withSprite) {
+    const sprite = {
+      isSprite: true,
+      material: { map: { image: { width: 384, height: 96 } } },
+      position: { y: 3.55 },
+      getWorldPosition(point) {
+        point.x = 0;
+        point.y = 0;
+        point.z = 0;
+        return point;
+      },
+    };
+    const npcGroup = new Object3D();
+    npcGroup.children = [sprite];
+    npcGroup.position = { x: 2, y: 0, z: 2 };
+    scene.children = [npcGroup];
+  }
+  scene.updateMatrixWorld();
+  const camera = new Object3D();
+  camera.isCamera = true;
+  camera.parent = null;
+  camera.position = projectingCameraPosition();
+  camera.updateMatrixWorld();
+  return { child, windowLike };
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  const { child } = installCapturedSceneChild(prompt, { withSprite: true });
+  const state = child.sync();
+  assert.equal(state.active, true, 'captured isScene still finds NPC name sprites when the camera is not parented');
+  assert.equal(state.name, 'หัวหน้ามะลิ');
+  assert.equal(state.x, 0.5, 'projected name x comes from the captured scene sprite');
+  assert.equal(state.y, 0.4, 'projected name y comes from the captured scene sprite, not the fallback');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  const { child } = installCapturedSceneChild(prompt, { withSprite: false });
+  const state = child.sync();
+  assert.equal(state.active, true, 'in-range prompt still posts a visible talk chip when projection has no sprite');
+  assert.equal(state.name, 'หัวหน้ามะลิ');
+  assert.equal(state.x, 0.5);
+  assert.equal(state.y, 0.32);
+  assert.ok(state.width > 0 && state.width <= 0.5, 'fallback chip width stays inside the parent proxy contract');
+  assert.ok(state.height > 0 && state.height <= 0.3, 'fallback chip height stays inside the parent proxy contract');
   child.stop();
 }
 
