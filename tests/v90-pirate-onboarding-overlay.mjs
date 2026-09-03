@@ -77,11 +77,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=3/, 'parent cache-busts the NPC-name interaction module');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=4/, 'parent cache-busts the NPC-name interaction module');
 assert.match(childEntry, /pocket-presentation\.mjs\?v=8/, 'Pirate child HTML cache-busts presentation after the pointerdown fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=3/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=4/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -91,8 +91,10 @@ assert.match(source, /requestOriginalPirateInteraction\(prompt, windowLike\)/, '
 assert.match(source, /prompt\.style\?\.display !== 'block'/, 'prompt name reads inline runtime display, not computed CSS');
 assert.doesNotMatch(source, /getComputedStyle/);
 assert.doesNotMatch(source, /__combat/, 'child projection must not depend on window.__combat');
-assert.match(source, /opacity:\s*'0\.01'/, 'parent overlay stays slightly opaque so Safari can receive taps');
-assert.doesNotMatch(source, /opacity:\s*'0'/);
+assert.match(source, /opacity:\s*'1'/, 'talk chip is fully visible on the projected NPC name');
+assert.doesNotMatch(source, /opacity:\s*'0\.01'/);
+assert.doesNotMatch(source, /color:\s*'transparent'/);
+assert.match(source, /textContent = 'คุย'/, 'relocated talk control shows compact คุย text');
 assert.match(source, /addEventListener\('pointerdown', sendActivate\)/, 'parent hit target activates on pointerdown');
 
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C3SJLfq8.js', import.meta.url), 'utf8');
@@ -207,17 +209,27 @@ function createPrompt(name = 'หัวหน้ามะลิ') {
     data: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: true, name: 'หัวหน้ามะลิ', x: 0.5, y: 0.4, width: 0.2, height: 0.1 },
   }), true);
   const button = nodes.get(PIRATE_NPC_NAME_PROXY_ID);
-  assert.ok(button, 'transparent name hit target exists');
+  assert.ok(button, 'visible talk chip exists on the projected NPC name');
   assert.equal(button.style.display, 'block');
+  assert.equal(button.textContent, 'คุย');
   assert.equal(button.attributes.get('aria-label'), 'คุยกับ หัวหน้ามะลิ');
   assert.equal(button.style.zIndex, '40');
-  assert.equal(button.style.opacity, '0.01');
-  assert.notEqual(button.style.opacity, '0', 'Safari does not hit-test opacity 0 overlays');
+  assert.equal(button.style.opacity, '1');
+  assert.notEqual(button.style.opacity, '0');
+  assert.notEqual(button.style.opacity, '0.01');
+  assert.notEqual(button.style.color, 'transparent');
+  assert.equal(button.style.pointerEvents, 'auto');
   button.dispatchEvent(new FakePointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true }));
   assert.deepEqual(posted, [{
     message: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'activate', name: 'หัวหน้ามะลิ' },
     origin: '*',
   }], 'parent proxy pointerdown posts activate');
+  assert.equal(proxy.accept({
+    source: frameWindow,
+    origin: 'null',
+    data: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: false },
+  }), true);
+  assert.equal(button.style.display, 'none', 'inactive proxy stays hidden');
   proxy.destroy();
 }
 
