@@ -23,33 +23,65 @@ function ownProto(value, name) {
   try { return !!Object.getOwnPropertyDescriptor(value?.prototype || {}, name); } catch { return false; }
 }
 
-function pirateObject3DFromVendor(vendor) {
-  for (const value of Object.values(vendor || {})) {
-    if (typeof value !== 'function') continue;
-    if (ownProto(value, 'updateMatrixWorld') && ownProto(value, 'traverse') && ownProto(value, 'add')) return value;
-  }
-  return null;
+function specializedObject3DProto(proto) {
+  return proto?.isCamera === true
+    || proto?.isMesh === true
+    || proto?.isGroup === true
+    || proto?.isSprite === true
+    || proto?.isScene === true;
 }
 
-/** Capture the live Pirate Fruit camera without weakening the opaque iframe. */
+function pirateObject3DFromVendor(vendor) {
+  const candidates = [];
+  for (const value of Object.values(vendor || {})) {
+    if (typeof value !== 'function') continue;
+    if (!(ownProto(value, 'updateMatrixWorld') && ownProto(value, 'traverse') && ownProto(value, 'add'))) continue;
+    if (specializedObject3DProto(value.prototype)) continue;
+    candidates.push(value);
+  }
+  if (!candidates.length) return null;
+  for (const candidate of candidates) {
+    if (candidates.some(other => other !== candidate && candidate.prototype instanceof other)) continue;
+    return candidate;
+  }
+  return candidates[0];
+}
+
+/** Capture the live Pirate Fruit camera and scene without weakening the opaque iframe. */
 export function installPirateNpcCameraCapture(vendor) {
   const Object3D = pirateObject3DFromVendor(vendor);
   if (!Object3D?.prototype) return null;
-  const original = Object3D.prototype.updateMatrixWorld;
-  if (typeof original !== 'function') return null;
-  if (typeof original[CAMERA_GETTER_PROP] === 'function') return original[CAMERA_GETTER_PROP];
+  const existing = Object3D.prototype.updateMatrixWorld;
+  if (typeof existing === 'function' && typeof existing[CAMERA_GETTER_PROP] === 'function') {
+    return existing[CAMERA_GETTER_PROP];
+  }
 
   let camera = null;
+  let scene = null;
   const getCamera = () => camera;
-  function updateMatrixWorld(force) {
-    if (this?.isCamera === true) camera = this;
-    return original.call(this, force);
+  getCamera.getScene = () => scene;
+
+  function wrapUpdateMatrixWorld(ctor) {
+    const original = ctor?.prototype?.updateMatrixWorld;
+    if (typeof original !== 'function') return;
+    if (typeof original[CAMERA_GETTER_PROP] === 'function') return;
+    function updateMatrixWorld(force) {
+      if (this?.isCamera === true) camera = this;
+      if (this?.isScene === true) scene = this;
+      return original.call(this, force);
+    }
+    Object.defineProperty(updateMatrixWorld, CAMERA_GETTER_PROP, { value: getCamera });
+    if (original.__pocketPirateBridge) {
+      Object.defineProperty(updateMatrixWorld, '__pocketPirateBridge', { value: original.__pocketPirateBridge });
+    }
+    ctor.prototype.updateMatrixWorld = updateMatrixWorld;
   }
-  Object.defineProperty(updateMatrixWorld, CAMERA_GETTER_PROP, { value: getCamera });
-  if (original.__pocketPirateBridge) {
-    Object.defineProperty(updateMatrixWorld, '__pocketPirateBridge', { value: original.__pocketPirateBridge });
+
+  wrapUpdateMatrixWorld(Object3D);
+  for (const value of Object.values(vendor || {})) {
+    if (value === Object3D || typeof value !== 'function') continue;
+    if (ownProto(value, 'updateMatrixWorld')) wrapUpdateMatrixWorld(value);
   }
-  Object3D.prototype.updateMatrixWorld = updateMatrixWorld;
   return getCamera;
 }
 
@@ -308,10 +340,16 @@ export function installPirateNpcNameChild({
     }
     const prompt = documentLike.querySelector?.('.interaction-prompt');
     const name = readPirateNpcPromptName(prompt);
+    if (!name) {
+      currentName = '';
+      post(inactiveState());
+      return inactiveState();
+    }
     const camera = getCamera();
-    const scene = name ? sceneFromCamera(camera) : null;
-    const vectorSeed = name ? projectionSeed(camera) : null;
-    const anchor = name ? findNearestPirateNpcNameAnchor(scene, camera?.position, 48) : null;
+    const capturedScene = typeof getCamera.getScene === 'function' ? getCamera.getScene() : null;
+    const scene = capturedScene || sceneFromCamera(camera);
+    const vectorSeed = projectionSeed(camera);
+    const anchor = findNearestPirateNpcNameAnchor(scene, camera?.position, 48);
     const projected = anchor ? projectPirateNpcNameAnchor({
       sprite: anchor.sprite,
       camera,
@@ -319,11 +357,6 @@ export function installPirateNpcNameChild({
       width: windowLike.innerWidth,
       height: windowLike.innerHeight,
     }) : null;
-    if (!name || !projected) {
-      currentName = '';
-      post(inactiveState());
-      return inactiveState();
-    }
     const nameLength = [...name].length;
     const widthPx = clamp(80 + nameLength * 10, 104, 180);
     const heightPx = 48;
@@ -331,8 +364,8 @@ export function installPirateNpcNameChild({
     const state = Object.freeze({
       active: true,
       name,
-      x: projected.x,
-      y: projected.y,
+      x: projected?.x ?? 0.5,
+      y: projected?.y ?? 0.32,
       width: clamp(widthPx / Math.max(1, windowLike.innerWidth), 0.08, 0.5),
       height: clamp(heightPx / Math.max(1, windowLike.innerHeight), 0.05, 0.3),
     });
