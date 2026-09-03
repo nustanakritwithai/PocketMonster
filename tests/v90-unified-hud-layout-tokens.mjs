@@ -26,7 +26,9 @@ assert.match(css, /\.mmorpg-bottom-strip\{[^}]*bottom:0/, 'bottom strip hugs the
 assert.match(css, /\.mmorpg-banner\{[^}]*left:29\.4%/, 'system banner sits top-center');
 
 // ---------- Touch targets fail closed at 48px ----------
-assert.match(css, /\.mmorpg-tab\{[^}]*min-width:var\(--hud-hit-min\)[^}]*min-height:var\(--hud-hit-min\)/, 'dock tabs keep 48px touch targets');
+assert.match(css, /\.mmorpg-tab\{[^}]*min-width:var\(--hud-hit-min\)/, 'dock tabs keep a 48px wide hit strip');
+assert.match(css, /\.mmorpg-tab\{[^}]*min-height:0/, 'dock tabs hug แชท/เควส/Party with no extra height');
+assert.doesNotMatch(css, /\.mmorpg-tab\{[^}]*min-height:var\(--hud-hit-min\)/, 'dock tabs are not 48px tall');
 assert.match(css, /\.mmorpg-chat-input\{[^}]*min-height:var\(--hud-hit-min\)/, 'chat input keeps a 48px touch height');
 assert.match(css, /\.mmorpg-chat-send\{[^}]*min-width:var\(--hud-hit-min\)[^}]*min-height:var\(--hud-hit-min\)/, 'chat send keeps a 48px touch target');
 assert.match(css, /\.mmorpg-party-slot\{[^}]*min-height:40px/, 'party slot rows stay readable and tappable');

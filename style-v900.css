@@ -197,8 +197,8 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-dock.collapsed{height:var(--hud-dock-collapsed)}
 .mmorpg-dock.collapsed .mmorpg-panel{display:none}
 .mmorpg-dock-summary{flex:0 0 auto;padding:4px 10px;font-size:11px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mmorpg-dock-tabs{flex:0 0 auto;display:flex;gap:2px;padding:2px 6px}
-.mmorpg-tab{min-width:var(--hud-hit-min);min-height:var(--hud-hit-min);flex:1;border:1px solid transparent;border-radius:8px;background:none;color:var(--hud-text);font:700 12px system-ui}
+.mmorpg-dock-tabs{flex:0 0 auto;display:flex;gap:2px;padding:0 6px;align-items:center}
+.mmorpg-tab{min-width:var(--hud-hit-min);min-height:0;padding:2px 8px;line-height:1.2;flex:1;border:1px solid transparent;border-radius:8px;background:none;color:var(--hud-text);font:700 12px system-ui}
 .mmorpg-tab[aria-selected="true"]{border-color:var(--hud-accent);color:var(--hud-accent)}
 .mmorpg-unread{margin-left:6px;padding:0 5px;border-radius:8px;background:#f43f5e;color:#fff;font-size:10px}
 .mmorpg-unread.hidden{display:none}
