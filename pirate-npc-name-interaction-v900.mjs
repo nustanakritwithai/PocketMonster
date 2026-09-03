@@ -120,9 +120,11 @@ function npcNameSprite(group) {
   for (const child of group.children) {
     if (child?.isSprite !== true) continue;
     const image = child.material?.map?.image;
-    if (image?.width !== 384 || image?.height !== 96) continue;
+    const width = finite(image?.width);
+    const height = finite(image?.height);
+    if (!(width > 0) || !(height > 0) || width < height) continue;
     const y = finite(child.position?.y);
-    if (y === null || Math.abs(y - 3.55) > 0.45) continue;
+    if (y === null || y < 1.2) continue;
     return child;
   }
   return null;
