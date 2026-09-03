@@ -345,6 +345,16 @@ function bootWorld() {
   hud.unmount();
 }
 
+{
+  const { hud, documentLike } = bootWorld();
+  hud.mount();
+  const banner = documentLike.getElementById('mmorpgBanner');
+  assert.match(banner.textContent, /กิจกรรมจำลอง/, 'activity banner shows mock text');
+  assert.equal(banner.classList.contains('hidden'), false, 'activity toast is visible when it fires');
+  hud.unmount();
+  assert.equal(documentLike.getElementById('mmorpgBanner'), null, 'unmount removes the activity banner');
+}
+
 // ---------- 6. Entry wiring ----------
 const preload = fs.readFileSync(new URL('../entry-preload.mjs', import.meta.url), 'utf8');
 assert.match(preload, /unified-mmorpg-hud-v900\.mjs/, 'entry preload owns the unified HUD module');

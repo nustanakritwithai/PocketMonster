@@ -135,7 +135,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     root.append(register('mmorpgRoster', el(documentLike, 'div', '', 'mmorpg-roster')));
     root.append(register('mmorpgCompanions', el(documentLike, 'div', '', 'mmorpg-companions')));
     root.append(register('mmorpgUtilities', el(documentLike, 'div', '', 'mmorpg-utilities')));
-    root.append(register('mmorpgBanner', el(documentLike, 'div', '', 'mmorpg-banner')));
+    root.append(register('mmorpgBanner', el(documentLike, 'div', '', 'mmorpg-banner hidden')));
 
     const dock = register('mmorpgDock', el(documentLike, 'section', '', 'mmorpg-dock'));
     dock.append(register('mmorpgDockSummary', el(documentLike, 'div', '', 'mmorpg-dock-summary')));
@@ -660,10 +660,18 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
 
   const UTILITY_COMMANDS = Object.freeze(['fullscreen', 'menu', 'character', 'audio', 'map', 'home', 'world', 'save']);
   const BANNER_DEFAULT_MS = 8000;
+  const ACTIVITY_INTERVAL_MS = 5 * 60 * 1000;
+  const MOCK_ACTIVITY = Object.freeze([
+    'กิจกรรมจำลอง: เควสใหม่ใน Meadow',
+    'กิจกรรมจำลอง: มอนป่าใกล้บ้าน',
+    'กิจกรรมจำลอง: โบนัสจับมอน 5 นาที',
+  ]);
   let bannerTimer = 0;
   let bannerArmedAt = 0;
   let bannerRemainMs = 0;
   let bannerText = '';
+  let activityTimer = 0;
+  let activityIndex = 0;
   let sessionStartedAt = 0;
   let stripTimer = 0;
   let lastChatSnapshot = null;
@@ -775,7 +783,6 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     if (!banner) return;
     const text = snapshot?.text || '';
     if (!text) {
-      hideBanner();
       return;
     }
     banner.classList.remove('error');
@@ -790,6 +797,25 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     const expiresAt = Number(snapshot?.expiresAt) || 0;
     const ms = expiresAt > Date.now() ? expiresAt - Date.now() : BANNER_DEFAULT_MS;
     armBannerTimer(ms);
+  }
+
+  function showActivityToast() {
+    const text = MOCK_ACTIVITY[activityIndex % MOCK_ACTIVITY.length];
+    activityIndex += 1;
+    renderBanner({ text, expiresAt: Date.now() + BANNER_DEFAULT_MS });
+  }
+
+  function stopActivityTicker() {
+    if (activityTimer) {
+      clearInterval(activityTimer);
+      activityTimer = 0;
+    }
+  }
+
+  function startActivityTicker() {
+    stopActivityTicker();
+    showActivityToast();
+    activityTimer = setInterval(showActivityToast, ACTIVITY_INTERVAL_MS);
   }
 
   function renderUtilities(snapshot) {
@@ -929,6 +955,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     setExpanded(expanded);
     renderStrip(chatAdapter()?.snapshot?.());
     renderParty(partyAdapter()?.snapshot?.() || { available: false, slots: [] });
+    startActivityTicker();
     return shell;
   }
 
@@ -947,6 +974,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
     }
     lastRevisions.clear();
     hideBanner();
+    stopActivityTicker();
     if (stripTimer) {
       clearInterval(stripTimer);
       stripTimer = 0;
