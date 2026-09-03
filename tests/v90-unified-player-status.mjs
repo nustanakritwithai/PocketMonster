@@ -111,6 +111,9 @@ const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8
 assert.match(css, /\.mmorpg-player-portrait/, 'portrait slot is styled');
 assert.match(css, /\.mmorpg-bar-fill/, 'HP/resource fill is width-clamped visually');
 assert.match(css, /\.mmorpg-player-status\{[^}]*display:flex/, 'player status packs portrait beside vitals');
+assert.match(css, /\.mmorpg-player-status\{[^}]*flex-wrap:nowrap/, 'player status cannot wrap out of the golden box');
+assert.match(css, /\.mmorpg-player-vital\{[^}]*width:100%/, 'each vital row fills the remaining slot width');
+assert.match(css, /\.mmorpg-player-hp\[role="progressbar"\][^}]*width:100%/, 'HP bar cannot overflow sideways');
 assert.match(css, /\.mmorpg-player-energy\[role="progressbar"\]/, 'energy is a third vital bar');
 assert.doesNotMatch(css, /\.mmorpg-player-hp-text[^}]*clear:both/, 'HP text cannot clear below the portrait');
 assert.match(css, /\.mmorpg-quick-indicators\{[^}]*left:50%/, 'quick indicators sit top-center');
@@ -163,6 +166,7 @@ assert.match(css, /\.mmorpg-quick-indicator\{[^}]*pointer-events:none/, 'quick i
   assert.equal(energy.getAttribute('role'), 'progressbar');
   assert.equal(energy.children[0].style.width, '40%', 'energy fill follows modePercent');
   assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-body')).length, 1, 'vitals sit beside the portrait');
+  assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-vital')).length, 3, 'HP MP energy stay on three contained rows');
   const buffs = document.getElementById('mmorpgBuffRow').children;
   assert.equal(buffs.length, 8, 'seven buffs plus overflow');
   assert.equal(buffs[7].textContent, '+1');
