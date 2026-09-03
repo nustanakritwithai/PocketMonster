@@ -229,6 +229,25 @@ function stateMessage(state) {
   return Object.freeze({ type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', ...state });
 }
 
+export function requestOriginalPirateInteraction(prompt, windowLike = globalThis.window) {
+  if (!prompt?.dispatchEvent) return false;
+  const PointerEventCtor = windowLike?.PointerEvent || globalThis.PointerEvent;
+  if (typeof PointerEventCtor === 'function') {
+    return prompt.dispatchEvent(new PointerEventCtor('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'touch',
+      isPrimary: true,
+    }));
+  }
+  const EventCtor = windowLike?.Event || globalThis.Event;
+  if (typeof EventCtor !== 'function') return false;
+  return prompt.dispatchEvent(new EventCtor('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+  }));
+}
+
 export function installPirateNpcNameChild({
   three,
   windowLike = globalThis.window,
@@ -310,7 +329,7 @@ export function installPirateNpcNameChild({
     const prompt = documentLike.querySelector?.('.interaction-prompt');
     const liveName = readPirateNpcPromptName(prompt);
     if (!currentName || requestedName !== currentName || liveName !== currentName) return;
-    prompt.click?.();
+    requestOriginalPirateInteraction(prompt, windowLike);
   }
 
   windowLike.addEventListener?.('message', onMessage);
