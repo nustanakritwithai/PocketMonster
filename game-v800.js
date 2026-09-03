@@ -256,6 +256,7 @@ const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl'
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
+let summonAimActive=false;
 function gameMount(){return window.POCKETMONSTER_SCENE_MOUNT_TARGET||(pirateThrowWorld&&el('monsterThrowStage'))||el('game');}
 const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
 const rand=a=>a[Math.floor(Math.random()*a.length)];
@@ -2657,15 +2658,40 @@ function pocketPartyHudProjection(){
 function publishPocketPartyHud(){
   pocketPartyHud.publish(buildPocketPartyHudFeature(pocketPartyHudProjection()));
 }
-function selectPartySlotCommand(slot){
+function selectPartySlotCommand(slot,options){
   const index=Number.isInteger(slot)?slot:-1;
   if(index<0||index>=state.party.length)return createHudCommandResult({ok:false,reason:'invalid-slot'});
-  if(pirateThrowPanelPaused())return createHudCommandResult({ok:false,reason:'input-paused'});
+  if(!options?.ignorePanelPause&&pirateThrowPanelPaused())return createHudCommandResult({ok:false,reason:'input-paused'});
   if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
   const gate=characterUI.requestSwitchParty(index);
   if(!gate.ok)return createHudCommandResult({ok:false,reason:gate.reason||'switch-blocked',message:gate.reasonText||''});
-  switchPartySlot(index);
+  switchPartySlot(index,{ignorePanelPause:options?.ignorePanelPause===true});
   return createHudCommandResult({ok:true,reason:'slot-selected'});
+}
+function beginSummonAim(){
+  const inst=selectedInstance();
+  if(!inst){msg('Party ช่องนี้ว่าง');return false;}
+  if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return false;}
+  summonAimActive=true;
+  runBestEffortCombatPresentation(()=>{try{playerVisual.play('throw',{duration:.28});}catch{}});
+  msg(`ถือบอล ${displayName(inst)} • ปล่อยเพื่อปา`);
+  return true;
+}
+function armSummonCommand(slot){
+  const selected=selectPartySlotCommand(slot,{ignorePanelPause:true});
+  if(!selected.ok)return selected;
+  if(!beginSummonAim())return createHudCommandResult({ok:false,reason:'aim-blocked'});
+  return createHudCommandResult({ok:true,reason:'summon-aimed'});
+}
+function executeArmedSummonCommand(){
+  if(!summonAimActive)return createHudCommandResult({ok:false,reason:'not-aimed'});
+  summonAimActive=false;
+  summonThrow({ignorePanelPause:true});
+  return createHudCommandResult({ok:true,reason:'summon-thrown'});
+}
+function cancelArmedSummonCommand(){
+  summonAimActive=false;
+  return createHudCommandResult({ok:true,reason:'summon-aim-cancelled'});
 }
 function openCharacterCommand(slot){
   if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
@@ -2679,6 +2705,9 @@ window.POCKETMONSTER_PARTY_HUD=Object.freeze({
   snapshot:pocketPartyHud.snapshot,
   selectPartySlot:selectPartySlotCommand,
   switchPartySlot:selectPartySlotCommand,
+  armSummon:armSummonCommand,
+  executeArmedSummon:executeArmedSummonCommand,
+  cancelArmedSummon:cancelArmedSummonCommand,
   openCharacter:openCharacterCommand,
   reset:pocketPartyHud.reset,
 });
@@ -4553,7 +4582,7 @@ function resolveCapture(w,ballMesh,attemptId,end){
   }
   startCaptureSequence(w,ballMesh,attemptId,resolution);
 }
-function summonThrow(){if(pirateThrowPanelPaused())return;const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;pendingSummon={instanceId:inst.instanceId};runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});clearHubCompanion();});const started=throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return false;let spawned=false;try{spawned=spawnOwned(inst,end);}finally{pendingSummon=null;}if(!spawned)runBestEffortCombatPresentation(()=>msg(`เรียก ${displayName(inst)} ไม่สำเร็จ`));return spawned;});if(!started){pendingSummon=null;runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)} ไม่สำเร็จ`));return;}runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)}`));}
+function summonThrow(options){if(!options?.ignorePanelPause&&pirateThrowPanelPaused())return;const inst=selectedInstance();if(activeCaptureAttempt||captureSequence){msg('รอผล Capture ให้จบก่อนปาเรียกมอน');return;}if(Date.now()<summonCooldownUntil){msg(`Switch cooldown ${(summonCooldownUntil-Date.now())/1000|0}s`);return;}if(state.currentZone==='hub'){msg('ใน Ranch จะแสดงคู่หูอัตโนมัติ • ออกไป Wild Zone ก่อนแล้วค่อยปาเรียก');return;}if(!inst){msg('Party ช่องนี้ว่าง');return;}if(activeSummon||pendingSummon){msg('ลงสนามได้ครั้งละ 1 ตัว • Recall ตัวเดิมก่อน');return;}if(inst.hp<=0||inst.fainted){msg(`${displayName(inst)} Fainted • Heal ฟรีที่ Ranch/NPC ก่อน`);return;}const end=player.position.clone().add(forward().multiplyScalar(4));end.y=.12;pendingSummon={instanceId:inst.instanceId};runBestEffortCombatPresentation(()=>{playerVisual.play('throw',{duration:.34});clearHubCompanion();});const started=throwProjectile('summon',end,()=>{if(!pendingSummon||pendingSummon.instanceId!==inst.instanceId)return false;let spawned=false;try{spawned=spawnOwned(inst,end);}finally{pendingSummon=null;}if(!spawned)runBestEffortCombatPresentation(()=>msg(`เรียก ${displayName(inst)} ไม่สำเร็จ`));return spawned;});if(!started){pendingSummon=null;runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)} ไม่สำเร็จ`));return;}runBestEffortCombatPresentation(()=>msg(`ปาเรียก ${displayName(inst)}`));}
 function spawnOwned(inst,pos){
   try{clearHubCompanion();}catch{}
   try{removeSceneRole('activeSummon');}catch{}
@@ -6764,8 +6793,8 @@ function renderHUD(){
   renderCharacterAccess();
   renderStarterJourney();
 }
-function switchPartySlot(index){
-  if(pirateThrowPanelPaused())return;
+function switchPartySlot(index,options){
+  if(!options?.ignorePanelPause&&pirateThrowPanelPaused())return;
   if(index<0||index>=state.party.length)return;
   const gate=characterUI.requestSwitchParty(index);
   if(!gate.ok){if(gate.reasonText)msg(gate.reasonText);return;}
