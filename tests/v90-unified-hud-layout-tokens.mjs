@@ -29,6 +29,8 @@ assert.match(css, /\.mmorpg-dock\.collapsed\{height:var\(--hud-dock-collapsed\)/
 assert.match(css, /\.mmorpg-dock\{[^}]*height:var\(--hud-dock-expanded\)/, 'expanded dock uses the token height');
 assert.match(css, /\.mmorpg-bottom-strip\{[^}]*bottom:0/, 'bottom strip hugs the viewport bottom');
 assert.match(css, /\.mmorpg-banner\{[^}]*left:29\.4%/, 'system banner sits top-center');
+assert.match(css, /\.mmorpg-banner\{[^}]*height:auto/, 'activity banner hugs the text height');
+assert.match(css, /\.mmorpg-banner\{[^}]*padding:2px 8px/, 'activity banner has no extra chrome around the text');
 
 // ---------- Touch targets fail closed at 48px ----------
 assert.match(css, /\.mmorpg-tab\{[^}]*min-width:var\(--hud-hit-min\)/, 'dock tabs keep a 48px wide hit strip');
