@@ -57,12 +57,27 @@ function inactiveState() {
   return Object.freeze({ active: false, name: '', x: 0, y: 0, width: 0, height: 0 });
 }
 
+/**
+ * Read the NPC target independently from visual CSS. In integrated V9 the
+ * original Pirate interaction prompt is intentionally display:none, so its
+ * visibility must never decide whether the overhead NPC name can activate it.
+ */
 export function readPirateNpcPromptName(prompt) {
-  if (!prompt || prompt.style?.display !== 'block') return '';
+  if (!prompt) return '';
   const text = typeof prompt.textContent === 'string' ? prompt.textContent : '';
   if (!text.includes('คุยกับ')) return '';
   const strongs = [...(prompt.querySelectorAll?.('strong') || [])];
   return safeName(strongs.at(-1)?.textContent || '');
+}
+
+export function activatePirateNpcPrompt({ prompt, requestedName, currentName } = {}) {
+  const requested = safeName(requestedName);
+  const current = safeName(currentName);
+  const live = readPirateNpcPromptName(prompt);
+  if (!prompt || !current || requested !== current || live !== current) return false;
+  if (typeof prompt.click !== 'function') return false;
+  prompt.click();
+  return true;
 }
 
 function npcNameSprite(group) {
@@ -306,11 +321,11 @@ export function installPirateNpcNameChild({
     if (event.source !== windowLike.parent || event.origin !== trustedParentOrigin) return;
     const message = event.data;
     if (message?.type !== PIRATE_NPC_NAME_MESSAGE || message.kind !== 'activate') return;
-    const requestedName = safeName(message.name);
     const prompt = documentLike.querySelector?.('.interaction-prompt');
-    const liveName = readPirateNpcPromptName(prompt);
-    if (!currentName || requestedName !== currentName || liveName !== currentName) return;
-    prompt.click?.();
+    const scene = windowLike.__combat?.scene;
+    const playerPosition = windowLike.__combat?.controller?.position;
+    if (!findNearestPirateNpcNameAnchor(scene, playerPosition)) return;
+    activatePirateNpcPrompt({ prompt, requestedName: message.name, currentName });
   }
 
   windowLike.addEventListener?.('message', onMessage);
