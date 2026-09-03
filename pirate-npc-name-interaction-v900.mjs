@@ -151,16 +151,22 @@ function styleParentProxy(button) {
     display: 'none',
     zIndex: '40',
     margin: '0',
-    padding: '0',
-    border: '0',
+    padding: '3px 10px',
+    border: '2px solid rgba(255,226,145,.85)',
     outline: '0',
-    background: 'transparent',
-    color: 'transparent',
-    boxShadow: 'none',
-    opacity: '0.01',
+    borderRadius: '16px',
+    background: 'linear-gradient(180deg, rgba(24,40,54,.94), rgba(10,22,32,.94))',
+    color: '#ffdd7d',
+    boxShadow: '0 2px 8px rgba(0,0,0,.45)',
+    opacity: '1',
     pointerEvents: 'auto',
     touchAction: 'manipulation',
-    transform: 'translate(-50%,-50%)',
+    transform: 'translate(-50%, 40%)',
+    font: "700 12px 'Segoe UI',Tahoma,sans-serif",
+    whiteSpace: 'nowrap',
+    lineHeight: '1.2',
+    width: 'auto',
+    height: 'auto',
   });
 }
 
@@ -175,6 +181,7 @@ export function createPirateNpcNameParentProxy({ frame, documentLike = globalThi
     button.id = PIRATE_NPC_NAME_PROXY_ID;
     button.type = 'button';
     button.dataset.pirateNpcNameProxy = 'true';
+    button.textContent = 'คุย';
     styleParentProxy(button);
     const sendActivate = event => {
       event.preventDefault?.();
@@ -201,15 +208,12 @@ export function createPirateNpcNameParentProxy({ frame, documentLike = globalThi
       target.style.display = 'none';
       return false;
     }
-    const widthPx = clamp(state.width * rect.width, 72, 220);
-    const heightPx = clamp(state.height * rect.height, 40, 72);
     Object.assign(target.style, {
       display: 'block',
       left: `${rect.left + state.x * rect.width}px`,
       top: `${rect.top + state.y * rect.height}px`,
-      width: `${widthPx}px`,
-      height: `${heightPx}px`,
     });
+    target.textContent = 'คุย';
     target.setAttribute?.('aria-label', `คุยกับ ${state.name}`);
     target.title = `คุยกับ ${state.name}`;
     return true;
