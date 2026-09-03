@@ -60,8 +60,8 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900.mjs\?v=941/);
-assert.match(index, /style-v900\.css\?v=939/);
+assert.match(index, /entry-preload-v900.mjs\?v=942/);
+assert.match(index, /style-v900\.css\?v=940/);
 const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');

@@ -541,12 +541,13 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike } = {}) {
       row.append(bar, label);
       return row;
     };
-    body.append(
-      identity,
+    const vitals = el(documentLike, 'div', '', 'mmorpg-player-vitals');
+    vitals.append(
       wrapVital(hp, hpText),
       wrapVital(resource, resourceText),
       wrapVital(energy, mode),
     );
+    body.append(identity, vitals);
     panel.replaceChildren(portrait, body);
     const buffRow = node('mmorpgBuffRow');
     if (buffRow) {
