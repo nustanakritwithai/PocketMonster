@@ -226,6 +226,9 @@ try {
 assert.match(entry, /unified-input-bridge-v900\.mjs\?v=5/);
 assert.match(child, /startPirateHudTelemetryPublisher/);
 assert.match(parent, /createPirateHudTelemetryCollector/);
+assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HUD store for the parent Dock');
+assert.match(parent, /POCKETMONSTER_POCKET_HUD/, 'Pirate boot exposes the Pocket HUD adapter the Dock already binds');
+assert.match(parent, /pocketPlayerHud.publish\(snapshot\.player\)/, 'telemetry snapshots fill the top-left player HP panel');
 assert.match(parent, /event\.source !== frame\.contentWindow \|\| event\.origin !== 'null'/);
 assert.match(parent, /frameGeneration/);
 assert.match(parent, /pagehide/);

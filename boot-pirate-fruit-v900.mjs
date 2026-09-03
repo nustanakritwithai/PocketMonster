@@ -15,10 +15,19 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
+import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=1';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=916', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=827&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
+
+const pocketPlayerHud = createPocketPlayerHudStore();
+if (typeof window !== 'undefined') {
+  window.POCKETMONSTER_POCKET_HUD = Object.freeze({
+    player: pocketPlayerHud,
+    resetAll() { pocketPlayerHud.reset(); },
+  });
+}
 
 const startup = document.getElementById('startupStatus');
 const game = document.getElementById('game');
@@ -102,6 +111,7 @@ function bindPocketMonsterLink(frame) {
     frameWindow: frame.contentWindow,
     frameGeneration,
     onSnapshot: (snapshot, metadata) => {
+      pocketPlayerHud.publish(snapshot.player);
       window.dispatchEvent(new CustomEvent('pocketmonster:pirate-hud-update-v1', {
         detail: Object.freeze({ snapshot, metadata }),
       }));
@@ -185,6 +195,7 @@ function bindPocketMonsterLink(frame) {
     activate: reason => activateHudTelemetry(reason),
     invalidate: reason => {
       npcNameProxy?.reset();
+      pocketPlayerHud.reset();
       return hudTelemetry.invalidate(reason);
     },
   });
