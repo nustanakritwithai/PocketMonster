@@ -405,6 +405,9 @@ function installCapturedSceneChild(prompt, {
   groupName = '',
   nested = false,
   cameraZ = 2,
+  spriteWidth = 384,
+  spriteHeight = 96,
+  spriteY = 3.55,
 } = {}) {
   class Object3D {
     constructor() {
@@ -454,8 +457,8 @@ function installCapturedSceneChild(prompt, {
   if (withSprite) {
     const sprite = {
       isSprite: true,
-      material: { map: { image: { width: 384, height: 96 } } },
-      position: { y: 3.55 },
+      material: { map: { image: { width: spriteWidth, height: spriteHeight } } },
+      position: { y: spriteY },
       getWorldPosition(point) {
         point.x = 0;
         point.y = 0;
@@ -564,6 +567,25 @@ function installCapturedSceneChild(prompt, {
   const state = child.sync();
   assert.equal(state.active, true, 'nested name sprite still posts when the prompt is hidden and the camera sits behind the player');
   assert.equal(state.name, 'หลิน');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child } = installCapturedSceneChild(prompt, {
+    withSprite: true,
+    pirateHud: '',
+    groupName: 'หัวหน้ามะลิ',
+    nested: true,
+    cameraZ: 8,
+    spriteWidth: 256,
+    spriteHeight: 64,
+    spriteY: 2.2,
+  });
+  const state = child.sync();
+  assert.equal(state.active, true, 'live Pirate name plates are not 384x96 at y=3.55');
+  assert.equal(state.name, 'หัวหน้ามะลิ');
   child.stop();
 }
 
