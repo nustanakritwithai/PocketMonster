@@ -194,17 +194,18 @@ function bootWorld() {
   for (const id of [
     'mmorpgPlayerStatus', 'mmorpgBuffRow', 'mmorpgQuickIndicators', 'mmorpgQuestPanel', 'mmorpgMinimap',
     'mmorpgRoster', 'mmorpgCompanions', 'mmorpgUtilities', 'mmorpgBanner',
-    'mmorpgDock', 'mmorpgBottomStrip',
+    'mmorpgDock', 'mmorpgBottomStrip', 'mmorpgSideDrawer', 'mmorpgSideTabs',
   ]) {
     assert.ok(shell.byId(id), `region #${id} exists exactly once`);
   }
-  const tablist = shell.byId('mmorpgDockTabs');
-  assert.equal(tablist?.getAttribute('role'), 'tablist', 'dock exposes an ARIA tablist');
-  for (const tabId of ['mmorpgTabChat', 'mmorpgTabQuest', 'mmorpgTabParty']) {
+  const tablist = shell.byId('mmorpgSideTabs');
+  assert.equal(tablist?.getAttribute('role'), 'tablist', 'side window exposes เควส/Party tabs');
+  for (const tabId of ['mmorpgTabQuest', 'mmorpgTabParty']) {
     const tab = shell.byId(tabId);
     assert.equal(tab?.getAttribute('role'), 'tab', `${tabId} is a tab`);
   }
-  assert.equal(documentLike.querySelectorAll?.('[role="tab"]').length ?? 3, 3);
+  assert.equal(shell.byId('mmorpgDockTabs'), null, 'bottom dock has no chat/quest/party tab picker');
+  assert.equal(shell.byId('mmorpgTabChat'), null, 'chat has no tab; the dock is chat-only');
   hud.unmount();
 }
 
@@ -218,10 +219,7 @@ function bootWorld() {
   const unreadBadge = documentLike.getElementById('mmorpgChatUnread');
   assert.equal(unreadBadge.textContent, '2', 'collapsed dock shows the unread count');
   hud.setTab('chat');
-  assert.equal(chatCalls.markRead, 1, 'opening the chat tab marks chat read');
-  const chatTab = documentLike.getElementById('mmorpgTabChat');
-  assert.equal(chatTab.getAttribute('aria-selected'), 'true');
-  assert.equal(documentLike.getElementById('mmorpgTabQuest').getAttribute('aria-selected'), 'false');
+  assert.equal(chatCalls.markRead, 1, 'opening chat marks chat read');
   const input = documentLike.getElementById('mmorpgChatInput');
   assert.equal(input.getAttribute('placeholder'), 'พิมพ์ข้อความ', 'chat compose is visible at the dock bottom');
   input.value = 'ตอบกลับ';
@@ -259,9 +257,11 @@ function bootWorld() {
   assert.match(questPanel.text(), /Grass Meadow/, 'quest title renders');
   assert.match(questPanel.text(), /ปราบ ELITE/, 'current quest step renders');
   hud.setTab('party');
+  assert.equal(documentLike.getElementById('mmorpgTabParty').getAttribute('aria-selected'), 'true');
+  assert.equal(documentLike.getElementById('mmorpgTabQuest').getAttribute('aria-selected'), 'false');
   const roster = documentLike.getElementById('mmorpgRoster');
   assert.match(roster.text(), /Mossbun/, 'party roster renders monster rows');
-  assert.match(documentLike.getElementById('mmorpgDock').text(), /Mossbun/, 'collapsed dock summarizes the active monster');
+  assert.match(documentLike.getElementById('mmorpgPartyPanel').text(), /Mossbun/, 'side Party pane lists the active monster');
   const slotButtons = [];
   const collect = node => { if (node.dataset?.partySlot !== undefined) slotButtons.push(node); node.children.forEach(collect); };
   collect(documentLike.getElementById('mmorpgPartyPanel'));

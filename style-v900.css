@@ -132,7 +132,7 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-hud{position:absolute;inset:0;pointer-events:none;z-index:30;font:600 12px/1.35 system-ui;color:var(--hud-text)}
 .mmorpg-chat-dismiss{position:fixed;inset:0;z-index:6;background:transparent;pointer-events:auto}
 .mmorpg-chat-dismiss.hidden{display:none;pointer-events:none}
-.mmorpg-hud .mmorpg-dock,.mmorpg-hud .mmorpg-player-status,.mmorpg-hud .mmorpg-quest-panel,.mmorpg-hud .mmorpg-minimap,.mmorpg-hud .mmorpg-roster,.mmorpg-hud .mmorpg-utilities,.mmorpg-hud .mmorpg-banner,.mmorpg-hud .mmorpg-companions,.mmorpg-hud .mmorpg-bottom-strip,.mmorpg-hud .mmorpg-buff-row{pointer-events:auto}
+.mmorpg-hud .mmorpg-dock,.mmorpg-hud .mmorpg-player-status,.mmorpg-hud .mmorpg-quest-panel,.mmorpg-hud .mmorpg-minimap,.mmorpg-hud .mmorpg-roster,.mmorpg-hud .mmorpg-utilities,.mmorpg-hud .mmorpg-banner,.mmorpg-hud .mmorpg-companions,.mmorpg-hud .mmorpg-bottom-strip,.mmorpg-hud .mmorpg-buff-row,.mmorpg-hud .mmorpg-side-drawer{pointer-events:auto}
 .mmorpg-player-status{position:absolute;left:0.4%;top:0.7%;width:38.3%;height:13.1%;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:4px 6px;box-sizing:border-box;min-width:0;max-width:38.3%;border:1px solid var(--hud-line);border-radius:10px;background:linear-gradient(180deg,rgba(42,28,14,.94),var(--hud-glass));box-shadow:0 8px 22px #0008,inset 0 1px 0 rgba(255,230,170,.18);overflow:hidden;transform-origin:0 0;transform:scale(0.65)}
 .mmorpg-player-status.skeleton{min-height:0;opacity:.7}
 .mmorpg-player-connecting{color:#d6c4a3}
@@ -158,6 +158,12 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-buff-row{position:absolute;left:8%;top:10.5%;display:flex;gap:4px;z-index:31}
 .mmorpg-buff{min-width:22px;min-height:22px;padding:2px 5px;border:1px solid var(--hud-line);border-radius:6px;background:var(--hud-glass);font-size:10px}
 .mmorpg-quest-rail{position:absolute;left:0;top:20.2%;width:3.1%;height:28.8%;pointer-events:none;background:linear-gradient(180deg,rgba(90,58,18,.35),rgba(20,12,6,.08))}
+.mmorpg-side-drawer{position:absolute;left:0.4%;top:14.5%;width:24%;height:38.3%;display:flex;flex-direction:row;z-index:31;box-sizing:border-box;border:1px solid var(--hud-line);border-radius:10px;background:linear-gradient(180deg,rgba(36,24,12,.38),rgba(18,12,8,.32));overflow:hidden}
+.mmorpg-side-tabs{flex:0 0 36px;display:flex;flex-direction:column;gap:2px;padding:4px 2px;border-right:1px solid var(--hud-line);box-sizing:border-box}
+.mmorpg-side-tab{min-width:0;min-height:48px;padding:4px 2px;border:1px solid transparent;border-radius:6px;background:none;color:var(--hud-text);font:700 11px/1.15 system-ui;writing-mode:vertical-rl;transform:rotate(180deg)}
+.mmorpg-side-tab[aria-selected="true"]{border-color:var(--hud-accent);color:var(--hud-accent);background:rgba(245,196,81,.12)}
+.mmorpg-side-detail{flex:1 1 0;min-width:0;overflow:auto;padding:6px 8px}
+.mmorpg-side-detail .mmorpg-quest-panel,.mmorpg-side-detail .mmorpg-panel{position:static;left:auto;top:auto;width:auto;height:auto;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible}
 .mmorpg-quest-panel{position:absolute;left:2.6%;top:14.5%;width:20.8%;height:38.3%;padding:8px 10px;border:1px solid var(--hud-line);border-radius:10px;background:linear-gradient(180deg,rgba(48,32,14,.94),var(--hud-glass));box-shadow:0 10px 24px #0007,inset 0 1px 0 rgba(255,230,170,.16);overflow:hidden}
 .mmorpg-quest-title{color:var(--hud-accent);font:800 12px/1.3 system-ui;margin-bottom:6px}
 .mmorpg-quest-step{padding:2px 0 2px 2px;font-size:11px}
@@ -199,7 +205,7 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-dock.collapsed{height:var(--hud-dock-collapsed)}
 .mmorpg-dock.collapsed .mmorpg-panel{display:none}
 .mmorpg-dock-summary{display:none;height:0;padding:0;overflow:hidden}
-.mmorpg-dock-tabs{flex:0 0 auto;display:flex;gap:2px;padding:0 6px;align-items:center}
+.mmorpg-dock-tabs{display:none}
 .mmorpg-tab{min-width:var(--hud-hit-min);min-height:0;padding:2px 8px;line-height:1.2;flex:1;border:1px solid transparent;border-radius:8px;background:none;color:var(--hud-text);font:700 12px system-ui}
 .mmorpg-tab[aria-selected="true"]{border-color:var(--hud-accent);color:var(--hud-accent)}
 .mmorpg-unread{margin-left:6px;padding:0 5px;border-radius:8px;background:#f43f5e;color:#fff;font-size:10px}
