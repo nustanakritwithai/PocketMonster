@@ -199,7 +199,7 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-utility-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f43f5e;color:#fff;font-size:10px}
 .mmorpg-banner{display:none;position:absolute;left:29.4%;top:10.2%;width:auto;max-width:42.2%;height:auto;bottom:auto;transform:none;padding:2px 8px;line-height:1.2;font-size:12px;border:1px solid rgba(255,176,188,.45);border-radius:8px;background:rgba(176,64,96,.86);color:#fff;text-align:center;z-index:32;overflow:visible;box-shadow:0 8px 20px #0006;white-space:nowrap}
 .mmorpg-banner:not(.hidden){display:inline-block}
-.mmorpg-banner.hidden{display:none}
+.mmorpg-banner.hidden,.mmorpg-banner:empty{display:none!important}
 .mmorpg-banner.error{border-color:#f87171;color:#fecaca}
 .mmorpg-chat-extras{display:flex;gap:4px;margin-top:4px;pointer-events:none}
 .mmorpg-chat-extra{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.08)}
