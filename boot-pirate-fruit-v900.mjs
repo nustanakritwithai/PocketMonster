@@ -1,6 +1,7 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
-import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=3';
+import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=4';
+import { createPirateNpcNameParentProxy } from './pirate-npc-name-interaction-v900.mjs?v=1';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
   PIRATE_HUD_INIT_MESSAGE,
@@ -15,7 +16,7 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=914', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=915', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=826&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -62,7 +63,7 @@ function assignCombinedWorld(worldId) {
   }));
 }
 
-function syncPirateOnboardingActionProxies(onboarding, sendInput) {
+function syncPirateOnboardingActionProxies(onboarding) {
   const layerId = 'pirateOnboardingActionProxies';
   let layer = document.getElementById(layerId);
   if (!onboarding.active) {
@@ -74,28 +75,10 @@ function syncPirateOnboardingActionProxies(onboarding, sendInput) {
     layer.id = layerId;
     document.body?.appendChild(layer);
   }
-  const liveActions = new Set(Object.keys(onboarding.actions));
-  for (const stale of layer.querySelectorAll('[data-onboarding-action]')) {
-    if (!liveActions.has(stale.dataset.onboardingAction)) stale.remove();
-  }
-  for (const [action, rect] of Object.entries(onboarding.actions)) {
-    let proxy = layer.querySelector(`[data-onboarding-action="${action}"]`);
-    if (!proxy) {
-      proxy = document.createElement('button');
-      proxy.type = 'button';
-      proxy.className = 'pirate-onboarding-action-proxy';
-      proxy.dataset.onboardingAction = action;
-      proxy.setAttribute('aria-label', `บทสอน ${action}`);
-      proxy.addEventListener('click', () => sendInput({ kind: 'onboarding-action', action }));
-      layer.appendChild(proxy);
-    }
-    Object.assign(proxy.style, {
-      left: `${rect.x}px`,
-      top: `${rect.y}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
-    });
-  }
+  // The integrated parent HUD owns the visible/touchable controls. Keep the
+  // structural onboarding layer empty so a hidden child tutorial cannot leave
+  // invisible proxy buttons over the game surface.
+  layer.replaceChildren();
 }
 
 function bindPocketMonsterLink(frame) {
@@ -114,6 +97,7 @@ function bindPocketMonsterLink(frame) {
   let piratePose = null;
   let latestPresenceSnapshot = null;
   let frameGeneration = 0;
+  const npcNameProxy = createPirateNpcNameParentProxy({ frame, documentLike: document });
   const hudTelemetry = createPirateHudTelemetryCollector({
     frameWindow: frame.contentWindow,
     frameGeneration,
@@ -125,6 +109,7 @@ function bindPocketMonsterLink(frame) {
   });
   const activateHudTelemetry = reason => {
     frameGeneration += 1;
+    npcNameProxy?.reset();
     hudTelemetry.reset({ frameWindow: frame.contentWindow, frameGeneration, reason });
     frame.contentWindow?.postMessage({ type: PIRATE_HUD_INIT_MESSAGE, frameGeneration }, '*');
   };
@@ -135,6 +120,7 @@ function bindPocketMonsterLink(frame) {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
   frame.addEventListener('load', () => {
+    npcNameProxy?.reset();
     if (!pirateRuntimeActive) {
       hudTelemetry.invalidate('load-after-teardown');
       return;
@@ -162,10 +148,11 @@ function bindPocketMonsterLink(frame) {
     if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     if (hudTelemetry.accept(event)) return;
+    if (npcNameProxy?.accept(event)) return;
     const message = event.data;
     const onboarding = readPirateOnboardingState(message);
     if (onboarding) {
-      syncPirateOnboardingActionProxies(onboarding, sendInput);
+      syncPirateOnboardingActionProxies(onboarding);
       return;
     }
     const nextPose = sanitizePirateLocalPresence(message);
@@ -185,12 +172,21 @@ function bindPocketMonsterLink(frame) {
   const message = document.getElementById('message');
   if (message) message.textContent = 'โลก Pirate Fruit จริง • เดินเข้าประตูในโลกเพื่อเดินทาง';
   window.addEventListener('pocketmonster:world-warp-v1', event => {
-    if (event.detail?.world !== 'pirate-fruit') hudTelemetry.invalidate('world-switch');
+    if (event.detail?.world !== 'pirate-fruit') {
+      npcNameProxy?.reset();
+      hudTelemetry.invalidate('world-switch');
+    }
   });
-  window.addEventListener('pagehide', () => hudTelemetry.invalidate('pagehide'), { once: true });
+  window.addEventListener('pagehide', () => {
+    npcNameProxy?.reset();
+    hudTelemetry.invalidate('pagehide');
+  }, { once: true });
   return Object.freeze({
     activate: reason => activateHudTelemetry(reason),
-    invalidate: reason => hudTelemetry.invalidate(reason),
+    invalidate: reason => {
+      npcNameProxy?.reset();
+      return hudTelemetry.invalidate(reason);
+    },
   });
 }
 
