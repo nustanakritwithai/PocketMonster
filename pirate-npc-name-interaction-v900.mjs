@@ -65,6 +65,34 @@ export function readPirateNpcPromptName(prompt) {
   return safeName(strongs.at(-1)?.textContent || '');
 }
 
+/**
+ * The vendored Pirate interaction control is hidden by the integrated HUD, so a
+ * normal DOM click is not a reliable mobile activation path. Reproduce the
+ * touch gesture the original control receives instead. A click fallback is kept
+ * only for environments without PointerEvent support.
+ */
+export function activatePirateNpcPrompt(prompt, windowLike = globalThis.window) {
+  if (!prompt) return false;
+  const PointerEventCtor = windowLike?.PointerEvent;
+  if (typeof prompt.dispatchEvent === 'function' && typeof PointerEventCtor === 'function') {
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 9701,
+      pointerType: 'touch',
+      isPrimary: true,
+    };
+    prompt.dispatchEvent(new PointerEventCtor('pointerdown', init));
+    prompt.dispatchEvent(new PointerEventCtor('pointerup', init));
+    return true;
+  }
+  if (typeof prompt.click === 'function') {
+    prompt.click();
+    return true;
+  }
+  return false;
+}
+
 function npcNameSprite(group) {
   if (!Array.isArray(group?.children)) return null;
   for (const child of group.children) {
@@ -310,7 +338,7 @@ export function installPirateNpcNameChild({
     const prompt = documentLike.querySelector?.('.interaction-prompt');
     const liveName = readPirateNpcPromptName(prompt);
     if (!currentName || requestedName !== currentName || liveName !== currentName) return;
-    prompt.click?.();
+    activatePirateNpcPrompt(prompt, windowLike);
   }
 
   windowLike.addEventListener?.('message', onMessage);
