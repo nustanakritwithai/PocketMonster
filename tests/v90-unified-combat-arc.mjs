@@ -35,6 +35,9 @@ assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#sk
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill3Btn\.tc-skill3\{[^}]*right:120px!important;bottom:70px/, 'short coarse phones keep equal skill-3 chord on the packed arc');
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill4Btn\.tc-ult\{[^}]*right:calc\(var\(--arc-right\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat ultimate on the attack left edge');
 
+assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*right:224px!important;bottom:88px/, 'desktop item 2 stays on the combat cluster');
+assert.match(css, /@media\(max-width:700px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:8px!important;right:auto!important;bottom:88px/, 'narrow phones pin item 2 to the bottom-left, clear of the chat dock');
+
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
 }
