@@ -7,8 +7,8 @@ const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8
 assert.match(css, /--hud-hit-min:48px/, 'shared HUD touch target token is at least 48px');
 assert.match(css, /--hud-top-budget:56px/, 'top HUD budget token exists');
 assert.match(css, /--hud-side-budget:200px/, 'side HUD budget token exists');
-assert.match(css, /--hud-dock-collapsed:56px/, 'collapsed dock height token exists');
-assert.match(css, /--hud-dock-expanded:96px/, 'expanded dock height token exists');
+assert.match(css, /--hud-dock-collapsed:40px/, 'collapsed dock hugs tabs plus compose');
+assert.match(css, /--hud-dock-expanded:64px/, 'expanded dock is a short console');
 assert.match(css, /--hud-control-gap:10px/, 'control gap token exists');
 
 // ---------- Golden-reference region placement (1080x608) ----------
@@ -39,8 +39,8 @@ assert.match(css, /\.mmorpg-utility\{[^}]*min-height:var\(--hud-hit-min\)/, 'uti
 assert.match(css, /\.mmorpg-hud [^,{]*\{[^}]*pointer-events:auto/, 'HUD regions re-enable pointer events on purpose');
 
 // ---------- Compact tiers (short landscape) ----------
-assert.match(css, /@media \(max-height:420px\)\{[^]*?--hud-dock-expanded:80px/, 'compact tier shrinks the dock');
-assert.match(css, /@media \(max-height:320px\)\{[^]*?--hud-dock-expanded:64px/, 'ultra-compact tier shrinks the dock further');
+assert.match(css, /@media \(max-height:420px\)\{[^]*?--hud-dock-expanded:56px/, 'compact tier shrinks the dock');
+assert.match(css, /@media \(max-height:320px\)\{[^]*?--hud-dock-expanded:48px/, 'ultra-compact tier shrinks the dock further');
 assert.match(css, /@media \(max-height:420px\)\{[^]*?\.mmorpg-minimap\{display:none/, 'compact tier drops the minimap before squeezing controls');
 
 console.log('V9 unified HUD layout tokens: PASS');
