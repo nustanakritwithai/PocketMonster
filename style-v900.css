@@ -130,6 +130,8 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 /* Unified HUD Task 7 — MMORPG Monitor Dock layout tokens + regions */
 :root{--hud-hit-min:48px;--hud-top-budget:56px;--hud-side-budget:200px;--hud-dock-collapsed:56px;--hud-dock-expanded:108px;--hud-control-gap:10px;--hud-glass:rgba(18,12,8,.88);--hud-line:rgba(232,197,120,.42);--hud-text:#f8ecd0;--hud-accent:#f5c451}
 .mmorpg-hud{position:absolute;inset:0;pointer-events:none;z-index:30;font:600 12px/1.35 system-ui;color:var(--hud-text)}
+.mmorpg-chat-dismiss{position:fixed;inset:0;z-index:6;background:transparent;pointer-events:auto}
+.mmorpg-chat-dismiss.hidden{display:none;pointer-events:none}
 .mmorpg-hud .mmorpg-dock,.mmorpg-hud .mmorpg-player-status,.mmorpg-hud .mmorpg-quest-panel,.mmorpg-hud .mmorpg-minimap,.mmorpg-hud .mmorpg-roster,.mmorpg-hud .mmorpg-utilities,.mmorpg-hud .mmorpg-banner,.mmorpg-hud .mmorpg-companions,.mmorpg-hud .mmorpg-bottom-strip,.mmorpg-hud .mmorpg-buff-row{pointer-events:auto}
 .mmorpg-player-status{position:absolute;left:0.4%;top:0.7%;width:38.3%;height:13.1%;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:4px 6px;box-sizing:border-box;min-width:0;max-width:38.3%;border:1px solid var(--hud-line);border-radius:10px;background:linear-gradient(180deg,rgba(42,28,14,.94),var(--hud-glass));box-shadow:0 8px 22px #0008,inset 0 1px 0 rgba(255,230,170,.18);overflow:hidden;transform-origin:0 0;transform:scale(0.65)}
 .mmorpg-player-status.skeleton{min-height:0;opacity:.7}

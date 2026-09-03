@@ -29,6 +29,7 @@ assert.match(css, /\.mmorpg-banner\{[^}]*left:29\.4%/, 'system banner sits top-c
 assert.match(css, /\.mmorpg-tab\{[^}]*min-width:var\(--hud-hit-min\)/, 'dock tabs keep a 48px wide hit strip');
 assert.match(css, /\.mmorpg-tab\{[^}]*min-height:0/, 'dock tabs hug แชท/เควส/Party with no extra height');
 assert.doesNotMatch(css, /\.mmorpg-tab\{[^}]*min-height:var\(--hud-hit-min\)/, 'dock tabs are not 48px tall');
+assert.match(css, /\.mmorpg-chat-dismiss\{[^}]*z-index:6/, 'keyboard dismiss sits above the scene and below combat');
 assert.match(css, /\.mmorpg-chat-form\{[^}]*flex:0 0 auto/, 'chat compose sits on the dock bottom');
 assert.match(css, /\.mmorpg-chat-input\{[^}]*height:20px/, 'compose field is a short type-in row');
 assert.match(css, /\.mmorpg-chat-send\{[^}]*height:20px/, 'send control matches the short type-in row');

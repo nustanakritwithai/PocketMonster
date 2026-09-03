@@ -19,6 +19,7 @@ class FakeNode {
     this.textContent = '';
     this.value = '';
     this.disabled = false;
+    this.focused = false;
     this.scrollTop = 0;
     this.scrollHeight = 0;
     this.renderWrites = 0;
@@ -59,7 +60,14 @@ class FakeNode {
   dispatch(type, event = {}) {
     for (const handler of [...(this.listeners.get(type) || [])]) handler(event);
   }
-  focus() { this.focused = true; }
+  focus() {
+    this.focused = true;
+    this.dispatch('focus', {});
+  }
+  blur() {
+    this.focused = false;
+    this.dispatch('blur', {});
+  }
   querySelector(selector) {
     if (selector.startsWith('#')) return this.byId(selector.slice(1));
     return null;
@@ -79,13 +87,22 @@ class FakeNode {
 
 function createFakeDocument() {
   const body = new FakeNode('body');
+  const listeners = new Map();
   const documentLike = {
     body,
     createElement(tag) { return new FakeNode(tag); },
     querySelector(selector) { return selector.startsWith('#') ? body.byId(selector.slice(1)) : null; },
     getElementById(id) { return body.byId(id); },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, handler) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(handler);
+    },
+    removeEventListener(type, handler) {
+      listeners.set(type, (listeners.get(type) || []).filter(item => item !== handler));
+    },
+    dispatch(type, event = {}) {
+      for (const handler of [...(listeners.get(type) || [])]) handler(event);
+    },
   };
   return documentLike;
 }
@@ -217,6 +234,20 @@ function bootWorld() {
     unread: 0, status: 'connected', canSend: true,
   });
   assert.match(log.text(), /ข้อความใหม่/, 'revision bumps re-render chat');
+  hud.unmount();
+}
+
+{
+  const { hud, documentLike } = bootWorld();
+  hud.mount();
+  const input = documentLike.getElementById('mmorpgChatInput');
+  const dismiss = documentLike.getElementById('mmorpgChatDismiss');
+  assert.ok(dismiss.classList.contains('hidden'), 'world tap catcher stays off until chat is focused');
+  input.focus();
+  assert.equal(dismiss.classList.contains('hidden'), false, 'focusing chat arms a tap-away keyboard dismiss');
+  documentLike.dispatch('pointerdown', { target: { parentNode: null } });
+  assert.equal(input.focused, false, 'tapping the play surface blurs chat and closes the keyboard');
+  assert.ok(dismiss.classList.contains('hidden'), 'the tap catcher hides after blur');
   hud.unmount();
 }
 

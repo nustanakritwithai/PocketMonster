@@ -7,7 +7,7 @@ const launch = await prepareLaunch(config);
 if (launch.state === 'redirecting') throw new Error('Redirecting to the Firebase launcher');
 await applyPendingPatch();
 await import('./chat-runtime.mjs?v=8.4.0-presence-protocol-owner');
-const { createUnifiedMmorpgHud } = await import('./unified-mmorpg-hud-v900.mjs?v=942');
+const { createUnifiedMmorpgHud } = await import('./unified-mmorpg-hud-v900.mjs?v=943');
 const unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
 unifiedHud.mount();
 window.POCKETMONSTER_UNIFIED_HUD = unifiedHud;
