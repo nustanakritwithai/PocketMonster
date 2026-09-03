@@ -54,7 +54,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=927/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=928/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -84,11 +84,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=6/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=10/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=7/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=11/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=6/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=7/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -399,7 +399,13 @@ function createSpecializedCtor(flag) {
   return Specialized;
 }
 
-function installCapturedSceneChild(prompt, { withSprite = true, pirateHud = 'pirate-primary-parent', groupName = '' } = {}) {
+function installCapturedSceneChild(prompt, {
+  withSprite = true,
+  pirateHud = 'pirate-primary-parent',
+  groupName = '',
+  nested = false,
+  cameraZ = 2,
+} = {}) {
   class Object3D {
     constructor() {
       this.children = [];
@@ -461,13 +467,21 @@ function installCapturedSceneChild(prompt, { withSprite = true, pirateHud = 'pir
     npcGroup.children = [sprite];
     npcGroup.position = { x: 2, y: 0, z: 2 };
     if (groupName) npcGroup.name = groupName;
-    scene.children = [npcGroup];
+    if (nested) {
+      const world = new Object3D();
+      world.position = { x: 0, y: 0, z: 0 };
+      world.children = [npcGroup];
+      scene.children = [world];
+    } else {
+      scene.children = [npcGroup];
+    }
   }
   scene.updateMatrixWorld();
   const camera = new Object3D();
   camera.isCamera = true;
   camera.parent = null;
   camera.position = projectingCameraPosition();
+  camera.position.z = cameraZ;
   camera.updateMatrixWorld();
   return { child, windowLike };
 }
@@ -534,6 +548,22 @@ function installCapturedSceneChild(prompt, { withSprite = true, pirateHud = 'pir
   prompt.style.display = 'none';
   const { child } = installCapturedSceneChild(prompt, { withSprite: false, pirateHud: '' });
   assert.equal(child.sync().active, false, 'chip stays hidden when inactive: no in-range prompt and no nearby name sprite');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child } = installCapturedSceneChild(prompt, {
+    withSprite: true,
+    pirateHud: '',
+    groupName: 'หลิน',
+    nested: true,
+    cameraZ: 8,
+  });
+  const state = child.sync();
+  assert.equal(state.active, true, 'nested name sprite still posts when the prompt is hidden and the camera sits behind the player');
+  assert.equal(state.name, 'หลิน');
   child.stop();
 }
 
