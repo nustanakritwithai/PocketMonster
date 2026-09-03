@@ -84,7 +84,13 @@ export function validateStudioCharacterPackage(pkg) {
   if (!isPlainObject(pkg.sceneGraph?.root)) errors.push('sceneGraph.root missing');
 
   if (!isPlainObject(pkg.catalogEntry)) errors.push('catalogEntry missing');
-  else errors.push(...validateAssetDefinition(pkg.catalogEntry).map(error => `catalogEntry: ${error}`));
+  else {
+    errors.push(...validateAssetDefinition(pkg.catalogEntry).map(error => `catalogEntry: ${error}`));
+    if (pkg.catalogEntry.provider !== STUDIO_CHARACTER_PROVIDER) {
+      errors.push(`catalogEntry.provider must be ${STUDIO_CHARACTER_PROVIDER}`);
+    }
+    if (pkg.catalogEntry.id !== pkg.manifest?.id) errors.push('catalogEntry.id must match manifest.id');
+  }
 
   errors.push(...validateJointBindings(pkg.rig?.jointBindings));
   for (const name of ['rightHand', 'leftHand', 'head', 'back', 'waist', 'vfxOrigin', 'attackOrigin', 'throwOrigin']) {
