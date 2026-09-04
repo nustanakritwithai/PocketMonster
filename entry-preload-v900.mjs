@@ -45,4 +45,4 @@ document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
 installPersistentMinimapOwner({ windowLike: window, documentLike: document });
-await import('./online-world-shell-v900.mjs?v=51');
+await import('./online-world-shell-v900.mjs?v=52');
