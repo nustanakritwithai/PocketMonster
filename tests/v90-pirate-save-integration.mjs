@@ -26,12 +26,12 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=10/, 'parent boot cach
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=932/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=940/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=50/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=47/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
-assert.match(sceneHtml, /style-v900\.css\?v=963/, 'scene HTML cache-busts the persistent fullscreen control layout');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=22/, 'offline HTML cache-busts presentation integration after child minimap retirement');
+assert.match(boot, /index\.html\?v=933/, 'parent cache-busts the Pirate child HTML without the circular minimap');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=941/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=51/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=48/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
+assert.match(sceneHtml, /style-v900\.css\?v=964/, 'scene HTML cache-busts the persistent fullscreen control layout');
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=23/, 'offline HTML cache-busts presentation integration after child minimap retirement');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=10/, 'presentation loads the HUD policy that retires the circular child minimap');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is hidden by the parent-primary HUD policy');

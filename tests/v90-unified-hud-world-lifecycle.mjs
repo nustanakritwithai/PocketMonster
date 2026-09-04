@@ -86,7 +86,7 @@ assert.match(shellSource, /unifiedHud\?\.unmount/, 'session end unmounts the Doc
 assert.match(shellSource, /clearSceneHudAdapters/, 'world switch drops iframe HUD adapters');
 assert.match(shellSource, /bindSceneHudAdapters\(sceneWindow\)/, 'scene-ready rebinds iframe HUD adapters');
 assert.match(sceneEntrySource, /unified-hud-active/, 'hosted scene raises the Dock capability class');
-assert.match(preloadV9, /online-world-shell-v900.mjs\?v=50/, 'V9 entry cache-busts the Dock-mounting shell');
+assert.match(preloadV9, /online-world-shell-v900.mjs\?v=51/, 'V9 entry cache-busts the Dock-mounting shell');
 
 const documentLike = createFakeDocument();
 const windowLike = {

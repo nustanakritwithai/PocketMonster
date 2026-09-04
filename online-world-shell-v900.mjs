@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=942';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=943';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -96,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '55');
+  url.searchParams.set('shellRevision', '56');
   return url.href;
 }
 
@@ -139,6 +139,12 @@ shellStatus.id = 'onlineWorldShellStatus';
 shellStatus.textContent = 'กำลังเปิดโลกออนไลน์…';
 shell.append(sceneFrame, combatHost, shellStatus);
 document.body.replaceChildren(shell);
+window.addEventListener('message', event => {
+  if (event.source !== sceneFrame.contentWindow) return;
+  if (event.data?.type !== 'pocketmonster:pirate-dialogue-v1') return;
+  if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
+  else delete document.body.dataset.pirateDialogue;
+});
 
 function combatUnavailable() {
   const sessionActive = !sessionEnding && isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION);
