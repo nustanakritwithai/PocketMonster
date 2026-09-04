@@ -217,21 +217,44 @@ export function findNearestPirateNpcNameAnchor(scene, playerPosition, maxDistanc
   return best;
 }
 
-export function projectPirateNpcNameAnchor({ sprite, camera, vectorSeed, width, height } = {}) {
+export function projectPirateNpcNameAnchor({ sprite, camera, vectorSeed, width, height, group } = {}) {
   if (!sprite?.getWorldPosition || !camera || typeof vectorSeed?.clone !== 'function') return null;
   const viewportWidth = finite(width);
   const viewportHeight = finite(height);
   if (!(viewportWidth > 0) || !(viewportHeight > 0)) return null;
-  const point = vectorSeed.clone();
-  if (!point?.project) return null;
+  const projected = vectorSeed.clone();
+  if (!projected?.project) return null;
   camera.updateMatrixWorld?.();
-  sprite.getWorldPosition(point);
-  point.project(camera);
-  if (![point.x, point.y, point.z].every(Number.isFinite)) return null;
-  if (point.z < -1 || point.z > 1 || point.x < -1.15 || point.x > 1.15 || point.y < -1.15 || point.y > 1.15) return null;
+  sprite.updateMatrixWorld?.();
+  let wx = null;
+  let wy = null;
+  let wz = null;
+  try {
+    const world = worldPositionTarget(sprite);
+    sprite.getWorldPosition(world);
+    wx = finite(world.x);
+    wy = finite(world.y);
+    wz = finite(world.z);
+  } catch {
+    wx = wy = wz = null;
+  }
+  if (wx === null || wy === null || wz === null) {
+    const xz = groupWorldXz(group || sprite.parent);
+    const sy = finite(sprite.position?.y);
+    if (!xz || sy === null) return null;
+    wx = xz.x;
+    wy = sy;
+    wz = xz.z;
+  }
+  projected.x = wx;
+  projected.y = wy;
+  projected.z = wz;
+  projected.project(camera);
+  if (![projected.x, projected.y, projected.z].every(Number.isFinite)) return null;
+  if (projected.z < -1 || projected.z > 1 || projected.x < -1.15 || projected.x > 1.15 || projected.y < -1.15 || projected.y > 1.15) return null;
   return Object.freeze({
-    x: clamp((point.x + 1) / 2, 0, 1),
-    y: clamp((1 - point.y) / 2, 0, 1),
+    x: clamp((projected.x + 1) / 2, 0, 1),
+    y: clamp((1 - projected.y) / 2, 0, 1),
   });
 }
 
@@ -251,7 +274,7 @@ function styleParentProxy(button) {
   Object.assign(button.style, {
     position: 'fixed',
     display: 'none',
-    zIndex: '40',
+    zIndex: '80',
     margin: '0',
     padding: '3px 10px',
     border: '2px solid rgba(255,226,145,.85)',
@@ -269,10 +292,12 @@ function styleParentProxy(button) {
     lineHeight: '1.2',
     width: 'auto',
     height: 'auto',
+    minWidth: '48px',
+    minHeight: '48px',
   });
 }
 
-export function createPirateNpcNameParentProxy({ frame, documentLike = globalThis.document, parentOrigin } = {}) {
+export function createPirateNpcNameParentProxy({ frame, documentLike = globalThis.document, parentOrigin, layoutFrame } = {}) {
   if (!frame || !documentLike?.createElement) return null;
   const trustedParentOrigin = resolveOrigin(parentOrigin)
     || resolveOrigin(documentLike?.defaultView?.location?.href)
@@ -310,7 +335,7 @@ export function createPirateNpcNameParentProxy({ frame, documentLike = globalThi
       target.removeAttribute?.('aria-label');
       return false;
     }
-    const rect = frame.getBoundingClientRect?.();
+    const rect = (layoutFrame || frame).getBoundingClientRect?.();
     if (!rect || !(rect.width > 0) || !(rect.height > 0)) {
       target.style.display = 'none';
       return false;
@@ -436,6 +461,7 @@ export function installPirateNpcNameChild({
       vectorSeed,
       width: windowLike.innerWidth,
       height: windowLike.innerHeight,
+      group: anchor.group,
     }) : null;
     const nameLength = [...name].length;
     const widthPx = clamp(80 + nameLength * 10, 104, 180);
