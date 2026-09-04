@@ -6,7 +6,6 @@ import {
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
 } from '../pirate-fruit-control-hud-v900.mjs?v=10';
-import { installPirateNpcNameChild } from '../pirate-npc-name-interaction-v900.mjs?v=10';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 let skipVendorFullscreen = false;
@@ -51,12 +50,6 @@ window.addEventListener('message', event => {
 });
 
 hookPirateFruitRenderer(pirateFruitThree);
-installPirateNpcNameChild({
-  three: pirateFruitThree,
-  windowLike: window,
-  documentLike: document,
-  parentOrigin,
-});
 
 const postDialogue = open => {
   try {
