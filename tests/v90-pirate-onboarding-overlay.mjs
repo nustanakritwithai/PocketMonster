@@ -44,9 +44,10 @@ const parentBoot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', impo
 const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', import.meta.url), 'utf8');
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
+const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=940/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=941/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -86,11 +87,14 @@ assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board in
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=22/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=23/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
 assert.match(presentation, /OVERLAY_ROOTS/, 'quest/boat/potion shops hide the parent control surface');
+assert.match(presentation, /setInterval\(syncDialogue, 200\)/, 'child keeps publishing overlay open on phones that miss MutationObserver');
+assert.match(parentBoot, /window\.parent\?\.postMessage/, 'scene forwards overlay open to the parent shell');
+assert.match(shell, /pirate-dialogue-v1/, 'parent shell raises the scene over HUD while a Pirate window is open');
 assert.match(presentation, /PIRATE_FRUIT_DIALOGUE_MESSAGE/, 'child publishes dialogue open so parent HUD can stand down');
 assert.match(parentBoot, /pocketmonster:pirate-dialogue-v1/, 'parent lets the talk window sit in front of HUD buttons');
 

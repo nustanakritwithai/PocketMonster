@@ -57,8 +57,11 @@ const postDialogue = open => {
   } catch {}
 };
 const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.boat-shop-root', '.potion-shop-root', '.dealer-shop-root', '.inv-root'];
+let lastOverlayOpen = null;
 const syncDialogue = () => {
   const open = OVERLAY_ROOTS.some(selector => document.querySelector(selector)?.style?.display === 'flex');
+  if (open === lastOverlayOpen) return;
+  lastOverlayOpen = open;
   postDialogue(open);
 };
 if (typeof MutationObserver === 'function') {
@@ -69,3 +72,6 @@ if (typeof MutationObserver === 'function') {
     attributeFilter: ['style', 'class'],
   });
 }
+window.addEventListener('pointerup', syncDialogue, { capture: true });
+setInterval(syncDialogue, 200);
+syncDialogue();

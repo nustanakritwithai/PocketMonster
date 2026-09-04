@@ -16,7 +16,7 @@ import {
 } from './pirate-presence-bridge-v900.mjs?v=2';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=1';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=932', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=933', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=827&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -155,9 +155,16 @@ function bindPocketMonsterLink(frame) {
     if (event.source !== frame.contentWindow) return;
     const dialogue = event.data;
     if (dialogue?.type === 'pocketmonster:pirate-dialogue-v1') {
-      const host = window.frameElement?.ownerDocument || document;
-      if (dialogue.open === true) host.body.dataset.pirateDialogue = 'open';
-      else delete host.body.dataset.pirateDialogue;
+      const open = dialogue.open === true;
+      const apply = doc => {
+        if (!doc?.body) return;
+        if (open) doc.body.dataset.pirateDialogue = 'open';
+        else delete doc.body.dataset.pirateDialogue;
+      };
+      apply(document);
+      try { apply(window.frameElement?.ownerDocument); } catch {}
+      try { apply(window.parent?.document); } catch {}
+      try { window.parent?.postMessage({ type: 'pocketmonster:pirate-dialogue-v1', open }, '*'); } catch {}
       return;
     }
     if (event.origin !== 'null') return;
