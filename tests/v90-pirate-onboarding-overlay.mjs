@@ -55,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=930/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=931/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.

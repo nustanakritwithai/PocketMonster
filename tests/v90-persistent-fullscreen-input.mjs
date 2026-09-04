@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {
   bindPersistentFullscreenControls,
   PERSISTENT_FULLSCREEN_BRIDGE_KIND,
+  PERSISTENT_FULLSCREEN_REQUEST_MESSAGE,
   installPersistentFullscreenBridge,
 } from '../persistent-fullscreen-v900.mjs';
 
@@ -89,6 +90,61 @@ assert.match(html, /id="persistentFullscreenBtn"[^>]*data-pirate-icon="⛶"/);
 assert.match(css, /#pirateUnifiedControls #persistentFullscreenBtn\.tc-fullscreen/);
 assert.match(css, /#persistentFullscreenBtn\.tc-fullscreen::after\{content:'⛶'!important/);
 assert.match(pirateHud, /\.fullscreen-prompt-root/);
+
+const opaquePosted = [];
+const opaqueLocal = createDocument();
+const opaqueWindow = {
+  document: opaqueLocal.document,
+  parent: {
+    postMessage(data, origin) {
+      opaquePosted.push({ data, origin });
+    },
+  },
+  location: { href: 'https://opaque.invalid/pirate-fruit-offline/index.html?parentOrigin=https://parent.example' },
+};
+Object.defineProperty(opaqueWindow, 'top', {
+  get() {
+    throw new Error('Blocked a frame with origin "null" from accessing a cross-origin frame.');
+  },
+});
+const opaqueBridge = installPersistentFullscreenBridge(opaqueWindow);
+assert.equal(opaqueBridge?.kind, PERSISTENT_FULLSCREEN_BRIDGE_KIND);
+assert.equal(opaqueBridge?.owner, 'opaque-parent-relay', 'opaque iframe must patch requestFullscreen before vendor FullscreenPrompt loads');
+await opaqueWindow.document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+assert.equal(opaqueLocal.calls.length, 0, 'opaque pirate document cannot become the fullscreen element');
+assert.equal(opaquePosted.length, 1, 'opaque requestFullscreen relays to the parent instead of the child document');
+assert.equal(opaquePosted[0].data.type, PERSISTENT_FULLSCREEN_REQUEST_MESSAGE);
+assert.equal(opaquePosted[0].data.kind, PERSISTENT_FULLSCREEN_BRIDGE_KIND);
+assert.deepEqual(opaquePosted[0].data.options, { navigationUI: 'hide' });
+assert.equal(opaquePosted[0].origin, 'https://parent.example');
+
+const parentListeners = [];
+const parentLocal = createDocument();
+const parentWindow = {
+  document: parentLocal.document,
+  top: ownerWindow,
+  parent: ownerWindow,
+  addEventListener(type, listener) {
+    if (type === 'message') parentListeners.push(listener);
+  },
+};
+const parentBridge = installPersistentFullscreenBridge(parentWindow);
+assert.equal(parentBridge?.owner, 'parent-shell');
+assert.equal(parentListeners.length, 1, 'same-origin parent accepts opaque child fullscreen relays');
+owner.document.fullscreenElement = null;
+parentListeners[0]({
+  origin: 'null',
+  source: opaqueWindow,
+  data: opaquePosted[0].data,
+});
+assert.equal(owner.calls.length, 2, 'opaque child relay uses the persistent parent fullscreen owner');
+assert.deepEqual(owner.calls[1], { navigationUI: 'hide' });
+parentListeners[0]({
+  origin: 'https://evil.example',
+  source: opaqueWindow,
+  data: opaquePosted[0].data,
+});
+assert.equal(owner.calls.length, 2, 'foreign origins cannot request parent fullscreen through the relay');
 
 const standalone = createDocument();
 const standaloneWindow = { document: standalone.document };
