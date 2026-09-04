@@ -21,6 +21,7 @@ html[data-pirate-hud="pirate-primary-parent"] .onboarding-root {
   pointer-events: none !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt {
+  bottom: 120px !important;
   pointer-events: auto !important;
   z-index: 40 !important;
 }
