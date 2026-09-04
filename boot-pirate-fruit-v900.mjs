@@ -5,7 +5,7 @@ import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?
 import {
   PIRATE_HUD_INIT_MESSAGE,
   createPirateHudTelemetryCollector,
-} from './pirate-hud-telemetry-v900.mjs?v=1';
+} from './pirate-hud-telemetry-v900.mjs?v=2';
 import { publishWorldState } from './world-presence-v800.mjs';
 import {
   PIRATE_PRESENCE_ZONE,
@@ -14,9 +14,9 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=2';
-import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=1';
+import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=934', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=935', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=827&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 

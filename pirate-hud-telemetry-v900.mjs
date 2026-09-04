@@ -126,6 +126,8 @@ export function readPirateHudDom(documentLike) {
     const hp = parseRange(readText(documentLike, '.progression-hp-text'));
     const resource = parseRange(readText(documentLike, '.progression-mp-text'));
     const mode = parseRange(readText(documentLike, '.progression-energy-text'));
+    const expText = readText(documentLike, '.progression-exp-text');
+    const exp = /MAX LEVEL/i.test(expText) ? { value: 1, maximum: 1 } : parseRange(expText);
     const playerAvailable = visible(documentLike, documentLike.querySelector('.progression-hud')) && Boolean(hp);
     const questRoot = documentLike.querySelector('.quest-tracker');
     const questAvailable = visible(documentLike, questRoot);
@@ -143,6 +145,7 @@ export function readPirateHudDom(documentLike) {
         resourceKind: resource ? 'MP' : '', resource: resource?.value ?? 0, resourceMax: resource?.maximum ?? 0,
         modeLabel: mode ? 'Energy' : '',
         modePercent: mode?.maximum ? mode.value / mode.maximum * 100 : 0,
+        exp: exp?.value ?? 0, expMax: exp?.maximum ?? 0,
         buffs: [],
       },
       chat: { revision: 1, channel: 'WORLD', channels: ['WORLD', 'ZONE'], rows: [], unread: 0, status: 'unavailable', canSend: false },
@@ -249,16 +252,18 @@ function validTelemetryShape(snapshot) {
       || !safeRevision(context.revision)
       || !['onboardingActive', 'connected', 'loading'].every(field => typeof context[field] === 'boolean')
       || !featureNames.every(feature => validRevision(snapshot[feature]))) return false;
-    if (!hasExactKeys(snapshot.player, ['revision', 'available', 'portraitKey', 'displayName', 'level', 'title', 'hp', 'hpMax', 'resourceKind', 'resource', 'resourceMax', 'modeLabel', 'modePercent', 'buffs'])
+    if (!hasExactKeys(snapshot.player, ['revision', 'available', 'portraitKey', 'displayName', 'level', 'title', 'hp', 'hpMax', 'resourceKind', 'resource', 'resourceMax', 'modeLabel', 'modePercent', 'exp', 'expMax', 'buffs'])
       || typeof snapshot.player.available !== 'boolean'
       || !fieldsHaveType(snapshot.player, ['portraitKey', 'displayName', 'title', 'resourceKind', 'modeLabel'], 'string')
-      || !fieldsHaveType(snapshot.player, ['level', 'hp', 'hpMax', 'resource', 'resourceMax', 'modePercent'], 'number')
+      || !fieldsHaveType(snapshot.player, ['level', 'hp', 'hpMax', 'resource', 'resourceMax', 'modePercent', 'exp', 'expMax'], 'number')
       || !Number.isInteger(snapshot.player.level) || !finiteBetween(snapshot.player.level, 0, HUD_LIMITS.levelMax)
       || !finiteBetween(snapshot.player.hpMax, 0, HUD_LIMITS.numericMax)
       || !finiteBetween(snapshot.player.hp, 0, snapshot.player.hpMax)
       || !finiteBetween(snapshot.player.resourceMax, 0, HUD_LIMITS.numericMax)
       || !finiteBetween(snapshot.player.resource, 0, snapshot.player.resourceMax)
       || !finiteBetween(snapshot.player.modePercent, 0, 100)
+      || !finiteBetween(snapshot.player.expMax, 0, HUD_LIMITS.numericMax)
+      || !finiteBetween(snapshot.player.exp, 0, snapshot.player.expMax)
       || !validArray(snapshot.player.buffs, HUD_LIMITS.buffs)
       || snapshot.player.buffs.length !== 0
       || !uniqueStableIds(snapshot.player.buffs)

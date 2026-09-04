@@ -576,6 +576,11 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
       documentLike, 'mmorpg-player-energy', snapshot.modePercent, 100,
       snapshot.modeLabel || 'Energy',
     );
+    const expText = el(documentLike, 'div', '', 'mmorpg-player-exp-text');
+    const expMax = Number.isFinite(snapshot.expMax) ? snapshot.expMax : 0;
+    const expValue = Number.isFinite(snapshot.exp) ? snapshot.exp : 0;
+    expText.textContent = expMax > 0 ? `EXP ${Math.round(expValue)}/${Math.round(expMax)}` : 'EXP';
+    const exp = fillBar(documentLike, 'mmorpg-player-exp', expValue, expMax || 1, 'EXP');
     const wrapVital = (bar, label) => {
       const row = el(documentLike, 'div', '', 'mmorpg-player-vital');
       row.append(bar, label);
@@ -587,6 +592,9 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
       wrapVital(resource, resourceText),
       wrapVital(energy, mode),
     );
+    const expRow = wrapVital(exp, expText);
+    expRow.className += ' mmorpg-player-exp-row';
+    vitals.append(expRow);
     body.append(identity, vitals);
     panel.replaceChildren(portrait, body);
     const buffRow = node('mmorpgBuffRow');
