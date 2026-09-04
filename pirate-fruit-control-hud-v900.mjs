@@ -12,6 +12,18 @@ html[data-pirate-hud="pirate-primary-parent"] .game-minimap {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+html[data-pirate-hud="pirate-primary-parent"] .tc-root {
+  display: none !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .graphics-setting,
+html[data-pirate-hud="pirate-primary-parent"] .audio-toggle,
+html[data-pirate-hud="pirate-primary-parent"] .audio-panel,
+html[data-pirate-hud="pirate-primary-parent"] .inv-open-button,
+html[data-pirate-hud="pirate-primary-parent"] .stats-open-button,
+html[data-pirate-hud="pirate-primary-parent"] .stats-panel-root {
+  display: none !important;
+  pointer-events: none !important;
+}
 html[data-pirate-hud="pirate-primary-parent"] .progression-hud {
   opacity: 0 !important;
   pointer-events: none !important;

@@ -47,7 +47,7 @@ const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-pre
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=941/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=942/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -81,13 +81,21 @@ assert.match(
   /\.interaction-prompt\s*\{[\s\S]*bottom:\s*120px/,
   'original Pirate คุยกับ prompt sits above the chat dock',
 );
+assert.match(pirateHud, /\.graphics-setting/,
+  'old iframe graphics chip is retired');
+assert.match(pirateHud, /\.audio-toggle/,
+  'old iframe speaker chip is retired');
+assert.match(pirateHud, /\.inv-open-button/,
+  'old iframe bag chip is retired');
+assert.match(pirateHud, /\.tc-root \{[\s\S]*display: none/,
+  'old iframe punch/shield cluster is retired');
 assert.match(pirateHud, /\.dialogue-root \{[\s\S]*inset: auto/, 'talk window is not a fullscreen overlay');
 assert.match(pirateHud, /\.dialogue-card \{[\s\S]*max-height: 22vh/, 'talk card inner size fits a phone');
 assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board inner size fits a phone');
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=23/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=24/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
