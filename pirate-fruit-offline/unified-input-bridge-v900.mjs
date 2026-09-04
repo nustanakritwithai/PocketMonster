@@ -6,7 +6,7 @@ import {
 import {
   PIRATE_HUD_INIT_MESSAGE,
   startPirateHudTelemetryPublisher,
-} from '../pirate-hud-telemetry-v900.mjs?v=1';
+} from '../pirate-hud-telemetry-v900.mjs?v=2';
 
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 

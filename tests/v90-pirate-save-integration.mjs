@@ -26,11 +26,11 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cach
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=934/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=942/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=52/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=49/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
-assert.match(sceneHtml, /style-v900\.css\?v=965/, 'scene HTML cache-busts the persistent fullscreen control layout');
+assert.match(boot, /index\.html\?v=935/, 'parent cache-busts the Pirate child HTML without the circular minimap');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=943/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=53/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=50/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
+assert.match(sceneHtml, /style-v900\.css\?v=966/, 'scene HTML cache-busts the persistent fullscreen control layout');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=24/, 'offline HTML cache-busts presentation integration after child minimap retirement');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'presentation loads the HUD policy that retires the circular child minimap');

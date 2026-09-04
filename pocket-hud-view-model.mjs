@@ -49,6 +49,8 @@ export function buildPocketPlayerHudFeature(input = {}) {
     resourceMax: input.resourceMax,
     modeLabel: input.modeLabel,
     modePercent: input.modePercent,
+    exp: input.exp,
+    expMax: input.expMax,
     buffs: Array.isArray(input.buffs) ? input.buffs : [],
   };
 }
@@ -57,6 +59,7 @@ function unavailablePlayerSnapshot(revision) {
   return Object.freeze({
     revision, available: false, portraitKey: '', displayName: '', level: 0, title: '',
     hp: 0, hpMax: 0, resourceKind: '', resource: 0, resourceMax: 0, modeLabel: '', modePercent: 0,
+    exp: 0, expMax: 0,
     buffs: Object.freeze([]),
   });
 }
@@ -77,6 +80,7 @@ function normalizePlayerForStore(input, revision) {
   if (!input || typeof input !== 'object' || input.available !== true) return unavailablePlayerSnapshot(revision);
   const hpMax = finiteClamp(input.hpMax, 0, NUMERIC_MAX);
   const resourceMax = finiteClamp(input.resourceMax, 0, NUMERIC_MAX);
+  const expMax = finiteClamp(input.expMax, 0, NUMERIC_MAX);
   const buffs = [];
   for (const candidate of (Array.isArray(input.buffs) ? input.buffs : []).slice(0, BUFF_LIMIT)) {
     const normalized = normalizeBuffForStore(candidate, buffs.length);
@@ -96,6 +100,8 @@ function normalizePlayerForStore(input, revision) {
     resourceMax,
     modeLabel: clampText(input.modeLabel),
     modePercent: finiteClamp(input.modePercent, 0, 100),
+    exp: finiteClamp(input.exp, 0, expMax),
+    expMax,
     buffs: Object.freeze(buffs),
   });
 }

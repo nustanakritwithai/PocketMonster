@@ -11,7 +11,7 @@ const child = fs.readFileSync(new URL('../pirate-fruit-offline/unified-input-bri
 const entry = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const parent = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 assert.equal(inventory.captureMode, 'local-headless-runtime-dom');
-assert.deepEqual(inventory.player.selectors, { level: '.progression-hud-level', hp: '.progression-hp-text', resource: '.progression-mp-text', mode: '.progression-energy-text' });
+assert.deepEqual(inventory.player.selectors, { level: '.progression-hud-level', hp: '.progression-hp-text', resource: '.progression-mp-text', mode: '.progression-energy-text', exp: '.progression-exp-text' });
 assert.equal(inventory.target.available, false, 'fraction-only target HP must not be guessed');
 assert.ok(inventory.player.unavailableFields.includes('buffs'));
 assert.deepEqual(inventory.actions.map(({ id }) => id), ['capture', 'summon', 'recall', 'skill1', 'skill2', 'skill3', 'skill4', 'block', 'weapon', 'potion1', 'potion2', 'zoomIn', 'zoomOut']);
@@ -34,7 +34,7 @@ potion.querySelector = selector => selector === '.tc-potion-count' ? element('12
 const dom = readPirateHudDom(documentWith({
   '.progression-hud': element(), '.progression-hud-level': element('Lv.27'),
   '.progression-hp-text': element('75 / 120'), '.progression-mp-text': element('40/80'),
-  '.progression-energy-text': element('30/60'), '.quest-tracker': element('', { display: 'none' }),
+  '.progression-energy-text': element('30/60'), '.progression-exp-text': element('12 / 48 EXP'), '.quest-tracker': element('', { display: 'none' }),
   '.tc-attack': element('Attack'), '.tc-skill1': element('Fire', { classes: ['tc-skill-locked'] }),
   '.tc-block': element('Block', { classes: ['tc-on'] }),
   '.tc-potion1': potion, '.stats-open-button': element('Stats'),
@@ -43,6 +43,7 @@ const dom = readPirateHudDom(documentWith({
 }));
 assert.deepEqual({ level: dom.player.level, hp: dom.player.hp, hpMax: dom.player.hpMax }, { level: 27, hp: 75, hpMax: 120 });
 assert.deepEqual({ resource: dom.player.resource, resourceMax: dom.player.resourceMax, modePercent: dom.player.modePercent }, { resource: 40, resourceMax: 80, modePercent: 50 });
+assert.deepEqual({ exp: dom.player.exp, expMax: dom.player.expMax }, { exp: 12, expMax: 48 });
 assert.deepEqual(dom.player.buffs, []);
 assert.equal(dom.target.available, false);
 assert.equal(dom.quest.available, false);
@@ -223,7 +224,7 @@ try {
   Date.now = realNow;
 }
 
-assert.match(entry, /unified-input-bridge-v900\.mjs\?v=5/);
+assert.match(entry, /unified-input-bridge-v900\.mjs\?v=6/);
 assert.match(child, /startPirateHudTelemetryPublisher/);
 assert.match(parent, /createPirateHudTelemetryCollector/);
 assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HUD store for the parent Dock');

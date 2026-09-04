@@ -121,6 +121,7 @@ function normalizePlayer(source) {
   const input = isRecord(source) ? source : {};
   const hpMax = clamp(input.hpMax, 0, HUD_LIMITS.numericMax, 0);
   const resourceMax = clamp(input.resourceMax, 0, HUD_LIMITS.numericMax, 0);
+  const expMax = clamp(input.expMax, 0, HUD_LIMITS.numericMax, 0);
   return Object.freeze({
     revision: featureRevision(input),
     available: input.available === true,
@@ -135,6 +136,8 @@ function normalizePlayer(source) {
     resourceMax,
     modeLabel: text(input.modeLabel),
     modePercent: clamp(input.modePercent, 0, 100, 0),
+    exp: clamp(input.exp, 0, expMax, 0),
+    expMax,
     buffs: immutableArray((Array.isArray(input.buffs) ? input.buffs : [])
       .slice(0, HUD_LIMITS.buffs).map(normalizeBuff).filter(Boolean)),
   });
@@ -476,7 +479,7 @@ function validateUnifiedHudSnapshotUnsafe(snapshot) {
     checkBoolean(snapshot.player, 'available', 'player', issues);
     for (const field of ['portraitKey', 'displayName', 'title', 'resourceKind', 'modeLabel']) checkString(snapshot.player, field, 'player', issues);
     checkNumber(snapshot.player, 'level', 'player', issues, 0, HUD_LIMITS.levelMax);
-    for (const field of ['hp', 'hpMax', 'resource', 'resourceMax']) checkNumber(snapshot.player, field, 'player', issues);
+    for (const field of ['hp', 'hpMax', 'resource', 'resourceMax', 'exp', 'expMax']) checkNumber(snapshot.player, field, 'player', issues);
     checkNumber(snapshot.player, 'modePercent', 'player', issues, 0, 100);
     for (const [index, buff] of checkCollection(snapshot.player.buffs, HUD_LIMITS.buffs, 'player.buffs', issues).entries()) {
       const path = `player.buffs[${index}]`;

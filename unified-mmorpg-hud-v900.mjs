@@ -94,6 +94,9 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
     const player = register('mmorpgPlayerStatus', el(documentLike, 'div', '', 'mmorpg-player-status'));
     player.setAttribute('aria-label', 'Player status');
     root.append(player);
+    const expBar = register('mmorpgExpBar', el(documentLike, 'div', '', 'mmorpg-exp-bar'));
+    expBar.setAttribute('aria-label', 'EXP');
+    root.append(expBar);
 
     root.append(register('mmorpgBuffRow', el(documentLike, 'div', '', 'mmorpg-buff-row')));
     const quick = register('mmorpgQuickIndicators', el(documentLike, 'div', '', 'mmorpg-quick-indicators'));
@@ -543,6 +546,12 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
       status.textContent = 'กำลังเชื่อมต่อ…';
       panel.append(status);
       node('mmorpgBuffRow')?.replaceChildren();
+      const expTrack = node('mmorpgExpBar');
+      if (expTrack) {
+        expTrack.replaceChildren();
+        expTrack.setAttribute('aria-valuenow', '0');
+        expTrack.setAttribute('aria-valuemax', '0');
+      }
       return;
     }
     panel.classList.remove('skeleton');
@@ -589,6 +598,15 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
     );
     body.append(identity, vitals);
     panel.replaceChildren(portrait, body);
+    const expMax = Number.isFinite(snapshot.expMax) ? snapshot.expMax : 0;
+    const expValue = Number.isFinite(snapshot.exp) ? snapshot.exp : 0;
+    const expTrack = node('mmorpgExpBar');
+    if (expTrack) {
+      const painted = fillBar(documentLike, 'mmorpg-exp-fill', expValue, expMax || 1, 'EXP');
+      expTrack.replaceChildren(painted);
+      expTrack.setAttribute('aria-valuenow', String(expValue));
+      expTrack.setAttribute('aria-valuemax', String(expMax));
+    }
     const buffRow = node('mmorpgBuffRow');
     if (buffRow) {
       const all = Array.isArray(snapshot.buffs) ? snapshot.buffs : [];

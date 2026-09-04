@@ -46,8 +46,8 @@ const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs'
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
-assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=942/);
+assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=6/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=943/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);

@@ -8,7 +8,8 @@
       "level": ".progression-hud-level",
       "hp": ".progression-hp-text",
       "resource": ".progression-mp-text",
-      "mode": ".progression-energy-text"
+      "mode": ".progression-energy-text",
+      "exp": ".progression-exp-text"
     },
     "unavailableFields": ["portraitKey", "displayName", "title", "buffs"]
   },

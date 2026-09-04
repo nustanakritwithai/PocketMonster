@@ -35,7 +35,7 @@ assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=827', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=942', 'mutant 0e2: pirate world still boots through the cache-busted pirate boot module');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=943', 'mutant 0e2: pirate world still boots through the cache-busted pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
