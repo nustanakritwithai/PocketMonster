@@ -35,12 +35,12 @@ assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#sk
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill3Btn\.tc-skill3\{[^}]*right:120px!important;bottom:70px/, 'short coarse phones keep equal skill-3 chord on the packed arc');
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill4Btn\.tc-ult\{[^}]*right:calc\(var\(--arc-right\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat ultimate on the attack left edge');
 
-assert.match(css, /#pirateUnifiedControls \.tc-potion\{[^}]*border-radius:8px/, 'potion buttons stay square, not the circular combat cluster');
-assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px!important;bottom:148px/, 'desktop item 1 stays on the combat cluster');
-assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*right:224px!important;bottom:88px/, 'desktop item 2 stays on the combat cluster');
-assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion1Btn\.tc-potion1\{left:34px!important;right:auto!important;bottom:42px/, 'touch screens seat potion 1 beside zoom-in at the bottom-left');
-assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:34px!important;right:auto!important;bottom:10px/, 'touch screens seat potion 2 beside zoom-out at the bottom-left');
-assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*\.tc-potion\{[^}]*width:32px!important;height:32px/, 'touch screens shrink potions next to the 24px zoom cluster');
+assert.match(css, /#pirateUnifiedControls \.tc-potion\{[^}]*width:32px!important;height:32px/, 'potions stay 32px on computer and phone');
+assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*left:34px!important;right:auto!important;bottom:10px/, 'potion 1 starts the horizontal row beside zoom');
+assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*left:68px!important;right:auto!important;bottom:10px/, 'potion 2 sits to the right of potion 1 on the same row');
+assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*bottom:42px/, 'potions cannot stack vertically beside zoom-in');
+assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px/, 'potions cannot stay on the desktop combat cluster');
+assert.doesNotMatch(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion/, 'potions cannot use a separate phone-only position');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
@@ -65,8 +65,6 @@ const boxes = {
   skill3: box(129, 76, 48),
   skill4: box(118, 2, 48),
   block: box(172, 132, 48),
-  potion1: box(224, 148, 48),
-  potion2: box(224, 88, 48),
 };
 const skillCenters = ['skill1', 'skill2', 'skill3', 'skill4'].map(name => center(boxes[name]));
 const skillDistances = skillCenters.slice(0, -1).map((point, index) => distance(point, skillCenters[index + 1]));
