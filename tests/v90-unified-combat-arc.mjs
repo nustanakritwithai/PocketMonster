@@ -41,6 +41,11 @@ assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*left:68px!important;right
 assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*bottom:42px/, 'potions cannot stack vertically beside zoom-in');
 assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px/, 'potions cannot stay on the desktop combat cluster');
 assert.doesNotMatch(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion/, 'potions cannot use a separate phone-only position');
+assert.match(css, /#joystick\.tc-joyzone\{[^}]*bottom:48px/, 'joystick drag zone sits above the potion row');
+assert.doesNotMatch(css, /#joystick\.tc-joyzone\{[^}]*bottom:0!important/, 'joystick cannot cover potions on the bottom edge');
+assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*pointer-events:auto/, 'potion 1 keeps its own hit above the drag zone');
+assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*pointer-events:auto/, 'potion 2 keeps its own hit above the drag zone');
+assert.match(css, /\.mmorpg-dock\{position:absolute;left:32\.5%;bottom:0;transform:none/, 'chat dock stays on the viewport bottom');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
