@@ -55,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=936/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=937/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -100,10 +100,10 @@ assert.match(
   'original Pirate คุยกับ prompt sits above the chat dock',
 );
 assert.match(pirateHud, /\.dialogue-root \{[\s\S]*inset: auto/, 'talk window is not a fullscreen overlay');
-assert.match(pirateHud, /\.dialogue-card \{[\s\S]*max-height: 28vh/, 'talk card is sized for a phone');
+assert.match(pirateHud, /\.dialogue-card \{[\s\S]*max-height: 22vh/, 'talk card inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
 assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=18/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=19/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
