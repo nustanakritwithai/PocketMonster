@@ -11,6 +11,7 @@ import {
   PIRATE_NPC_NAME_PROXY_ID,
   createPirateNpcNameParentProxy,
   installPirateNpcNameChild,
+  projectPirateNpcNameAnchor,
   readPirateNpcPromptName,
   requestOriginalPirateInteraction,
 } from '../pirate-npc-name-interaction-v900.mjs';
@@ -54,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=929/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=930/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -84,11 +85,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=8/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=12/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=9/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=13/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=8/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=9/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -102,6 +103,9 @@ assert.match(source, /opacity:\s*'1'/, 'talk chip is fully visible on the projec
 assert.doesNotMatch(source, /opacity:\s*'0\.01'/);
 assert.doesNotMatch(source, /color:\s*'transparent'/);
 assert.match(source, /textContent = 'คุย'/, 'relocated talk control shows compact คุย text');
+assert.match(source, /zIndex:\s*'80'/, 'คุย chip stacks above the parent camera pad');
+assert.match(source, /minHeight:\s*'48px'/, 'คุย chip keeps a 48px touch target');
+assert.match(parentBoot, /frameElement\?\.ownerDocument/, 'คุย chip mounts on the hosted scene parent so cameraPad cannot eat the tap');
 assert.match(source, /addEventListener\('pointerdown', sendActivate\)/, 'parent hit target activates on pointerdown');
 
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C3SJLfq8.js', import.meta.url), 'utf8');
@@ -240,7 +244,7 @@ function createPrompt(name = 'หัวหน้ามะลิ') {
   assert.equal(button.style.display, 'block');
   assert.equal(button.textContent, 'คุย');
   assert.equal(button.attributes.get('aria-label'), 'คุยกับ หัวหน้ามะลิ');
-  assert.equal(button.style.zIndex, '40');
+  assert.equal(button.style.zIndex, '80');
   assert.equal(button.style.opacity, '1');
   assert.notEqual(button.style.opacity, '0');
   assert.notEqual(button.style.opacity, '0.01');
@@ -257,6 +261,50 @@ function createPrompt(name = 'หัวหน้ามะลิ') {
     data: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: false },
   }), true);
   assert.equal(button.style.display, 'none', 'inactive proxy stays hidden');
+  proxy.destroy();
+}
+
+{
+  const posted = [];
+  const frameWindow = {
+    postMessage(message, origin) { posted.push({ message, origin }); },
+  };
+  const pirateFrame = {
+    contentWindow: frameWindow,
+    getBoundingClientRect() { return { left: 0, top: 0, width: 800, height: 450 }; },
+  };
+  const layoutFrame = {
+    getBoundingClientRect() { return { left: 120, top: 40, width: 800, height: 450 }; },
+  };
+  const nodes = new Map();
+  const body = new FakeNode('body');
+  const hostDocument = {
+    body,
+    getElementById: id => nodes.get(id) || null,
+    createElement(tag) {
+      const el = new FakeNode(tag);
+      el.registry = nodes;
+      return el;
+    },
+  };
+  const proxy = createPirateNpcNameParentProxy({
+    frame: pirateFrame,
+    documentLike: hostDocument,
+    layoutFrame,
+    parentOrigin: 'https://nustanakritwithai.github.io',
+  });
+  assert.equal(proxy.accept({
+    source: frameWindow,
+    origin: 'null',
+    data: { type: PIRATE_NPC_NAME_MESSAGE, kind: 'state', active: true, name: 'หัวหน้ามะลิ', x: 0.25, y: 0.2, width: 0.2, height: 0.1 },
+  }), true);
+  const button = nodes.get(PIRATE_NPC_NAME_PROXY_ID);
+  assert.ok(button, 'hosted parent still owns the same คุย proxy id');
+  assert.equal(button.style.left, '320px', 'chip left follows the scene iframe plus NPC x, not the player');
+  assert.equal(button.style.top, '130px', 'chip top follows the scene iframe plus NPC y, not the player');
+  assert.equal(Number(button.style.zIndex) >= 80, true, 'chip sits above cameraPad z-index 1 inside HUD z-index 20');
+  button.dispatchEvent(new FakePointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true }));
+  assert.equal(posted[0]?.message?.kind, 'activate');
   proxy.destroy();
 }
 
@@ -616,6 +664,67 @@ function installCapturedSceneChild(prompt, {
   assert.equal(state.active, true, 'live THREE.Sprite name plates require Vector3.getWorldPosition, not a plain {x,y,z}');
   assert.equal(state.name, 'หัวหน้ามะลิ');
   child.stop();
+}
+
+{
+  const camera = {
+    position: { x: 2, y: 1.6, z: 8 },
+    updateMatrixWorld() {},
+  };
+  camera.position.clone = function cloneCameraPoint() {
+    return {
+      x: this.x,
+      y: this.y,
+      z: this.z,
+      project() {
+        this.x = (this.x - 2) / 20;
+        this.y = (this.y - 1.6) / 8;
+        this.z = 0;
+        return this;
+      },
+    };
+  };
+  const group = {
+    position: { x: 12, y: 0, z: 8 },
+    getWorldPosition(target) {
+      if (typeof target?.setFromMatrixPosition !== 'function') {
+        throw new TypeError('THREE.Object3D.getWorldPosition requires a Vector3');
+      }
+      target.x = 12;
+      target.y = 0;
+      target.z = 8;
+      return target;
+    },
+  };
+  const sprite = {
+    position: { y: 3.55 },
+    parent: group,
+    getWorldPosition(target) {
+      if (typeof target?.setFromMatrixPosition !== 'function') {
+        throw new TypeError('THREE.Object3D.getWorldPosition requires a Vector3');
+      }
+      target.x = 12;
+      target.y = 3.55;
+      target.z = 8;
+      return target;
+    },
+  };
+  let projected = null;
+  try {
+    projected = projectPirateNpcNameAnchor({
+      sprite,
+      camera,
+      vectorSeed: camera.position,
+      width: 800,
+      height: 450,
+      group,
+    });
+  } catch {
+    projected = null;
+  }
+  assert.ok(projected, 'NPC name still projects when live getWorldPosition requires a Vector3');
+  assert.equal(projected.x, 0.75, 'คุย chip follows the NPC world x, not the camera/player center');
+  assert.notEqual(projected.x, 0.5, 'คุย chip must not sit under the local player');
 }
 
 console.log('V9 Pirate onboarding retirement bridge: PASS');
