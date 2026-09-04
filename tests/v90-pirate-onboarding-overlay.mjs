@@ -54,7 +54,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=928/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=929/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -84,11 +84,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=7/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=11/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=8/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=12/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=7/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=8/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -408,6 +408,7 @@ function installCapturedSceneChild(prompt, {
   spriteWidth = 384,
   spriteHeight = 96,
   spriteY = 3.55,
+  threeWorldPosition = false,
 } = {}) {
   class Object3D {
     constructor() {
@@ -469,6 +470,17 @@ function installCapturedSceneChild(prompt, {
     const npcGroup = new Object3D();
     npcGroup.children = [sprite];
     npcGroup.position = { x: 2, y: 0, z: 2 };
+    if (threeWorldPosition) {
+      npcGroup.getWorldPosition = function getWorldPosition(target) {
+        if (typeof target?.setFromMatrixPosition !== 'function') {
+          throw new TypeError('THREE.Object3D.getWorldPosition requires a Vector3');
+        }
+        target.x = this.position.x;
+        target.y = this.position.y;
+        target.z = this.position.z;
+        return target;
+      };
+    }
     if (groupName) npcGroup.name = groupName;
     if (nested) {
       const world = new Object3D();
@@ -585,6 +597,23 @@ function installCapturedSceneChild(prompt, {
   });
   const state = child.sync();
   assert.equal(state.active, true, 'live Pirate name plates are not 384x96 at y=3.55');
+  assert.equal(state.name, 'หัวหน้ามะลิ');
+  child.stop();
+}
+
+{
+  const prompt = createPrompt('หัวหน้ามะลิ');
+  prompt.style.display = 'none';
+  const { child } = installCapturedSceneChild(prompt, {
+    withSprite: true,
+    pirateHud: '',
+    groupName: 'หัวหน้ามะลิ',
+    nested: true,
+    cameraZ: 8,
+    threeWorldPosition: true,
+  });
+  const state = child.sync();
+  assert.equal(state.active, true, 'live THREE.Sprite name plates require Vector3.getWorldPosition, not a plain {x,y,z}');
   assert.equal(state.name, 'หัวหน้ามะลิ');
   child.stop();
 }

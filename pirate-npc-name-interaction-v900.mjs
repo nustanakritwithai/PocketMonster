@@ -151,13 +151,38 @@ function nodeChildren(node) {
   return [];
 }
 
+function worldPositionTarget(group) {
+  if (typeof group?.position?.clone === 'function') {
+    const cloned = group.position.clone();
+    if (cloned && typeof cloned.setFromMatrixPosition === 'function') return cloned;
+  }
+  return {
+    x: 0,
+    y: 0,
+    z: 0,
+    setFromMatrixPosition(matrix) {
+      const e = matrix?.elements;
+      if (e && e.length >= 15) {
+        this.x = Number(e[12]);
+        this.y = Number(e[13]);
+        this.z = Number(e[14]);
+      }
+      return this;
+    },
+  };
+}
+
 function groupWorldXz(group) {
   if (typeof group?.getWorldPosition === 'function') {
-    const world = { x: 0, y: 0, z: 0 };
-    group.getWorldPosition(world);
-    const gx = finite(world.x);
-    const gz = finite(world.z);
-    if (gx !== null && gz !== null) return { x: gx, z: gz };
+    try {
+      const world = worldPositionTarget(group);
+      group.getWorldPosition(world);
+      const gx = finite(world.x);
+      const gz = finite(world.z);
+      if (gx !== null && gz !== null) return { x: gx, z: gz };
+    } catch {
+      // Live THREE.Object3D.getWorldPosition throws unless the target is a Vector3.
+    }
   }
   const gx = finite(group?.position?.x);
   const gz = finite(group?.position?.z);
