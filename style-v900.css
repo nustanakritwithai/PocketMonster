@@ -100,8 +100,8 @@ body[data-pirate-dialogue="open"] .mmorpg-hud{visibility:hidden!important;pointe
 #pirateUnifiedControls #skill3Btn.tc-skill3{right:129px!important;bottom:76px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:16px}
 #pirateUnifiedControls .tc-skill{opacity:.55}
 #pirateUnifiedControls #skill4Btn.tc-ult{right:118px!important;bottom:2px!important;width:var(--arc-skill)!important;height:var(--arc-skill)!important;font-size:13px;border-color:rgba(200,120,255,.85)!important;background-color:rgba(70,25,110,.55)!important;opacity:.65}
-#pirateUnifiedControls #pirateBlockBtn.tc-block{right:172px!important;bottom:132px!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:18px;border-color:rgba(150,200,255,.8)!important}
-#pirateUnifiedControls #pirateWeaponBtn.tc-weapon{right:16px!important;top:55.1%!important;bottom:auto!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:17px;opacity:.9;border-color:rgba(255,215,140,.8)!important}
+#pirateUnifiedControls #pirateBlockBtn.tc-block{right:172px!important;bottom:132px!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:18px;border-color:rgba(150,200,255,.8)!important;display:none!important;pointer-events:none!important}
+#pirateUnifiedControls #pirateWeaponBtn.tc-weapon{right:16px!important;top:55.1%!important;bottom:auto!important;width:var(--arc-util)!important;height:var(--arc-util)!important;font-size:17px;opacity:.9;border-color:rgba(255,215,140,.8)!important;display:none!important;pointer-events:none!important}
 #pirateUnifiedControls .tc-potion{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;font-size:11px!important;border-radius:8px!important}
 #pirateUnifiedControls #piratePotion1Btn.tc-potion1{left:34px!important;right:auto!important;bottom:10px!important;z-index:32;pointer-events:auto!important}
 #pirateUnifiedControls #piratePotion2Btn.tc-potion2{left:68px!important;right:auto!important;bottom:10px!important;z-index:32;pointer-events:auto!important}
