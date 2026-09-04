@@ -26,10 +26,10 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=5/, 'parent boot cache
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=922/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=930/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=40/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=37/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
+assert.match(boot, /index\.html\?v=923/, 'parent cache-busts the Pirate child HTML without the circular minimap');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=931/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=41/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=38/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
 assert.match(sceneHtml, /style-v900\.css\?v=958/, 'scene HTML cache-busts the persistent fullscreen control layout');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=13/, 'offline HTML cache-busts presentation integration after child minimap retirement');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');

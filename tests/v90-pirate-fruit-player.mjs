@@ -75,7 +75,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=818/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900.mjs\?v=40/, 'V9 preload cache-busts the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900.mjs\?v=41/, 'V9 preload cache-busts the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -91,7 +91,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=827');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=930');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=931');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=904');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -127,7 +127,7 @@ assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world lo
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
 assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell/, 'persistent shell owns the presence-aware Pocket chat for every world');
 assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persistent shell owns fullscreen across scene swaps');
-assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=3/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
+assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=4/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
 assert.match(html, /id="chatToggleBtn"/, 'V9 ships the player chat toggle outside the HUD');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"/, 'human/throw switcher is removed from the game');
