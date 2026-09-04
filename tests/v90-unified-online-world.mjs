@@ -49,8 +49,8 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=948/, 'active HTML cache-busts the restored minimap entry');
-assert.match(indexHtml, /style-v900\.css\?v=957/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
-assert.match(sceneHtml, /style-v900\.css\?v=957/, 'hosted scene cache-busts the same V9 stylesheet');
+assert.match(indexHtml, /style-v900\.css\?v=958/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(sceneHtml, /style-v900\.css\?v=958/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
