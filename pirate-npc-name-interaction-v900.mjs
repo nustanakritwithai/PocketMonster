@@ -426,7 +426,7 @@ export function installPirateNpcNameChild({
       height: Math.round(state.height * 10000) / 10000,
     } : inactiveState();
     const serialized = JSON.stringify(rounded);
-    if (serialized === lastSerialized) return false;
+    if (serialized === lastSerialized && !rounded.active) return false;
     lastSerialized = serialized;
     windowLike.parent?.postMessage?.(stateMessage(rounded), trustedParentOrigin);
     return true;

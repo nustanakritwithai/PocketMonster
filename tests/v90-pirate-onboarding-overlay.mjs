@@ -55,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=931/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=932/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -85,11 +85,11 @@ assert.match(
   'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=9/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=13/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'parent cache-busts the NPC-name interaction module');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=14/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=9/, 'Pirate presentation cache-busts the NPC-name interaction module');
+assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'Pirate presentation cache-busts the NPC-name interaction module');
 
 const source = fs.readFileSync(new URL('../pirate-npc-name-interaction-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(source, /prompt\.click\?\.\(\)/);
@@ -107,6 +107,11 @@ assert.match(source, /zIndex:\s*'80'/, 'คุย chip stacks above the parent c
 assert.match(source, /minHeight:\s*'48px'/, 'คุย chip keeps a 48px touch target');
 assert.match(parentBoot, /frameElement\?\.ownerDocument/, 'คุย chip mounts on the hosted scene parent so cameraPad cannot eat the tap');
 assert.match(source, /addEventListener\('pointerdown', sendActivate\)/, 'parent hit target activates on pointerdown');
+assert.doesNotMatch(parentBoot, /const activateHudTelemetry = reason => \{\s*frameGeneration \+= 1;\s*npcNameProxy\?\.reset\(\);/, 'HUD activate cannot clear the คุย chip');
+assert.doesNotMatch(parentBoot, /frame\.addEventListener\('load', \(\) => \{\s*npcNameProxy\?\.reset\(\);/, 'iframe load cannot clear the คุย chip');
+assert.match(parentBoot, /event\.detail\?\.world !== 'pirate-fruit'[\s\S]*npcNameProxy\?\.reset\(\)/, 'leaving Pirate still resets the คุย chip');
+assert.match(parentBoot, /pagehide[\s\S]*npcNameProxy\?\.reset\(\)/, 'pagehide still resets the คุย chip');
+assert.match(source, /serialized === lastSerialized && !rounded\.active/, 'identical active คุย state is re-posted after a parent reset');
 
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C3SJLfq8.js', import.meta.url), 'utf8');
 assert.match(
