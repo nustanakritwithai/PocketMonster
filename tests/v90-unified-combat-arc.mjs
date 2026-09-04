@@ -38,8 +38,9 @@ assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#sk
 assert.match(css, /#pirateUnifiedControls \.tc-potion\{[^}]*border-radius:8px/, 'potion buttons stay square, not the circular combat cluster');
 assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px!important;bottom:148px/, 'desktop item 1 stays on the combat cluster');
 assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*right:224px!important;bottom:88px/, 'desktop item 2 stays on the combat cluster');
-assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion1Btn\.tc-potion1\{left:8px!important;right:auto!important;bottom:148px/, 'touch screens pin potion 1 above potion 2 on the bottom-left, independent of a 1280px scene iframe');
-assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:8px!important;right:auto!important;bottom:88px/, 'touch and narrow screens pin potions to the bottom-left, independent of a 1280px scene iframe');
+assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion1Btn\.tc-potion1\{left:34px!important;right:auto!important;bottom:42px/, 'touch screens seat potion 1 beside zoom-in at the bottom-left');
+assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:34px!important;right:auto!important;bottom:10px/, 'touch screens seat potion 2 beside zoom-out at the bottom-left');
+assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*\.tc-potion\{[^}]*width:32px!important;height:32px/, 'touch screens shrink potions next to the 24px zoom cluster');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
