@@ -116,7 +116,9 @@ assert.match(css, /\.mmorpg-player-body\{[^}]*flex-direction:column/, 'name then
 assert.match(css, /\.mmorpg-player-vitals\{[^}]*flex-direction:column/, 'HP MP energy are long tubes stacked beside the portrait');
 assert.match(css, /\.mmorpg-player-vital\{[^}]*width:100%/, 'each tube fills the remaining slot width');
 assert.match(css, /\.mmorpg-player-vital\{[^}]*height:6px/, 'vital tubes stay short enough to fit the golden slot');
-assert.match(css, /\.mmorpg-player-exp-row\{[^}]*height:4px/, 'EXP tube stays smaller under the vitals');
+assert.match(css, /\.mmorpg-exp-bar\{[^}]*bottom:0/, 'EXP is a full-width bar on the bottom edge');
+assert.match(css, /\.mmorpg-exp-bar\{[^}]*height:8px/, 'bottom EXP bar stays a thin trim');
+assert.match(css, /\.mmorpg-exp-bar\{[^}]*pointer-events:none/, 'bottom EXP bar cannot eat taps');
 assert.doesNotMatch(css, /\.mmorpg-player-status\{height:22%/, 'the golden slot stays short; tubes are long not tall');
 assert.match(css, /\.mmorpg-player-status\{[^}]*transform-origin:0 0/, 'the player frame shrinks from the top-left corner');
 assert.match(css, /\.mmorpg-player-status\{[^}]*transform:scale\(0\.65\)/, 'the whole player frame scales down on the diagonal');
@@ -172,10 +174,10 @@ assert.match(css, /\.mmorpg-quick-indicator\{[^}]*pointer-events:none/, 'quick i
   assert.equal(energy.getAttribute('role'), 'progressbar');
   assert.equal(energy.children[0].style.width, '40%', 'energy fill follows modePercent');
   assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-body')).length, 1, 'vitals sit beside the portrait');
-  assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-vital')).length, 4, 'HP MP energy plus a small EXP tube');
-  assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-exp')).length, 1, 'EXP sits under the vital stack');
-  const expBar = panel.collect(node => node.classList.contains('mmorpg-player-exp'))[0];
-  assert.equal(expBar.children[0].style.width, '25%', 'EXP fill follows exp/expMax');
+  assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-vital')).length, 3, 'HP MP energy stay three long tubes after the name');
+  const expBar = document.getElementById('mmorpgExpBar');
+  assert.ok(expBar, 'EXP bar is mounted on the play surface');
+  assert.equal(expBar.children[0].children[0].style.width, '25%', 'bottom EXP fill follows exp/expMax');
   assert.equal(panel.collect(node => node.classList.contains('mmorpg-player-vitals')).length, 1, 'tubes are grouped after identity');
   const buffs = document.getElementById('mmorpgBuffRow').children;
   assert.equal(buffs.length, 8, 'seven buffs plus overflow');
