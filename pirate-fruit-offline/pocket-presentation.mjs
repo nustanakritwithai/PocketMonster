@@ -4,10 +4,17 @@ import {
   PIRATE_FRUIT_CONTROL_HUD_CSS,
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
-} from '../pirate-fruit-control-hud-v900.mjs?v=7';
+  PIRATE_FRUIT_DIALOGUE_MESSAGE,
+} from '../pirate-fruit-control-hud-v900.mjs?v=8';
 import { installPirateNpcNameChild } from '../pirate-npc-name-interaction-v900.mjs?v=10';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
+window.addEventListener('pointerdown', event => {
+  const target = event.target;
+  if (target && typeof target.closest === 'function' && target.closest('.interaction-prompt, .dialogue-root')) {
+    event.stopImmediatePropagation();
+  }
+}, { capture: true });
 window.addEventListener('message', event => {
   if (event.source !== window.parent || event.origin !== parentOrigin) return;
   const message = event.data;
@@ -30,3 +37,21 @@ installPirateNpcNameChild({
   documentLike: document,
   parentOrigin,
 });
+
+const postDialogue = open => {
+  try {
+    window.parent?.postMessage({ type: PIRATE_FRUIT_DIALOGUE_MESSAGE, open: open === true }, parentOrigin || '*');
+  } catch {}
+};
+const syncDialogue = () => {
+  const root = document.querySelector('.dialogue-root');
+  postDialogue(!!root && root.style.display === 'flex');
+};
+if (typeof MutationObserver === 'function') {
+  new MutationObserver(syncDialogue).observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ['style', 'class'],
+  });
+}

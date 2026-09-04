@@ -1,6 +1,6 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
 import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
-import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=7';
+import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=8';
 import { createPirateNpcNameParentProxy } from './pirate-npc-name-interaction-v900.mjs?v=10';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -17,7 +17,7 @@ import {
 } from './pirate-presence-bridge-v900.mjs?v=2';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=1';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=926', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=927', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=827&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -163,6 +163,13 @@ function bindPocketMonsterLink(frame) {
     if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow) return;
     if (npcNameProxy?.accept(event)) return;
+    const dialogue = event.data;
+    if (dialogue?.type === 'pocketmonster:pirate-dialogue-v1') {
+      const host = window.frameElement?.ownerDocument || document;
+      if (dialogue.open === true) host.body.dataset.pirateDialogue = 'open';
+      else delete host.body.dataset.pirateDialogue;
+      return;
+    }
     if (event.origin !== 'null') return;
     if (hudTelemetry.accept(event)) return;
     const message = event.data;
