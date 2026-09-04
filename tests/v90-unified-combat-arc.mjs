@@ -35,8 +35,11 @@ assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#sk
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill3Btn\.tc-skill3\{[^}]*right:120px!important;bottom:70px/, 'short coarse phones keep equal skill-3 chord on the packed arc');
 assert.match(css, /@media\(max-height:420px\) and \(pointer:coarse\)\{[\s\S]*#skill4Btn\.tc-ult\{[^}]*right:calc\(var\(--arc-right\) \+ var\(--arc-primary\)\)/, 'short coarse phones seat ultimate on the attack left edge');
 
+assert.match(css, /#pirateUnifiedControls \.tc-potion\{[^}]*border-radius:8px/, 'potion buttons stay square, not the circular combat cluster');
+assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px!important;bottom:148px/, 'desktop item 1 stays on the combat cluster');
 assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*right:224px!important;bottom:88px/, 'desktop item 2 stays on the combat cluster');
-assert.match(css, /@media\(max-width:700px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:8px!important;right:auto!important;bottom:88px/, 'narrow phones pin item 2 to the bottom-left, clear of the chat dock');
+assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion1Btn\.tc-potion1\{left:8px!important;right:auto!important;bottom:148px/, 'touch screens pin potion 1 above potion 2 on the bottom-left, independent of a 1280px scene iframe');
+assert.match(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion2Btn\.tc-potion2\{left:8px!important;right:auto!important;bottom:88px/, 'touch and narrow screens pin potions to the bottom-left, independent of a 1280px scene iframe');
 
 function box(right, bottom, size) {
   return { x1: right, y1: bottom, x2: right + size, y2: bottom + size };
