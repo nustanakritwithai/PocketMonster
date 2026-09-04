@@ -13,7 +13,7 @@
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
   <script type="module" src="./entry-preload-v900.mjs?v=947"></script>
   <link rel="stylesheet" href="./style-v800.css?v=813" />
-  <link rel="stylesheet" href="./style-v900.css?v=953" />
+  <link rel="stylesheet" href="./style-v900.css?v=954" />
   <link rel="stylesheet" href="./combat-v91.css?v=1" />
 </head>
 <body>
@@ -77,8 +77,8 @@
       <button id="recallBtn" class="action recall tc-btn tc-jump" data-pirate-icon="⬆" aria-label="กระโดด"></button>
       <button id="pirateBlockBtn" class="action tc-btn tc-block pirate-only" data-pirate-icon="🛡" aria-label="ป้องกัน"></button>
       <button id="pirateWeaponBtn" class="action tc-btn tc-weapon pirate-only" data-pirate-icon="👊" aria-label="เปลี่ยนอาวุธ"></button>
-      <button id="piratePotion1Btn" class="action tc-btn tc-potion tc-potion1 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 1"></button>
-      <button id="piratePotion2Btn" class="action tc-btn tc-potion tc-potion2 pirate-only" data-pirate-icon="＋" aria-label="ใช้ยา 2"></button>
+      <button id="piratePotion1Btn" class="action tc-btn tc-potion tc-potion1 pirate-only" data-pirate-icon="ยา" aria-label="ใช้ยา 1"></button>
+      <button id="piratePotion2Btn" class="action tc-btn tc-potion tc-potion2 pirate-only" data-pirate-icon="ยา2" aria-label="ใช้ยา 2"></button>
       <button id="pirateZoomInBtn" class="action tc-btn tc-zoom tc-zoom-in pirate-only" data-pirate-icon="＋" aria-label="ซูมเข้า"></button>
       <button id="pirateZoomOutBtn" class="action tc-btn tc-zoom tc-zoom-out pirate-only" data-pirate-icon="−" aria-label="ซูมออก"></button>
       <button id="monsterSlot1Btn" class="action tc-btn tc-monster tc-monster1" data-pirate-icon="🐾" aria-label="มอนช่อง 1">🐾</button>

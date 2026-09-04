@@ -49,8 +49,8 @@ for (const file of [
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
 assert.match(indexHtml, /entry-preload-v900\.mjs\?v=947/, 'active HTML cache-busts the restored minimap entry');
-assert.match(indexHtml, /style-v900\.css\?v=953/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
-assert.match(sceneHtml, /style-v900\.css\?v=953/, 'hosted scene cache-busts the same V9 stylesheet');
+assert.match(indexHtml, /style-v900\.css\?v=954/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
+assert.match(sceneHtml, /style-v900\.css\?v=954/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
@@ -131,7 +131,7 @@ assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSessio
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
 assert.match(shell, /combined-worlds-v900\.mjs\?v=930/, 'persistent shell cache-busts the changed world catalog');
-assert.match(shell, /searchParams\.set\('shellRevision', '42'\)/, 'persistent shell cache-busts the changed scene HTML');
+assert.match(shell, /searchParams\.set\('shellRevision', '43'\)/, 'persistent shell cache-busts the changed scene HTML');
 assert.match(worlds, /combined-worlds-v900\.mjs\?v=930/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=935/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
