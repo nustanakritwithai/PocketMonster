@@ -39,31 +39,31 @@ html[data-pirate-hud="pirate-primary-parent"] .dialogue-root {
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-card {
   width: 100% !important;
   max-width: 100% !important;
-  max-height: 28vh !important;
+  max-height: 22vh !important;
   overflow: auto !important;
-  padding: 8px 10px 8px !important;
-  border-radius: 12px !important;
+  padding: 6px 8px 6px !important;
+  border-radius: 10px !important;
   box-sizing: border-box !important;
 }
-html[data-pirate-hud="pirate-primary-parent"] .dialogue-name { font-size: 14px !important; }
+html[data-pirate-hud="pirate-primary-parent"] .dialogue-name { font-size: 13px !important; }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-role,
-html[data-pirate-hud="pirate-primary-parent"] .dialogue-page { font-size: 10px !important; }
+html[data-pirate-hud="pirate-primary-parent"] .dialogue-page { font-size: 9px !important; }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-text {
-  font-size: 12px !important;
-  min-height: 28px !important;
-  margin: 6px 0 8px !important;
-  line-height: 1.4 !important;
+  font-size: 11px !important;
+  min-height: 20px !important;
+  margin: 4px 0 6px !important;
+  line-height: 1.35 !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-close {
-  font-size: 22px !important;
-  min-width: 44px;
-  min-height: 44px;
+  font-size: 20px !important;
+  min-width: 40px;
+  min-height: 40px;
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-next,
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-action {
-  min-height: 44px;
-  padding: 6px 10px !important;
-  font-size: 12px !important;
+  min-height: 40px;
+  padding: 4px 8px !important;
+  font-size: 11px !important;
 }
 
 `;

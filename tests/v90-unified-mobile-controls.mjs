@@ -137,6 +137,6 @@ assert.doesNotMatch(sceneEntrySource, /installNpcInteractionLayer/, 'rollback: o
 assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera pad leaves a hole for the original Pirate คุยกับ prompt above chat');
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls/, 'open talk stands the parent HUD down so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=43/, 'online scene cache-busts the Dock world-lifecycle wiring');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=44/, 'online scene cache-busts the Dock world-lifecycle wiring');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
