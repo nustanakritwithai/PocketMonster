@@ -41,7 +41,8 @@ assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*left:68px!important;right
 assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*bottom:42px/, 'potions cannot stack vertically beside zoom-in');
 assert.doesNotMatch(css, /#piratePotion1Btn\.tc-potion1\{[^}]*right:224px/, 'potions cannot stay on the desktop combat cluster');
 assert.doesNotMatch(css, /@media\(pointer:coarse\),\(hover:none\),\(max-width:900px\)\{[\s\S]*#piratePotion/, 'potions cannot use a separate phone-only position');
-assert.match(css, /#joystick\.tc-joyzone\{[^}]*bottom:48px/, 'joystick drag zone sits above the potion row');
+assert.match(css, /#joystick\.tc-joyzone\{[^}]*bottom:72px/, 'joystick drag zone sits above the potion and zoom cluster');
+assert.doesNotMatch(css, /#joystick\.tc-joyzone\{[^}]*bottom:48px/, 'joystick cannot graze the 32px potion row');
 assert.doesNotMatch(css, /#joystick\.tc-joyzone\{[^}]*bottom:0!important/, 'joystick cannot cover potions on the bottom edge');
 assert.match(css, /#piratePotion1Btn\.tc-potion1\{[^}]*pointer-events:auto/, 'potion 1 keeps its own hit above the drag zone');
 assert.match(css, /#piratePotion2Btn\.tc-potion2\{[^}]*pointer-events:auto/, 'potion 2 keeps its own hit above the drag zone');

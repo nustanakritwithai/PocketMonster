@@ -78,6 +78,20 @@ assert.deepEqual(
   [['capture', 'start'], ['capture', 'end']],
 );
 
+pirateCalls.length = 0;
+elements.get('cameraPad').dispatchEvent(pointer('pointerdown', 22, 70, 40));
+const potionLook = pointer('pointerdown', 77, 50, 90);
+elements.get('piratePotion1Btn').dispatchEvent(potionLook);
+elements.get('piratePotion1Btn').dispatchEvent(pointer('pointerup', 77, 50, 90));
+assert.equal(controls.diagnostics().controlMode, 'pirate', 'potion tap while looking cannot leave Pirate control mode');
+assert.equal(controls.diagnostics().pointerInput.cameraPointerId, 22, 'potion tap cannot steal the look-around pointer');
+assert.equal(pirateCalls.filter(([kind]) => kind === 'reset').length, 0, 'potion tap while looking cannot reset the control surface');
+assert.deepEqual(
+  pirateCalls.filter(([kind]) => kind === 'action').map(([, payload]) => [payload.action, payload.phase]),
+  [['potion1', 'start'], ['potion1', 'end']],
+);
+windowLike.dispatchEvent(pointer('pointerup', 22, 70, 40));
+
 controls.activate('pocket-monster');
 assert.equal(controls.diagnostics().controlMode, 'capture');
 assert.equal(controls.diagnostics().pointerInput.joystickPointerId, null, 'world switch releases stale joystick capture');
