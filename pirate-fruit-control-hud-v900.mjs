@@ -16,10 +16,13 @@ html[data-pirate-hud="pirate-primary-parent"] .progression-hud {
   pointer-events: none !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .fullscreen-prompt-root,
-html[data-pirate-hud="pirate-primary-parent"] .onboarding-root,
-html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt {
+html[data-pirate-hud="pirate-primary-parent"] .onboarding-root {
   display: none !important;
   pointer-events: none !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt {
+  pointer-events: auto !important;
+  z-index: 40 !important;
 }
 `;
 

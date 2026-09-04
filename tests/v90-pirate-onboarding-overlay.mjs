@@ -55,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=932/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=933/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -81,12 +81,22 @@ assert.match(parentBoot, /createPirateNpcNameParentProxy/, 'NPC-name interaction
 assert.match(parentBoot, /npcNameProxy\?\.accept\(event\)/, 'parent accepts NPC-name hit-target state from the opaque child');
 assert.match(
   pirateHud,
-  /\.onboarding-root,[\s\S]*\.interaction-prompt\s*\{[\s\S]*display:\s*none\s*!important/,
-  'integrated Pirate HUD removes both the bottom tutorial bar and bottom interaction prompt',
+  /\.onboarding-root\s*\{[\s\S]*display:\s*none\s*!important/,
+  'integrated Pirate HUD still removes the bottom tutorial bar',
+);
+assert.doesNotMatch(
+  pirateHud,
+  /\.interaction-prompt\s*\{[\s\S]*display:\s*none/,
+  'original Pirate คุยกับ prompt stays visible',
+);
+assert.match(
+  pirateHud,
+  /\.interaction-prompt\s*\{[\s\S]*pointer-events:\s*auto/,
+  'original Pirate คุยกับ prompt keeps its own hit',
 );
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
 assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=14/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=15/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'Pirate presentation cache-busts the NPC-name interaction module');
