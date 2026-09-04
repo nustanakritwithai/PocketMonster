@@ -55,7 +55,7 @@ const worldCatalog = fs.readFileSync(new URL('../combined-worlds-v900.mjs', impo
 const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=5/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=935/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=936/);
 
 // Keep the child bridge intact for standalone Pirate Fruit, but integrated V9
 // owns the visible interaction UI through the parent HUD policy.
@@ -103,10 +103,11 @@ assert.match(pirateHud, /\.dialogue-root \{[\s\S]*inset: auto/, 'talk window is 
 assert.match(pirateHud, /\.dialogue-card \{[\s\S]*max-height: 28vh/, 'talk card is sized for a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
 assert.match(parentBoot, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'parent cache-busts the NPC-name interaction module');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=17/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=18/, 'Pirate child HTML cache-busts presentation after the same-origin talk-chip fix');
 
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
-assert.match(presentation, /stopImmediatePropagation/, 'talk taps cannot trigger vendor fullscreen');
+assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
+assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
 assert.match(presentation, /PIRATE_FRUIT_DIALOGUE_MESSAGE/, 'child publishes dialogue open so parent HUD can stand down');
 assert.match(parentBoot, /pocketmonster:pirate-dialogue-v1/, 'parent lets the talk window sit in front of HUD buttons');
 assert.match(presentation, /pirate-npc-name-interaction-v900\.mjs\?v=10/, 'Pirate presentation cache-busts the NPC-name interaction module');
