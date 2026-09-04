@@ -12,7 +12,7 @@ let skipVendorFullscreen = false;
 window.addEventListener('pointerdown', event => {
   const target = event.target;
   skipVendorFullscreen = !!(target && typeof target.closest === 'function'
-    && target.closest('.interaction-prompt, .dialogue-root'));
+    && target.closest('.interaction-prompt, .dialogue-root, .quest-board-root, .boat-shop-root, .potion-shop-root, .dealer-shop-root, .inv-root'));
 }, { capture: true });
 const wrapFullscreen = () => {
   const root = document.documentElement;
@@ -56,9 +56,10 @@ const postDialogue = open => {
     window.parent?.postMessage({ type: PIRATE_FRUIT_DIALOGUE_MESSAGE, open: open === true }, parentOrigin || '*');
   } catch {}
 };
+const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.boat-shop-root', '.potion-shop-root', '.dealer-shop-root', '.inv-root'];
 const syncDialogue = () => {
-  const root = document.querySelector('.dialogue-root');
-  postDialogue(!!root && root.style.display === 'flex');
+  const open = OVERLAY_ROOTS.some(selector => document.querySelector(selector)?.style?.display === 'flex');
+  postDialogue(open);
 };
 if (typeof MutationObserver === 'function') {
   new MutationObserver(syncDialogue).observe(document.documentElement, {
