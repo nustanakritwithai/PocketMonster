@@ -75,7 +75,7 @@ assert.match(liveHtml, /entry-preload-v900\.mjs/, 'active index.html boots the V
 assert.match(preload, /game-v800\.js\?v=818/, 'legacy V8.4 preload remains available for v800.html');
 assert.doesNotMatch(preload, /game-v900|worlds-v900/, 'legacy V8.4 preload stays isolated from the combined V9 channel');
 assert.match(preloadV900, /prepareLaunch/, 'V9 reuses the proven V8.4 launch-ticket login bootstrap');
-assert.match(preloadV900, /online-world-shell-v900.mjs\?v=47/, 'V9 preload cache-busts the persistent 3-world shell after login');
+assert.match(preloadV900, /online-world-shell-v900.mjs\?v=48/, 'V9 preload cache-busts the persistent 3-world shell after login');
 assert.doesNotMatch(preloadV900, /await import\('\.\/game-v900\.js/, 'V9 preload must not skip the world gate');
 assert.match(html, /entry-preload-v900\.mjs/, 'v900.html is the separate combined entry');
 assert.doesNotMatch(html, /src="\.\/entry-preload\.mjs"/, 'combined page must not use the live V8.4 preload');
@@ -91,7 +91,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=827');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=937');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=938');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=904');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -262,7 +262,7 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateBootstrap, /import\('\.\/assets\/index-/, 'offline bootstrap imports the relative playable Vite bundle');
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=19"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=20"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
 assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
   'Pocket visual hook is listed before the save bootstrap that loads the real Pirate Fruit bundle',

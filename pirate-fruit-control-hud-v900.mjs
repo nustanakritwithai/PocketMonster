@@ -65,6 +65,54 @@ html[data-pirate-hud="pirate-primary-parent"] .dialogue-action {
   padding: 4px 8px !important;
   font-size: 11px !important;
 }
+html[data-pirate-hud="pirate-primary-parent"] .quest-board-root,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop-root,
+html[data-pirate-hud="pirate-primary-parent"] .potion-shop-root,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-shop-root {
+  align-items: flex-end !important;
+  padding: 6px 8px 64px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-board,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop,
+html[data-pirate-hud="pirate-primary-parent"] .potion-shop,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-shop {
+  width: min(380px, 100%) !important;
+  max-height: 48vh !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-board h2,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop-head h2,
+html[data-pirate-hud="pirate-primary-parent"] .potion-shop-head h2,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-shop-head h2 {
+  font-size: 14px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-board header p,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop-head p,
+html[data-pirate-hud="pirate-primary-parent"] .potion-shop-head p,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-shop-head p {
+  font-size: 10px !important;
+  margin: 2px 0 0 !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-board-cards,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop-cards,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-cards {
+  grid-template-columns: 1fr !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-card,
+html[data-pirate-hud="pirate-primary-parent"] .boat-card,
+html[data-pirate-hud="pirate-primary-parent"] .potion-card,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-card {
+  padding: 8px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-card h3,
+html[data-pirate-hud="pirate-primary-parent"] .boat-card h3,
+html[data-pirate-hud="pirate-primary-parent"] .potion-card-body h4,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-card-body h4 {
+  font-size: 12px !important;
+}
 
 `;
 
