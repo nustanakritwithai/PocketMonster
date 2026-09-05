@@ -1,4 +1,5 @@
 import {
+  PRESENCE_COORDINATE_LIMIT,
   sanitizeAnimation,
   sanitizeLocomotion,
   sanitizeOnlineWorldSnapshot,
@@ -22,13 +23,17 @@ export function sanitizePirateLocalPresence(message) {
   if (!isRecord(message) || message.type !== PIRATE_LOCAL_PRESENCE_MESSAGE) return null;
   if (message.zone !== PIRATE_PRESENCE_ZONE) return null;
   if (!isFiniteNumber(message.x) || !isFiniteNumber(message.z) || !isFiniteNumber(message.dir)) return null;
-  return Object.freeze({
+  const pose = {
     x: message.x,
     z: message.z,
     dir: message.dir,
     locomotion: sanitizeLocomotion(message.locomotion),
     animation: sanitizeAnimation(message.animation),
-  });
+  };
+  if (isFiniteNumber(message.y)) {
+    pose.y = Math.max(-PRESENCE_COORDINATE_LIMIT, Math.min(PRESENCE_COORDINATE_LIMIT, message.y));
+  }
+  return Object.freeze(pose);
 }
 
 /**

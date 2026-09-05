@@ -5,6 +5,9 @@ const {
   WORLD_PRESENCE_PROTOCOL_VERSION,
   MAX_REMOTE_PLAYERS,
   MAX_SNAPSHOT_CANDIDATES,
+  LOCOMOTION_VALUES,
+  COMBAT_STATE_VALUES,
+  ANIMATION_CATEGORY_VALUES,
   buildWorldPosFrame,
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
@@ -14,9 +17,15 @@ const {
   selfPresenceId,
 } = await import('../world-presence-protocol.mjs');
 
-assert.equal(WORLD_PRESENCE_PROTOCOL_VERSION, 'world-presence-protocol/v1');
+assert.equal(WORLD_PRESENCE_PROTOCOL_VERSION, 'world-presence-protocol/v2');
 assert.equal(MAX_REMOTE_PLAYERS, 100);
 assert.equal(MAX_SNAPSHOT_CANDIDATES, 400);
+assert.deepEqual(LOCOMOTION_VALUES, ['idle', 'walk', 'run', 'swim']);
+assert.deepEqual(COMBAT_STATE_VALUES, [
+  'idle', 'attack1', 'attack2', 'attack3', 'attack4', 'casting', 'blocking',
+  'stunned', 'knockback', 'knockdown', 'dead',
+]);
+assert.deepEqual(ANIMATION_CATEGORY_VALUES, ['style', 'sword', 'gun', 'fruit', 'utility']);
 
 const poseOnly = { zone: 'hub', x: 1, z: -2, dir: 0.5, locomotion: 'idle', animation: null };
 assert.deepEqual(buildWorldPosFrame({ zone: 'hub', x: 1, z: -2, dir: 0.5 }), poseOnly);
@@ -37,16 +46,19 @@ assert.deepEqual(
     x: 1,
     z: -2,
     dir: 0.25,
-    locomotion: 'jump',
-    animation: { combatState: 'skill', skillAnimationProgress: 0.4, onGround: false, dashing: true },
+    locomotion: 'run',
+    animation: { combatState: 'casting', category: 'fruit', skillAnimationProgress: 0.4, onGround: false, dashing: true },
   }),
   {
     zone: 'pirate-fruit',
     x: 1,
     z: -2,
     dir: 0.25,
-    locomotion: 'jump',
-    animation: { combatState: 'skill', onGround: false, dashing: true, skillAnimationProgress: 0.4 },
+    locomotion: 'run',
+    animation: {
+      combatState: 'casting', category: 'fruit', onGround: false, dashing: true,
+      verticalVelocity: 0, skillAnimationProgress: 0.4,
+    },
   },
   'validated locomotion/animation survive sanitization',
 );
@@ -64,7 +76,7 @@ const snapshot = worldSnapshotPayload({
   payload: {
     zone: 'hub',
     players: [
-      { id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5, locomotion: 'run', animation: { combatState: 'attack', attackProgress: 2 } },
+      { id: 'alice', name: 'Alice', x: 1, y: 3, z: 2, dir: 0.5, locomotion: 'run', animation: { combatState: 'attack1', category: 'style', attackProgress: 2 } },
       { id: 'alice', name: 'duplicate', x: 9, z: 9 },
       { id: 'bad', x: Infinity, z: 0 },
     ],
@@ -76,17 +88,20 @@ assert.deepEqual(snapshot, {
     id: 'alice',
     name: 'Alice',
     x: 1,
+    y: 3,
     z: 2,
     dir: 0.5,
     locomotion: 'run',
-    animation: { combatState: 'attack', attackProgress: 1 },
+    animation: { combatState: 'attack1', category: 'style', onGround: true, dashing: false, verticalVelocity: 0, attackProgress: 1 },
   }],
 });
 
 assert.deepEqual(
-  sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25, locomotion: 'run', animation: { combatState: 'attack', attackProgress: .5, dashing: true } }),
-  { zone: 'pirate-fruit', x: 1, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack', dashing: true, attackProgress: .5 } },
+  sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, y: 2.5, z: -2, dir: 0.25, locomotion: 'run', animation: { combatState: 'attack2', category: 'sword', attackProgress: .5, dashing: true } }),
+  { zone: 'pirate-fruit', x: 1, y: 2.5, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack2', category: 'sword', onGround: true, dashing: true, verticalVelocity: 0, attackProgress: .5 } },
 );
+assert.equal(buildWorldPosFrame({ zone: 'hub', x: 1, y: 20000, z: 2, dir: 0 }).y, 10000, 'height is bounded');
+assert.equal('y' in buildWorldPosFrame({ zone: 'hub', x: 1, y: Number.NaN, z: 2, dir: 0 }), false, 'invalid optional height is omitted');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [] }, 'pirate-fruit'), null);
 
 const self = 'keeper_one';
