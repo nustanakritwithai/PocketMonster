@@ -293,6 +293,10 @@ function assertRotation(actual, expected) {
 {
   const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
   const kit = threeFromPirateFruitVendor(vendor);
+  const probe = new kit.Group();
+  const Quaternion = probe.quaternion.constructor;
+  const Euler = probe.rotation.constructor;
+  const Vector3 = probe.position.constructor;
   const host = new kit.Group();
   host.name = 'remote-player:remote-a';
   const original = new kit.Mesh(
@@ -341,15 +345,15 @@ function assertRotation(actual, expected) {
   };
   const actionPoses = [
     ['attack', () => { source['right-arm'].rotation.z = -0.85; }, () => {
-      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z + 0.93) < 1e-12, 'attack reaches the expected right arm delta');
+      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z - 0.93) < 1e-12, 'attack reaches the expected right arm delta');
     }],
     ['casting', () => { source.chest.rotation.x = -0.4; source['left-arm'].rotation.z = 0.35; }, () => {
-      assert.ok(Math.abs(pivots.torsoPivot.rotation.x + 0.4) < 1e-12, 'casting reaches the expected torso delta');
-      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z - 0.43) < 1e-12, 'casting reaches the expected left arm delta');
+      assert.ok(Math.abs(pivots.torsoPivot.rotation.x - 0.4) < 1e-12, 'casting reaches the expected torso delta');
+      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z + 0.43) < 1e-12, 'casting reaches the expected left arm delta');
     }],
     ['blocking', () => { source['left-arm'].rotation.z = -0.35; source['right-arm'].rotation.z = 0.35; }, () => {
-      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z + 0.27) < 1e-12, 'blocking reaches the expected left guard delta');
-      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z - 0.27) < 1e-12, 'blocking reaches the expected right guard delta');
+      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z - 0.27) < 1e-12, 'blocking reaches the expected left guard delta');
+      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z + 0.27) < 1e-12, 'blocking reaches the expected right guard delta');
     }],
     ['dead', () => {
       sourceRoot.position.y = 0.24;
@@ -359,9 +363,9 @@ function assertRotation(actual, expected) {
       assert.ok(Math.abs(overlayRoot.position.y - 0.24) < 1e-12, 'dead root translation reaches overlay');
       const sourceDelta = new kit.Group();
       sourceDelta.rotation.z = -0.9;
-      expectedDeadRoot.quaternion.multiply(sourceDelta.quaternion);
+      expectedDeadRoot.quaternion.copy(sourceDelta.quaternion.clone().multiply(expectedDeadRoot.quaternion.clone()));
       assert.ok(overlayRoot.quaternion.angleTo(expectedDeadRoot.quaternion) < 1e-12, 'dead root rotation reaches overlay in world quaternion space');
-      assert.ok(Math.abs(pivots.torsoPivot.rotation.z + 1.05) < 1e-12, 'dead body pose reaches overlay');
+      assert.ok(Math.abs(pivots.torsoPivot.rotation.z - 1.05) < 1e-12, 'dead body pose reaches overlay');
     }],
   ];
   for (const [action, apply, assertPose] of actionPoses) {
@@ -391,9 +395,174 @@ function assertRotation(actual, expected) {
   lateExpectedRoot.rotation.y = Math.PI;
   const lateSourceDelta = new kit.Group();
   lateSourceDelta.rotation.z = -0.9;
-  lateExpectedRoot.quaternion.multiply(lateSourceDelta.quaternion);
+  lateExpectedRoot.quaternion.copy(lateSourceDelta.quaternion.clone().multiply(lateExpectedRoot.quaternion.clone()));
   assert.ok(lateOverlayRoot.quaternion.angleTo(lateExpectedRoot.quaternion) < 1e-12, 'late attach keeps the in-flight root pose');
-  assert.ok(Math.abs(latePivots.torsoPivot.rotation.z + 1.05) < 1e-12, 'late attach keeps the in-flight body pose');
+  assert.ok(Math.abs(latePivots.torsoPivot.rotation.z - 1.05) < 1e-12, 'late attach keeps the in-flight body pose');
+}
+
+// Actual hierarchical Three rig regression: flat target pivots must receive
+// the source ancestor-chain quaternion delta, not only the first matching node.
+{
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const kit = threeFromPirateFruitVendor(vendor);
+  const probe = new kit.Group();
+  const Quaternion = probe.quaternion.constructor;
+  const Euler = probe.rotation.constructor;
+  const Vector3 = probe.position.constructor;
+  const host = new kit.Group();
+  const sourceRoot = new kit.Group(); sourceRoot.name = 'player-rig:root'; host.add(sourceRoot);
+  const hips = new kit.Group(); hips.name = 'player-rig:hips'; sourceRoot.add(hips);
+  const spine = new kit.Group(); spine.name = 'player-rig:spine'; hips.add(spine);
+  const chest = new kit.Group(); chest.name = 'player-rig:chest'; spine.add(chest);
+  const head = new kit.Group(); head.name = 'player-rig:head'; chest.add(head);
+  const leftArm = new kit.Group(); leftArm.name = 'player-rig:left-arm'; chest.add(leftArm);
+  const rightArm = new kit.Group(); rightArm.name = 'player-rig:right-arm'; chest.add(rightArm);
+  const leftLeg = new kit.Group(); leftLeg.name = 'player-rig:left-leg'; hips.add(leftLeg);
+  const rightLeg = new kit.Group(); rightLeg.name = 'player-rig:right-leg'; hips.add(rightLeg);
+  leftArm.rotation.z = -0.08;
+  rightArm.rotation.z = 0.08;
+  sourceRoot.updateMatrixWorld(true);
+  const bindWorld = new Map([sourceRoot, hips, spine, chest, head, leftArm, rightArm, leftLeg, rightLeg]
+    .map(node => [node, node.getWorldQuaternion(new Quaternion())]));
+
+  const overlayRoot = new kit.Group();
+  overlayRoot.rotation.y = Math.PI;
+  const names = ['hipsPivot', 'torsoPivot', 'headPivot', 'leftArmRoot', 'rightArmRoot', 'leftLegRoot', 'rightLegRoot'];
+  const pivots = Object.fromEntries(names.map(name => [name, new kit.Group()]));
+  Object.values(pivots).forEach(pivot => overlayRoot.add(pivot));
+  const rest = new Map(Object.values(pivots).map(pivot => [pivot, {
+    px: pivot.position.x, py: pivot.position.y, pz: pivot.position.z,
+    rx: pivot.rotation.x, ry: pivot.rotation.y, rz: pivot.rotation.z,
+  }]));
+  const retargeter = createPirateFruitRigRetargeter(host, { pivots, rest }, {
+    sourceRootName: 'player-rig:root',
+    targetRoot: overlayRoot,
+    sourceRestMode: 'bind',
+  });
+
+  const applyDelta = (node, x, y, z) => {
+    const euler = node.rotation.clone().set(x, y, z);
+    const delta = node.quaternion.clone().set(0, 0, 0, 1).setFromEuler(euler);
+    node.quaternion.multiply(delta);
+  };
+  sourceRoot.rotation.set(-0.3, 0.24, -0.18);
+  hips.rotation.set(0.14, -0.2, 0.22);
+  spine.rotation.set(-0.08, -0.5, 0.12);
+  chest.rotation.set(0.22, 0.18, -0.12);
+  head.rotation.set(0.12, -0.18, 0.2);
+  applyDelta(leftArm, -0.76, 0.08, -0.34);
+  applyDelta(rightArm, -1.16, -0.16, 0.28);
+  leftLeg.rotation.set(-0.2, 0.1, -0.08);
+  rightLeg.rotation.set(0.24, -0.08, 0.12);
+  sourceRoot.updateMatrixWorld(true);
+  const poseWorld = new Map([sourceRoot, hips, spine, chest, head, leftArm, rightArm, leftLeg, rightLeg]
+    .map(node => [node, node.getWorldQuaternion(new Quaternion())]));
+  // เก็บ rotation oracle ก่อน nonuniform scale จะสร้าง shear ใน world matrix
+  chest.scale.y = 1.25;
+  sourceRoot.scale.set(1.08, 0.94, 1.03);
+  retargeter.update();
+
+  const deltaOf = (node, restRotation) => {
+    const restQuaternion = node.quaternion.clone().set(0, 0, 0, 1)
+      .setFromEuler(new Euler(...restRotation));
+    return restQuaternion.invert().multiply(node.quaternion.clone());
+  };
+  const chain = (...deltas) => deltas.reduce(
+    (out, delta) => out.multiply(delta),
+    new Quaternion().set(0, 0, 0, 1),
+  );
+  const qRoot = deltaOf(sourceRoot, [0, 0, 0]);
+  const qHips = deltaOf(hips, [0, 0, 0]);
+  const qSpine = deltaOf(spine, [0, 0, 0]);
+  const qChest = deltaOf(chest, [0, 0, 0]);
+  const qHead = deltaOf(head, [0, 0, 0]);
+  const qLeftArm = deltaOf(leftArm, [0, 0, -0.08]);
+  const qRightArm = deltaOf(rightArm, [0, 0, 0.08]);
+  const qLeftLeg = deltaOf(leftLeg, [0, 0, 0]);
+  const qRightLeg = deltaOf(rightLeg, [0, 0, 0]);
+  const near = (actual, expected, message) => {
+    for (const axis of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+      const actualAxis = new Vector3(...axis).applyQuaternion(actual);
+      const expectedAxis = new Vector3(...axis).applyQuaternion(expected);
+      assert.ok(actualAxis.distanceTo(expectedAxis) < 1e-9, message);
+    }
+  };
+  const targetBasis = new Quaternion().set(0, 0, 0, 1).setFromEuler(new Euler(0, Math.PI, 0));
+  const toTargetFrame = delta => targetBasis.clone().invert().multiply(delta).multiply(targetBasis);
+  const worldDelta = node => {
+    const currentRoot = poseWorld.get(sourceRoot);
+    const bindRoot = bindWorld.get(sourceRoot);
+    const currentRelative = currentRoot.clone().invert().multiply(poseWorld.get(node));
+    const bindRelative = bindRoot.clone().invert().multiply(bindWorld.get(node));
+    return currentRelative.multiply(bindRelative.clone().invert());
+  };
+  near(pivots.torsoPivot.quaternion, toTargetFrame(worldDelta(chest)), 'torso includes hips, spine, and chest deltas');
+  near(pivots.headPivot.quaternion, toTargetFrame(worldDelta(head)), 'head includes the full ancestor chain');
+  near(pivots.leftArmRoot.quaternion, toTargetFrame(worldDelta(leftArm)), 'left arm includes chest and bind splay');
+  near(pivots.rightArmRoot.quaternion, toTargetFrame(worldDelta(rightArm)), 'right arm includes chest and bind splay');
+  near(pivots.leftLegRoot.quaternion, toTargetFrame(worldDelta(leftLeg)), 'left leg includes hips delta');
+  near(pivots.rightLegRoot.quaternion, toTargetFrame(worldDelta(rightLeg)), 'right leg includes hips delta');
+  assert.ok(Math.abs(overlayRoot.scale.x - 1.08) < 1e-10, 'root scale follows source root');
+  assert.ok(Math.abs(pivots.torsoPivot.scale.y - 1.25) < 1e-10, 'chest scale follows torso target');
+
+  // Spatial basis proof for target Y=PI: source local +Z is target idle -Z,
+  // while both front and up retain the same source-pose delta in world space.
+  const sourceFront = new Vector3(0, 0, 1).applyQuaternion(qRoot);
+  const sourceUp = new Vector3(0, 1, 0).applyQuaternion(qRoot);
+  const targetFront = new Vector3(0, 0, -1).applyQuaternion(overlayRoot.quaternion);
+  const targetUp = new Vector3(0, 1, 0).applyQuaternion(overlayRoot.quaternion);
+  const expectedFront = new Vector3(0, 0, -1).applyQuaternion(qRoot.clone().multiply(targetBasis));
+  const expectedUp = new Vector3(0, 1, 0).applyQuaternion(qRoot.clone().multiply(targetBasis));
+  assert.ok(targetFront.distanceTo(sourceFront) < 1e-10, 'target -Z front follows source +Z front');
+  assert.ok(targetFront.distanceTo(expectedFront) < 1e-10, 'target front uses sourceDelta * targetRest');
+  assert.ok(targetUp.distanceTo(expectedUp) < 1e-10, 'target up uses sourceDelta * targetRest');
+  assert.ok(targetFront.y > 0, 'source pitch that raises +Z raises target world front');
+  assert.ok(sourceUp.y > 0.9 && targetUp.y > 0.9, 'up basis remains upright after Y=PI mapping');
+  assert.equal(retargeter.diagnostics().mappedRig, true, 'hierarchical rig is source-pose driven');
+
+  // optional forearm ต้องไม่ชดเชย head ที่หายแล้วปิด fallback ของโมเดลไม่ครบ
+  chest.remove(head);
+  const forearm = new kit.Group(); forearm.name = 'player-rig:left-forearm'; leftArm.add(forearm);
+  const optionalTarget = new kit.Group(); pivots.leftArmRoot.add(optionalTarget);
+  const incomplete = createPirateFruitRigRetargeter(host, {
+    pivots: { ...pivots, leftForearmPivot: optionalTarget }, rest,
+  }, { sourceRootName: 'player-rig:root', targetRoot: overlayRoot, sourceRestMode: 'bind' });
+  assert.equal(incomplete.diagnostics().mappedCount, 7);
+  assert.equal(incomplete.diagnostics().missingCount, 1);
+  assert.equal(incomplete.diagnostics().mappedRig, false, 'optional mapping cannot replace a required head');
+}
+
+// ใช้ขอบเขต geometry จริงตรวจว่าท่าล้มพ้นพื้น โดยไม่ขยับ actor/source ของเกม
+{
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const kit = threeFromPirateFruitVendor(vendor);
+  const actor = new kit.Group(); actor.position.set(100, 7, 100); actor.rotation.y = 0.7;
+  const source = new kit.Group(); source.name = 'player-rig:root'; actor.add(source);
+  const overlay = new kit.Group(); overlay.rotation.y = Math.PI; actor.add(overlay);
+  const body = new kit.Mesh(new kit.BoxGeometry(0.4, 1.8, 0.4), new kit.MeshStandardMaterial());
+  body.position.y = 0.9; overlay.add(body);
+  body.geometry.computeBoundingBox();
+  const Bounds = body.geometry.boundingBox.constructor;
+  const retargeter = createPirateFruitRigRetargeter(actor, { pivots: {} }, {
+    sourceRootName: 'player-rig:root', targetRoot: overlay, sourceRestMode: 'bind', keepGroundContact: true,
+  });
+  source.rotation.z = -1.42; source.position.y = -0.32;
+  retargeter.update();
+  actor.updateMatrixWorld(true);
+  const box = new Bounds().setFromObject(overlay);
+  assert.ok(Math.abs(box.min.y - 7) < 1e-9, 'ร่างล้มวางบนพื้น actor แม้โลกมีพิกัดสูงและหมุนอยู่');
+  assert.ok(box.max.x - box.min.x > 1, 'ร่างยังนอน ไม่ถูกยืดหรือหมุนกลับไปยืน');
+  const liftedY = overlay.position.y;
+  for (let frame = 0; frame < 5; frame += 1) retargeter.update();
+  assert.ok(Math.abs(overlay.position.y - liftedY) < 1e-12, 'ground offset ไม่สะสมทุกเฟรม');
+  assert.equal(source.position.y, -0.32, 'ไม่เขียนทับการเคลื่อนไหวต้นทาง');
+  assert.deepEqual(actor.position.toArray(), [100, 7, 100], 'ไม่ขยับตำแหน่ง actor/snapshot');
+  source.rotation.set(0, 0, 0); source.position.y = 0;
+  retargeter.update();
+  assert.equal(overlay.position.y, 0, 'กลับมายืนแล้วไม่ค้าง offset ท่าล้ม');
+  source.position.y = 0.45;
+  retargeter.update();
+  assert.equal(overlay.position.y, 0.45, 'ความสูงกระโดดยังตาม source เดิม');
 }
 
 console.log('V9.0 pirate-fruit rig retarget: PASS');

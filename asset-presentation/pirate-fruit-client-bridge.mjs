@@ -376,14 +376,17 @@ export async function installPirateFruitPocketPresentation({
         sourceRootName: 'player-rig:root',
         targetRoot: handle.root,
         sourceRestMode: 'bind',
+        keepGroundContact: true,
       })
       : null;
+    const sourcePoseDriven = Boolean(rigRetargeter?.diagnostics?.().mappedRig);
     visuals.push({
       host,
       handle,
       kind,
       actionTracker,
       rigRetargeter,
+      sourcePoseDriven,
       lastAction: null,
       lastX: host.position.x,
       lastZ: host.position.z,
@@ -483,6 +486,14 @@ export async function installPirateFruitPocketPresentation({
       const moving = distanceSq > 0.00002;
       item.lastX = item.host.position.x;
       item.lastZ = item.host.position.z;
+      if (item.sourcePoseDriven) {
+        item.handle.update?.(dt, {
+          moving,
+          locomotion: item.kind === 'remote' ? remoteLocomotionFor(item.host, moving) : undefined,
+        });
+        item.rigRetargeter.update();
+        continue;
+      }
       if (!item.actionTracker) {
         item.handle.update?.(dt, {
           moving,

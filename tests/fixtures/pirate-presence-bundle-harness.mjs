@@ -105,11 +105,40 @@ function compileRemotePlayerManager(bundle, classes) {
     /constructor[\s\S]*?\{([A-Za-z_$][\w$]*)\(this,"players",new Map\)/,
     'remote-player class-field helper',
   )[1];
+  // The current manager snapshots `const now = this.now()` and computes the
+  // cutoff from the module-level stale constant (`cutoff = now - STALE_MS`).
+  // Older bundles inlined the subtraction as `this.now() - STALE_MS` inside
+  // the class.  Keep the fixture coupled to the real bundle constant rather
+  // than to either minifier spelling.
   const staleLimit = requiredMatch(
-    block.source,
-    /this\.now\(\)-([A-Za-z_$][\w$]*)/,
-    'remote-player stale timeout',
+    bundle.slice(0, block.start),
+    /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*2e4\b/,
+    'remote-player stale timeout constant',
   )[1];
+  const vectorType = requiredMatch(
+    block.source,
+    /new\s+([A-Za-z_$][\w$]*)\(e\.x,e\.y,e\.z\)/,
+    'remote-player Vector3 dependency',
+  )[1];
+  const mathUtils = requiredMatch(
+    block.source,
+    /([A-Za-z_$][\w$]*)\.clamp\(r\*l/,
+    'remote-player MathUtils dependency',
+  )[1];
+  const runtimeConstants = requiredMatch(
+    bundle.slice(0, block.start),
+    new RegExp(
+      `(?:const|let|var)\\s+${staleLimit}\\s*=\\s*2e4\\s*,\\s*`
+      + `([A-Za-z_$][\\w$]*)\\s*=\\s*\\.25\\s*,\\s*`
+      + `([A-Za-z_$][\\w$]*)\\s*=\\s*24\\s*,\\s*`
+      + `([A-Za-z_$][\\w$]*)\\s*=\\s*12\\s*,\\s*`
+      + `([A-Za-z_$][\\w$]*)\\s*=\\s*60\\s*,\\s*`
+      + `([A-Za-z_$][\\w$]*)\\s*=\\s*\\.6\\b`,
+    ),
+    'remote-player runtime constants',
+  );
+  const [, extrapolationLimit, maxVelocity, teleportDistance, renderSpeed, renderProgressRate]
+    = runtimeConstants;
   const disposableTypes = requiredMatch(
     block.source,
     /instanceof ([A-Za-z_$][\w$]*)\?\([^:]+\):t instanceof ([A-Za-z_$][\w$]*)/,
@@ -118,6 +147,16 @@ function compileRemotePlayerManager(bundle, classes) {
   const parameterValues = new Map([
     [fieldHelper, defineClassField],
     [staleLimit, 20_000],
+    [vectorType, TestVector3],
+    [mathUtils, { clamp: (value, min, max) => Math.min(max, Math.max(min, value)) }],
+    [extrapolationLimit, 0.25],
+    [maxVelocity, 24],
+    [teleportDistance, 12],
+    [renderSpeed, 60],
+    // Keep the bundle's real render-only denominator.  The round-trip tests
+    // capture the wire snapshot before `manager.update(1 / 60)` and assert the
+    // animator's bounded render progress separately afterward.
+    [renderProgressRate, 0.6],
     [disposableTypes[1], class TestMesh {}],
     [disposableTypes[2], class TestSprite {}],
   ]);
@@ -175,6 +214,20 @@ export class TestVector3 {
     return this;
   }
 
+  sub(other) {
+    this.x -= other.x;
+    this.y -= other.y;
+    this.z -= other.z;
+    return this;
+  }
+
+  addScaledVector(other, scalar) {
+    this.x += other.x * scalar;
+    this.y += other.y * scalar;
+    this.z += other.z * scalar;
+    return this;
+  }
+
   multiplyScalar(value) {
     this.x *= value;
     this.y *= value;
@@ -184,6 +237,16 @@ export class TestVector3 {
 
   lengthSq() {
     return this.x * this.x + this.y * this.y + this.z * this.z;
+  }
+
+  length() {
+    return Math.sqrt(this.lengthSq());
+  }
+
+  setLength(value) {
+    const current = this.length();
+    if (current > 0) this.multiplyScalar(value / current);
+    return this;
   }
 }
 
@@ -253,6 +316,10 @@ export function seedRemotePlayer(manager, playerId, islandId, animatorEvents, no
     hitDirection: new TestVector3(),
     hitDistance: 0,
     hitUntil: 0,
+    targetVelocity: new TestVector3(),
+    renderActionIdentity: null,
+    renderAttackProgress: 0,
+    renderSkillProgress: 0,
   });
   return group;
 }

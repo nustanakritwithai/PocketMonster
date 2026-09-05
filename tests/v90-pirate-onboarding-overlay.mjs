@@ -47,7 +47,7 @@ const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-pre
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=6/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=944/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=945/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -95,7 +95,7 @@ assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board in
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=24/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=25/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
@@ -115,7 +115,7 @@ assert.equal(
   'failed NPC-name interaction module is removed',
 );
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C1tDBALO.js', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-CxUAmAqt.js', import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
   /className="interaction-prompt",this\.element\.type="button",this\.element\.addEventListener\("pointerdown",t=>\{t\.preventDefault\(\),this\.requested=!0\}\)/,
