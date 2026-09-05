@@ -92,10 +92,13 @@ function compileRemotePlayerManager(bundle, classes) {
   ));
   if (!block) throw new Error('Pirate bundle fixture could not locate the remote-player manager');
 
-  const footMarker = bundle.lastIndexOf(':"foot"', block.start);
-  const helpersStart = bundle.lastIndexOf('function ', footMarker);
-  if (footMarker < 0 || helpersStart < 0) {
-    throw new Error('Pirate bundle fixture could not locate the remote-player avatar-kind helper');
+  const defaultAnimationMarker = bundle.lastIndexOf(
+    'combatState:"idle",category:"style",onGround:!0,dashing:!1,verticalVelocity:0',
+    block.start,
+  );
+  const helpersStart = bundle.lastIndexOf('function ', defaultAnimationMarker);
+  if (defaultAnimationMarker < 0 || helpersStart < 0) {
+    throw new Error('Pirate bundle fixture could not locate the remote-player helper declaration boundary');
   }
   const fieldHelper = requiredMatch(
     block.source,
