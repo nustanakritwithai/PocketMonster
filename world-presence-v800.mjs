@@ -93,12 +93,6 @@ function createDefaultRemoteAvatar(THREE, id) {
       const moving = state?.locomotion === 'walk'
         || state?.locomotion === 'run'
         || state?.locomotion === 'swim';
-      const stride = moving ? Math.sin(animationTime * (state.locomotion === 'run' ? 14 : 9)) * .45 : 0;
-      leftLeg.rotation.x = stride;
-      rightLeg.rotation.x = -stride;
-      leftArm.rotation.x = -stride * .72;
-      rightArm.rotation.x = stride * .72;
-
       const combatState = state?.combatState || 'idle';
       const attacking = combatState === 'attack1'
         || combatState === 'attack2'
@@ -107,11 +101,23 @@ function createDefaultRemoteAvatar(THREE, id) {
       const casting = combatState === 'casting';
       const blocking = combatState === 'blocking';
       const stunned = combatState === 'stunned' || combatState === 'knockback';
-      body.rotation.z = attacking ? Math.sin(animationTime * 18) * .18 : casting ? -.14 : 0;
+      const verticalVelocity = Number(state?.verticalVelocity) || 0;
+      const jumping = state?.onGround === false && verticalVelocity > .5;
+      const falling = state?.onGround === false && verticalVelocity < -.5;
+      const landing = state?.onGround === true && Number.isInteger(state?.hitReactionId);
+      const dashing = state?.dashing === true || state?.skillAnimationType === 'dash';
+      const stride = moving ? Math.sin(animationTime * (state.locomotion === 'run' ? 14 : 9)) * .45 : 0;
+      leftLeg.rotation.x = jumping ? -.55 : falling ? .65 : dashing ? -.22 : stride;
+      rightLeg.rotation.x = jumping ? -.55 : falling ? .65 : dashing ? -.22 : -stride;
+      leftArm.rotation.x = jumping ? -.4 : falling ? .45 : dashing ? -.5 : -stride * .72;
+      rightArm.rotation.x = jumping ? -.4 : falling ? .45 : dashing ? -.5 : stride * .72;
+      body.rotation.x = jumping ? -.16 : falling ? .18 : landing ? .16 : dashing ? .1 : 0;
+      body.rotation.z = attacking ? Math.sin(animationTime * 18) * .18 : casting ? -.14 : dashing ? .2 : 0;
       leftArm.rotation.z = attacking ? -.8 : casting ? -.55 : blocking ? -.35 : 0;
       rightArm.rotation.z = attacking ? .8 : casting ? .55 : blocking ? .35 : 0;
       head.rotation.z = stunned ? Math.sin(animationTime * 30) * .12 : 0;
       root.rotation.z = combatState === 'knockdown' || combatState === 'dead' ? -.9 : 0;
+      root.rotation.x = jumping ? -.08 : falling ? .08 : 0;
       root.userData.remoteAnimationState = state;
     },
   };

@@ -105,6 +105,17 @@ controller.update(.1);
 assert.equal(avatar.userData.remoteAnimationState.combatState, 'casting', 'default avatar renderer consumes canonical combat state');
 assert.equal(avatar.userData.remoteAnimationState.locomotion, 'walk', 'default avatar renderer consumes canonical locomotion');
 
+for (const [label, animation] of [
+  ['jump', { combatState: 'idle', category: 'style', onGround: false, verticalVelocity: 8 }],
+  ['fall', { combatState: 'idle', category: 'style', onGround: false, verticalVelocity: -8 }],
+  ['land', { combatState: 'idle', category: 'style', onGround: true, verticalVelocity: 0, hitReactionId: 1 }],
+  ['dash', { combatState: 'idle', category: 'utility', onGround: true, dashing: true, verticalVelocity: 0, skillAnimationType: 'dash' }],
+]) {
+  controller.acceptSnapshot({ zone: 'hub', players: [{ id: 'player-b', x: 1, z: 2, dir: .4, locomotion: 'idle', animation }] });
+  controller.update(.1);
+  assert.ok(Math.abs(avatar.children[0].rotation.x || 0) > .02, `default avatar renderer changes the rig for ${label}`);
+}
+
 const animatorEvents = [];
 avatar.userData.remoteAnimator = {
   update(deltaSeconds, state) {
