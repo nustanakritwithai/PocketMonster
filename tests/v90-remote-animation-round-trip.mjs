@@ -195,23 +195,87 @@ check('duplicate player entries are bounded and first-wins', () => {
   assert.equal(snapshot.players[0].name, 'First');
   assert.equal(snapshot.players[0].x, 1);
 });
-check('duplicate action snapshots retain one stable action identity at the animator boundary', () => {
-  const receiver = createReceiver();
-  const snapshot = sanitizePirateWorldSnapshot(snapshotFromPublishedFrame({
+function actionSnapshot({
+  session = 'session_a_20260905',
+  sequence,
+  progress,
+}) {
+  return sanitizePirateWorldSnapshot(snapshotFromPublishedFrame({
     zone: PRESENCE_ZONE,
     ...shortAttackSample,
-    animation: shortAttackWireAnimation,
+    animation: {
+      ...shortAttackSample.animation,
+      attackProgress: progress,
+      actionSessionId: session,
+      actionSequence: sequence,
+      actionDurationMs: 750,
+    },
   }));
-  sendSnapshot(receiver, snapshot);
-  sendSnapshot(receiver, snapshot);
-  const states = receiver.animatorEvents.slice(-2).map(event => event.state);
-  assert.equal(states.length, 2);
-  assert.deepEqual(
-    states.map(state => [state.actionSessionId, state.actionSequence]),
-    [['session_a_20260905', 1], ['session_a_20260905', 1]],
-    'a duplicate must not acquire a fresh action identity before the production animator sees it',
-  );
+}
+
+function animatorObservation(receiver, label) {
+  const state = receiver.animatorEvents.at(-1)?.state;
+  return [label, state?.actionSessionId, state?.actionSequence, state?.attackProgress];
+}
+
+check('animator identity is high-water deduped and lifecycle-scoped', () => {
+  const observations = [];
+  const receiver = createReceiver();
+  sendSnapshot(receiver, actionSnapshot({ sequence: 1, progress: 0.1 }));
+  observations.push(animatorObservation(receiver, 'seq1'));
+  sendSnapshot(receiver, actionSnapshot({ sequence: 1, progress: 0.2 }));
+  observations.push(animatorObservation(receiver, 'duplicate-progress'));
+  sendSnapshot(receiver, actionSnapshot({ sequence: 2, progress: 0.3 }));
+  observations.push(animatorObservation(receiver, 'seq2'));
+  sendSnapshot(receiver, actionSnapshot({ sequence: 1, progress: 0.9 }));
+  observations.push(animatorObservation(receiver, 'delayed-seq1'));
+  sendSnapshot(receiver, actionSnapshot({
+    session: 'session_b_20260905',
+    sequence: 1,
+    progress: 0.4,
+  }));
+  observations.push(animatorObservation(receiver, 'new-session'));
   receiver.runtime.dispose();
+
+  const removed = createReceiver();
+  sendSnapshot(removed, actionSnapshot({ sequence: 2, progress: 0.4 }));
+  sendSnapshot(removed, sanitizePirateWorldSnapshot({ zone: PRESENCE_ZONE, players: [] }));
+  seedRemotePlayer(removed.manager, REMOTE_PLAYER_ID, ISLAND_ID, removed.animatorEvents, removed.clock.now);
+  sendSnapshot(removed, actionSnapshot({ sequence: 1, progress: 0.5 }));
+  observations.push(animatorObservation(removed, 'after-removal'));
+  removed.runtime.dispose();
+
+  const zoned = createReceiver();
+  sendSnapshot(zoned, actionSnapshot({ sequence: 2, progress: 0.4 }));
+  zoned.islandRef.current = 'azure-frost';
+  zoned.clock.now += 100;
+  zoned.runtime.update();
+  zoned.islandRef.current = ISLAND_ID;
+  zoned.clock.now += 100;
+  zoned.runtime.update();
+  seedRemotePlayer(zoned.manager, REMOTE_PLAYER_ID, ISLAND_ID, zoned.animatorEvents, zoned.clock.now);
+  sendSnapshot(zoned, actionSnapshot({ sequence: 1, progress: 0.6 }));
+  observations.push(animatorObservation(zoned, 'after-zone'));
+  zoned.runtime.dispose();
+
+  const disposed = createReceiver();
+  sendSnapshot(disposed, actionSnapshot({ sequence: 2, progress: 0.4 }));
+  disposed.runtime.dispose();
+  const reconnected = createReceiver();
+  sendSnapshot(reconnected, actionSnapshot({ sequence: 1, progress: 0.7 }));
+  observations.push(animatorObservation(reconnected, 'after-dispose'));
+  reconnected.runtime.dispose();
+
+  assert.deepEqual(observations, [
+    ['seq1', 'session_a_20260905', 1, 0.1],
+    ['duplicate-progress', 'session_a_20260905', 1, 0.2],
+    ['seq2', 'session_a_20260905', 2, 0.3],
+    ['delayed-seq1', 'session_a_20260905', 2, 0.3],
+    ['new-session', 'session_b_20260905', 1, 0.4],
+    ['after-removal', 'session_a_20260905', 1, 0.5],
+    ['after-zone', 'session_a_20260905', 1, 0.6],
+    ['after-dispose', 'session_a_20260905', 1, 0.7],
+  ]);
 });
 
 check('invalid input fails closed without poisoning a valid snapshot', () => {
