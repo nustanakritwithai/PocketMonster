@@ -20,6 +20,24 @@ const SERVER_RELEASE = Object.freeze({
   builtAtUtc: '2026-08-31T00:00:00Z',
 });
 
+const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const pagesWorkflow = fs.readFileSync(new URL('../.github/workflows/github-pages.yml', import.meta.url), 'utf8');
+const firebaseWorkflow = fs.readFileSync(new URL('../.github/workflows/firebase-hosting-merge.yml', import.meta.url), 'utf8');
+for (const testFile of [
+  'remote-animation-protocol-baseline.mjs',
+  'remote-animation-world-publisher.mjs',
+  'v90-remote-animation-round-trip.mjs',
+]) {
+  assert.match(packageJson.scripts['test:remote-animation'], new RegExp(testFile.replace('.', '\\.') ));
+}
+assert.match(packageJson.scripts.check, /npm run test:remote-animation/, 'default check gates remote animation regressions');
+assert.match(pagesWorkflow, /npm run test:remote-animation/, 'Pages deploy gates remote animation regressions');
+assert.match(firebaseWorkflow, /npm run test:remote-animation/, 'Firebase deploy gates remote animation regressions');
+assert.ok(
+  PAGES_LIVE_SMOKE_FILES.includes('pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js'),
+  'live verifier hashes the entry-referenced onboarding chunk',
+);
+
 function runtimeConfig(overrides = {}, configOverrides = {}) {
   return {
     configVersion: 1,

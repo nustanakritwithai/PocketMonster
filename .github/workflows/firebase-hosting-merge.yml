@@ -51,6 +51,7 @@ jobs:
           node tests/deployment-runtime-config.mjs
           node tests/production-launch-workflows.mjs
           node tests/v90-deployment-gates.mjs
+          npm run test:remote-animation
           npm run test:v90:pirate-player
           node scripts/build-firebase-launcher.mjs
           node tests/hosting-architecture.mjs

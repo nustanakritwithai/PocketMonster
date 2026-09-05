@@ -45,6 +45,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/assets/MistJungleIsland-DqvztBUJ.js',
   'pirate-fruit-offline/assets/SunscarDesertIsland-CSW2q1xT.js',
   'pirate-fruit-offline/assets/TempestSkyIsland-DxscI_sr.js',
+  'pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js',
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
 ]);
 
