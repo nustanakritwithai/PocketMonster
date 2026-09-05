@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "node tests/check-active-syntax.mjs && node tests/launch-ticket-bootstrap.mjs && node tests/launch-security-artifacts.mjs && node tests/patch-updater.mjs && node tests/chat-ui-layout.mjs && node tests/world-presence-protocol.mjs && npm run test:remote-animation",
-    "test:remote-animation": "node tests/remote-animation-protocol-baseline.mjs && node tests/remote-animation-world-publisher.mjs && node tests/v90-remote-animation-round-trip.mjs",
+    "test:remote-animation": "node tests/remote-animation-protocol-baseline.mjs && node tests/remote-animation-world-publisher.mjs && node tests/v90-remote-animation-round-trip.mjs && node tests/v90-world-presence-avatars.mjs",
     "manifest": "node tests/workspace-manifest.mjs",
     "build:pages": "node scripts/build-github-pages.mjs && node tests/v91-combat-artifact.mjs",
     "build:launcher": "node scripts/build-firebase-launcher.mjs",

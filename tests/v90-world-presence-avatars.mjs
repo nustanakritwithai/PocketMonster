@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { createWorldPresenceController } from '../world-presence-v800.mjs';
+import { createWorldPresenceController, installWorldPresence } from '../world-presence-v800.mjs';
 
 class Position {
   constructor(x = 0, y = 0, z = 0) { this.set(x, y, z); }
@@ -90,8 +90,113 @@ assert.ok(avatar, 'a same-zone remote snapshot creates a 3D avatar in the active
 assert.deepEqual([avatar.position.x, avatar.position.y, avatar.position.z], [1, 0, 2]);
 assert.equal(avatar.rotation.y, .4);
 assert.equal(avatar.children.length, 6, 'remote avatar has a visible blocky humanoid body');
+assert.equal(typeof avatar.userData.remoteAnimator?.update, 'function', 'default Pocket/Living avatar exposes a remote animator');
 const marker = domNodes.find(node => node.className === 'remote-world-player');
 assert.equal(marker?.textContent, 'Player B');
+
+controller.acceptSnapshot({
+  zone: 'hub',
+  players: [{
+    id: 'player-b', x: 1, z: 2, dir: .4, locomotion: 'walk',
+    animation: { combatState: 'casting', category: 'fruit', onGround: true, dashing: false, verticalVelocity: 0 },
+  }],
+});
+controller.update(.1);
+assert.equal(avatar.userData.remoteAnimationState.combatState, 'casting', 'default avatar renderer consumes canonical combat state');
+assert.equal(avatar.userData.remoteAnimationState.locomotion, 'walk', 'default avatar renderer consumes canonical locomotion');
+
+const animatorEvents = [];
+avatar.userData.remoteAnimator = {
+  update(deltaSeconds, state) {
+    animatorEvents.push({ deltaSeconds, state });
+  },
+};
+controller.acceptSnapshot({
+  zone: 'hub',
+  players: [{
+    id: 'player-b',
+    name: 'Player B',
+    x: 4,
+    z: 5,
+    dir: 1,
+    locomotion: 'run',
+    animation: {
+      combatState: 'attack2',
+      category: 'sword',
+      onGround: true,
+      dashing: false,
+      verticalVelocity: 0,
+      attackProgress: .4,
+      actionSessionId: 'session_hub_1',
+      actionSequence: 1,
+      actionDurationMs: 80,
+    },
+  }],
+});
+controller.update();
+assert.equal(animatorEvents.at(-1)?.state.combatState, 'attack2', 'canonical action state reaches the remote animator');
+assert.equal(animatorEvents.at(-1)?.state.locomotion, 'run', 'locomotion is routed with the action state');
+
+const originalNow = Date.now;
+let now = originalNow();
+Date.now = () => now;
+try {
+  controller.acceptSnapshot({
+    zone: 'hub',
+    players: [{
+      id: 'player-b', x: 4, z: 5, dir: 1,
+      animation: {
+        combatState: 'attack1', category: 'style', onGround: true, dashing: false, verticalVelocity: 0,
+        actionSessionId: 'session_expiry', actionSequence: 1, actionDurationMs: 80,
+      },
+    }],
+  });
+  now += 300;
+  controller.update();
+  assert.equal(avatar.userData.remoteAnimation.combatState, 'idle', 'expired action returns to neutral animation');
+  controller.acceptSnapshot({
+    zone: 'hub',
+    players: [{
+      id: 'player-b', x: 4, z: 5, dir: 1,
+      animation: {
+        combatState: 'attack1', category: 'style', onGround: true, dashing: false, verticalVelocity: 0,
+        actionSessionId: 'session_expiry', actionSequence: 1, actionDurationMs: 80,
+      },
+    }],
+  });
+  assert.equal(avatar.userData.remoteAnimation.combatState, 'idle', 'late retransmission of an expired identity is ignored');
+  controller.acceptSnapshot({
+    zone: 'hub',
+    players: [{
+      id: 'player-b', x: 4, z: 5, dir: 1,
+      animation: {
+        combatState: 'attack2', category: 'sword', onGround: true, dashing: false, verticalVelocity: 0,
+        actionSessionId: 'session_highwater', actionSequence: 2, actionDurationMs: 750,
+      },
+    }],
+  });
+  controller.update();
+  controller.acceptSnapshot({
+    zone: 'hub',
+    players: [{
+      id: 'player-b', x: 4, z: 5, dir: 1,
+      animation: {
+        combatState: 'attack1', category: 'sword', onGround: true, dashing: false, verticalVelocity: 0,
+        actionSessionId: 'session_highwater', actionSequence: 1, actionDurationMs: 750,
+      },
+    }],
+  });
+  assert.equal(avatar.userData.remoteAnimation.combatState, 'attack2', 'lower sequence in the active session cannot rewind the remote action');
+} finally {
+  Date.now = originalNow;
+}
+
+controller.acceptSnapshot({
+  zone: 'hub',
+  players: [{ id: 'far-player', name: 'Far', x: 999999, z: -999999, dir: 0 }],
+});
+const farAvatar = scene.children.find(node => node.name === 'remote-world-player:far-player');
+assert.deepEqual([farAvatar.position.x, farAvatar.position.z], [10000, -10000], 'direct presence ingress clamps remote coordinates');
 
 controller.acceptSnapshot({
   zone: 'hub',
@@ -111,4 +216,23 @@ assert.ok(geometries.every(geometry => geometry.disposed), 'departed avatar geom
 assert.equal(marker.removed, true, 'departed player name marker is removed');
 
 controller.dispose();
+
+const previousWindow = globalThis.window;
+globalThis.window = new EventTarget();
+const stopPresence = installWorldPresence({
+  THREE,
+  scene,
+  getCamera: () => ({}),
+  getZone: () => 'hub',
+});
+assert.equal(typeof globalThis.window.POCKETMONSTER_WORLD_PRESENCE, 'function');
+globalThis.window.POCKETMONSTER_WORLD_PRESENCE({
+  zone: 'hub',
+  players: [{ id: 'reconnect-player', x: 1, z: 2, dir: 0 }],
+});
+assert.equal(scene.children.some(node => node.name === 'remote-world-player:reconnect-player'), true);
+globalThis.window.dispatchEvent(new CustomEvent('pocketmonster:world-socket-status', { detail: { connected: false } }));
+assert.equal(scene.children.some(node => node.name === 'remote-world-player:reconnect-player'), false, 'disconnect clears direct-world remote avatars immediately');
+stopPresence();
+globalThis.window = previousWindow;
 console.log('V9 world presence remote avatars: PASS');

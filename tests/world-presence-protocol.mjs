@@ -101,6 +101,11 @@ assert.deepEqual(
   { zone: 'pirate-fruit', x: 1, y: 2.5, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack2', category: 'sword', onGround: true, dashing: true, verticalVelocity: 0, attackProgress: .5 } },
 );
 assert.equal(buildWorldPosFrame({ zone: 'hub', x: 1, y: 20000, z: 2, dir: 0 }).y, 10000, 'height is bounded');
+assert.deepEqual(
+  buildWorldPosFrame({ zone: 'hub', x: 20000, y: 0, z: -20000, dir: 0 }),
+  { zone: 'hub', x: 10000, y: 0, z: -10000, dir: 0, locomotion: 'idle', animation: null },
+  'world coordinates are bounded at the shared protocol ingress',
+);
 assert.equal('y' in buildWorldPosFrame({ zone: 'hub', x: 1, y: Number.NaN, z: 2, dir: 0 }), false, 'invalid optional height is omitted');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [] }, 'pirate-fruit'), null);
 

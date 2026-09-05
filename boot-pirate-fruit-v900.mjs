@@ -136,7 +136,12 @@ function bindPocketMonsterLink(frame) {
     forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
   });
   window.addEventListener('pocketmonster:world-socket-status', event => {
-    forwardPresenceStatus(event.detail?.connected === true);
+    const connected = event.detail?.connected === true;
+    if (!connected) {
+      latestPresenceSnapshot = null;
+      forwardPresence({ zone: PIRATE_PRESENCE_ZONE, players: [] });
+    }
+    forwardPresenceStatus(connected);
   });
   publishWorldState({
     getZone: () => 'pirate-fruit',

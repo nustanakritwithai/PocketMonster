@@ -109,8 +109,8 @@ export function sanitizeOnlineWorldPose(value) {
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
   const pose = {
     zone,
-    x: value.x,
-    z: value.z,
+    x: clamp(value.x, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT),
+    z: clamp(value.z, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT),
     dir: value.dir,
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
@@ -137,8 +137,8 @@ export function sanitizePresencePlayer(candidate, seen = null) {
     name: typeof candidate.name === 'string'
       ? candidate.name.trim().slice(0, MAX_PLAYER_NAME_LENGTH) || 'ผู้เล่นออนไลน์'
       : 'ผู้เล่นออนไลน์',
-    x: candidate.x,
-    z: candidate.z,
+    x: clamp(candidate.x, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT),
+    z: clamp(candidate.z, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT),
     dir: isFiniteNumber(candidate.dir) ? candidate.dir : 0,
     locomotion: sanitizeLocomotion(candidate.locomotion),
     animation: sanitizeAnimation(candidate.animation),
