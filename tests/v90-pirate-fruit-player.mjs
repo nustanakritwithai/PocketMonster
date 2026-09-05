@@ -280,7 +280,7 @@ assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
 assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-parent-primary');
 assert.equal(pirateSource.ref, 'codex/remote-animation-sol-20260905');
-assert.equal(pirateSource.commit, '4015039e84254713070c1811a4738eed643551de');
+assert.equal(pirateSource.commit, '39a4809c5d1ea753f6e0a7da0f9c86761ba8ac77');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket');

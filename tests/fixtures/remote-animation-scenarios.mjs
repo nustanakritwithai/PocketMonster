@@ -56,7 +56,7 @@ export const shortAttackWireAnimation = Object.freeze({
   ...shortAttackSample.animation,
   actionSessionId: 'session_a_20260905',
   actionSequence: 1,
-  actionDurationMs: 750,
+  actionDurationMs: 1000,
 });
 
 export const idleAfterShortAttack = Object.freeze({
@@ -77,8 +77,8 @@ export const idleAfterShortAttack = Object.freeze({
 export const shortActionTimeline = Object.freeze([
   Object.freeze({ atMs: 0, pose: shortAttackSample }),
   Object.freeze({ atMs: 100, pose: idleAfterShortAttack }),
-  Object.freeze({ atMs: 700, pose: idleAfterShortAttack }),
-  Object.freeze({ atMs: 800, pose: idleAfterShortAttack }),
+  Object.freeze({ atMs: 950, pose: idleAfterShortAttack }),
+  Object.freeze({ atMs: 1050, pose: idleAfterShortAttack }),
 ]);
 
 export const richCastingSample = Object.freeze({
@@ -108,7 +108,7 @@ export const richCastingWireAnimation = Object.freeze({
   ...richCastingSample.animation,
   actionSessionId: 'session_a_20260905',
   actionSequence: 1,
-  actionDurationMs: 750,
+  actionDurationMs: 1000,
 });
 
 /**

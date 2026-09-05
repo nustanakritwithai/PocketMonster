@@ -39,7 +39,7 @@ const required = new Set([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
-  'pirate-fruit-offline/assets/index-D9QIDu6v.js',
+  'pirate-fruit-offline/assets/index-C1tDBALO.js',
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
   'assets/catalog/humanoid-core.json',
 ]);

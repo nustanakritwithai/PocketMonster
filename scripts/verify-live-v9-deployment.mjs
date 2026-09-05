@@ -39,7 +39,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-D9QIDu6v.js',
+  'pirate-fruit-offline/assets/index-C1tDBALO.js',
   'pirate-fruit-offline/assets/AzureFrostIsland-YXfE4fb3.js',
   'pirate-fruit-offline/assets/EmberVolcanoIsland-7TjfvXZj.js',
   'pirate-fruit-offline/assets/MistJungleIsland-DqvztBUJ.js',
@@ -216,7 +216,7 @@ async function verifyPages(options, runtimeConfig) {
   }
   const pirateBootstrap = bodies.get('pirate-fruit-offline/pocket-bootstrap.mjs');
   if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
-    || !pirateBootstrap.includes("await import('./assets/index-D9QIDu6v.js')")) {
+    || !pirateBootstrap.includes("await import('./assets/index-C1tDBALO.js')")) {
     throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
   }
   return { runtimeConfig, manifest };

@@ -1,11 +1,11 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
   "ref": "codex/remote-animation-sol-20260905",
-  "commit": "4015039e84254713070c1811a4738eed643551de",
+  "commit": "39a4809c5d1ea753f6e0a7da0f9c86761ba8ac77",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client built from the pinned read-only presence source plus presentation-only remote animation relay. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral pose, locomotion, height, animation and bounded short-action identity only, while Pocket overlays asset-engine visuals without replacing the client.",
+  "note": "Playable Pirate Fruit client built from the pinned read-only presence source plus presentation-only remote animation relay. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral pose, locomotion, height, animation and bounded short-action identity only, while Pocket overlays asset-engine visuals without replacing the client. Includes verified remote defeat/respawn visibility and long-skill timeline continuity.",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",

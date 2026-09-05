@@ -115,7 +115,7 @@ assert.equal(
   'failed NPC-name interaction module is removed',
 );
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-D9QIDu6v.js', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C1tDBALO.js', import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
   /className="interaction-prompt",this\.element\.type="button",this\.element\.addEventListener\("pointerdown",t=>\{t\.preventDefault\(\),this\.requested=!0\}\)/,

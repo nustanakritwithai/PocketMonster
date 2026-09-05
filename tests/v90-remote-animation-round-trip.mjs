@@ -167,7 +167,7 @@ check('short canonical attack reaches the real remote animator boundary', () => 
   assert.equal(animatorState?.attackProgress, 0.35);
   assert.equal(animatorState?.actionSessionId, 'session_a_20260905');
   assert.equal(animatorState?.actionSequence, 1);
-  assert.equal(animatorState?.actionDurationMs, 750);
+  assert.equal(animatorState?.actionDurationMs, 1000);
   assert.equal(actionReceiver.manager.players.get(REMOTE_PLAYER_ID)?.target.y, shortAttackSample.y);
 });
 actionReceiver.runtime.dispose();
@@ -354,14 +354,14 @@ check('reconnect starts without a stale avatar or stale listener', () => {
   second.runtime.dispose();
 });
 
-check('100 ms action is latched for at least 750 ms, then returns to current idle', () => {
+check('100 ms action is latched through 950 ms and releases after 1000 ms', () => {
   const frames = publishTimeline(shortActionTimeline);
   assert.equal(frames.length, shortActionTimeline.length);
   for (const index of [0, 1, 2]) {
     assert.equal(frames[index].animation?.combatState, 'attack1', `latched frame ${index} keeps the short attack`);
     assert.equal(frames[index].animation?.actionSessionId, 'session_a_20260905');
     assert.equal(frames[index].animation?.actionSequence, 1);
-    assert.equal(frames[index].animation?.actionDurationMs, 750);
+    assert.equal(frames[index].animation?.actionDurationMs, 1000);
   }
   assert.equal(frames[3].animation?.combatState, 'idle', 'publisher releases the latch after the minimum window');
   assert.equal('actionSessionId' in frames[3].animation, false);

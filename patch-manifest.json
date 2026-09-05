@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.e2e85a906058",
+  "buildId": "8.4.0.content.a064ed1005a8",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-05T13:02:04.006Z",
+  "publishedAtUtc": "2026-09-05T17:30:28.347Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -292,8 +292,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 10564,
-      "sha256": "818d3d5e7795b583a2d3d943a48a5189f82d7dff09ffc601c6a4bdae5a1be0a4"
+      "size": 10730,
+      "sha256": "1f19b1dd782d3148dd91915e6f1745c2ba79aceba9e54d51ee1acdd4c8c7e6e1"
     },
     {
       "path": "boss-challenge.mjs",
@@ -626,19 +626,19 @@
       "sha256": "a81a1d12e0d4897fae9dcd160a7bc3aae74d278490164e3ffdceb719e9237a20"
     },
     {
-      "path": "pirate-fruit-offline/assets/AzureFrostIsland-YXfE4fb3.js",
+      "path": "pirate-fruit-offline/assets/AzureFrostIsland-CC7UzWdw.js",
       "size": 5201,
-      "sha256": "dbf3d5182eed17faf4ca3e0d0405df0a19eb1acfabdfbec52575c59dfc0ebd02"
+      "sha256": "1517a66333b3dbd229eae788a79f77d466bcc5ecea8fa0b5c940e783ac023991"
     },
     {
-      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-7TjfvXZj.js",
+      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-BBgr5zRf.js",
       "size": 6479,
-      "sha256": "ae77ee8268b5ff29e65fac49d95ead2ea9a505b61dac56837f8d9fc05210e279"
+      "sha256": "8f55f4f1a9b79faa068a288abf878859f990b07d0d7b85cd68be49e66321f37f"
     },
     {
-      "path": "pirate-fruit-offline/assets/MistJungleIsland-DqvztBUJ.js",
+      "path": "pirate-fruit-offline/assets/MistJungleIsland-DYlCyhXl.js",
       "size": 6126,
-      "sha256": "26fa254c0ce71d96489ef6d0d6bd38de7e719bb901c29de362d8c5db2745fd4d"
+      "sha256": "6ccb340e59427ee56d98b73f30d4a131eb7de3a3ad3c3246378780ec268f86f7"
     },
     {
       "path": "pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js",
@@ -646,19 +646,19 @@
       "sha256": "06bbfe336727de437932112f49321d1927ed7b998638b81d1c88da1294c3cb92"
     },
     {
-      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-CSW2q1xT.js",
+      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-hue69tmX.js",
       "size": 6375,
-      "sha256": "84cc3386f56fae33136588587153dfc557c3317dce75dec07c6eba478923449a"
+      "sha256": "6b68d20d7f7a56a9fe5ba41157d1a4fb8999e5894291619fbed9b4f0654f8d36"
     },
     {
-      "path": "pirate-fruit-offline/assets/TempestSkyIsland-DxscI_sr.js",
+      "path": "pirate-fruit-offline/assets/TempestSkyIsland-wPhUuh4s.js",
       "size": 5411,
-      "sha256": "b2485a7c3697b6448da7a67b279a4499d61c80645690fa8d94911bfc6e7e5021"
+      "sha256": "845b283d0a412cf420ec9f7a43c60c36ca946f71fbb999c5dffcc5bbf6df2af2"
     },
     {
-      "path": "pirate-fruit-offline/assets/index-D9QIDu6v.js",
-      "size": 1102617,
-      "sha256": "8d95c43790d548a7f5588afb3d78a76fc99520bc248cf42c32e363e96b06542e"
+      "path": "pirate-fruit-offline/assets/index-C1tDBALO.js",
+      "size": 1103126,
+      "sha256": "b09cafbf91a466044e3d93d6f85c2cc06dfdf374e18368a4c312cae07273030b"
     },
     {
       "path": "pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js",
@@ -673,7 +673,7 @@
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
       "size": 158,
-      "sha256": "b48880794ef5fcce77324d139148578161cf4ef6f69f4777e791e11c9cc18142"
+      "sha256": "bd47d7906af0090e8433f7cd33498955bc573409d4195707362492a0373d83d3"
     },
     {
       "path": "pirate-fruit-offline/pocket-presentation.mjs",
@@ -967,13 +967,13 @@
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 8855,
-      "sha256": "595436abf5ef298bedba9633dac1e723fda9c07e7661a73a02d6f59e434dd944"
+      "size": 9103,
+      "sha256": "e4a481b7d7de60af13b3b8711b43662da0502ec81e433dbcd86da06a5ac0cef3"
     },
     {
       "path": "world-presence-v800.mjs",
-      "size": 9006,
-      "sha256": "cc2bb203cf3fb861824b29afc9e0edab834bfcd9d84be95d4c208351a0b5eea3"
+      "size": 14823,
+      "sha256": "19724859b2d25b3d239397a2734c35b4b3fec7409ae50966c1adb8ee49caa71c"
     },
     {
       "path": "worlds-v900.mjs",
