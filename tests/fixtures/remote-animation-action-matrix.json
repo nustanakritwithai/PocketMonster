@@ -1,0 +1,19 @@
+{
+  "contractStatus": "accepted-sol-g1",
+  "browserEvidence": "not-tested-by-team",
+  "rows": [
+    { "action": "walk-run-turn-stop", "candidateStatus": "pending-candidate" },
+    { "action": "jump-fall-land", "candidateStatus": "pending-candidate" },
+    { "action": "dash", "candidateStatus": "pending-candidate" },
+    { "action": "attack1", "candidateStatus": "pending-candidate" },
+    { "action": "attack2", "candidateStatus": "pending-candidate" },
+    { "action": "attack3", "candidateStatus": "pending-candidate" },
+    { "action": "attack4", "candidateStatus": "pending-candidate" },
+    { "action": "casting", "candidateStatus": "pending-candidate" },
+    { "action": "blocking", "candidateStatus": "pending-candidate" },
+    { "action": "stunned", "candidateStatus": "pending-candidate" },
+    { "action": "knockback", "candidateStatus": "pending-candidate" },
+    { "action": "knockdown", "candidateStatus": "pending-candidate" },
+    { "action": "dead", "candidateStatus": "pending-candidate" }
+  ]
+}

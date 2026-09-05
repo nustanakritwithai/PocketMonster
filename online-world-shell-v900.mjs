@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=945';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=946';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=2';
+} from './online-world-bridge-v900.mjs?v=3';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -557,7 +557,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
+await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-6');
 unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
 installUnifiedHud();
 unifiedHud.setExpanded(false);

@@ -20,7 +20,7 @@ export const activeEntryName = withoutQuery(activeEntryRef);
 export const activeEntryUrl = new URL(activeEntryName, rootUrl);
 export const activeEntry = fs.readFileSync(activeEntryUrl, 'utf8');
 const gameImport = activeEntry.match(/import\(['"]([^'"]+game-v800\.js(?:\?[^'"]*)?)['"]\)/)
-  || (activeEntryName === 'entry-preload-v900.mjs' ? [null, './game-v800.js?v=827'] : null);
+  || (activeEntryName === 'entry-preload-v900.mjs' ? [null, './game-v800.js?v=828'] : null);
 if (!gameImport) throw new Error('active preload does not declare the authenticated game import');
 export const activeJsRef = gameImport[1];
 export const activeJsName = withoutQuery(activeJsRef);

@@ -26,17 +26,17 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=943',
+    runtime: './boot-pirate-fruit-v900.mjs?v=944',
   }),
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=827',
+    runtime: './game-v800.js?v=828',
   }),
   Object.freeze({
     world: 'living-world',
     panel: 'human',
-    runtime: './world-living-v900.mjs?v=904',
+    runtime: './world-living-v900.mjs?v=905',
   }),
 ]);
 const worldRuntimePaths = new Set(worldCases.map(item => new URL(item.runtime, 'https://game.example/').pathname));

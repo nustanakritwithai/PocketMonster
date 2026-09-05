@@ -4,7 +4,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
-import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=2';
+import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=3';
 
 export const LIVING_WORLD_VERSION = '9.0.1-living-world-portal';
 export const LIVING_WORLD_ID = 'living-world';

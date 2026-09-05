@@ -30,14 +30,14 @@ assert.ok(liveHtml.indexOf('id="chatToggleBtn"') < liveHtml.indexOf('<div id="hu
 assert.ok(html.indexOf('id="chatToggleBtn"') < html.indexOf('<div id="hud">'), 'V9 chat toggle stays outside #hud');
 assert.match(html, /id="gameChat"/, 'V9 combined entry ships the player chat panel');
 assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-presence-protocol-owner/, 'live preload cache-busts the top-right chat');
-assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-presence-protocol-owner[\s\S]*game-v800\.js\?v=818/, 'legacy preload binds chat before game overlays');
+assert.match(preload, /chat-runtime\.mjs\?v=8\.4\.0-presence-protocol-owner-2[\s\S]*game-v800\.js\?v=819/, 'legacy preload binds chat before game overlays');
 assert.doesNotMatch(liveJs, /bindMobileDualPointerInput\(/, 'Pocket runtime does not create a second pointer lifecycle');
 assert.match(liveJs, /registerAdapter\('pocket-monster'/, 'Pocket movement and camera register with the parent control lifecycle');
 assert.match(unifiedControls, /onJoystickStart:[\s\S]*onCameraStart:/, 'parent joystick and camera keep independent pointer channels');
 assert.match(launcher, /ONLINE_CONFIG_REQUIRED/, 'Firebase launcher fails closed when launch-ticket mode is unavailable');
 assert.doesNotMatch(launcher, /loadLegacyGame|chat-runtime|game-v800/, 'Firebase launcher cannot boot a second legacy game/session path');
 assert.doesNotMatch(launcher, /LAUNCH_TICKET_QA_ONLY/, 'ticket admission errors stay visible instead of silently entering a local game');
-assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-5'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
+assert.match(shellJs, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-6'\)/, 'persistent V9 shell owns the one presence-aware chat transport');
 assert.match(worldsJs, /POCKETMONSTER_SCENE_EMBEDDED !== true[\s\S]*chat-runtime/, 'standalone compatibility path may mount chat but hosted scenes skip it');
 assert.doesNotMatch(sceneEntryJs, /chat-runtime|new WebSocket|prepareLaunch/, 'hosted scene entry cannot create another socket or login bootstrap');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'V9 starts in Pirate Fruit then warps into Pocket Monster');
@@ -57,7 +57,7 @@ assert.match(liveJs, /text\.textContent='1\/3 ไป Grass Meadow'/, 'Ranch Hub 
 assert.doesNotMatch(liveJs, /if\(!STAGE_BY_ID\[state\.currentZone\]\)\{panel\.classList\.add\('hidden'\);return;\}/, 'Ranch Hub no longer hides the quest tracker');
 assert.match(boot, /publishWorldState\(/, 'real pirate world publishes WORLD_STATE');
 assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'pirate presence uses the pirate-fruit zone id');
-assert.match(livingJs, /from '\.\/world-presence-v800\.mjs\?v=2'/, 'living world uses the cache-busted shared presence helper');
+assert.match(livingJs, /from '\.\/world-presence-v800\.mjs\?v=3'/, 'living world uses the cache-busted shared presence helper');
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
 assert.match(livingJs, /pocketmonster:world-warp-v1/, 'Living World returns directly to Pirate Fruit through the in-document route');

@@ -1,4 +1,42 @@
-import { MAX_REMOTE_PLAYERS, buildWorldPosFrame, currentSelfPresenceId, isRemoteWorldPlayer } from './world-presence-protocol.mjs';
+import {
+  MAX_REMOTE_PLAYERS,
+  buildWorldPosFrame,
+  currentSelfPresenceId,
+  isRemoteWorldPlayer,
+  sanitizeOnlineWorldSnapshot,
+} from './world-presence-protocol.mjs?v=2';
+
+const DEFAULT_REMOTE_ANIMATION = Object.freeze({
+  combatState: 'idle',
+  category: 'style',
+  onGround: true,
+  dashing: false,
+  verticalVelocity: 0,
+});
+
+function actionIdentity(animation) {
+  if (!animation?.actionSessionId || !Number.isInteger(animation.actionSequence)) return null;
+  return `${animation.actionSessionId}:${animation.actionSequence}`;
+}
+
+function actionLifetimeMs(animation) {
+  return Math.max(250, Number.isInteger(animation?.actionDurationMs) ? animation.actionDurationMs : 0);
+}
+
+function updateRemoteAnimator(remote, deltaSeconds) {
+  const animator = remote.avatar?.userData?.remoteAnimator
+    || remote.avatar?.userData?.animator
+    || remote.avatar?.userData?.animationController;
+  if (!animator) return;
+  const state = Object.freeze({
+    ...(remote.animation || DEFAULT_REMOTE_ANIMATION),
+    locomotion: remote.locomotion,
+  });
+  try {
+    if (typeof animator.update === 'function') animator.update(deltaSeconds, state);
+    else if (typeof animator.setState === 'function') animator.setState(state);
+  } catch {}
+}
 
 function disposeAvatar(root) {
   const geometries = new Set();
@@ -47,6 +85,42 @@ function createDefaultRemoteAvatar(THREE, id) {
     mesh.receiveShadow = true;
     root.add(mesh);
   }
+  const [body, head, leftLeg, rightLeg, leftArm, rightArm] = root.children;
+  let animationTime = 0;
+  root.userData.remoteAnimator = {
+    update(deltaSeconds, state) {
+      animationTime += Math.max(0, Number(deltaSeconds) || 0);
+      const moving = state?.locomotion === 'walk'
+        || state?.locomotion === 'run'
+        || state?.locomotion === 'swim';
+      const combatState = state?.combatState || 'idle';
+      const attacking = combatState === 'attack1'
+        || combatState === 'attack2'
+        || combatState === 'attack3'
+        || combatState === 'attack4';
+      const casting = combatState === 'casting';
+      const blocking = combatState === 'blocking';
+      const stunned = combatState === 'stunned' || combatState === 'knockback';
+      const verticalVelocity = Number(state?.verticalVelocity) || 0;
+      const jumping = state?.onGround === false && verticalVelocity > .5;
+      const falling = state?.onGround === false && verticalVelocity < -.5;
+      const landing = state?.onGround === true && Number.isInteger(state?.hitReactionId);
+      const dashing = state?.dashing === true || state?.skillAnimationType === 'dash';
+      const stride = moving ? Math.sin(animationTime * (state.locomotion === 'run' ? 14 : 9)) * .45 : 0;
+      leftLeg.rotation.x = jumping ? -.55 : falling ? .65 : dashing ? -.22 : stride;
+      rightLeg.rotation.x = jumping ? -.55 : falling ? .65 : dashing ? -.22 : -stride;
+      leftArm.rotation.x = jumping ? -.4 : falling ? .45 : dashing ? -.5 : -stride * .72;
+      rightArm.rotation.x = jumping ? -.4 : falling ? .45 : dashing ? -.5 : stride * .72;
+      body.rotation.x = jumping ? -.16 : falling ? .18 : landing ? .16 : dashing ? .1 : 0;
+      body.rotation.z = attacking ? Math.sin(animationTime * 18) * .18 : casting ? -.14 : dashing ? .2 : 0;
+      leftArm.rotation.z = attacking ? -.8 : casting ? -.55 : blocking ? -.35 : 0;
+      rightArm.rotation.z = attacking ? .8 : casting ? .55 : blocking ? .35 : 0;
+      head.rotation.z = stunned ? Math.sin(animationTime * 30) * .12 : 0;
+      root.rotation.z = combatState === 'knockdown' || combatState === 'dead' ? -.9 : 0;
+      root.rotation.x = jumping ? -.08 : falling ? .08 : 0;
+      root.userData.remoteAnimationState = state;
+    },
+  };
   return root;
 }
 
@@ -79,11 +153,56 @@ export function createWorldPresenceController({
     remoteWorldPlayers.delete(id);
   }
 
+  function clear() {
+    for (const id of [...remoteWorldPlayers.keys()]) removeRemote(id);
+  }
+
+  function applyAnimation(remote, animation, now) {
+    const identity = actionIdentity(animation);
+    if (!identity) {
+      remote.animation = animation;
+      remote.actionIdentity = null;
+      remote.actionExpiresAt = 0;
+      return;
+    }
+    if (remote.expiredActionIdentity === identity) return;
+    if (remote.retiredActionSessions.has(animation.actionSessionId)) return;
+    if (remote.actionSessionId !== animation.actionSessionId) {
+      if (remote.actionSessionId) {
+        remote.retiredActionSessions.add(remote.actionSessionId);
+        while (remote.retiredActionSessions.size > 8) {
+          const oldest = remote.retiredActionSessions.values().next().value;
+          if (!oldest) break;
+          remote.retiredActionSessions.delete(oldest);
+        }
+      }
+      remote.actionSessionId = animation.actionSessionId;
+      remote.actionHighestSequence = animation.actionSequence;
+    } else if (animation.actionSequence < remote.actionHighestSequence) {
+      return;
+    } else if (animation.actionSequence > remote.actionHighestSequence) {
+      remote.actionHighestSequence = animation.actionSequence;
+    }
+    remote.animation = animation;
+    remote.actionIdentity = identity;
+    remote.actionExpiresAt = now + actionLifetimeMs(animation);
+  }
+
+  function expireAnimation(remote, now) {
+    if (!remote.actionIdentity || now < remote.actionExpiresAt) return;
+    remote.expiredActionIdentity = remote.actionIdentity;
+    remote.actionIdentity = null;
+    remote.actionExpiresAt = 0;
+    remote.animation = DEFAULT_REMOTE_ANIMATION;
+  }
+
   function acceptSnapshot(payload) {
-    if (!payload || payload.zone !== getZone?.() || !Array.isArray(payload.players)) return false;
+    const snapshot = sanitizeOnlineWorldSnapshot(payload, getZone?.());
+    if (!snapshot) return false;
     const selfId = getSelfId?.() ?? currentSelfPresenceId();
     const seen = new Set();
-    for (const item of payload.players.slice(0, MAX_REMOTE_PLAYERS)) {
+    const now = Date.now();
+    for (const item of snapshot.players.slice(0, MAX_REMOTE_PLAYERS)) {
       if (!isRemoteWorldPlayer(item, selfId)) continue;
       const id = String(item.id);
       seen.add(id);
@@ -108,7 +227,23 @@ export function createWorldPresenceController({
         }
         const avatar = scene ? createAvatar(id, item) : null;
         if (avatar) scene.add(avatar);
-        remote = { marker, avatar, targetX: item.x, targetY: 0, targetZ: item.z, targetDir: 0, locomotion: 'idle', animation: null, animationPhase: 0 };
+        remote = {
+          marker,
+          avatar,
+          targetX: item.x,
+          targetY: 0,
+          targetZ: item.z,
+          targetDir: 0,
+          locomotion: 'idle',
+          animation: null,
+          actionIdentity: null,
+          actionExpiresAt: 0,
+          expiredActionIdentity: null,
+          actionSessionId: null,
+          actionHighestSequence: 0,
+          retiredActionSessions: new Set(),
+          animationPhase: 0,
+        };
         remoteWorldPlayers.set(id, remote);
       }
       const y = Number(getHeightAt?.(item.x, item.z));
@@ -117,7 +252,7 @@ export function createWorldPresenceController({
       remote.targetZ = item.z;
       remote.targetDir = Number.isFinite(item.dir) ? item.dir : 0;
       remote.locomotion = typeof item.locomotion === 'string' ? item.locomotion : 'idle';
-      remote.animation = item.animation && typeof item.animation === 'object' ? item.animation : null;
+      applyAnimation(remote, item.animation, now);
       if (remote.marker) {
         remote.marker.textContent = item.name || 'ผู้เล่นออนไลน์';
         remote.marker.dataset.x = item.x;
@@ -134,9 +269,11 @@ export function createWorldPresenceController({
     return true;
   }
 
-  function update() {
+  function update(deltaSeconds = 0.1) {
     const camera = getCamera?.();
+    const now = Date.now();
     for (const remote of remoteWorldPlayers.values()) {
+      expireAnimation(remote, now);
       const avatar = remote.avatar;
       if (avatar) {
         avatar.position.x += (remote.targetX - avatar.position.x) * .35;
@@ -149,6 +286,7 @@ export function createWorldPresenceController({
         const combatState = remote.animation?.combatState || 'idle';
         avatar.userData.remoteLocomotion = remote.locomotion;
         avatar.userData.remoteAnimation = remote.animation;
+        updateRemoteAnimator(remote, deltaSeconds);
         const bob = moving ? Math.sin(remote.animationPhase * 8) * .035 : 0;
         avatar.position.y += (remote.targetY + bob - avatar.position.y) * .35;
         const actionLean = combatState === 'attack' || combatState === 'skill' ? Math.sin(remote.animationPhase * 12) * .12 : combatState === 'hurt' ? -.12 : 0;
@@ -169,7 +307,7 @@ export function createWorldPresenceController({
   }
 
   function dispose() {
-    for (const id of [...remoteWorldPlayers.keys()]) removeRemote(id);
+    clear();
     remoteWorldLayer?.remove?.();
     remoteWorldLayer = null;
   }
@@ -181,7 +319,7 @@ export function createWorldPresenceController({
     });
   }
 
-  return Object.freeze({ acceptSnapshot, update, dispose, diagnostics });
+  return Object.freeze({ acceptSnapshot, clear, update, dispose, diagnostics });
 }
 
 export function installWorldPresence(options = {}) {
@@ -189,9 +327,15 @@ export function installWorldPresence(options = {}) {
   if (typeof window.POCKETMONSTER_WORLD_PRESENCE === 'function') return () => {};
   const controller = createWorldPresenceController(options);
   window.POCKETMONSTER_WORLD_PRESENCE = payload => controller.acceptSnapshot(payload);
-  const timer = setInterval(() => controller.update(), 100);
+  const onSocketStatus = event => {
+    if (event?.detail?.connected !== true) controller.clear();
+  };
+  const canListenForSocketStatus = typeof window.addEventListener === 'function';
+  if (canListenForSocketStatus) window.addEventListener('pocketmonster:world-socket-status', onSocketStatus);
+  const timer = setInterval(() => controller.update(0.1), 100);
   return () => {
     clearInterval(timer);
+    if (canListenForSocketStatus) window.removeEventListener('pocketmonster:world-socket-status', onSocketStatus);
     if (window.POCKETMONSTER_WORLD_PRESENCE) delete window.POCKETMONSTER_WORLD_PRESENCE;
     controller.dispose();
   };
@@ -205,6 +349,7 @@ export function publishWorldState({ getZone, getPosition, getDir } = {}) {
     return buildWorldPosFrame({
       zone: getZone?.(),
       x: pos?.x,
+      y: pos?.y,
       z: pos?.z,
       dir: dir === undefined ? 0 : dir,
       locomotion: pos?.locomotion,

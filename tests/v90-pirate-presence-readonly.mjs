@@ -107,14 +107,14 @@ assert.deepEqual(sanitizePirateLocalPresence({
   x: 7,
   z: 11.5,
   dir: 0.4,
-  locomotion: 'jump',
-  animation: { combatState: 'attack', attackProgress: 1.4, onGround: false },
+  locomotion: 'run',
+  animation: { combatState: 'attack1', category: 'style', attackProgress: 1.4, onGround: false },
 }), {
   x: 7,
   z: 11.5,
   dir: 0.4,
-  locomotion: 'jump',
-  animation: { combatState: 'attack', attackProgress: 1, onGround: false },
+  locomotion: 'run',
+  animation: { combatState: 'attack1', category: 'style', onGround: false, dashing: false, verticalVelocity: 0, attackProgress: 1 },
 });
 assert.deepEqual(sanitizePirateLocalPresence({
   type: PIRATE_LOCAL_PRESENCE_MESSAGE,
@@ -129,7 +129,7 @@ assert.deepEqual(sanitizePirateLocalPresence({
   z: 11.5,
   dir: 0.4,
   locomotion: 'idle',
-  animation: { combatState: 'idle' },
+  animation: null,
 });
 
 const actionSnapshot = sanitizePirateWorldSnapshot({
@@ -140,8 +140,8 @@ const actionSnapshot = sanitizePirateWorldSnapshot({
     x: 3,
     z: 4,
     dir: 1,
-    locomotion: 'dash',
-    animation: { combatState: 'skill', skillAnimationProgress: 0.25, dashing: true },
+    locomotion: 'run',
+    animation: { combatState: 'casting', category: 'fruit', skillAnimationProgress: 0.25, dashing: true },
   }],
 });
 assert.deepEqual(actionSnapshot.players[0], {
@@ -150,15 +150,24 @@ assert.deepEqual(actionSnapshot.players[0], {
   x: 3,
   z: 4,
   dir: 1,
-  locomotion: 'dash',
-  animation: { combatState: 'skill', skillAnimationProgress: 0.25, dashing: true },
+  locomotion: 'run',
+  animation: { combatState: 'casting', category: 'fruit', onGround: true, dashing: true, verticalVelocity: 0, skillAnimationProgress: 0.25 },
 });
 
-pose = { x: 2, z: 3, dir: 0.25, locomotion: 'run', animation: { combatState: 'guard' } };
+pose = { x: 2, y: 4, z: 3, dir: 0.25, locomotion: 'run', animation: { combatState: 'blocking', category: 'style' } };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
-  zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'run',
-  animation: { combatState: 'guard' },
+  zone: 'pirate-fruit', x: 2, y: 4, z: 3, dir: 0.25, locomotion: 'run',
+  animation: { combatState: 'blocking', category: 'style', onGround: true, dashing: false, verticalVelocity: 0 },
 });
+
+assert.equal(sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE,
+  zone: 'pirate-fruit',
+  x: 2,
+  y: 4,
+  z: 3,
+  dir: 0.25,
+})?.y, 4, 'the iframe-to-parent bridge preserves optional height');
 
 assert.doesNotMatch(bridge, /PIRATE_PRESENCE_LOCOMOTION_VALUES|PIRATE_PRESENCE_COMBAT_STATES/,
   'pirate bridge must not copy protocol locomotion/combat enums');

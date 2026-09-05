@@ -47,7 +47,7 @@ const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-pre
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=6/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=943/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=944/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -115,7 +115,7 @@ assert.equal(
   'failed NPC-name interaction module is removed',
 );
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C3SJLfq8.js', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C1tDBALO.js', import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
   /className="interaction-prompt",this\.element\.type="button",this\.element\.addEventListener\("pointerdown",t=>\{t\.preventDefault\(\),this\.requested=!0\}\)/,
