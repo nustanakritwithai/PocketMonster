@@ -105,7 +105,9 @@ function createReceiver({ clock = { now: 20_000 }, seed = true } = {}) {
 
 function sendSnapshot(receiver, snapshot) {
   receiver.host.dispatch(createPirateSnapshotMessage(snapshot));
+  const wireAnimation = receiver.manager.players.get(REMOTE_PLAYER_ID)?.animation;
   receiver.manager.update(1 / 60);
+  return wireAnimation ? structuredClone(wireAnimation) : undefined;
 }
 
 const results = [];
@@ -152,7 +154,9 @@ movementReceiver.runtime.dispose();
 const [shortActionFrame] = publishSamples([shortAttackSample]);
 const shortActionSnapshot = parentRoundTrip(shortActionFrame);
 const actionReceiver = createReceiver();
-if (shortActionSnapshot) sendSnapshot(actionReceiver, shortActionSnapshot);
+const shortWireAnimation = shortActionSnapshot
+  ? sendSnapshot(actionReceiver, shortActionSnapshot)
+  : undefined;
 const animatorState = actionReceiver.animatorEvents.at(-1)?.state;
 
 check('short canonical attack leaves the real Pirate publisher', () => {
@@ -162,9 +166,10 @@ check('short canonical attack survives parent protocol and neutral JSON relay', 
   assert.deepEqual(shortActionSnapshot?.players[0]?.animation, shortAttackWireAnimation);
 });
 check('short canonical attack reaches the real remote animator boundary', () => {
+  assert.deepEqual(shortWireAnimation, shortAttackWireAnimation);
   assert.equal(animatorState?.combatState, 'attack1');
   assert.equal(animatorState?.category, 'sword');
-  assert.equal(animatorState?.attackProgress, 0.35);
+  assert.equal(animatorState?.attackProgress, 0.35 + (1 / 60) / 0.6);
   assert.equal(animatorState?.actionSessionId, 'session_a_20260905');
   assert.equal(animatorState?.actionSequence, 1);
   assert.equal(animatorState?.actionDurationMs, 1000);
@@ -175,11 +180,18 @@ actionReceiver.runtime.dispose();
 const richActionFrame = publishSamples([richCastingSample])[0];
 const richActionReceiver = createReceiver();
 const richActionSnapshot = parentRoundTrip(richActionFrame);
-if (richActionSnapshot) sendSnapshot(richActionReceiver, richActionSnapshot);
+const richWireAnimation = richActionSnapshot
+  ? sendSnapshot(richActionReceiver, richActionSnapshot)
+  : undefined;
 check('height and rich animation details reach the animator without semantic clamping', () => {
   const state = richActionReceiver.animatorEvents.at(-1)?.state;
   assert.equal(richActionReceiver.manager.players.get(REMOTE_PLAYER_ID)?.target.y, richCastingSample.y);
-  assert.deepEqual(state, { ...richCastingWireAnimation, locomotion: richCastingSample.locomotion });
+  assert.deepEqual(richWireAnimation, richCastingWireAnimation);
+  assert.deepEqual(
+    { ...state, skillAnimationProgress: richCastingWireAnimation.skillAnimationProgress },
+    { ...richCastingWireAnimation, locomotion: richCastingSample.locomotion },
+  );
+  assert.equal(state?.skillAnimationProgress, 0.45 + (1 / 60) / 0.6);
 });
 richActionReceiver.runtime.dispose();
 
@@ -267,14 +279,14 @@ check('animator identity is high-water deduped and lifecycle-scoped', () => {
   reconnected.runtime.dispose();
 
   assert.deepEqual(observations, [
-    ['seq1', 'session_a_20260905', 1, 0.1],
-    ['duplicate-progress', 'session_a_20260905', 1, 0.2],
-    ['seq2', 'session_a_20260905', 2, 0.3],
-    ['delayed-seq1', 'session_a_20260905', 2, 0.3],
-    ['new-session', 'session_b_20260905', 1, 0.4],
-    ['after-removal', 'session_a_20260905', 1, 0.5],
-    ['after-zone', 'session_a_20260905', 1, 0.6],
-    ['after-dispose', 'session_a_20260905', 1, 0.7],
+    ['seq1', 'session_a_20260905', 1, 0.1 + (1 / 60) / 0.6],
+    ['duplicate-progress', 'session_a_20260905', 1, 0.2 + (1 / 60) / 0.6],
+    ['seq2', 'session_a_20260905', 2, 0.3 + (1 / 60) / 0.6],
+    ['delayed-seq1', 'session_a_20260905', 2, 0.3 + (2 / 60) / 0.6],
+    ['new-session', 'session_b_20260905', 1, 0.4 + (1 / 60) / 0.6],
+    ['after-removal', 'session_a_20260905', 1, 0.5 + (1 / 60) / 0.6],
+    ['after-zone', 'session_a_20260905', 1, 0.6 + (1 / 60) / 0.6],
+    ['after-dispose', 'session_a_20260905', 1, 0.7 + (1 / 60) / 0.6],
   ]);
 });
 

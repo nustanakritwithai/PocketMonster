@@ -1,5 +1,5 @@
 import * as pirateFruitThree from './assets/vendor-three-Bv6LZXUZ.js';
-import { hookPirateFruitRenderer } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=1';
+import { hookPirateFruitRenderer } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=2';
 import {
   PIRATE_FRUIT_CONTROL_HUD_CSS,
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,

@@ -1,11 +1,11 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "codex/remote-animation-sol-20260905",
-  "commit": "39a4809c5d1ea753f6e0a7da0f9c86761ba8ac77",
+  "ref": "codex/remote-animation-lod-smoothing-20260906",
+  "commit": "3811c146e3696c3b8be68597f09a0803481a346b",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client built from the pinned read-only presence source plus presentation-only remote animation relay. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral pose, locomotion, height, animation and bounded short-action identity only, while Pocket overlays asset-engine visuals without replacing the client. Includes verified remote defeat/respawn visibility and long-skill timeline continuity.",
+  "note": "Playable Pirate Fruit client built from the pinned read-only presence source plus presentation-only remote animation relay. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral pose, locomotion, height, animation and bounded short-action identity only, while Pocket overlays asset-engine visuals without replacing the client. Includes verified remote defeat/respawn visibility and long-skill timeline continuity. Remote on-foot players retain full Pirate rigs at all distances and device tiers, with bounded render-only motion smoothing. Equipment and skill VFX replication are not added by this artifact.",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",
@@ -38,9 +38,16 @@
     "pocketMonsterPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,
-      "position": { "x": 7, "z": 15 },
+      "position": {
+        "x": 7,
+        "z": 15
+      },
       "triggerRadius": 2.25,
-      "safeArrival": { "x": 7, "z": 11.5, "heading": 0 },
+      "safeArrival": {
+        "x": 7,
+        "z": 11.5,
+        "heading": 0
+      },
       "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "pocket-monster",
@@ -49,9 +56,16 @@
     "livingWorldPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,
-      "position": { "x": -7, "z": 15 },
+      "position": {
+        "x": -7,
+        "z": 15
+      },
       "triggerRadius": 2.25,
-      "safeArrival": { "x": -7, "z": 11.5, "heading": 0 },
+      "safeArrival": {
+        "x": -7,
+        "z": 11.5,
+        "heading": 0
+      },
       "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "living-world",
