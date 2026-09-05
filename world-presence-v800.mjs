@@ -205,6 +205,7 @@ export function publishWorldState({ getZone, getPosition, getDir } = {}) {
     return buildWorldPosFrame({
       zone: getZone?.(),
       x: pos?.x,
+      y: pos?.y,
       z: pos?.z,
       dir: dir === undefined ? 0 : dir,
       locomotion: pos?.locomotion,
