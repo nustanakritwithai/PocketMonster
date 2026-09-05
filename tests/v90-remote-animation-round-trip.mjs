@@ -22,8 +22,10 @@ import {
   REMOTE_PLAYER_ID,
   movementSamples,
   richCastingSample,
+  richCastingWireAnimation,
   shortActionTimeline,
   shortAttackSample,
+  shortAttackWireAnimation,
   snapshotFromPublishedFrame,
 } from './fixtures/remote-animation-scenarios.mjs';
 
@@ -46,6 +48,11 @@ function runtimeOptions({ host, remotePlayers, poseRef, islandRef, clock }) {
     getHeading: () => currentPose().dir,
     getLocomotion: () => currentPose().locomotion,
     getAnimation: () => currentPose().animation,
+    getActionSnapshot: () => ({
+      ...currentPose().animation,
+      locomotion: currentPose().locomotion,
+    }),
+    actionSessionId: 'session_a_20260905',
     getPresence: currentPose,
     getPresenceState: currentPose,
     getPose: currentPose,
@@ -149,10 +156,10 @@ if (shortActionSnapshot) sendSnapshot(actionReceiver, shortActionSnapshot);
 const animatorState = actionReceiver.animatorEvents.at(-1)?.state;
 
 check('short canonical attack leaves the real Pirate publisher', () => {
-  assert.deepEqual(shortActionFrame.animation, shortAttackSample.animation);
+  assert.deepEqual(shortActionFrame.animation, shortAttackWireAnimation);
 });
 check('short canonical attack survives parent protocol and neutral JSON relay', () => {
-  assert.deepEqual(shortActionSnapshot?.players[0]?.animation, shortAttackSample.animation);
+  assert.deepEqual(shortActionSnapshot?.players[0]?.animation, shortAttackWireAnimation);
 });
 check('short canonical attack reaches the real remote animator boundary', () => {
   assert.equal(animatorState?.combatState, 'attack1');
@@ -160,7 +167,7 @@ check('short canonical attack reaches the real remote animator boundary', () => 
   assert.equal(animatorState?.attackProgress, 0.35);
   assert.equal(animatorState?.actionSessionId, 'session_a_20260905');
   assert.equal(animatorState?.actionSequence, 1);
-  assert.equal(animatorState?.actionDurationMs, 100);
+  assert.equal(animatorState?.actionDurationMs, 750);
   assert.equal(actionReceiver.manager.players.get(REMOTE_PLAYER_ID)?.target.y, shortAttackSample.y);
 });
 actionReceiver.runtime.dispose();
@@ -172,7 +179,7 @@ if (richActionSnapshot) sendSnapshot(richActionReceiver, richActionSnapshot);
 check('height and rich animation details reach the animator without semantic clamping', () => {
   const state = richActionReceiver.animatorEvents.at(-1)?.state;
   assert.equal(richActionReceiver.manager.players.get(REMOTE_PLAYER_ID)?.target.y, richCastingSample.y);
-  assert.deepEqual(state, { ...richCastingSample.animation, locomotion: richCastingSample.locomotion });
+  assert.deepEqual(state, { ...richCastingWireAnimation, locomotion: richCastingSample.locomotion });
 });
 richActionReceiver.runtime.dispose();
 
@@ -193,6 +200,7 @@ check('duplicate action snapshots retain one stable action identity at the anima
   const snapshot = sanitizePirateWorldSnapshot(snapshotFromPublishedFrame({
     zone: PRESENCE_ZONE,
     ...shortAttackSample,
+    animation: shortAttackWireAnimation,
   }));
   sendSnapshot(receiver, snapshot);
   sendSnapshot(receiver, snapshot);
@@ -289,6 +297,7 @@ check('100 ms action is latched for at least 750 ms, then returns to current idl
     assert.equal(frames[index].animation?.combatState, 'attack1', `latched frame ${index} keeps the short attack`);
     assert.equal(frames[index].animation?.actionSessionId, 'session_a_20260905');
     assert.equal(frames[index].animation?.actionSequence, 1);
+    assert.equal(frames[index].animation?.actionDurationMs, 750);
   }
   assert.equal(frames[3].animation?.combatState, 'idle', 'publisher releases the latch after the minimum window');
   assert.equal('actionSessionId' in frames[3].animation, false);

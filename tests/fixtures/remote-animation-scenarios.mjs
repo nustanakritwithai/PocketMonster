@@ -48,11 +48,15 @@ export const shortAttackSample = Object.freeze({
     dashing: false,
     verticalVelocity: 0,
     attackProgress: 0.35,
-    actionSessionId: 'session_a_20260905',
-    actionSequence: 1,
-    actionDurationMs: 100,
   }),
   observedDurationMs: 100,
+});
+
+export const shortAttackWireAnimation = Object.freeze({
+  ...shortAttackSample.animation,
+  actionSessionId: 'session_a_20260905',
+  actionSequence: 1,
+  actionDurationMs: 750,
 });
 
 export const idleAfterShortAttack = Object.freeze({
@@ -97,10 +101,14 @@ export const richCastingSample = Object.freeze({
     skillAnimationVariant: 3,
     skillAnimationUltimate: true,
     skillAnimationCategory: 'fruit',
-    actionSessionId: 'session_a_20260905',
-    actionSequence: 2,
-    actionDurationMs: 900,
   }),
+});
+
+export const richCastingWireAnimation = Object.freeze({
+  ...richCastingSample.animation,
+  actionSessionId: 'session_a_20260905',
+  actionSequence: 1,
+  actionDurationMs: 750,
 });
 
 /**
