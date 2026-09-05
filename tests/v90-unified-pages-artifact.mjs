@@ -39,7 +39,7 @@ const required = new Set([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
-  'pirate-fruit-offline/assets/index-C3SJLfq8.js',
+  'pirate-fruit-offline/assets/index-D9QIDu6v.js',
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
   'assets/catalog/humanoid-core.json',
 ]);
@@ -60,7 +60,7 @@ for (const relative of closure) {
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, /entry-preload-v900.mjs\?v=962/);
+assert.match(index, /entry-preload-v900.mjs\?v=963/);
 assert.match(index, /style-v900\.css\?v=966/);
 const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');

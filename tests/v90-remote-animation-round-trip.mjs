@@ -367,7 +367,7 @@ check('100 ms action is latched for at least 750 ms, then returns to current idl
   assert.equal('actionSessionId' in frames[3].animation, false);
 });
 for (const row of actionMatrix.rows) {
-  pending(`per-action candidate matrix: ${row.action}`, 'candidate not integrated; Browser result not claimed');
+  pending(`per-action Browser matrix: ${row.action}`, 'machine path integrated; Browser result not tested or claimed');
 }
 
 for (const result of results) {

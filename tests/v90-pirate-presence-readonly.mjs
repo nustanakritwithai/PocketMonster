@@ -156,7 +156,7 @@ assert.deepEqual(actionSnapshot.players[0], {
 
 pose = { x: 2, y: 4, z: 3, dir: 0.25, locomotion: 'run', animation: { combatState: 'blocking', category: 'style' } };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
-  zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'run',
+  zone: 'pirate-fruit', x: 2, y: 4, z: 3, dir: 0.25, locomotion: 'run',
   animation: { combatState: 'blocking', category: 'style', onGround: true, dashing: false, verticalVelocity: 0 },
 });
 

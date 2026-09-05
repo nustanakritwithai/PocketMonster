@@ -26,7 +26,7 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
       .replace(/src="\.\/entry-preload\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
       .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`)
-      .replace(`  <script type="module" src="./game-v800.js?v=818"></script>`, '');
+      .replace(`  <script type="module" src="./game-v800.js?v=819"></script>`, '');
   }
   const required = [assetBase, 'firebase-launcher-entry.mjs', `${assetBase}style-v800.css`];
   if (isCombinedV9) required.push(`${assetBase}style-v900.css`);

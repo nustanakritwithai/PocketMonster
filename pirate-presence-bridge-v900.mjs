@@ -3,7 +3,7 @@ import {
   sanitizeAnimation,
   sanitizeLocomotion,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs';
+} from './world-presence-protocol.mjs?v=2';
 
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
 export const PIRATE_LOCAL_PRESENCE_MESSAGE = 'pocketmonster:pirate-presence-v1';

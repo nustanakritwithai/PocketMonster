@@ -3,7 +3,7 @@ import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
-} from './online-world-bridge-v900.mjs?v=2';
+} from './online-world-bridge-v900.mjs?v=3';
 
 export const ONLINE_WORLD_SCENE_TEARDOWN_EVENT = 'pocketmonster:online-scene-teardown';
 
@@ -188,7 +188,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=950');
+  await import('./worlds-v900.mjs?v=951');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });

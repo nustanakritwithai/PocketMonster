@@ -1,6 +1,6 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
 import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
-import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs';
+import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=2';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];

@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=945';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=946';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (window.POCKETMONSTER_SCENE_EMBEDDED !== true) {
-  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
+  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-6');
 }
 
 const startup = document.getElementById('startupStatus');

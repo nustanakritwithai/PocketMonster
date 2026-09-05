@@ -24,7 +24,6 @@ try {
   });
 
   assert.deepEqual(globalThis.window.POCKETMONSTER_WORLD_STATE(), {
-    type: 'world-pos',
     zone: 'pirate-fruit',
     x: 12,
     y: 3.25,

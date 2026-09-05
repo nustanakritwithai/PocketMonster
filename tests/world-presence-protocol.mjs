@@ -131,7 +131,7 @@ assert.equal(selfPresenceId(null), null);
 
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs'/, 'chat runtime owns the presence protocol');
+assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=2'/, 'chat runtime owns the presence protocol');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -139,7 +139,7 @@ assert.match(presence, /if \(!isRemoteWorldPlayer\(item, selfId\)\) continue;/, 
 assert.match(presence, /locomotion: pos\?\.locomotion/, 'published world state forwards locomotion');
 assert.match(presence, /animation: pos\?\.animation/, 'published world state forwards animation');
 const bridge = fs.readFileSync(new URL('online-world-bridge-v900.mjs', root), 'utf8');
-assert.match(bridge, /from '\.\/world-presence-protocol\.mjs'/, 'online bridge imports the shared protocol');
+assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=2'/, 'online bridge imports the shared protocol');
 assert.doesNotMatch(bridge, /LOCOMOTION_VALUES = new Set/, 'online bridge does not declare a second locomotion vocabulary');
 assert.doesNotMatch(bridge, /COMBAT_STATE_VALUES = new Set/, 'online bridge does not declare a second combat vocabulary');
 const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root), 'utf8');

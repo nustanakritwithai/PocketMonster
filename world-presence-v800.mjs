@@ -1,4 +1,4 @@
-import { MAX_REMOTE_PLAYERS, buildWorldPosFrame, currentSelfPresenceId, isRemoteWorldPlayer } from './world-presence-protocol.mjs';
+import { MAX_REMOTE_PLAYERS, buildWorldPosFrame, currentSelfPresenceId, isRemoteWorldPlayer } from './world-presence-protocol.mjs?v=2';
 
 function disposeAvatar(root) {
   const geometries = new Set();
