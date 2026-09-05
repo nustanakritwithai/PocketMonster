@@ -1,0 +1,34 @@
+name: Studio character runtime provider CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'asset-presentation/**'
+      - 'tests/v91-studio-character-provider.mjs'
+      - '.github/workflows/studio-character-provider-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check Studio runtime modules
+        run: |
+          node --check asset-presentation/studio-character-package.mjs
+          node --check asset-presentation/providers/studio-character.mjs
+          node --check tests/v91-studio-character-provider.mjs
+      - name: Run Studio character provider gate
+        run: node tests/v91-studio-character-provider.mjs
+      - name: Preserve Asset Engine contracts
+        run: |
+          node tests/v80-ae0-contracts.mjs
+          node tests/v80-ae1-adapter.mjs
+          node tests/v90-pirate-fruit-player.mjs
