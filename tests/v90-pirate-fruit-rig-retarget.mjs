@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 
 import { createPirateFruitRigRetargeter } from '../asset-presentation/pirate-fruit-rig-retarget.mjs';
+import {
+  hidePirateFruitOriginalMeshes,
+  threeFromPirateFruitVendor,
+} from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
 function rotation(x = 0, y = 0, z = 0) {
   return {
@@ -282,6 +286,114 @@ function assertRotation(actual, expected) {
     missingCount: 7,
     mappedSourceNames: [],
   });
+}
+
+// Actual vendor-Three remote host/overlay regression: the source remote rig
+// owns the pose, while the Pocket overlay receives it without local __combat.
+{
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const kit = threeFromPirateFruitVendor(vendor);
+  const host = new kit.Group();
+  host.name = 'remote-player:remote-a';
+  const original = new kit.Mesh(
+    new kit.BoxGeometry(1, 1, 1),
+    new kit.MeshStandardMaterial({ color: 0x334455 }),
+  );
+  original.name = 'remote:original-body';
+  host.add(original);
+  const sourceRoot = new kit.Group();
+  sourceRoot.name = 'player-rig:root';
+  host.add(sourceRoot);
+  const source = Object.fromEntries([
+    'hips', 'chest', 'head', 'left-arm', 'right-arm', 'left-leg', 'right-leg',
+  ].map(part => {
+    const node = new kit.Group();
+    node.name = `player-rig:${part}`;
+    sourceRoot.add(node);
+    return [part, node];
+  }));
+  source['left-arm'].rotation.z = -0.08;
+  source['right-arm'].rotation.z = 0.08;
+
+  const overlayRoot = new kit.Group();
+  overlayRoot.rotation.y = Math.PI;
+  const expectedDeadRoot = new kit.Group();
+  expectedDeadRoot.rotation.y = Math.PI;
+  const pivots = Object.fromEntries([
+    ['hips', 'hipsPivot'], ['chest', 'torsoPivot'], ['head', 'headPivot'],
+    ['left-arm', 'leftArmRoot'], ['right-arm', 'rightArmRoot'],
+    ['left-leg', 'leftLegRoot'], ['right-leg', 'rightLegRoot'],
+  ].map(([, name]) => [name, new kit.Group()]));
+  const retargeter = createPirateFruitRigRetargeter(host, { pivots }, {
+    sourceRootName: 'player-rig:root',
+    targetRoot: overlayRoot,
+    sourceRestMode: 'bind',
+  });
+  hidePirateFruitOriginalMeshes(host);
+  assert.equal(original.visible, false, 'remote original mesh is hidden beneath the overlay');
+
+  const resetSourceBind = () => {
+    sourceRoot.position.set(0, 0, 0);
+    sourceRoot.rotation.set(0, 0, 0);
+    for (const node of Object.values(source)) node.rotation.set(0, 0, 0);
+    source['left-arm'].rotation.z = -0.08;
+    source['right-arm'].rotation.z = 0.08;
+  };
+  const actionPoses = [
+    ['attack', () => { source['right-arm'].rotation.z = -0.85; }, () => {
+      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z + 0.93) < 1e-12, 'attack reaches the expected right arm delta');
+    }],
+    ['casting', () => { source.chest.rotation.x = -0.4; source['left-arm'].rotation.z = 0.35; }, () => {
+      assert.ok(Math.abs(pivots.torsoPivot.rotation.x + 0.4) < 1e-12, 'casting reaches the expected torso delta');
+      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z - 0.43) < 1e-12, 'casting reaches the expected left arm delta');
+    }],
+    ['blocking', () => { source['left-arm'].rotation.z = -0.35; source['right-arm'].rotation.z = 0.35; }, () => {
+      assert.ok(Math.abs(pivots.leftArmRoot.rotation.z + 0.27) < 1e-12, 'blocking reaches the expected left guard delta');
+      assert.ok(Math.abs(pivots.rightArmRoot.rotation.z - 0.27) < 1e-12, 'blocking reaches the expected right guard delta');
+    }],
+    ['dead', () => {
+      sourceRoot.position.y = 0.24;
+      sourceRoot.rotation.z = -0.9;
+      source.chest.rotation.z = -1.05;
+    }, () => {
+      assert.ok(Math.abs(overlayRoot.position.y - 0.24) < 1e-12, 'dead root translation reaches overlay');
+      const sourceDelta = new kit.Group();
+      sourceDelta.rotation.z = -0.9;
+      expectedDeadRoot.quaternion.multiply(sourceDelta.quaternion);
+      assert.ok(overlayRoot.quaternion.angleTo(expectedDeadRoot.quaternion) < 1e-12, 'dead root rotation reaches overlay in world quaternion space');
+      assert.ok(Math.abs(pivots.torsoPivot.rotation.z + 1.05) < 1e-12, 'dead body pose reaches overlay');
+    }],
+  ];
+  for (const [action, apply, assertPose] of actionPoses) {
+    resetSourceBind();
+    apply();
+    retargeter.update();
+    assertPose();
+    assert.ok(Object.values(pivots).some(pivot => Math.abs(pivot.rotation.x) > 0.01 || Math.abs(pivot.rotation.z) > 0.01), `${action} source pose reaches overlay bones`);
+  }
+  assert.equal(retargeter.diagnostics().rootMapped, true, 'remote root pose is mapped for knockdown/dead');
+
+  // Attach after a remote has already entered an action: the current pose is
+  // preserved as a delta from the authored bind pose, rather than captured as
+  // the new rest pose and rendered flat.
+  const lateOverlayRoot = new kit.Group();
+  lateOverlayRoot.rotation.y = Math.PI;
+  const latePivots = Object.fromEntries(Object.values(pivots).map(pivot => [pivot.name || '', new kit.Group()]));
+  const lateNames = ['hipsPivot', 'torsoPivot', 'headPivot', 'leftArmRoot', 'rightArmRoot', 'leftLegRoot', 'rightLegRoot'];
+  for (const name of lateNames) if (!latePivots[name]) latePivots[name] = new kit.Group();
+  const lateRetargeter = createPirateFruitRigRetargeter(host, { pivots: latePivots }, {
+    sourceRootName: 'player-rig:root',
+    targetRoot: lateOverlayRoot,
+    sourceRestMode: 'bind',
+  });
+  lateRetargeter.update();
+  const lateExpectedRoot = new kit.Group();
+  lateExpectedRoot.rotation.y = Math.PI;
+  const lateSourceDelta = new kit.Group();
+  lateSourceDelta.rotation.z = -0.9;
+  lateExpectedRoot.quaternion.multiply(lateSourceDelta.quaternion);
+  assert.ok(lateOverlayRoot.quaternion.angleTo(lateExpectedRoot.quaternion) < 1e-12, 'late attach keeps the in-flight root pose');
+  assert.ok(Math.abs(latePivots.torsoPivot.rotation.z + 1.05) < 1e-12, 'late attach keeps the in-flight body pose');
 }
 
 console.log('V9.0 pirate-fruit rig retarget: PASS');

@@ -189,7 +189,20 @@ assert.match(bridgeSrc, /paintGroundGrid/, 'bridge paints Pocket ground on exist
 assert.match(bridgeSrc, /paintSkyGradient/, 'bridge paints Pocket sky on the existing scene');
 assert.match(bridgeSrc, /createPirateFruitActionTracker/, 'bridge imports and creates the live action adapter');
 assert.match(bridgeSrc, /createPirateFruitRigRetargeter/, 'bridge imports and creates source-bone retargeting');
-assert.match(bridgeSrc, /createPirateFruitRigRetargeter\(host, handle\.rig\)/, 'local player retargets from the real host into the Pocket rig');
+assert.match(
+  bridgeSrc,
+  /kind === 'player' \|\| kind === 'remote'[\s\S]*?createPirateFruitRigRetargeter\(host, handle\.rig, \{[\s\S]*?sourceRootName: 'player-rig:root'/,
+  'local and remote players retarget from their own full source rig into the Pocket rig',
+);
+assert.match(bridgeSrc, /targetRoot: handle\.root/, 'retargeting includes root pose for knockdown and death');
+assert.match(bridgeSrc, /sourceRestMode: 'bind'/, 'late overlay attach uses authored bind pose, not an in-flight source action');
+assert.match(bridgeSrc, /item\.kind === 'remote' \? remoteLocomotionFor\(item\.host, moving\)/, 'remote overlay locomotion comes from its own source state');
+assert.match(bridgeSrc, /item\.rigRetargeter\?\.update\(\)/, 'remote overlay retargets source pose after its generic update');
+assert.doesNotMatch(
+  bridgeSrc,
+  /if \(item\.kind === 'remote'[\s\S]*?globalThis\.__combat/,
+  'remote overlay does not use the local combat singleton',
+);
 assert.match(bridgeSrc, /userData:\s*\{\s*pocketActionSignal:\s*signal\s*\}/, 'action adapter samples an ephemeral presentation host');
 assert.doesNotMatch(bridgeSrc, /host\.userData\.pocketActionSignal\s*=/, 'bridge never writes action signals onto the real host');
 assert.match(
