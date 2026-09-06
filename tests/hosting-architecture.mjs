@@ -26,6 +26,11 @@ assert.equal(isPublicGameFile('world-runtime-import-purity-v912.mjs'), false,
 assert.equal(isPublicGameFile('server_save_backup.json'), false);
 assert.equal(isPublicGameFile('firebase.json'), false);
 assert.equal(isPublicGameFile('package.json'), false);
+const firebaseHostingConfig = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+assert.deepEqual(firebaseHostingConfig.hosting.headers, [{
+  source: '**',
+  headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }],
+}], 'Firebase launcher must not cache a stale release entry after a deployment');
 
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'pocketmonster-launcher-'));
 try {
