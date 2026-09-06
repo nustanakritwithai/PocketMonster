@@ -206,6 +206,8 @@ assert.match(boot, /clearPresenceQueue: \(\) => \{/,
   'presence queue cleanup stays inside bindPocketMonsterLink closure');
 assert.doesNotMatch(boot, /if \(frameReady\) return/,
   'reload after ready=true reactivates the HUD lifecycle');
+assert.doesNotMatch(boot, /registerExternalPose\(piratePose\);[\s\S]{0,120}forwardPresence\(latestPresenceSnapshot\)/,
+  'local iframe pose updates do not replay the last remote snapshot as a fresh network sample');
 assert.match(boot, /try \{\s*if \(frame\.contentDocument\?\.readyState === 'complete'/,
   'opaque iframe contentDocument getter is guarded');
 assert.match(boot, /now - pending\.queuedAt <= 3000/,

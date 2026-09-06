@@ -236,7 +236,6 @@ function bindPocketMonsterLink(frame) {
         piratePose = nextPose;
       }
       registerExternalPose(piratePose);
-      if (latestPresenceSnapshot) forwardPresence(latestPresenceSnapshot);
       return;
     }
     if (message?.type !== 'pocketmonster:world-warp-v1') return;

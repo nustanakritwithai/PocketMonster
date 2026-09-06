@@ -350,17 +350,21 @@ window.POCKETMONSTER_WORLD_VISUAL_EVENTS(Array.from({ length: 70 }, (_, index) =
 await new Promise(resolve => setTimeout(resolve, 360));
 const firstVisualFrame = physicalSocket.sent.find(message => message.type === 'world-pos' && message.visual?.events?.length === 32);
 assert.ok(firstVisualFrame, 'first 32 visual events cross the real world-pos socket');
-assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 38, 'events beyond one cadence remain queued');
-for (let attempt = 0; attempt < 40 && window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending > 6; attempt += 1) {
+assert.ok(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending <= 38, '20Hz cadence drains at least one visual batch');
+for (let attempt = 0; attempt < 40 && window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending > 0; attempt += 1) {
   await new Promise(resolve => setTimeout(resolve, 25));
 }
-assert.ok(physicalSocket.sent.filter(message => message.type === 'world-pos' && message.visual?.events?.length === 32).length >= 2, 'second 32-event batch crosses the real socket');
-assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 6, 'only the final six events remain after two batches');
-await new Promise(resolve => setTimeout(resolve, 400));
-assert.ok(physicalSocket.sent.some(message => message.type === 'world-pos' && message.visual?.events?.length === 6), 'final burst events cross in a third batch');
+assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 0, '20Hz cadence drains the full visual burst');
+const burstFrames = physicalSocket.sent.filter(message => message.type === 'world-pos' && message.visual?.events?.length);
+assert.ok(burstFrames.filter(message => message.visual.events.length === 32).length >= 2, 'multiple 32-event batches cross the real socket');
+assert.deepEqual(
+  burstFrames.flatMap(message => message.visual.events.map(event => event.sequence)).sort((a, b) => a - b),
+  Array.from({ length: 70 }, (_, index) => index + 1),
+  '20Hz burst sequence crosses exactly once',
+);
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS([visualEvent(41)]);
 physicalSocket.throwNext = true;
-await new Promise(resolve => setTimeout(resolve, 120));
+await new Promise(resolve => setTimeout(resolve, 10));
 assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 1, 'failed socket send does not commit the queue');
 await new Promise(resolve => setTimeout(resolve, 700));
 assert.ok(physicalSocket.sent.some(message => message.type === 'world-pos' && message.visual?.events?.some(event => event.sequence === 41)), 'queued event retries after transport recovers');
