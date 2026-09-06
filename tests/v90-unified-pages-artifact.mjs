@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PAGES_LIVE_SMOKE_FILES } from '../scripts/verify-live-v9-deployment.mjs';
 import {
   REQUIRED_V9_ENTRY_FILES,
   collectPublicDependencyClosure,
@@ -47,6 +48,9 @@ const required = new Set([
 for (const relative of required) assert.ok(closure.has(relative), `${relative} must be reachable from a shipped V9 entry`);
 
 const manifestFiles = new Map(manifest.files.map(item => [item.path, item]));
+for (const relative of PAGES_LIVE_SMOKE_FILES) {
+  assert.ok(manifestFiles.has(relative), `รายการตรวจ live ต้องอยู่ใน manifest ก่อนเผยแพร่: ${relative}`);
+}
 assert.equal(manifestFiles.size, closure.size, 'patch manifest must not force-download public compatibility files outside the active V9 closure');
 assert.deepEqual([...manifestFiles.keys()].sort(), [...closure].sort(), 'patch manifest must equal the active V9 dependency closure exactly');
 for (const relative of closure) {
