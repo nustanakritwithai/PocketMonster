@@ -10,6 +10,8 @@ import {
 
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
+/** The native Pirate HUD alone decides this mode.  The parent only mirrors it. */
+export const PIRATE_UNIFIED_INPUT_MODE_MESSAGE = 'pocketmonster:unified-mobile-input-mode-v1';
 
 const query = new URLSearchParams(location.search);
 const parentOrigin = query.get('parentOrigin');
@@ -26,6 +28,10 @@ const ACTION_SELECTORS = Object.freeze({
   capture: '.tc-attack',
   summon: '.tc-dash',
   recall: '.tc-jump',
+  cannonLeft: '.tc-cannon-left',
+  cannonRight: '.tc-cannon-right',
+  boost: '.tc-dash',
+  anchor: '.tc-jump',
   block: '.tc-block',
   weapon: '.tc-weapon',
   potion1: '.tc-potion1',
@@ -46,12 +52,49 @@ let activeCameraGesture = null;
 let inputReadySent = false;
 let inputReadyObserver = null;
 let inputWindowLoaded = document.readyState === 'complete';
+let controlModeObserver = null;
+let reportedControlMode = null;
 let onboardingStateSignature = null;
 let onboardingObserver = null;
 let hudTelemetryPublisher = null;
 
 function isPositiveSafeInteger(value) {
   return Number.isSafeInteger(value) && value > 0;
+}
+
+function nativeControlMode() {
+  // TouchControls switches these native buttons synchronously in setMode().
+  // Looking at its own inline state stays valid even while the parent hides
+  // .tc-root, and never guesses from a player/boat position or an intent.
+  const starboard = document.querySelector('.tc-cannon-right');
+  return starboard?.style?.display === 'flex' ? 'boat' : 'player';
+}
+
+function publishNativeControlMode(force = false) {
+  if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
+  const controlMode = nativeControlMode();
+  if (!force && controlMode === reportedControlMode) return false;
+  reportedControlMode = controlMode;
+  window.parent.postMessage({
+    type: PIRATE_UNIFIED_INPUT_MODE_MESSAGE,
+    frameGeneration: activeFrameGeneration,
+    controlMode,
+  }, allowedParentOrigin);
+  return true;
+}
+
+function monitorNativeControlMode() {
+  controlModeObserver?.disconnect();
+  const root = document.documentElement;
+  if (!root) return;
+  controlModeObserver = new MutationObserver(() => publishNativeControlMode());
+  controlModeObserver.observe(root, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+    attributeFilter: ['class', 'style'],
+  });
+  publishNativeControlMode(true);
 }
 
 function announceInputReady() {
@@ -233,6 +276,7 @@ function handleTransportReset(message) {
   resetInputs();
   activeFrameGeneration = message.frameGeneration;
   if (advancesGeneration) cameraGestureHighWater = 0;
+  publishNativeControlMode(true);
 }
 
 window.addEventListener('message', event => {
@@ -269,6 +313,8 @@ window.addEventListener('pagehide', () => {
   resetInputs();
   inputReadyObserver?.disconnect();
   inputReadyObserver = null;
+  controlModeObserver?.disconnect();
+  controlModeObserver = null;
   onboardingObserver?.disconnect();
   hudTelemetryPublisher?.stop();
   hudTelemetryPublisher = null;
@@ -279,6 +325,7 @@ window.addEventListener('pagehide', () => {
 document.documentElement.dataset.unifiedParentControls = 'active';
 if (!inputWindowLoaded) window.addEventListener('load', handleInputWindowLoad, { once: true });
 monitorInputReady();
+monitorNativeControlMode();
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', monitorOnboardingOverlay, { once: true });
 } else {

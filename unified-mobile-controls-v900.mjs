@@ -2,6 +2,8 @@ import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs
 
 export const UNIFIED_MOBILE_CONTROLS_KIND = 'monsterlife-unified-mobile-controls-v1';
 export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
+export const PIRATE_UNIFIED_INPUT_MODE_MESSAGE = 'pocketmonster:unified-mobile-input-mode-v1';
+export const PIRATE_CONTROL_MODE_EVENT = 'pocketmonster:pirate-control-mode-v1';
 
 function positiveInteger(value) {
   return Number.isSafeInteger(value) && value > 0;
@@ -16,6 +18,7 @@ export function createPirateIframeInputTransport({
   frame,
   inputMessageType = 'pocketmonster:unified-mobile-input-v1',
   resetParentInput = () => {},
+  windowLike = globalThis.window,
 } = {}) {
   if (!frame || typeof inputMessageType !== 'string' || !inputMessageType) {
     throw new TypeError('Pirate iframe input transport requires a frame and message type');
@@ -26,6 +29,7 @@ export function createPirateIframeInputTransport({
   let activeCameraGestureId = null;
   let cameraGestureHighWater = 0;
   let droppedInputCount = 0;
+  let nativeControlMode = 'player';
 
   const ready = () => frameGeneration > 0 && readyGeneration === frameGeneration;
   const post = payload => {
@@ -51,20 +55,44 @@ export function createPirateIframeInputTransport({
     return post({ kind: 'reset', reason });
   };
 
+  const announceNativeControlMode = controlMode => {
+    if (!['player', 'boat'].includes(controlMode) || controlMode === nativeControlMode) return false;
+    nativeControlMode = controlMode;
+    const detail = Object.freeze({ controlMode, frameGeneration });
+    let modeEvent;
+    if (typeof CustomEvent === 'function') {
+      modeEvent = new CustomEvent(PIRATE_CONTROL_MODE_EVENT, { detail });
+    } else {
+      modeEvent = new Event(PIRATE_CONTROL_MODE_EVENT);
+      Object.defineProperty(modeEvent, 'detail', { value: detail });
+    }
+    windowLike?.dispatchEvent?.(modeEvent);
+    return true;
+  };
+
   return Object.freeze({
     beginGeneration(reason = 'frame-load') {
       if (frameGeneration >= Number.MAX_SAFE_INTEGER) return false;
       frameGeneration += 1;
       readyGeneration = 0;
       activeCameraGestureId = null;
+      // A replacement child starts in the normal player HUD until that exact
+      // generation reports its own native mode. This clears a prior frame's
+      // boat layout without manufacturing an interaction or boat intent.
+      nativeControlMode = null;
+      announceNativeControlMode('player');
       resetParentInput(`pirate-input-${reason}`);
       return true;
     },
     acceptReady(event) {
-      if (event?.source !== frame.contentWindow
-        || event?.origin !== 'null'
-        || event?.data?.type !== PIRATE_UNIFIED_INPUT_READY_MESSAGE
-        || frameGeneration <= 0) return false;
+      if (event?.source !== frame.contentWindow || event?.origin !== 'null' || frameGeneration <= 0) return false;
+      if (event?.data?.type === PIRATE_UNIFIED_INPUT_MODE_MESSAGE) {
+        if (!ready() || event.data.frameGeneration !== frameGeneration) return false;
+        if (!['player', 'boat'].includes(event.data.controlMode)) return false;
+        announceNativeControlMode(event.data.controlMode);
+        return true;
+      }
+      if (event?.data?.type !== PIRATE_UNIFIED_INPUT_READY_MESSAGE) return false;
       if (ready()) return true;
       // Clear any physical gesture which began while the iframe was loading.
       // The adapter reset caused by this call is still gated because readiness
@@ -110,6 +138,7 @@ export function createPirateIframeInputTransport({
       activeCameraGestureId,
       cameraGestureHighWater,
       droppedInputCount,
+      nativeControlMode,
     }),
   });
 }
@@ -128,6 +157,44 @@ const ACTION_BUTTONS = Object.freeze({
   piratePotion2Btn: 'potion2',
   pirateZoomInBtn: 'zoomIn',
   pirateZoomOutBtn: 'zoomOut',
+});
+
+const PIRATE_BOAT_ACTION_BUTTONS = Object.freeze({
+  captureBtn: 'cannonRight',
+  skill1Btn: 'cannonLeft',
+  summonBtn: 'boost',
+  recallBtn: 'anchor',
+  piratePotion1Btn: 'potion1',
+  piratePotion2Btn: 'potion2',
+  pirateZoomInBtn: 'zoomIn',
+  pirateZoomOutBtn: 'zoomOut',
+});
+
+const PIRATE_PLAYER_BUTTON_STATE = Object.freeze({
+  skill1Btn: { icon: '1', label: 'สกิล Pirate 1' },
+  skill2Btn: { icon: '2', label: 'สกิล Pirate 2' },
+  skill3Btn: { icon: '3', label: 'สกิล Pirate 3' },
+  skill4Btn: { icon: 'ULT', label: 'ท่าไม้ตาย Pirate' },
+  captureBtn: { icon: '⚔', label: 'โจมตี' },
+  summonBtn: { icon: '💨', label: 'แดช' },
+  recallBtn: { icon: '⬆', label: 'กระโดด' },
+  pirateBlockBtn: { icon: '🛡', label: 'ป้องกัน' },
+  pirateWeaponBtn: { icon: '👊', label: 'เปลี่ยนอาวุธ' },
+  piratePotion1Btn: { icon: 'ยา', label: 'ใช้ยา 1' },
+  piratePotion2Btn: { icon: 'ยา2', label: 'ใช้ยา 2' },
+  pirateZoomInBtn: { icon: '＋', label: 'ซูมเข้า' },
+  pirateZoomOutBtn: { icon: '−', label: 'ซูมออก' },
+});
+
+const PIRATE_BOAT_BUTTON_STATE = Object.freeze({
+  captureBtn: { icon: '💣▶', label: 'ยิงปืนใหญ่กราบขวา' },
+  skill1Btn: { icon: '◀💣', label: 'ยิงปืนใหญ่กราบซ้าย' },
+  summonBtn: { icon: '⚡', label: 'เร่งเรือ' },
+  recallBtn: { icon: '⚓', label: 'ทอดหรือยกสมอ' },
+  piratePotion1Btn: PIRATE_PLAYER_BUTTON_STATE.piratePotion1Btn,
+  piratePotion2Btn: PIRATE_PLAYER_BUTTON_STATE.piratePotion2Btn,
+  pirateZoomInBtn: PIRATE_PLAYER_BUTTON_STATE.pirateZoomInBtn,
+  pirateZoomOutBtn: PIRATE_PLAYER_BUTTON_STATE.pirateZoomOutBtn,
 });
 
 const CONTROL_MODES = Object.freeze({
@@ -170,10 +237,82 @@ export function createUnifiedMobileControls({
   let activeCameraGestureId = null;
   let cameraGestureSequence = 0;
   let joystickCenter = null;
+  let pirateControlMode = 'player';
 
   const activeAdapter = () => adapters.get(activeWorldId) || null;
 
   let visualUnsubscribe = null;
+
+  const setImportantStyle = (button, property, value) => {
+    if (!button?.style) return;
+    if (typeof button.style.setProperty === 'function') button.style.setProperty(property, value, 'important');
+    else button.style[property] = value;
+  };
+
+  const clearInlineStyle = (button, property) => {
+    if (!button?.style) return;
+    if (typeof button.style.removeProperty === 'function') button.style.removeProperty(property);
+    else delete button.style[property];
+  };
+
+  const setPirateButton = (buttonId, state, visible) => {
+    const button = documentLike.getElementById(buttonId);
+    if (!button) return;
+    if (state) {
+      button.setAttribute?.('data-pirate-icon', state.icon);
+      button.setAttribute?.('aria-label', state.label);
+    }
+    setImportantStyle(button, 'display', visible ? 'flex' : 'none');
+    setImportantStyle(button, 'pointer-events', visible ? 'auto' : 'none');
+  };
+
+  const restorePiratePlayerButtons = () => {
+    for (const [buttonId, state] of Object.entries(PIRATE_PLAYER_BUTTON_STATE)) {
+      const button = documentLike.getElementById(buttonId);
+      if (!button) continue;
+      button.setAttribute?.('data-pirate-icon', state.icon);
+      button.setAttribute?.('aria-label', state.label);
+      clearInlineStyle(button, 'display');
+      clearInlineStyle(button, 'pointer-events');
+      clearInlineStyle(button, 'right');
+      clearInlineStyle(button, 'bottom');
+      clearInlineStyle(button, 'width');
+      clearInlineStyle(button, 'height');
+      clearInlineStyle(button, 'min-width');
+      clearInlineStyle(button, 'min-height');
+    }
+  };
+
+  const applyPirateBoatButtons = () => {
+    for (const buttonId of Object.keys(ACTION_BUTTONS)) {
+      const state = PIRATE_BOAT_BUTTON_STATE[buttonId];
+      setPirateButton(buttonId, state, Boolean(state));
+    }
+    const port = documentLike.getElementById('skill1Btn');
+    if (port) {
+      setImportantStyle(port, 'right', '156px');
+      setImportantStyle(port, 'bottom', '18px');
+      setImportantStyle(port, 'width', '62px');
+      setImportantStyle(port, 'height', '62px');
+      setImportantStyle(port, 'min-width', '62px');
+      setImportantStyle(port, 'min-height', '62px');
+    }
+    const starboard = documentLike.getElementById('captureBtn');
+    if (starboard) {
+      setImportantStyle(starboard, 'right', '14px');
+      setImportantStyle(starboard, 'bottom', '18px');
+      setImportantStyle(starboard, 'width', '62px');
+      setImportantStyle(starboard, 'height', '62px');
+      setImportantStyle(starboard, 'min-width', '62px');
+      setImportantStyle(starboard, 'min-height', '62px');
+    }
+  };
+
+  const actionForButton = buttonId => (
+    activeWorldId === 'pirate-fruit' && pirateControlMode === 'boat'
+      ? PIRATE_BOAT_ACTION_BUTTONS[buttonId] ?? null
+      : ACTION_BUTTONS[buttonId] ?? null
+  );
 
   const paintActionButton = (button, item) => {
     if (!button) return;
@@ -256,6 +395,8 @@ export function createUnifiedMobileControls({
       ? 'capture'
       : (CONTROL_MODES[worldId] || 'travel');
     controlSurface.dataset.controlMode = mode;
+    if (mode === 'pirate') controlSurface.dataset.pirateControlMode = pirateControlMode;
+    else delete controlSurface.dataset.pirateControlMode;
     if (documentLike?.body?.dataset) documentLike.body.dataset.mobileControlMode = mode;
     if (mode === 'pirate') {
       for (const buttonId of Object.keys(ACTION_BUTTONS)) {
@@ -271,6 +412,8 @@ export function createUnifiedMobileControls({
         }
       }
     }
+    if (mode === 'pirate' && pirateControlMode === 'boat') applyPirateBoatButtons();
+    else restorePiratePlayerButtons();
     bindActionVisuals();
     return mode;
   };
@@ -361,11 +504,12 @@ export function createUnifiedMobileControls({
     return true;
   };
 
-  for (const [buttonId, action] of Object.entries(ACTION_BUTTONS)) {
+  for (const buttonId of Object.keys(ACTION_BUTTONS)) {
     const button = documentLike.getElementById(buttonId);
     if (!button) continue;
     button.addEventListener('pointerdown', event => {
-      if (!stopPirateAction(event) || actionPointers.has(event.pointerId)) return;
+      const action = actionForButton(buttonId);
+      if (!action || !stopPirateAction(event) || actionPointers.has(event.pointerId)) return;
       actionPointers.set(event.pointerId, { action, button });
       try { button.setPointerCapture?.(event.pointerId); } catch {}
       activeAdapter()?.action?.({ action, phase: 'start', pointerId: event.pointerId });
@@ -400,6 +544,22 @@ export function createUnifiedMobileControls({
     activeAdapter()?.reset?.(reason);
   };
 
+  const setPirateControlMode = nextMode => {
+    if (!['player', 'boat'].includes(nextMode) || nextMode === pirateControlMode) return false;
+    // Finish every parent gesture before changing what its button represents.
+    // The native child is authoritative for board/deck/helm and this does not
+    // manufacture an interaction or a boat intent.
+    if (activeWorldId === 'pirate-fruit') reset('pirate-control-mode-change');
+    pirateControlMode = nextMode;
+    if (activeWorldId === 'pirate-fruit') setControlMode(activeWorldId);
+    return true;
+  };
+
+  windowLike?.addEventListener?.(PIRATE_CONTROL_MODE_EVENT, event => {
+    const nextMode = event?.detail?.controlMode;
+    setPirateControlMode(nextMode);
+  });
+
   const api = Object.freeze({
     kind: UNIFIED_MOBILE_CONTROLS_KIND,
     registerAdapter(worldId, adapter) {
@@ -426,6 +586,7 @@ export function createUnifiedMobileControls({
     diagnostics: () => Object.freeze({
       activeWorldId,
       controlMode: controlSurface.dataset.controlMode,
+      pirateControlMode,
       adapters: Object.freeze([...adapters.keys()]),
       actionPointerCount: actionPointers.size,
       cameraGestureSequence,

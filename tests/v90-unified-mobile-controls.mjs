@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
+  PIRATE_CONTROL_MODE_EVENT,
   UNIFIED_MOBILE_CONTROLS_KIND,
   createUnifiedMobileControls,
 } from '../unified-mobile-controls-v900.mjs';
@@ -13,11 +14,15 @@ class FakeTarget extends EventTarget {
     this.style = {};
     this.dataset = {};
     this.capturedPointers = new Set();
+    this.attributes = new Map();
   }
   getBoundingClientRect() { return { left: 0, top: 0, width: 100, height: 100 }; }
   setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
   hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
   releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
+  removeAttribute(name) { this.attributes.delete(name); }
 }
 
 function pointer(type, pointerId, clientX, clientY) {
@@ -27,6 +32,12 @@ function pointer(type, pointerId, clientX, clientY) {
     clientX: { value: clientX },
     clientY: { value: clientY },
   });
+  return event;
+}
+
+function pirateControlMode(mode) {
+  const event = new Event(PIRATE_CONTROL_MODE_EVENT);
+  Object.defineProperty(event, 'detail', { value: { controlMode: mode } });
   return event;
 }
 
@@ -89,8 +100,59 @@ assert.deepEqual(
   [['capture', 'start'], ['capture', 'end']],
 );
 
+// Native Pirate alone reaches helm mode. Once it reports that state, the
+// shared parent must change the meaning of buttons without leaving a pressed
+// player action or auto-boarding/auto-helming.
+elements.get('captureBtn').dispatchEvent(pointer('pointerdown', 60, 0, 0));
+assert.equal(controls.diagnostics().actionPointerCount, 1);
+windowLike.dispatchEvent(pirateControlMode('boat'));
+assert.equal(controls.diagnostics().controlMode, 'pirate');
+assert.equal(controls.diagnostics().pirateControlMode, 'boat');
+assert.equal(controls.diagnostics().actionPointerCount, 0, 'mode change clears a held player action before the button is remapped');
+assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบขวา');
+assert.equal(elements.get('skill1Btn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบซ้าย');
+assert.equal(elements.get('summonBtn').getAttribute('aria-label'), 'เร่งเรือ');
+assert.equal(elements.get('recallBtn').getAttribute('aria-label'), 'ทอดหรือยกสมอ');
+assert.equal(elements.get('skill2Btn').style.display, 'none', 'hidden player skills cannot remain touch targets while steering');
+
+const boatActionsStart = pirateCalls.filter(([kind]) => kind === 'action').length;
+for (const [buttonId, pointerId] of [['captureBtn', 61], ['skill1Btn', 62], ['summonBtn', 63], ['recallBtn', 64]]) {
+  elements.get(buttonId).dispatchEvent(pointer('pointerdown', pointerId, 0, 0));
+  elements.get(buttonId).dispatchEvent(pointer('pointerup', pointerId, 0, 0));
+}
+assert.deepEqual(
+  pirateCalls.filter(([kind]) => kind === 'action').slice(boatActionsStart).map(([, payload]) => [payload.action, payload.phase]),
+  [
+    ['cannonRight', 'start'], ['cannonRight', 'end'],
+    ['cannonLeft', 'start'], ['cannonLeft', 'end'],
+    ['boost', 'start'], ['boost', 'end'],
+    ['anchor', 'start'], ['anchor', 'end'],
+  ],
+  'helm mode routes only to native boat actions, never hidden player attack/dash/jump meanings',
+);
+
+windowLike.dispatchEvent(pirateControlMode('player'));
+assert.equal(controls.diagnostics().pirateControlMode, 'player');
+assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'โจมตี');
+assert.equal(elements.get('summonBtn').getAttribute('aria-label'), 'แดช');
+assert.equal(elements.get('recallBtn').getAttribute('aria-label'), 'กระโดด');
+const playerActionsStart = pirateCalls.filter(([kind]) => kind === 'action').length;
+for (const [buttonId, pointerId] of [['captureBtn', 65], ['summonBtn', 66], ['recallBtn', 67]]) {
+  elements.get(buttonId).dispatchEvent(pointer('pointerdown', pointerId, 0, 0));
+  elements.get(buttonId).dispatchEvent(pointer('pointerup', pointerId, 0, 0));
+}
+assert.deepEqual(
+  pirateCalls.filter(([kind]) => kind === 'action').slice(playerActionsStart).map(([, payload]) => [payload.action, payload.phase]),
+  [['capture', 'start'], ['capture', 'end'], ['summon', 'start'], ['summon', 'end'], ['recall', 'start'], ['recall', 'end']],
+  'leaving helm restores ordinary Pirate actions',
+);
+
 pirateCalls.length = 0;
 elements.get('cameraPad').dispatchEvent(pointer('pointerdown', 22, 70, 40));
+const resumedCameraGestureId = pirateCalls
+  .filter(([kind, payload]) => kind === 'camera' && payload.phase === 'start')
+  .at(-1)?.[1]?.gestureId;
+assert.ok(Number.isSafeInteger(resumedCameraGestureId) && resumedCameraGestureId > firstCameraGestureId, 'mode cleanup requires a fresh camera gesture after leaving helm');
 const potionLook = pointer('pointerdown', 77, 50, 90);
 elements.get('piratePotion1Btn').dispatchEvent(potionLook);
 elements.get('piratePotion1Btn').dispatchEvent(pointer('pointerup', 77, 50, 90));
@@ -105,7 +167,7 @@ windowLike.dispatchEvent(pointer('pointerup', 22, 70, 40));
 assert.ok(
   pirateCalls.some(([kind, payload]) => kind === 'camera'
     && payload.phase === 'end'
-    && payload.gestureId === firstCameraGestureId),
+    && payload.gestureId === resumedCameraGestureId),
   'camera end carries the identity allocated at start',
 );
 
@@ -141,7 +203,8 @@ assert.ok(
 elements.get('joystick').dispatchEvent(pointer('pointerdown', 55, 20, 50));
 windowLike.dispatchEvent(pointer('pointermove', 55, 10, 50));
 assert.ok(pocketCalls.some(([kind, payload]) => kind === 'move' && payload.active === true));
-assert.equal(pirateCalls.filter(([kind]) => kind === 'move').at(-1)[1].active, false, 'old world receives neutral input before adapter switch');
+const lastPirateMove = pirateCalls.filter(([kind]) => kind === 'move').at(-1);
+assert.ok(!lastPirateMove || lastPirateMove[1].active === false, 'mode cleanup leaves no stale Pirate movement for the next world');
 
 
 const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
@@ -173,6 +236,6 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=55/, 'online scene cache-busts the original Pocket NPC menu bridge');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=56/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
