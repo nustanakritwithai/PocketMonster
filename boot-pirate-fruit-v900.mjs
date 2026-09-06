@@ -16,6 +16,7 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=5';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=938', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
@@ -91,18 +92,23 @@ function syncPirateOnboardingActionProxies(onboarding) {
 }
 
 function bindPocketMonsterLink(frame) {
-  const sendInput = payload => frame.contentWindow?.postMessage({
-    type: PIRATE_UNIFIED_INPUT_MESSAGE,
-    ...payload,
-  }, '*');
+  const inputTransport = createPirateIframeInputTransport({
+    frame,
+    inputMessageType: PIRATE_UNIFIED_INPUT_MESSAGE,
+    resetParentInput: reason => {
+      if (!pirateRuntimeActive) return false;
+      return window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.(reason) === true;
+    },
+  });
   window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.registerAdapter?.('pirate-fruit', Object.freeze({
     interceptActions: true,
-    move: payload => sendInput({ kind: 'move', ...payload }),
-    camera: payload => sendInput({ kind: 'camera', ...payload }),
-    action: payload => sendInput({ kind: 'action', ...payload }),
-    reset: reason => sendInput({ kind: 'reset', reason }),
-    activate: () => sendInput({ kind: 'reset', reason: 'pirate-activate' }),
+    move: payload => inputTransport.move(payload),
+    camera: payload => inputTransport.camera(payload),
+    action: payload => inputTransport.action(payload),
+    reset: reason => inputTransport.reset(reason),
+    activate: () => inputTransport.reset('pirate-activate'),
   }));
+  frame.addEventListener('load', () => inputTransport.beginGeneration('frame-load'));
   let piratePose = null;
   let latestPresenceSnapshot = null;
   let latestPresenceAt = 0;
@@ -144,6 +150,7 @@ function bindPocketMonsterLink(frame) {
     pending: pendingPresenceSnapshots.length,
     dropped: pendingPresenceDropped,
     frameReady,
+    input: inputTransport.diagnostics(),
   });
   const markFrameReady = () => {
     if (!pirateRuntimeActive) {
@@ -197,6 +204,7 @@ function bindPocketMonsterLink(frame) {
     return true;
   };
   window.addEventListener('message', event => {
+    if (inputTransport.acceptReady(event)) return;
     if (!pirateRuntimeActive) return;
     if (event.source !== frame.contentWindow) return;
     const dialogue = event.data;

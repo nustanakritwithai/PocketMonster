@@ -14,7 +14,12 @@ class FakeTarget extends EventTarget {
 
   setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
   hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
-  releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); }
+  releasePointerCapture(pointerId) {
+    if (!this.capturedPointers.delete(pointerId)) return;
+    this.dispatchEvent(pointerEvent('lostpointercapture', pointerId, 0, 0));
+  }
+
+  losePointerCapture(pointerId) { this.releasePointerCapture(pointerId); }
 }
 
 function pointerEvent(type, pointerId, x, y) {
@@ -81,6 +86,38 @@ windowLike.dispatchEvent(pointerEvent('pointercancel', 22, 206, 84));
 assert.equal(input.diagnostics().cameraPointerId, null);
 assert.equal(joystick.capturedPointers.size, 0);
 assert.equal(camera.capturedPointers.size, 0);
+assert.equal(calls.filter(([kind]) => kind === 'joy-end').length, 1,
+  'pointerup plus capture release emits one joystick terminal callback');
+assert.equal(calls.filter(([kind]) => kind === 'camera-end').length, 1,
+  'pointercancel plus capture release emits one camera terminal callback');
+
+joystick.dispatchEvent(pointerEvent('pointerdown', 31, 40, 50));
+joystick.losePointerCapture(31);
+assert.equal(input.diagnostics().joystickPointerId, null,
+  'unexpected joystick capture loss clears the active pointer');
+assert.deepEqual(calls.at(-1), ['joy-end', 'lostpointercapture']);
+const joyEndsAfterCaptureLoss = calls.filter(([kind]) => kind === 'joy-end').length;
+windowLike.dispatchEvent(pointerEvent('pointerup', 31, 40, 50));
+assert.equal(calls.filter(([kind]) => kind === 'joy-end').length, joyEndsAfterCaptureLoss,
+  'pointerup after joystick capture loss cannot emit a second terminal callback');
+joystick.dispatchEvent(pointerEvent('pointerdown', 32, 42, 52));
+assert.equal(input.diagnostics().joystickPointerId, 32,
+  'joystick accepts a new gesture after unexpected capture loss');
+windowLike.dispatchEvent(pointerEvent('pointerup', 32, 42, 52));
+
+camera.dispatchEvent(pointerEvent('pointerdown', 41, 240, 90));
+camera.losePointerCapture(41);
+assert.equal(input.diagnostics().cameraPointerId, null,
+  'unexpected camera capture loss clears the active pointer');
+assert.deepEqual(calls.at(-1), ['camera-end', 'lostpointercapture']);
+const cameraEndsAfterCaptureLoss = calls.filter(([kind]) => kind === 'camera-end').length;
+windowLike.dispatchEvent(pointerEvent('pointercancel', 41, 240, 90));
+assert.equal(calls.filter(([kind]) => kind === 'camera-end').length, cameraEndsAfterCaptureLoss,
+  'pointercancel after camera capture loss cannot emit a second terminal callback');
+camera.dispatchEvent(pointerEvent('pointerdown', 42, 242, 92));
+assert.equal(input.diagnostics().cameraPointerId, 42,
+  'camera accepts a new gesture after unexpected capture loss');
+windowLike.dispatchEvent(pointerEvent('pointerup', 42, 242, 92));
 
 joystick.dispatchEvent(pointerEvent('pointerdown', 33, 40, 50));
 camera.dispatchEvent(pointerEvent('pointerdown', 44, 240, 90));

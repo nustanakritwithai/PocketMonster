@@ -79,14 +79,16 @@ export function bindMobileDualPointerInput({
     if (disposed) return;
     if (event?.pointerId === joystickPointerId) {
       preventGesture(event);
-      releasePointer(joystickElement, joystickPointerId);
+      const pointerId = joystickPointerId;
       joystickPointerId = null;
+      releasePointer(joystickElement, pointerId);
       onJoystickEnd(reason);
     }
     if (event?.pointerId === cameraPointerId) {
       preventGesture(event);
-      releasePointer(cameraElement, cameraPointerId);
+      const pointerId = cameraPointerId;
       cameraPointerId = null;
+      releasePointer(cameraElement, pointerId);
       onCameraEnd(reason);
     }
   };
@@ -95,10 +97,12 @@ export function bindMobileDualPointerInput({
     if (disposed) return false;
     const hadJoystick = joystickPointerId !== null;
     const hadCamera = cameraPointerId !== null;
-    releasePointer(joystickElement, joystickPointerId);
-    releasePointer(cameraElement, cameraPointerId);
+    const joystickPointerToRelease = joystickPointerId;
+    const cameraPointerToRelease = cameraPointerId;
     joystickPointerId = null;
     cameraPointerId = null;
+    releasePointer(joystickElement, joystickPointerToRelease);
+    releasePointer(cameraElement, cameraPointerToRelease);
     if (hadJoystick) onJoystickEnd(reason);
     if (hadCamera) onCameraEnd(reason);
     resetCount += 1;
@@ -107,6 +111,12 @@ export function bindMobileDualPointerInput({
 
   const onPointerUp = event => endPointer(event, 'pointerup');
   const onPointerCancel = event => endPointer(event, 'pointercancel');
+  const onJoystickLostPointerCapture = event => {
+    if (event?.pointerId === joystickPointerId) endPointer(event, 'lostpointercapture');
+  };
+  const onCameraLostPointerCapture = event => {
+    if (event?.pointerId === cameraPointerId) endPointer(event, 'lostpointercapture');
+  };
   const onBlur = () => reset('blur');
   const onPageHide = () => reset('pagehide');
   const onVisibilityChange = () => {
@@ -115,6 +125,8 @@ export function bindMobileDualPointerInput({
 
   joystickElement.addEventListener('pointerdown', startJoystick, { passive: false });
   cameraElement.addEventListener('pointerdown', startCamera, { passive: false });
+  joystickElement.addEventListener('lostpointercapture', onJoystickLostPointerCapture);
+  cameraElement.addEventListener('lostpointercapture', onCameraLostPointerCapture);
   windowLike.addEventListener('pointermove', movePointer, { capture: true, passive: false });
   windowLike.addEventListener('pointerup', onPointerUp, { capture: true, passive: false });
   windowLike.addEventListener('pointercancel', onPointerCancel, { capture: true, passive: false });
@@ -132,6 +144,8 @@ export function bindMobileDualPointerInput({
       disposed = true;
       joystickElement.removeEventListener('pointerdown', startJoystick);
       cameraElement.removeEventListener('pointerdown', startCamera);
+      joystickElement.removeEventListener('lostpointercapture', onJoystickLostPointerCapture);
+      cameraElement.removeEventListener('lostpointercapture', onCameraLostPointerCapture);
       windowLike.removeEventListener('pointermove', movePointer, true);
       windowLike.removeEventListener('pointerup', onPointerUp, true);
       windowLike.removeEventListener('pointercancel', onPointerCancel, true);
