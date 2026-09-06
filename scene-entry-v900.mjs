@@ -3,7 +3,7 @@ import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
-} from './online-world-bridge-v900.mjs?v=4';
+} from './online-world-bridge-v900.mjs?v=5';
 
 export const ONLINE_WORLD_SCENE_TEARDOWN_EVENT = 'pocketmonster:online-scene-teardown';
 

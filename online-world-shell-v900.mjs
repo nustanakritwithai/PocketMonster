@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=4';
+} from './online-world-bridge-v900.mjs?v=5';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -557,7 +557,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-full-presentation-1');
+await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
 unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
 installUnifiedHud();
 unifiedHud.setExpanded(false);

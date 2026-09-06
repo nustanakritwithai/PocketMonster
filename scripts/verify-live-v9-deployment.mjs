@@ -39,12 +39,12 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-PYS02ZJs.js',
-  'pirate-fruit-offline/assets/AzureFrostIsland-D8bLD9Ky.js',
-  'pirate-fruit-offline/assets/EmberVolcanoIsland-LWr1iskC.js',
-  'pirate-fruit-offline/assets/MistJungleIsland-DaqTHS6g.js',
-  'pirate-fruit-offline/assets/SunscarDesertIsland-DjIpzqDl.js',
-  'pirate-fruit-offline/assets/TempestSkyIsland-Cc2tSYjh.js',
+  'pirate-fruit-offline/assets/index-YxSDH_bK.js',
+  'pirate-fruit-offline/assets/AzureFrostIsland-DSj3_LKB.js',
+  'pirate-fruit-offline/assets/EmberVolcanoIsland-B5I-pGAq.js',
+  'pirate-fruit-offline/assets/MistJungleIsland-BIymVPok.js',
+  'pirate-fruit-offline/assets/SunscarDesertIsland-BTMM2_cZ.js',
+  'pirate-fruit-offline/assets/TempestSkyIsland-B-304XFj.js',
   'pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js',
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
 ]);
@@ -216,7 +216,7 @@ async function verifyPages(options, runtimeConfig) {
   }
   const pirateBootstrap = bodies.get('pirate-fruit-offline/pocket-bootstrap.mjs');
   if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
-    || !pirateBootstrap.includes("await import('./assets/index-PYS02ZJs.js')")) {
+    || !pirateBootstrap.includes("await import('./assets/index-YxSDH_bK.js')")) {
     throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
   }
   return { runtimeConfig, manifest };

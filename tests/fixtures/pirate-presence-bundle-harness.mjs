@@ -208,7 +208,10 @@ async function compileCompiledEffects(bundle, classes, bundleUrl) {
   const source = bundle.slice(sourceStart, block.end).replaceAll('import.meta.url', '""');
   const names = aliases.map(alias => alias.localName);
   const values = aliases.map(alias => vendor[alias.exportName]);
-  const executable = `${source}; return ${block.name};`;
+  // Vite 6 emits the public-field helper before the vendor import; the
+  // evaluator intentionally starts after that import, so expose the same
+  // helper under the emitted name as well as the legacy test-harness name.
+  const executable = `const u = h; ${source}; return ${block.name};`;
   const classField = (target, key, value) => {
     Object.defineProperty(target, typeof key === 'symbol' ? key : `${key}`, {
       enumerable: true,

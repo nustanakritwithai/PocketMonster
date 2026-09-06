@@ -14,7 +14,7 @@ import {
   advancePirateSnapshotVisualAge,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
-} from './pirate-presence-bridge-v900.mjs?v=4';
+} from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=938', import.meta.url).href;

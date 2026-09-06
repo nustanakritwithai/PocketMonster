@@ -91,7 +91,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=829');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=946');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=947');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=906');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -125,7 +125,7 @@ assert.doesNotMatch(liveJs, /\b(?:joyEnd|endCam)\s*\(/, 'Pocket lifecycle cannot
 assert.match(boot, /pirateFrame\.contentWindow\?\.focus\?\.\(\)/, 'Pirate lifecycle restores iframe focus after returning without a document reload');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'orchestrator boots the selected world runtime');
-assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-full-presentation-1/, 'persistent shell owns the presence-aware Pocket chat for every world');
+assert.match(shellV900, /chat-runtime\.mjs\?v=8\.4\.0-smooth-presence-1/, 'persistent shell owns the presence-aware Pocket chat for every world');
 assert.match(shellV900, /requestFullscreen: requestPersistentFullscreen/, 'persistent shell owns fullscreen across scene swaps');
 assert.match(pirateOfflineHtml, /\.\.\/persistent-fullscreen-v900\.mjs\?v=4/, 'vendored Pirate client delegates fullscreen to the persistent shell before booting');
 assert.doesNotMatch(worldsJs, /requireFirebaseLogin/, 'GitHub V9 must use the V8.4 launch session instead of a second Firebase login');
