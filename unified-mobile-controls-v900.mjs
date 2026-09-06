@@ -1,6 +1,118 @@
-import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=2';
+import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=3';
 
 export const UNIFIED_MOBILE_CONTROLS_KIND = 'monsterlife-unified-mobile-controls-v1';
+export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
+
+function positiveInteger(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+/**
+ * Gate the parent-owned controls behind the current Pirate iframe generation.
+ * Input is deliberately never queued: a gesture which began before readiness
+ * must end locally and the player must start a fresh gesture after readiness.
+ */
+export function createPirateIframeInputTransport({
+  frame,
+  inputMessageType = 'pocketmonster:unified-mobile-input-v1',
+  resetParentInput = () => {},
+} = {}) {
+  if (!frame || typeof inputMessageType !== 'string' || !inputMessageType) {
+    throw new TypeError('Pirate iframe input transport requires a frame and message type');
+  }
+
+  let frameGeneration = 0;
+  let readyGeneration = 0;
+  let activeCameraGestureId = null;
+  let cameraGestureHighWater = 0;
+  let droppedInputCount = 0;
+
+  const ready = () => frameGeneration > 0 && readyGeneration === frameGeneration;
+  const post = payload => {
+    if (!ready()) {
+      droppedInputCount += 1;
+      return false;
+    }
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow?.postMessage) {
+      droppedInputCount += 1;
+      return false;
+    }
+    frameWindow.postMessage({
+      ...payload,
+      type: inputMessageType,
+      frameGeneration,
+    }, '*');
+    return true;
+  };
+
+  const reset = (reason = 'reset') => {
+    activeCameraGestureId = null;
+    return post({ kind: 'reset', reason });
+  };
+
+  return Object.freeze({
+    beginGeneration(reason = 'frame-load') {
+      if (frameGeneration >= Number.MAX_SAFE_INTEGER) return false;
+      frameGeneration += 1;
+      readyGeneration = 0;
+      activeCameraGestureId = null;
+      resetParentInput(`pirate-input-${reason}`);
+      return true;
+    },
+    acceptReady(event) {
+      if (event?.source !== frame.contentWindow
+        || event?.origin !== 'null'
+        || event?.data?.type !== PIRATE_UNIFIED_INPUT_READY_MESSAGE
+        || frameGeneration <= 0) return false;
+      if (ready()) return true;
+      // Clear any physical gesture which began while the iframe was loading.
+      // The adapter reset caused by this call is still gated because readiness
+      // is committed only afterwards.
+      resetParentInput('pirate-input-ready');
+      activeCameraGestureId = null;
+      readyGeneration = frameGeneration;
+      post({ kind: 'reset', reason: 'pirate-input-ready' });
+      return true;
+    },
+    move(payload) { return post({ kind: 'move', ...payload }); },
+    action(payload) { return post({ kind: 'action', ...payload }); },
+    camera(payload = {}) {
+      const { phase, gestureId } = payload;
+      if (!positiveInteger(gestureId)) {
+        droppedInputCount += 1;
+        return false;
+      }
+      if (phase === 'start') {
+        if (!ready() || activeCameraGestureId !== null || gestureId <= cameraGestureHighWater) {
+          droppedInputCount += 1;
+          return false;
+        }
+        activeCameraGestureId = gestureId;
+        cameraGestureHighWater = gestureId;
+        const sent = post({ kind: 'camera', ...payload });
+        if (!sent) activeCameraGestureId = null;
+        return sent;
+      }
+      if (!ready() || activeCameraGestureId !== gestureId || !['move', 'end'].includes(phase)) {
+        droppedInputCount += 1;
+        return false;
+      }
+      const sent = post({ kind: 'camera', ...payload });
+      if (phase === 'end') activeCameraGestureId = null;
+      return sent;
+    },
+    reset,
+    diagnostics: () => Object.freeze({
+      frameGeneration,
+      readyGeneration,
+      ready: ready(),
+      activeCameraGestureId,
+      cameraGestureHighWater,
+      droppedInputCount,
+    }),
+  });
+}
 
 const ACTION_BUTTONS = Object.freeze({
   skill1Btn: 'skill1',
@@ -55,6 +167,8 @@ export function createUnifiedMobileControls({
   const actionPointers = new Map();
   let activeWorldId = null;
   let cameraPoint = null;
+  let activeCameraGestureId = null;
+  let cameraGestureSequence = 0;
   let joystickCenter = null;
 
   const activeAdapter = () => adapters.get(activeWorldId) || null;
@@ -205,13 +319,24 @@ export function createUnifiedMobileControls({
     onJoystickMove: updateJoystick,
     onJoystickEnd: endJoystick,
     onCameraStart: event => {
+      cameraGestureSequence += 1;
+      activeCameraGestureId = cameraGestureSequence;
       cameraPoint = { x: event.clientX, y: event.clientY };
-      activeAdapter()?.camera?.({ phase: 'start', x: event.clientX, y: event.clientY, dx: 0, dy: 0 });
+      activeAdapter()?.camera?.({
+        phase: 'start',
+        gestureId: activeCameraGestureId,
+        x: event.clientX,
+        y: event.clientY,
+        dx: 0,
+        dy: 0,
+      });
     },
     onCameraMove: event => {
+      if (activeCameraGestureId === null) return;
       const previous = cameraPoint || { x: event.clientX, y: event.clientY };
       const payload = {
         phase: 'move',
+        gestureId: activeCameraGestureId,
         x: event.clientX,
         y: event.clientY,
         dx: event.clientX - previous.x,
@@ -221,8 +346,10 @@ export function createUnifiedMobileControls({
       activeAdapter()?.camera?.(payload);
     },
     onCameraEnd: reason => {
+      const gestureId = activeCameraGestureId;
       cameraPoint = null;
-      activeAdapter()?.camera?.({ phase: 'end', reason });
+      activeCameraGestureId = null;
+      if (gestureId !== null) activeAdapter()?.camera?.({ phase: 'end', gestureId, reason });
     },
   });
 
@@ -266,6 +393,7 @@ export function createUnifiedMobileControls({
     }
     actionPointers.clear();
     cameraPoint = null;
+    activeCameraGestureId = null;
     joystickCenter = null;
     stickElement.classList?.remove?.('tc-visible');
     joystickKnobElement.style.transform = 'translate(-50%,-50%)';
@@ -300,6 +428,8 @@ export function createUnifiedMobileControls({
       controlMode: controlSurface.dataset.controlMode,
       adapters: Object.freeze([...adapters.keys()]),
       actionPointerCount: actionPointers.size,
+      cameraGestureSequence,
+      activeCameraGestureId,
       pointerInput: pointerInput.diagnostics(),
     }),
   });

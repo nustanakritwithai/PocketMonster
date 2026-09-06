@@ -68,6 +68,17 @@ assert.equal(controls.diagnostics().pointerInput.joystickPointerId, 11);
 assert.equal(controls.diagnostics().pointerInput.cameraPointerId, 22);
 assert.ok(pirateCalls.some(([kind, payload]) => kind === 'move' && payload.active === true));
 assert.ok(pirateCalls.some(([kind, payload]) => kind === 'camera' && payload.phase === 'move' && payload.dx === 5));
+const firstCameraGesture = pirateCalls
+  .filter(([kind, payload]) => kind === 'camera' && ['start', 'move'].includes(payload.phase))
+  .map(([, payload]) => payload);
+assert.equal(firstCameraGesture.length, 2);
+assert.ok(Number.isSafeInteger(firstCameraGesture[0].gestureId) && firstCameraGesture[0].gestureId > 0);
+assert.equal(
+  firstCameraGesture[1].gestureId,
+  firstCameraGesture[0].gestureId,
+  'camera start and move carry one stable gesture identity',
+);
+const firstCameraGestureId = firstCameraGesture[0].gestureId;
 
 const attackDown = pointer('pointerdown', 33, 0, 0);
 elements.get('captureBtn').dispatchEvent(attackDown);
@@ -91,6 +102,12 @@ assert.deepEqual(
   [['potion1', 'start'], ['potion1', 'end']],
 );
 windowLike.dispatchEvent(pointer('pointerup', 22, 70, 40));
+assert.ok(
+  pirateCalls.some(([kind, payload]) => kind === 'camera'
+    && payload.phase === 'end'
+    && payload.gestureId === firstCameraGestureId),
+  'camera end carries the identity allocated at start',
+);
 
 controls.activate('pocket-monster');
 assert.equal(controls.diagnostics().controlMode, 'capture');
@@ -103,6 +120,22 @@ elements.get('captureBtn').dispatchEvent(pointer('pointerup', 44, 0, 0));
 assert.deepEqual(
   pocketCalls.filter(([kind]) => kind === 'action').map(([, payload]) => [payload.action, payload.phase]),
   [['capture', 'start'], ['capture', 'end']],
+);
+
+elements.get('cameraPad').dispatchEvent(pointer('pointerdown', 66, 120, 40));
+windowLike.dispatchEvent(pointer('pointermove', 66, 125, 42));
+windowLike.dispatchEvent(pointer('pointerup', 66, 125, 42));
+const secondCameraGesture = pocketCalls
+  .filter(([kind, payload]) => kind === 'camera')
+  .map(([, payload]) => payload);
+assert.deepEqual(secondCameraGesture.map(payload => payload.phase), ['start', 'move', 'end']);
+assert.ok(
+  secondCameraGesture.every(payload => payload.gestureId === secondCameraGesture[0].gestureId),
+  'the next camera gesture keeps one identity through its complete lifecycle',
+);
+assert.ok(
+  secondCameraGesture[0].gestureId > firstCameraGestureId,
+  'camera gesture identities increase monotonically across worlds',
 );
 
 elements.get('joystick').dispatchEvent(pointer('pointerdown', 55, 20, 50));
@@ -122,6 +155,8 @@ assert.doesNotMatch(gameSource, /bindMobileDualPointerInput/, 'Pocket runtime no
 assert.match(gameSource, /registerAdapter\('pocket-monster'/);
 assert.match(gameSource, /registerAdapter\('pocket-monster',[\s\S]*interceptActions:true[\s\S]*beginCaptureAim\(\)[\s\S]*executeCaptureThrow\(\)[\s\S]*summonThrow\(\)[\s\S]*recall\(true\)[\s\S]*dispatchSkill/);
 assert.match(bootSource, /registerAdapter\?\.\('pirate-fruit'/);
+assert.match(bootSource, /createPirateIframeInputTransport\([\s\S]*frame\.addEventListener\('load',[\s\S]*beginGeneration\('frame-load'\)/);
+assert.match(bootSource, /if \(inputTransport\.acceptReady\(event\)\) return;/);
 assert.match(bootSource, /postMessage\([\s\S]*, '\*'\)/, 'parent targets the exact opaque Pirate frame window');
 assert.match(bridgeSource, /event\.source !== window\.parent \|\| event\.origin !== allowedParentOrigin/);
 assert.match(bridgeSource, /\.tc-joyzone/);
@@ -138,6 +173,6 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=53/, 'online scene cache-busts the Dock world-lifecycle wiring');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=54/, 'online scene cache-busts the Dock world-lifecycle wiring');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
