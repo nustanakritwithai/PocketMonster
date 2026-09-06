@@ -328,9 +328,20 @@ export function createWorldPresenceController({
         // Approach the delayed sample instead of assigning it in one frame.
         // This bounds the first correction after a long packet gap while the
         // sample buffer still follows the authoritative target exactly.
-        avatar.position.x = boundedApproach(avatar.position.x, rendered.x);
-        avatar.position.y = boundedApproach(avatar.position.y, rendered.y);
-        avatar.position.z = boundedApproach(avatar.position.z, rendered.z);
+        const previousSample = samples.at(-2);
+        const latestSample = samples.at(-1);
+        const normalCadence = latestSample && previousSample
+          && latestSample.at > previousSample.at
+          && latestSample.at - previousSample.at <= 300;
+        if (normalCadence) {
+          avatar.position.x = rendered.x;
+          avatar.position.y = rendered.y;
+          avatar.position.z = rendered.z;
+        } else {
+          avatar.position.x = boundedApproach(avatar.position.x, rendered.x);
+          avatar.position.y = boundedApproach(avatar.position.y, rendered.y);
+          avatar.position.z = boundedApproach(avatar.position.z, rendered.z);
+        }
         const turn = Math.atan2(Math.sin(rendered.dir - avatar.rotation.y), Math.cos(rendered.dir - avatar.rotation.y));
         avatar.rotation.y += turn * .35;
         remote.animationPhase += .1;
