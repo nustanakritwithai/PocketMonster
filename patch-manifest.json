@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.62c5432bb936",
+  "buildId": "8.4.0.content.d56ee0291885",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-06T08:08:02.235Z",
+  "publishedAtUtc": "2026-09-06T09:21:45.865Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -572,8 +572,8 @@
     },
     {
       "path": "npc-overhead-action-v900.mjs",
-      "size": 4825,
-      "sha256": "507c4a1f19a7e66d00a54c337125703abe3cb2c9087e212e87f97210a1234b81"
+      "size": 3035,
+      "sha256": "9bd3cf7cf69a39dcd1261ea2425b6ba1ffd62afc817677a1e691b98b00bfe936"
     },
     {
       "path": "online-world-bridge-v900.mjs",
@@ -783,7 +783,7 @@
     {
       "path": "scene-v900.html",
       "size": 1327,
-      "sha256": "4dc2586246a38f045c8e1521993a47272a4bae3f1c94c8b27c27449767052d0f"
+      "sha256": "6ea914b82eb99f6d640456395e382c73bcb0ee8fe85cf1a4af9122f642c147d1"
     },
     {
       "path": "secondary-type-resolver.mjs",

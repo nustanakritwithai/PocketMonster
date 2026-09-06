@@ -70,8 +70,8 @@ const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=966/, 'scene entry loads the same HUD stylesheet revision as the parent');
-assert.match(scene, /npc-overhead-action-v900\.mjs\?v=2/, 'online scene cache-busts the clickable NPC-name adapter');
-assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs\?v=1/, 'online scene cannot keep the old pill-style NPC action');
+assert.match(scene, /npc-overhead-action-v900\.mjs\?v=3/, 'online scene cache-busts the restored NPC action pill');
+assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs\?v=2/, 'online scene cannot keep the NPC-name adapter cache key');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
