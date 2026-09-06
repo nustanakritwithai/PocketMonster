@@ -13,6 +13,10 @@ const DEFAULT_REMOTE_ANIMATION = Object.freeze({
   dashing: false,
   verticalVelocity: 0,
 });
+function boundedApproach(current, target, factor = .35, maxStep = 5) {
+  const delta = (target - current) * factor;
+  return current + Math.max(-maxStep, Math.min(maxStep, delta));
+}
 
 function actionIdentity(animation) {
   if (!animation?.actionSessionId || !Number.isInteger(animation.actionSequence)) return null;
@@ -132,9 +136,16 @@ export function createWorldPresenceController({
   getHeightAt = () => 0,
   createAvatar = id => createDefaultRemoteAvatar(THREE, id),
   getSelfId,
+  now = () => Date.now(),
+  interpolationDelayMs = 100,
 } = {}) {
   const remoteWorldPlayers = new Map();
   let remoteWorldLayer = null;
+  let routeGenerationHighWater = null;
+  const clockNow = () => {
+    const value = typeof now === 'function' ? now() : Date.now();
+    return Number.isFinite(value) ? value : Date.now();
+  };
   if (typeof document !== 'undefined') {
     remoteWorldLayer = document.getElementById('remoteWorldPlayers');
     if (!remoteWorldLayer) {
@@ -155,6 +166,7 @@ export function createWorldPresenceController({
 
   function clear() {
     for (const id of [...remoteWorldPlayers.keys()]) removeRemote(id);
+    routeGenerationHighWater = null;
   }
 
   function applyAnimation(remote, animation, now) {
@@ -199,9 +211,13 @@ export function createWorldPresenceController({
   function acceptSnapshot(payload) {
     const snapshot = sanitizeOnlineWorldSnapshot(payload, getZone?.());
     if (!snapshot) return false;
+    if (snapshot.generation !== undefined) {
+      if (routeGenerationHighWater !== null && snapshot.generation < routeGenerationHighWater) return false;
+      routeGenerationHighWater = snapshot.generation;
+    }
     const selfId = getSelfId?.() ?? currentSelfPresenceId();
     const seen = new Set();
-    const now = Date.now();
+    const receivedAt = clockNow();
     for (const item of snapshot.players.slice(0, MAX_REMOTE_PLAYERS)) {
       if (!isRemoteWorldPlayer(item, selfId)) continue;
       const id = String(item.id);
@@ -243,6 +259,7 @@ export function createWorldPresenceController({
           actionHighestSequence: 0,
           retiredActionSessions: new Set(),
           animationPhase: 0,
+          samples: [],
         };
         remoteWorldPlayers.set(id, remote);
       }
@@ -252,7 +269,10 @@ export function createWorldPresenceController({
       remote.targetZ = item.z;
       remote.targetDir = Number.isFinite(item.dir) ? item.dir : 0;
       remote.locomotion = typeof item.locomotion === 'string' ? item.locomotion : 'idle';
-      applyAnimation(remote, item.animation, now);
+      applyAnimation(remote, item.animation, receivedAt);
+      const sample = Object.freeze({ x: remote.targetX, y: remote.targetY, z: remote.targetZ, dir: remote.targetDir, at: receivedAt });
+      remote.samples.push(sample);
+      while (remote.samples.length > 8) remote.samples.shift();
       if (remote.marker) {
         remote.marker.textContent = item.name || 'ผู้เล่นออนไลน์';
         remote.marker.dataset.x = item.x;
@@ -271,15 +291,47 @@ export function createWorldPresenceController({
 
   function update(deltaSeconds = 0.1) {
     const camera = getCamera?.();
-    const now = Date.now();
+    const currentTime = clockNow();
     for (const remote of remoteWorldPlayers.values()) {
-      expireAnimation(remote, now);
+      expireAnimation(remote, currentTime);
       const avatar = remote.avatar;
       if (avatar) {
-        avatar.position.x += (remote.targetX - avatar.position.x) * .35;
-        avatar.position.y += (remote.targetY - avatar.position.y) * .35;
-        avatar.position.z += (remote.targetZ - avatar.position.z) * .35;
-        const turn = Math.atan2(Math.sin(remote.targetDir - avatar.rotation.y), Math.cos(remote.targetDir - avatar.rotation.y));
+        const renderAt = currentTime - Math.max(0, Number(interpolationDelayMs) || 0);
+        const samples = remote.samples;
+        let rendered = samples.at(-1) || { x: remote.targetX, y: remote.targetY, z: remote.targetZ, dir: remote.targetDir, at: currentTime };
+        if (samples.length > 1) {
+          const first = samples[0];
+          const last = samples.at(-1);
+          if (last.at <= first.at) {
+            avatar.position.x = boundedApproach(avatar.position.x, last.x);
+            avatar.position.y = boundedApproach(avatar.position.y, last.y);
+            avatar.position.z = boundedApproach(avatar.position.z, last.z);
+            rendered = { x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, dir: last.dir, at: currentTime };
+          } else if (renderAt <= first.at) rendered = first;
+          else if (renderAt < last.at) {
+            let rightIndex = samples.findIndex(sample => sample.at >= renderAt);
+            if (rightIndex < 1) rightIndex = 1;
+            const left = samples[rightIndex - 1];
+            const right = samples[rightIndex];
+            const span = Math.max(1, right.at - left.at);
+            const alpha = Math.max(0, Math.min(1, (renderAt - left.at) / span));
+            const turn = Math.atan2(Math.sin(right.dir - left.dir), Math.cos(right.dir - left.dir));
+            rendered = {
+              x: left.x + (right.x - left.x) * alpha,
+              y: left.y + (right.y - left.y) * alpha,
+              z: left.z + (right.z - left.z) * alpha,
+              dir: left.dir + turn * alpha,
+              at: renderAt,
+            };
+          }
+        }
+        // Approach the delayed sample instead of assigning it in one frame.
+        // This bounds the first correction after a long packet gap while the
+        // sample buffer still follows the authoritative target exactly.
+        avatar.position.x = boundedApproach(avatar.position.x, rendered.x);
+        avatar.position.y = boundedApproach(avatar.position.y, rendered.y);
+        avatar.position.z = boundedApproach(avatar.position.z, rendered.z);
+        const turn = Math.atan2(Math.sin(rendered.dir - avatar.rotation.y), Math.cos(rendered.dir - avatar.rotation.y));
         avatar.rotation.y += turn * .35;
         remote.animationPhase += .1;
         const moving = remote.locomotion === 'walk' || remote.locomotion === 'run' || remote.locomotion === 'swim' || remote.locomotion === 'dash';
