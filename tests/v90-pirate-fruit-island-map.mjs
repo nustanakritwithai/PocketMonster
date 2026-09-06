@@ -39,7 +39,7 @@ assert.equal(parkedPirateFruitPresencePose().x, 0);
 assert.equal(parkedPirateFruitPresencePose().z, 0);
 assert.doesNotMatch(boot, /parkedPirateFruitPresencePose/, 'boot no longer publishes the parked origin pose');
 assert.match(boot, /sanitizePirateLocalPresence/, 'boot accepts only a sanitized iframe pose');
-assert.match(boot, /getPosition: \(\) => piratePose/, 'WORLD_STATE follows the real iframe pose');
+assert.match(boot, /registerExternalPose\(piratePose\)/, 'WORLD_STATE follows the real iframe pose through the shared publisher');
 assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'presence zone stays pirate-fruit');
 assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'map contract does not open write flags');
 

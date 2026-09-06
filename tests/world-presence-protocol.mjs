@@ -15,6 +15,10 @@ const {
   isRemoteWorldPlayer,
   filterRemotePlayers,
   selfPresenceId,
+  sanitizePresentation,
+  sanitizeVisual,
+  createVisualEventQueue,
+  SPELL_FX_ASSET_IDS,
 } = await import('../world-presence-protocol.mjs');
 
 assert.equal(WORLD_PRESENCE_PROTOCOL_VERSION, 'world-presence-protocol/v2');
@@ -109,6 +113,60 @@ assert.deepEqual(
 assert.equal('y' in buildWorldPosFrame({ zone: 'hub', x: 1, y: Number.NaN, z: 2, dir: 0 }), false, 'invalid optional height is omitted');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [] }, 'pirate-fruit'), null);
 
+const presentation = sanitizePresentation({
+  schemaVersion: 1,
+  avatarId: 'pirate-v1',
+  appearanceId: 'player-orange',
+  clothingIds: ['clothing:coat'],
+  equipmentIds: ['equipment:sword'],
+  activeItem: { category: 'sword', itemId: 'equipment:sword' },
+});
+assert.equal(presentation.activeItem.itemId, 'equipment:sword');
+assert.equal(sanitizePresentation({ ...presentation, appearanceId: 'unknown' }), null, 'unknown appearance fails closed');
+assert.equal(SPELL_FX_ASSET_IDS.length, 9);
+const visual = sanitizeVisual({
+  schemaVersion: 1,
+  sessionId: 'visual-session-1',
+  stateSequence: 1,
+  events: [
+    { sequence: 1, kind: 'slash', ageMs: 0, position: { x: 1, y: 2, z: 3 }, heading: 0.2, color: 0xff00aa, scale: 1 },
+    { sequence: 2, kind: 'energy-launch', ageMs: 10, position: { x: 1, y: 2, z: 3 }, direction: { x: 0, y: 0, z: 1 }, color: 0xffffff, scale: 1 },
+  ],
+  projectiles: [{ id: 'projectile-1', position: { x: 1, y: 2, z: 3 }, direction: { x: 0, y: 0, z: 1 }, velocity: { x: 0, y: 0, z: 2 }, color: 0xffffff, scale: 1, elapsed: 0, lifeFraction: .2, remainingMs: 1000 }],
+});
+assert.equal(visual.events.length, 2);
+assert.equal(visual.projectiles[0].id, 'projectile-1');
+assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 33 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) }, { maxEvents: 32 }), null, 'outbound visual batches fail closed above 32');
+assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 512 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) })?.events.length, 512, 'inbound snapshots preserve up to 512 history events');
+assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 514 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) }), null, 'inbound visual history above 512 fails closed');
+let queueNow = 1000;
+const queue = createVisualEventQueue(256, { now: () => queueNow });
+queue.push(Array.from({ length: 40 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })));
+assert.equal(queue.drain().length, 32, 'visual queue emits at most one contract batch');
+assert.equal(queue.diagnostics().pending, 8, 'visual queue preserves events beyond a cadence');
+queueNow += 120;
+assert.equal(queue.peek(1)[0].ageMs, 120, 'queued event age advances from injectable clock time');
+queueNow += 3001;
+assert.equal(queue.diagnostics().pending, 0, 'expired queued events are removed before capacity/peek');
+queue.push([{ ...visual.events[0], sequence: 99 }, { sequence: 100 }]);
+assert.equal(queue.diagnostics().pending, 1, 'invalid events do not become head-of-line blockers');
+let originalAgeNow = 0;
+const originalAgeQueue = createVisualEventQueue(256, { now: () => originalAgeNow });
+originalAgeQueue.push({ ...visual.events[0], sequence: 150, ageMs: 2500 });
+originalAgeNow = 501;
+assert.equal(originalAgeQueue.diagnostics().pending, 0, 'original event age participates in TTL expiry');
+let commitNow = 0;
+const commitQueue = createVisualEventQueue(256, { now: () => commitNow });
+commitQueue.push({ ...visual.events[0], sequence: 201 });
+commitNow = 2999;
+commitQueue.push({ ...visual.events[0], sequence: 202 });
+const peekedBeforeExpiry = commitQueue.peek(1);
+assert.equal(peekedBeforeExpiry[0].ageMs, 2999);
+commitNow = 3001;
+commitQueue.commit(1, peekedBeforeExpiry);
+assert.equal(commitQueue.peek(1)[0].ageMs, 2, 'unsent event keeps its own queue age after sent head expires');
+assert.deepEqual(commitQueue.peek(1).map(event => event.sequence), [202], 'token commit removes only the sent event after clock advances');
+
 const self = 'keeper_one';
 assert.equal(isRemoteWorldPlayer({ id: 'other', x: 1, z: 2 }, self), true);
 assert.equal(isRemoteWorldPlayer({ id: self, x: 1, z: 2 }, self), false, 'exact self id is filtered');
@@ -136,7 +194,7 @@ assert.equal(selfPresenceId(null), null);
 
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=2'/, 'chat runtime owns the presence protocol');
+assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=3'/, 'chat runtime owns the presence protocol');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -144,7 +202,7 @@ assert.match(presence, /if \(!isRemoteWorldPlayer\(item, selfId\)\) continue;/, 
 assert.match(presence, /locomotion: pos\?\.locomotion/, 'published world state forwards locomotion');
 assert.match(presence, /animation: pos\?\.animation/, 'published world state forwards animation');
 const bridge = fs.readFileSync(new URL('online-world-bridge-v900.mjs', root), 'utf8');
-assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=2'/, 'online bridge imports the shared protocol');
+assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=3'/, 'online bridge imports the shared protocol');
 assert.doesNotMatch(bridge, /LOCOMOTION_VALUES = new Set/, 'online bridge does not declare a second locomotion vocabulary');
 assert.doesNotMatch(bridge, /COMBAT_STATE_VALUES = new Set/, 'online bridge does not declare a second combat vocabulary');
 const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root), 'utf8');

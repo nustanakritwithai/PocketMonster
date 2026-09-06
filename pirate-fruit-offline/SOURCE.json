@@ -1,11 +1,11 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "codex/remote-animation-lod-smoothing-20260906",
-  "commit": "3811c146e3696c3b8be68597f09a0803481a346b",
+  "ref": "codex/full-player-presentation-20260906",
+  "commit": "8796dbab9729c95ea6e5a89a5d864068432ababa",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client built from the pinned read-only presence source plus presentation-only remote animation relay. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral pose, locomotion, height, animation and bounded short-action identity only, while Pocket overlays asset-engine visuals without replacing the client. Includes verified remote defeat/respawn visibility and long-skill timeline continuity. Remote on-foot players retain full Pirate rigs at all distances and device tiers, with bounded render-only motion smoothing. Equipment and skill VFX replication are not added by this artifact.",
+  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเท่านั้น Save และ Combat authority ยังคงปิดบน VPS",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",

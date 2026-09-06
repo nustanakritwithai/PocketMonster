@@ -4,7 +4,7 @@ import {
   currentSelfPresenceId,
   isRemoteWorldPlayer,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=2';
+} from './world-presence-protocol.mjs?v=3';
 
 const DEFAULT_REMOTE_ANIMATION = Object.freeze({
   combatState: 'idle',
@@ -341,11 +341,18 @@ export function installWorldPresence(options = {}) {
   };
 }
 
-export function publishWorldState({ getZone, getPosition, getDir } = {}) {
+let externalPose = null;
+
+export function registerExternalPose(pose) {
+  externalPose = pose && typeof pose === 'object' ? pose : null;
+  return externalPose;
+}
+
+export function publishWorldState({ getZone, getPosition, getDir, getPresentation, getVisual } = {}) {
   if (typeof window === 'undefined') return;
   window.POCKETMONSTER_WORLD_STATE = () => {
-    const pos = getPosition?.();
-    const dir = getDir?.();
+    const pos = getPosition?.() ?? externalPose;
+    const dir = getDir?.() ?? pos?.dir;
     return buildWorldPosFrame({
       zone: getZone?.(),
       x: pos?.x,
@@ -354,6 +361,8 @@ export function publishWorldState({ getZone, getPosition, getDir } = {}) {
       dir: dir === undefined ? 0 : dir,
       locomotion: pos?.locomotion,
       animation: pos?.animation,
+      presentation: getPresentation?.() ?? pos?.presentation,
+      visual: getVisual?.() ?? pos?.visual,
     });
   };
 }
