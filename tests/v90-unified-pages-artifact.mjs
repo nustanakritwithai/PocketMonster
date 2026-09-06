@@ -17,6 +17,10 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.join(root, 'dist-pages');
 const manifest = JSON.parse(fs.readFileSync(path.join(output, 'patch-manifest.json'), 'utf8'));
 const closure = collectPublicDependencyClosure(root);
+const pirateBootstrap = fs.readFileSync(path.join(root, 'pirate-fruit-offline/pocket-bootstrap.mjs'), 'utf8');
+const pirateEntryMatch = pirateBootstrap.match(/import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(pirateEntryMatch, 'Pirate bootstrap must declare its compiled entry asset');
+const pirateEntryAsset = `pirate-fruit-offline/assets/${pirateEntryMatch[1]}`;
 const required = new Set([
   ...REQUIRED_V9_ENTRY_FILES,
   'entry-preload-v900.mjs',
@@ -40,7 +44,7 @@ const required = new Set([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
-  'pirate-fruit-offline/assets/index-YxSDH_bK.js',
+  pirateEntryAsset,
   'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
   'assets/catalog/humanoid-core.json',
 ]);
