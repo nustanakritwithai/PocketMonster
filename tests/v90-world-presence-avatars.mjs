@@ -209,13 +209,40 @@ controller.acceptSnapshot({
 const farAvatar = scene.children.find(node => node.name === 'remote-world-player:far-player');
 assert.deepEqual([farAvatar.position.x, farAvatar.position.z], [10000, -10000], 'direct presence ingress clamps remote coordinates');
 
-controller.acceptSnapshot({
-  zone: 'hub',
-  players: [{ id: 'player-b', name: 'Player B', x: 4, z: 5, dir: 1 }],
+let smoothingNow = 0;
+const smoothingScene = new Group();
+const smoothingController = createWorldPresenceController({
+  THREE,
+  scene: smoothingScene,
+  getCamera: () => ({}),
+  getZone: () => 'hub',
+  now: () => smoothingNow,
+  interpolationDelayMs: 100,
 });
-controller.update();
-assert.ok(avatar.position.x > 1 && avatar.position.x < 4, 'remote movement is smoothed toward the Server snapshot');
-assert.ok(avatar.rotation.y > .4 && avatar.rotation.y < 1, 'remote facing is smoothed across snapshots');
+smoothingController.acceptSnapshot({
+  zone: 'hub',
+  players: [{ id: 'smoothing-player', x: 0, z: 0, dir: 0 }],
+});
+smoothingNow = 250;
+smoothingController.acceptSnapshot({
+  zone: 'hub',
+  players: [{ id: 'smoothing-player', x: 4, z: 5, dir: 1 }],
+});
+smoothingController.update();
+const smoothingAvatar = smoothingScene.children.find(node => node.name === 'remote-world-player:smoothing-player');
+const positionBeforeGap = smoothingAvatar.position.x;
+const directionBeforeGap = smoothingAvatar.rotation.y;
+smoothingNow = 1_000;
+smoothingController.acceptSnapshot({
+  zone: 'hub',
+  players: [{ id: 'smoothing-player', x: 8, z: 9, dir: 2 }],
+});
+smoothingController.update();
+assert.ok(smoothingAvatar.position.x > positionBeforeGap && smoothingAvatar.position.x < 8,
+  'a long packet gap smooths the next remote movement correction');
+assert.ok(smoothingAvatar.rotation.y > directionBeforeGap && smoothingAvatar.rotation.y < 2,
+  'remote facing is smoothed across snapshots');
+smoothingController.dispose();
 assert.equal(controller.acceptSnapshot({ zone: 'grass-meadow', players: [] }), false, 'wrong-zone snapshots cannot clear the active avatar');
 assert.equal(controller.diagnostics().remotePlayers, 1);
 
