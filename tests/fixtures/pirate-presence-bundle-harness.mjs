@@ -395,12 +395,41 @@ export function seedRemotePlayer(manager, playerId, islandId, animatorEvents, no
   return group;
 }
 
-export function createRemoteManager(RemotePlayerManager, islandId, animatorEvents, clock) {
-  const scene = {
+export function createTrackedScene() {
+  const children = [];
+  return {
+    children,
+    add(...objects) {
+      for (const object of objects) {
+        if (!children.includes(object)) children.push(object);
+      }
+    },
+    remove(...objects) {
+      for (const object of objects) {
+        const index = children.indexOf(object);
+        if (index >= 0) children.splice(index, 1);
+      }
+    },
+    getObjectByName(name) {
+      for (const object of children) {
+        if (object?.name === name) return object;
+        const nested = object?.getObjectByName?.(name);
+        if (nested) return nested;
+      }
+      return undefined;
+    },
+    objectsByName(name) {
+      return children.filter(object => object?.name === name);
+    },
+  };
+}
+
+export function createRemoteManager(RemotePlayerManager, islandId, animatorEvents, clock, scene = null) {
+  const targetScene = scene ?? {
     add() {},
     remove() {},
   };
-  return new RemotePlayerManager(scene, islandId, () => clock.now, {
+  return new RemotePlayerManager(targetScene, islandId, () => clock.now, {
     tier: 'high',
     focus: () => ({ x: 0, y: 0, z: 0 }),
   });

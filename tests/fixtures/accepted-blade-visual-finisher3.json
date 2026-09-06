@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "a15aba814ff247ca826ce319841ac399",
+  "stateSequence": 3,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "blade-trail",
+      "ageMs": 672,
+      "position": {
+        "x": 2,
+        "y": 0,
+        "z": 3
+      },
+      "bladeBase": {
+        "x": 2.5514355551666945,
+        "y": 0.859197991372789,
+        "z": 3.241916784194351
+      },
+      "bladeTip": {
+        "x": 2.794484827131906,
+        "y": 1.1091796467435258,
+        "z": 4.127772428966843
+      },
+      "heading": 0,
+      "comboIndex": 0,
+      "color": 10476799,
+      "finisher": false
+    },
+    {
+      "sequence": 2,
+      "kind": "blade-trail",
+      "ageMs": 0,
+      "position": {
+        "x": 2,
+        "y": 0,
+        "z": 3
+      },
+      "bladeBase": {
+        "x": 2.5514355551666945,
+        "y": 0.859197991372789,
+        "z": 3.241916784194351
+      },
+      "bladeTip": {
+        "x": 2.794484827131906,
+        "y": 1.1091796467435258,
+        "z": 4.127772428966843
+      },
+      "heading": 0,
+      "comboIndex": 3,
+      "color": 10476799,
+      "finisher": true
+    }
+  ],
+  "projectiles": [],
+  "shield": {
+    "active": false,
+    "opacity": 0
+  }
+}
