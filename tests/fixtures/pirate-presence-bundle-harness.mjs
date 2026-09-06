@@ -66,7 +66,8 @@ function compilePresenceRuntime(bundle, classes) {
   if (!block) throw new Error('Pirate bundle fixture could not locate the presence publisher/receiver');
 
   const messageIndex = bundle.lastIndexOf('pocketmonster:pirate-presence-v1', block.start);
-  const declarationsStart = Math.max(
+  const protocolHelperStart = bundle.lastIndexOf('const Ei=', messageIndex);
+  const declarationsStart = protocolHelperStart >= 0 ? protocolHelperStart : Math.max(
     bundle.lastIndexOf('const ', messageIndex),
     bundle.lastIndexOf('let ', messageIndex),
     bundle.lastIndexOf('var ', messageIndex),
@@ -83,7 +84,7 @@ function compilePresenceRuntime(bundle, classes) {
   return new Function(fieldHelper, executable)(defineClassField);
 }
 
-function compileRemotePlayerManager(bundle, classes) {
+function compileRemotePlayerManager(bundle, classes, Effects) {
   const block = classes.find(candidate => (
     candidate.source.includes('acceptedPresence')
     && candidate.source.includes('applyPresence(')
@@ -120,6 +121,7 @@ function compileRemotePlayerManager(bundle, classes) {
     /new\s+([A-Za-z_$][\w$]*)\(e\.x,e\.y,e\.z\)/,
     'remote-player Vector3 dependency',
   )[1];
+  const effectsType = requiredMatch(block.source, /this\.effects=new ([A-Za-z_$][\w$]*)\(e\)/, 'remote-player Effects dependency')[1];
   const mathUtils = requiredMatch(
     block.source,
     /([A-Za-z_$][\w$]*)\.clamp\(r\*l/,
@@ -139,15 +141,15 @@ function compileRemotePlayerManager(bundle, classes) {
   );
   const [, extrapolationLimit, maxVelocity, teleportDistance, renderSpeed, renderProgressRate]
     = runtimeConstants;
-  const disposableTypes = requiredMatch(
-    block.source,
-    /instanceof ([A-Za-z_$][\w$]*)\?\([^:]+\):t instanceof ([A-Za-z_$][\w$]*)/,
-    'remote-player disposable render types',
-  );
+  const disposableTypes = [...block.source.matchAll(/instanceof ([A-Za-z_$][\w$]*)/g)]
+    .map(match => match[1])
+    .filter((name, index, names) => names.indexOf(name) === index);
+  if (disposableTypes.length < 2) throw new Error('Pirate bundle fixture could not locate remote-player disposable render types');
   const parameterValues = new Map([
     [fieldHelper, defineClassField],
     [staleLimit, 20_000],
     [vectorType, TestVector3],
+    [effectsType, Effects],
     [mathUtils, { clamp: (value, min, max) => Math.min(max, Math.max(min, value)) }],
     [extrapolationLimit, 0.25],
     [maxVelocity, 24],
@@ -157,15 +159,74 @@ function compileRemotePlayerManager(bundle, classes) {
     // capture the wire snapshot before `manager.update(1 / 60)` and assert the
     // animator's bounded render progress separately afterward.
     [renderProgressRate, 0.6],
-    [disposableTypes[1], class TestMesh {}],
-    [disposableTypes[2], class TestSprite {}],
+    [disposableTypes[0], class TestMesh {}],
+    [disposableTypes[1], class TestSprite {}],
   ]);
   const names = [...parameterValues.keys()];
   const executable = `${bundle.slice(helpersStart, block.end)}; return ${block.name};`;
   return new Function(...names, executable)(...names.map(name => parameterValues.get(name)));
 }
 
-export function loadPiratePresenceBundleHarness() {
+async function compileCompiledEffects(bundle, classes, bundleUrl) {
+  let block = classes.find(candidate => (
+    candidate.source.includes('createEnergyProjectile')
+    && candidate.source.includes('replayForOwner')
+  ));
+  // The compiled Effects class can follow a nested class expression that makes
+  // the generic class scanner skip it. Anchor directly on its real method and
+  // recover the owning class boundary from the bundle instead of substituting
+  // a test double.
+  if (!block) {
+    const methodIndex = bundle.indexOf('createEnergyProjectile');
+    const classStart = methodIndex < 0 ? -1 : bundle.lastIndexOf('class ', methodIndex);
+    const classMatch = classStart < 0
+      ? null
+      : bundle.slice(classStart).match(/^class\s+([A-Za-z_$][\w$]*)\{/);
+    if (classMatch) {
+      const openingBrace = classStart + classMatch[0].lastIndexOf('{');
+      const end = matchingBrace(bundle, openingBrace) + 1;
+      block = {
+        name: classMatch[1],
+        start: classStart,
+        end,
+        source: bundle.slice(classStart, end),
+      };
+    }
+  }
+  if (!block) throw new Error('Pirate bundle fixture could not locate compiled Effects class');
+  const importMatch = bundle.match(/import\{([^}]*)\}from"([^"]*vendor-three[^"]*)";/);
+  if (!importMatch) throw new Error('Pirate bundle fixture could not locate vendored Three import');
+  const vendor = await import(new URL(importMatch[2], bundleUrl).href);
+  const aliases = importMatch[1].split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
+    const [exportName, localName] = entry.split(/\s+as\s+/);
+    return { exportName, localName: localName || exportName };
+  });
+  const sourceStart = importMatch.index + importMatch[0].length;
+  // The bundle segment contains lazy-loader declarations with import.meta.url;
+  // replace that module-only syntax while preserving the actual Effects class
+  // and its compiled helper dependencies for this CommonJS-style evaluator.
+  const source = bundle.slice(sourceStart, block.end).replaceAll('import.meta.url', '""');
+  const names = aliases.map(alias => alias.localName);
+  const values = aliases.map(alias => vendor[alias.exportName]);
+  const executable = `${source}; return ${block.name};`;
+  const classField = (target, key, value) => {
+    Object.defineProperty(target, typeof key === 'symbol' ? key : `${key}`, {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value,
+    });
+    return value;
+  };
+  return new Function(...names, 'h', 'document', 'MutationObserver', executable)(
+    ...values,
+    classField,
+    { createElement() { return { getContext() { return null; } }; }, querySelectorAll() { return []; } },
+    class TestMutationObserver { observe() {} },
+  );
+}
+
+export async function loadPiratePresenceBundleHarness() {
   const bootstrapUrl = new URL('../../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url);
   const bootstrap = fs.readFileSync(bootstrapUrl, 'utf8');
   const bundleReference = bootstrap.match(/import\(['"]\.\/(assets\/index-[^'"]+\.js)['"]\)/)?.[1];
@@ -173,10 +234,11 @@ export function loadPiratePresenceBundleHarness() {
   const bundleUrl = new URL(`../../pirate-fruit-offline/${bundleReference}`, import.meta.url);
   const bundle = fs.readFileSync(bundleUrl, 'utf8');
   const classes = classBlocks(bundle);
+  const Effects = await compileCompiledEffects(bundle, classes, bundleUrl);
   return Object.freeze({
     bundleUrl,
     PresenceRuntime: compilePresenceRuntime(bundle, classes),
-    RemotePlayerManager: compileRemotePlayerManager(bundle, classes),
+    RemotePlayerManager: compileRemotePlayerManager(bundle, classes, Effects),
   });
 }
 
@@ -297,6 +359,15 @@ export function seedRemotePlayer(manager, playerId, islandId, animatorEvents, no
         animatorEvents.push(structuredClone({ playerId, deltaSeconds, state }));
       },
     },
+    equipment: null,
+    projectiles: new Map(),
+    projectileSamples: new Map(),
+    endedProjectiles: new Set(),
+    shield: null,
+    visualSessionId: null,
+    visualSequence: 0,
+    visualStateSequence: 0,
+    retiredVisualSessions: new Set(),
     locomotion: 'idle',
     animation: {
       combatState: 'idle',

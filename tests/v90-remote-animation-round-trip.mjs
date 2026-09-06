@@ -33,7 +33,7 @@ const actionMatrix = JSON.parse(fs.readFileSync(
   new URL('./fixtures/remote-animation-action-matrix.json', import.meta.url),
   'utf8',
 ));
-const { bundleUrl, PresenceRuntime, RemotePlayerManager } = loadPiratePresenceBundleHarness();
+const { bundleUrl, PresenceRuntime, RemotePlayerManager } = await loadPiratePresenceBundleHarness();
 
 function runtimeOptions({ host, remotePlayers, poseRef, islandRef, clock }) {
   const currentPose = () => poseRef.current;

@@ -6,18 +6,19 @@ import {
   PIRATE_HUD_INIT_MESSAGE,
   createPirateHudTelemetryCollector,
 } from './pirate-hud-telemetry-v900.mjs?v=2';
-import { publishWorldState } from './world-presence-v800.mjs?v=3';
+import { publishWorldState, registerExternalPose } from './world-presence-v800.mjs?v=4';
 import {
   PIRATE_PRESENCE_ZONE,
   createPiratePresenceStatusMessage,
   createPirateSnapshotMessage,
+  advancePirateSnapshotVisualAge,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
-} from './pirate-presence-bridge-v900.mjs?v=3';
+} from './pirate-presence-bridge-v900.mjs?v=4';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=937', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=828&animalControl=pirate-fruit';
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=938', import.meta.url).href;
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const pocketPlayerHud = createPocketPlayerHudStore();
@@ -40,7 +41,7 @@ export function ensurePocketAnimalControl() {
     return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
   }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=828&animalControl=pirate-fruit').then(() => {
+    throwRuntimePromise = import('./game-v800.js?v=829&animalControl=pirate-fruit').then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
@@ -104,6 +105,12 @@ function bindPocketMonsterLink(frame) {
   }));
   let piratePose = null;
   let latestPresenceSnapshot = null;
+  let latestPresenceAt = 0;
+  let frameReady = false;
+  // Server snapshots carry up to 512 recent visual events; retain only the
+  // newest late-boot snapshot so history is replayed once, age-adjusted.
+  const pendingPresenceSnapshots = [];
+  let pendingPresenceDropped = 0;
   let frameGeneration = 0;
   const hudTelemetry = createPirateHudTelemetryCollector({
     frameWindow: frame.contentWindow,
@@ -121,37 +128,69 @@ function bindPocketMonsterLink(frame) {
     frame.contentWindow?.postMessage({ type: PIRATE_HUD_INIT_MESSAGE, frameGeneration }, '*');
   };
   const forwardPresence = snapshot => {
+    if (!frameReady) {
+      if (snapshot?.zone === PIRATE_PRESENCE_ZONE && snapshot?.players?.some(player => player?.visual?.events?.length)) {
+        if (pendingPresenceSnapshots.length) pendingPresenceDropped += pendingPresenceSnapshots.length;
+        pendingPresenceSnapshots.splice(0, pendingPresenceSnapshots.length, { snapshot, queuedAt: Date.now() });
+      }
+      return;
+    }
     frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), '*');
   };
   const forwardPresenceStatus = connected => {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
   };
-  frame.addEventListener('load', () => {
+  window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS = () => Object.freeze({
+    pending: pendingPresenceSnapshots.length,
+    dropped: pendingPresenceDropped,
+    frameReady,
+  });
+  const markFrameReady = () => {
     if (!pirateRuntimeActive) {
       hudTelemetry.invalidate('load-after-teardown');
       return;
     }
     activateHudTelemetry('reload');
+    frameReady = true;
+    const now = Date.now();
+    const pending = pendingPresenceSnapshots.pop();
+    pendingPresenceSnapshots.length = 0;
+    if (pending && now - pending.queuedAt <= 3000 && pending.snapshot?.zone === PIRATE_PRESENCE_ZONE) {
+      const aged = advancePirateSnapshotVisualAge(pending.snapshot, now - pending.queuedAt);
+      if (aged.players.some(player => player?.visual?.events?.length || player?.visual?.projectiles?.length)) {
+        frame.contentWindow?.postMessage(createPirateSnapshotMessage(aged), '*');
+      }
+    }
     try { frame.contentWindow?.focus?.(); } catch {}
     forwardPresenceStatus(window.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true);
-  });
+    if (latestPresenceSnapshot && now - latestPresenceAt <= 3000) forwardPresence(latestPresenceSnapshot);
+  };
+  frame.addEventListener('load', markFrameReady);
+  try {
+    if (frame.contentDocument?.readyState === 'complete' || frame.readyState === 'complete') queueMicrotask(markFrameReady);
+  } catch {}
   window.addEventListener('pocketmonster:world-socket-status', event => {
     const connected = event.detail?.connected === true;
     if (!connected) {
       latestPresenceSnapshot = null;
+      latestPresenceAt = 0;
+      pendingPresenceSnapshots.length = 0;
+      window.POCKETMONSTER_WORLD_VISUAL_RESET?.();
+      registerExternalPose(null);
       forwardPresence({ zone: PIRATE_PRESENCE_ZONE, players: [] });
     }
     forwardPresenceStatus(connected);
   });
   publishWorldState({
     getZone: () => 'pirate-fruit',
-    getPosition: () => piratePose,
-    getDir: () => piratePose?.dir,
+    getPosition: () => null,
+    getDir: () => undefined,
   });
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
     const snapshot = sanitizePirateWorldSnapshot(payload);
     if (!snapshot) return;
     latestPresenceSnapshot = snapshot;
+    latestPresenceAt = Date.now();
     forwardPresenceStatus(true);
     forwardPresence(snapshot);
   };
@@ -182,7 +221,21 @@ function bindPocketMonsterLink(frame) {
     }
     const nextPose = sanitizePirateLocalPresence(message);
     if (nextPose) {
-      piratePose = nextPose;
+      const previousVisualSession = piratePose?.visual?.sessionId;
+      const nextVisualSession = nextPose.visual?.sessionId;
+      if (previousVisualSession && nextVisualSession && previousVisualSession !== nextVisualSession) {
+        window.POCKETMONSTER_WORLD_VISUAL_RESET?.();
+      }
+      if (nextPose.visual?.events?.length) {
+        window.POCKETMONSTER_WORLD_VISUAL_EVENTS?.(nextPose.visual.events);
+        piratePose = Object.freeze({
+          ...nextPose,
+          visual: Object.freeze({ ...nextPose.visual, events: Object.freeze([]) }),
+        });
+      } else {
+        piratePose = nextPose;
+      }
+      registerExternalPose(piratePose);
       if (latestPresenceSnapshot) forwardPresence(latestPresenceSnapshot);
       return;
     }
@@ -209,6 +262,10 @@ function bindPocketMonsterLink(frame) {
     invalidate: reason => {
       pocketPlayerHud.reset();
       return hudTelemetry.invalidate(reason);
+    },
+    clearPresenceQueue: () => {
+      pendingPresenceSnapshots.length = 0;
+      latestPresenceSnapshot = null;
     },
   });
 }
@@ -250,6 +307,9 @@ window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   },
   unmount:()=>{
     pirateRuntimeActive=false;
+    registerExternalPose(null);
+    delete window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS;
+    pirateHudTelemetry.clearPresenceQueue();
     pirateHudTelemetry.invalidate('teardown');
     try{pirateFrame.contentWindow?.blur?.();}catch{}
     return true;

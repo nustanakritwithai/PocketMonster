@@ -1,9 +1,11 @@
 import {
   PRESENCE_COORDINATE_LIMIT,
   sanitizeAnimation,
+  sanitizePresentation,
+  sanitizeVisual,
   sanitizeLocomotion,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=2';
+} from './world-presence-protocol.mjs?v=3';
 
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
 export const PIRATE_LOCAL_PRESENCE_MESSAGE = 'pocketmonster:pirate-presence-v1';
@@ -33,6 +35,14 @@ export function sanitizePirateLocalPresence(message) {
   if (isFiniteNumber(message.y)) {
     pose.y = Math.max(-PRESENCE_COORDINATE_LIMIT, Math.min(PRESENCE_COORDINATE_LIMIT, message.y));
   }
+  if (message.presentation !== undefined) {
+    const presentation = sanitizePresentation(message.presentation);
+    if (presentation) pose.presentation = presentation;
+  }
+  if (message.visual !== undefined) {
+    const visual = sanitizeVisual(message.visual, { maxEvents: 32 });
+    if (visual) pose.visual = visual;
+  }
   return Object.freeze(pose);
 }
 
@@ -57,4 +67,36 @@ export function createPiratePresenceStatusMessage(connected) {
     zone: PIRATE_PRESENCE_ZONE,
     connected: connected === true,
   });
+}
+
+/** Advance one-shot visual ages while preserving the current projectile phase. */
+export function advancePirateSnapshotVisualAge(snapshot, elapsedMs) {
+  const elapsed = Math.max(0, Number.isFinite(Number(elapsedMs)) ? Number(elapsedMs) : 0);
+  if (!isRecord(snapshot) || !Array.isArray(snapshot.players)) return snapshot;
+  const players = snapshot.players.map(player => {
+    if (!player?.visual) return player;
+    const events = Array.isArray(player.visual.events)
+      ? player.visual.events
+        .map(event => ({ ...event, ageMs: Math.round(event.ageMs + elapsed) }))
+        .filter(event => event.ageMs <= 3000)
+      : [];
+    const projectiles = Array.isArray(player.visual.projectiles)
+      ? player.visual.projectiles.flatMap(projectile => {
+        const remainingMs = projectile.remainingMs - elapsed;
+        if (remainingMs <= 0) return [];
+        const dt = Math.min(elapsed / 1000, .25);
+        const position = {
+          x: Math.max(-PRESENCE_COORDINATE_LIMIT, Math.min(PRESENCE_COORDINATE_LIMIT, projectile.position.x + projectile.velocity.x * dt)),
+          y: Math.max(-PRESENCE_COORDINATE_LIMIT, Math.min(PRESENCE_COORDINATE_LIMIT, projectile.position.y + projectile.velocity.y * dt)),
+          z: Math.max(-PRESENCE_COORDINATE_LIMIT, Math.min(PRESENCE_COORDINATE_LIMIT, projectile.position.z + projectile.velocity.z * dt)),
+        };
+        const phase = projectile.lifeFraction >= 1
+          ? 1
+          : Math.max(0, Math.min(1, projectile.lifeFraction * remainingMs / Math.max(1, projectile.remainingMs)));
+        return [{ ...projectile, position, elapsed: Math.min(120, projectile.elapsed + dt), lifeFraction: phase, remainingMs }];
+      })
+      : [];
+    return { ...player, visual: { ...player.visual, events, projectiles } };
+  });
+  return Object.freeze({ ...snapshot, players: Object.freeze(players) });
 }

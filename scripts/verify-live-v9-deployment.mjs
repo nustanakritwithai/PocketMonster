@@ -39,7 +39,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-CxUAmAqt.js',
+  'pirate-fruit-offline/assets/index-PYS02ZJs.js',
   'pirate-fruit-offline/assets/AzureFrostIsland-Cx4TiiC4.js',
   'pirate-fruit-offline/assets/EmberVolcanoIsland-4CrJ5YE9.js',
   'pirate-fruit-offline/assets/MistJungleIsland-COnyjkdL.js',
@@ -211,12 +211,12 @@ async function verifyPages(options, runtimeConfig) {
     || !/\bcreateCombatV91Shell\b/.test(parentShell)) {
     throw new Error('online-world-shell-v900.mjs must import and install combat-v91-entry.mjs in the parent shell');
   }
-  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=3')) {
+  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=4')) {
     throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
   }
   const pirateBootstrap = bodies.get('pirate-fruit-offline/pocket-bootstrap.mjs');
   if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
-    || !pirateBootstrap.includes("await import('./assets/index-CxUAmAqt.js')")) {
+    || !pirateBootstrap.includes("await import('./assets/index-PYS02ZJs.js')")) {
     throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
   }
   return { runtimeConfig, manifest };
