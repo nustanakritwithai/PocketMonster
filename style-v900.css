@@ -243,6 +243,12 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-minimap-player{width:10px;height:10px;background:#fff;border:2px solid #22c55e;border-radius:2px}
 /* Unified HUD Task 8 — legacy Pocket HUD retirement under the capability flag */
 body.unified-hud-active #hud{display:none!important;pointer-events:none!important}
+/* The native Pocket Monster NPC route remains inside #hud. Keep that
+   container invisible and input-dead, then allow only its gameplay-owned
+   prompt and service modal roots to escape the unified-HUD retirement. */
+body.unified-hud-active[data-combined-world="pocket-monster"] #hud{display:block!important;visibility:hidden!important;pointer-events:none!important}
+body.unified-hud-active[data-combined-world="pocket-monster"] #hud>#npcBtn.npc-btn:not(.hidden){display:block!important;visibility:visible!important;pointer-events:auto!important;touch-action:manipulation;z-index:45!important}
+body.unified-hud-active[data-combined-world="pocket-monster"] #hud>:is(#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker):not(.hidden){visibility:visible!important;pointer-events:auto!important}
 body.unified-hud-active #stageObjective{display:none!important;pointer-events:none!important}
 body.unified-hud-active #stageObjectiveToggle{display:none!important;pointer-events:none!important}
 body.unified-hud-active #targetCard{display:none!important;pointer-events:none!important}
