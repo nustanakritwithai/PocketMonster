@@ -28,6 +28,16 @@ for (const cls of ['.breeding-salon-brand', '.breeding-salon-stats', '.breeding-
 }
 assert.match(lounge, /#fde68a|#facc15/, 'salon lounge uses a gold accent');
 assert.match(lounge, /#f472b6|#f9a8d4|#db2777|#9f1239/, 'salon lounge uses a rose accent');
+assert.match(
+  lounge,
+  /\.breeding-salon \.breeding-caretaker-card\{[\s\S]*?width:min\(600px,92vw\);max-height:min\(78dvh,620px\);[\s\S]*?padding:14px;/,
+  'the Breeding Salon stays compact on desktop instead of expanding to a 760px card',
+);
+assert.match(
+  lounge,
+  /\.breeding-salon \.breeding-preview-grid>div:not\(\.breeding-heart\),[\s\S]*?min-height:104px/,
+  'the parent pods do not force an oversized salon',
+);
 
 assert.match(js, /function openBreedingCaretaker\(/, 'breeding NPC still opens the caretaker overlay');
 assert.match(js, /function renderBreedingSalon\(/, 'salon renderer exists');

@@ -17,14 +17,14 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   if (isCombinedV9) {
     html = html
       .replace(/src="\.\/entry-preload-v900\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
-      .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
+      .replace(`href="./style-v800.css?v=814"`, `href="${assetBase}style-v800.css?v=${release}"`)
       .replace(/href="\.\/style-v900\.css(?:\?[^"]*)?"/, `href="${assetBase}style-v900.css?v=${release}"`)
       .replace(/\n\s*<link rel="stylesheet" href="\.\/combat-v91\.css(?:\?[^"]*)?"\s*\/?>/, '')
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`);
   } else {
     html = html
       .replace(/src="\.\/entry-preload\.mjs(?:\?[^"]*)?"/, `src="./firebase-launcher-entry.mjs?v=${release}"`)
-      .replace(`href="./style-v800.css?v=813"`, `href="${assetBase}style-v800.css?v=${release}"`)
+      .replace(`href="./style-v800.css?v=814"`, `href="${assetBase}style-v800.css?v=${release}"`)
       .replace(`src="./startup-errors.mjs"`, `src="${assetBase}startup-errors.mjs?v=${release}"`)
       .replace(`  <script type="module" src="./game-v800.js?v=819"></script>`, '');
   }
