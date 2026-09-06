@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.da949653a01b",
+  "buildId": "8.4.0.content.9eb3d6eaf2a5",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-06T21:58:48.678Z",
+  "publishedAtUtc": "2026-09-06T22:03:36.255Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -292,8 +292,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 13929,
-      "sha256": "061da5d57db508bf3e220346e34f02b9cbd24706832222db5c080d7e13363c17"
+      "size": 14200,
+      "sha256": "7c4dc3103ac40ee3cbb5a75fa14afdd10c24693d6342a12c5e2748fddfd8c1c7"
     },
     {
       "path": "boss-challenge.mjs",
@@ -621,19 +621,19 @@
       "sha256": "a81a1d12e0d4897fae9dcd160a7bc3aae74d278490164e3ffdceb719e9237a20"
     },
     {
-      "path": "pirate-fruit-offline/assets/AzureFrostIsland-D65O0BFk.js",
+      "path": "pirate-fruit-offline/assets/AzureFrostIsland-C5Cdm3on.js",
       "size": 5201,
-      "sha256": "2fb2e14827ddb0f124da5d58aa602f3c0bb5b961e695b6ebe53105aa36be074c"
+      "sha256": "336fbc8499e37ce159a7c5935149208744710227afd6881dbc612ed776ee6824"
     },
     {
-      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-BaG79ntz.js",
+      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-CKj8myV9.js",
       "size": 6479,
-      "sha256": "c1800bc72126d1190235738f2fcc013475cc76711021ed57367b2b232a0ad7e8"
+      "sha256": "a7d365ef09709655ce1e1031a94b20eeb6677d31172a90a1ce22747ff9bb0a30"
     },
     {
-      "path": "pirate-fruit-offline/assets/MistJungleIsland-DrwaDHbY.js",
+      "path": "pirate-fruit-offline/assets/MistJungleIsland-WdqDIL_B.js",
       "size": 6126,
-      "sha256": "664e5cd04ca9fd76be93570c3bc26a2f5d2e48d544333c487aad2569947a285a"
+      "sha256": "9bd587eedd6f5f60375faedd3928427c8f3bfdbdb59ea743ac4c6ddc20e40b5b"
     },
     {
       "path": "pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js",
@@ -641,19 +641,19 @@
       "sha256": "06bbfe336727de437932112f49321d1927ed7b998638b81d1c88da1294c3cb92"
     },
     {
-      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-07feLGsv.js",
+      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-CqwolJiL.js",
       "size": 6375,
-      "sha256": "57acc1589e96e73b75e31a606312c2f5c62291ff3c111afce79137b6df8fbb6a"
+      "sha256": "6889fbd133533d27eab881e1242d768df16d9b27589a4c1ef938c4a3c25f39ae"
     },
     {
-      "path": "pirate-fruit-offline/assets/TempestSkyIsland-BgY3vPZ9.js",
+      "path": "pirate-fruit-offline/assets/TempestSkyIsland-gb6IvqMB.js",
       "size": 5411,
-      "sha256": "3fffa05ab90e855cac48f199f84166042706f1b3dae68378495f090a872afdbf"
+      "sha256": "b1b2a2499cc40232c5395ba7487e69318e37778729989710fce917a0fc206111"
     },
     {
-      "path": "pirate-fruit-offline/assets/index-DTCSihWI.js",
-      "size": 1127792,
-      "sha256": "5e24f4b01cb80164a853157b580597e75feaf36792f57a767047a4a221fd088a"
+      "path": "pirate-fruit-offline/assets/index-CbUVGL2y.js",
+      "size": 1129804,
+      "sha256": "9bc9ebee409bb11e98cba65ae59e0aabe8acf0d81d437650f2e7c9720ed2e7f3"
     },
     {
       "path": "pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js",
@@ -668,7 +668,7 @@
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
       "size": 158,
-      "sha256": "119cf53372bf7bd130bac3f81c50c0bd65d74115306c1638e3a356208c016d52"
+      "sha256": "6b75bb21bef4bb732fbe8e1db28f9099c653408b710ed5f437fdd5cb9464cc59"
     },
     {
       "path": "pirate-fruit-offline/pocket-presentation.mjs",
@@ -702,8 +702,8 @@
     },
     {
       "path": "pirate-presence-bridge-v900.mjs",
-      "size": 4301,
-      "sha256": "c407e6ce2d1837bf1242bcd66c58dccb6fce69889299a14d64c1eb437acf4756"
+      "size": 4564,
+      "sha256": "a033cd3edb3fba77fac7ca623903c2fdd840c1414cd14edc9b35a1633869551e"
     },
     {
       "path": "pirate-save-bridge-v900.mjs",
@@ -967,8 +967,8 @@
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 27031,
-      "sha256": "a371ccb391de7cb3152d2daad7046adc36752a9dcdca28380f376a7be48ca257"
+      "size": 27338,
+      "sha256": "9f5926860d714d6a683e76f7918e5cdf0e1360ca4b08e822de30614019bde0f9"
     },
     {
       "path": "world-presence-v800.mjs",

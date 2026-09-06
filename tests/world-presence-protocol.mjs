@@ -158,6 +158,18 @@ assert.equal(visual.projectiles[0].id, 'projectile-1');
 assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 33 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) }, { maxEvents: 32 }), null, 'outbound visual batches fail closed above 32');
 assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 512 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) })?.events.length, 512, 'inbound snapshots preserve up to 512 history events');
 assert.equal(sanitizeVisual({ ...visual, events: Array.from({ length: 514 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })) }), null, 'inbound visual history above 512 fails closed');
+assert.equal(sanitizeVisual({ ...visual, projectiles: Array.from({ length: 33 }, (_, i) => ({ ...visual.projectiles[0], id: `projectile-${i}` })) }), null, 'visual projectile batches remain capped at 32');
+const actorWithIndependentLifecycleGeneration = {
+  actorId: 'monster-route-generation-test', kind: 'monster', monsterType: 'flameling', zone: 'hub', generation: 9,
+  lifecycle: 'active', spawnSequence: 1, stateSequence: 2,
+  pose: { x: 0, y: 0, z: 0, dir: 0 }, locomotion: 'idle', animation: null,
+  presentation: { events: [], projectiles: [] },
+};
+assert.equal(
+  worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation: 3, players: [], actors: [actorWithIndependentLifecycleGeneration] } })?.actors[0].generation,
+  9,
+  'actor lifecycle generation is independent from viewer route generation',
+);
 let queueNow = 1000;
 const queue = createVisualEventQueue(256, { now: () => queueNow });
 queue.push(Array.from({ length: 40 }, (_, i) => ({ ...visual.events[0], sequence: i + 1 })));

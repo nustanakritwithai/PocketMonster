@@ -467,7 +467,11 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
   }
   let actors = [];
   if (payload.actors !== undefined) {
-    actors = sanitizePresenceActors(payload.actors, zone, generation, { maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS });
+    // `generation` on the snapshot is the viewer's world-route generation.
+    // Actor lifecycle generations belong to the actor stream and may advance
+    // independently during reconnect/despawn/re-spawn. Never compare these
+    // two domains or a valid actor snapshot is lost after a route reconnect.
+    actors = sanitizePresenceActors(payload.actors, zone, undefined, { maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS });
     if (!actors) return null;
   }
   return Object.freeze({

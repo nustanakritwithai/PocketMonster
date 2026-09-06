@@ -293,14 +293,21 @@ globalThis.document = {
   },
 };
 const { publishWorldState, registerExternalPose } = await import(`../world-presence-v800.mjs?presentation-integration=${Date.now()}`);
+const publishedActor = {
+  actorId: 'monster-fox-1', kind: 'monster', ownerId: 'player-other', monsterType: 'flameling',
+  zone: 'pirate-fruit', generation: 1, lifecycle: 'active', spawnSequence: 1, stateSequence: 1,
+  pose: { x: 4, y: 0, z: -2, dir: .5 }, locomotion: 'walk',
+  animation: { combatState: 'attack1', category: 'fruit', onGround: true, dashing: false, verticalVelocity: 0 },
+  presentation: { events: [], projectiles: [] },
+};
 const publishedLocalPose = { x: 9, y: 1, z: -3, locomotion: 'run', animation: null, presentation: {
   schemaVersion: 1, avatarId: 'pirate-v1', appearanceId: 'player-orange', clothingIds: [], equipmentIds: [], activeItem: null,
-}, visual: { schemaVersion: 1, sessionId: 'visual_session_2', stateSequence: 1, events: [], projectiles: [] } };
+}, visual: { schemaVersion: 1, sessionId: 'visual_session_2', stateSequence: 1, events: [], projectiles: [] }, actors: [publishedActor] };
 registerExternalPose({ ...publishedLocalPose, dir: .25 });
 publishWorldState({ getZone: () => 'pirate-fruit' });
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 9, y: 1, z: -3, dir: .25, locomotion: 'run', animation: null,
-  presentation: publishedLocalPose.presentation, visual: publishedLocalPose.visual,
+  presentation: publishedLocalPose.presentation, visual: publishedLocalPose.visual, actors: publishedLocalPose.actors,
 }, 'actual publishWorldState path preserves presentation and visual into socket hook');
 registerExternalPose({ ...publishedLocalPose, x: 10.123456789, z: -4.987654321, dir: .75, visual: {
   ...publishedLocalPose.visual, stateSequence: 2,
@@ -340,7 +347,7 @@ class FakeWebSocket {
   close() { this.readyState = FakeWebSocket.CLOSED; this.emit('close'); }
 }
 globalThis.WebSocket = FakeWebSocket;
-let activePose = { zone: 'pirate-fruit', x: 1, z: 2, dir: 0 };
+let activePose = { zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [publishedActor] };
 window.POCKETMONSTER_WORLD_STATE = () => activePose;
 window.POCKETMONSTER_WORLD_PRESENCE = () => true;
 await import(`../chat-runtime.mjs?unified-test=${Date.now()}`);
@@ -349,6 +356,15 @@ assert.equal(FakeWebSocket.instances.length, 1, 'first shell transport creates o
 const physicalSocket = FakeWebSocket.instances[0];
 physicalSocket.readyState = FakeWebSocket.OPEN;
 physicalSocket.emit('open');
+const actorFrameBeforeSnapshot = physicalSocket.sent.at(-1);
+assert.equal(actorFrameBeforeSnapshot.actors[0].actorId, publishedActor.actorId, 'iframe actor state reaches the existing world-pos WSS frame');
+const receivedSnapshots = [];
+window.POCKETMONSTER_WORLD_PRESENCE = snapshot => { receivedSnapshots.push(snapshot); return true; };
+physicalSocket.emit('message', { data: JSON.stringify({
+  type: 'world-snapshot',
+  payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [publishedActor] },
+}) });
+assert.equal(receivedSnapshots.at(-1).actors[0].actorId, publishedActor.actorId, 'WSS actor snapshot reaches the parent renderer callback');
 activePose.visual = { schemaVersion: 1, sessionId: 'visual_session_1', stateSequence: 1, events: [], projectiles: [] };
 const visualEvent = sequence => ({ sequence, kind: 'hit-spark', ageMs: 0, position: { x: 1, y: 2, z: 3 }, color: 0xffffff });
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS(Array.from({ length: 70 }, (_, index) => visualEvent(index + 1)));
