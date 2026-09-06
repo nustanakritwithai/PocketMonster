@@ -10,7 +10,10 @@ class FakeTarget extends EventTarget {
     super();
     this.name = name;
     this.dataset = {};
+    this.style = {};
   }
+
+  getBoundingClientRect() { return { left: 0, top: 0, width: 100, height: 100 }; }
 
   dispatchEvent(event) {
     if (event.type.startsWith('pointer')) {
@@ -67,6 +70,13 @@ const documentElement = new FakeTarget('documentElement');
 const head = { appendChild() {} };
 let cameraZone = null;
 let joystickZone = null;
+const childActions = new Map([
+  ['.tc-cannon-left', new FakeTarget('cannonLeft')],
+  ['.tc-cannon-right', new FakeTarget('cannonRight')],
+  ['.tc-dash', new FakeTarget('dash')],
+  ['.tc-jump', new FakeTarget('jump')],
+  ['.tc-attack', new FakeTarget('attack')],
+]);
 const documentLike = {
   documentElement,
   head,
@@ -76,6 +86,7 @@ const documentLike = {
   querySelector(selector) {
     if (selector === '.tc-camzone') return cameraZone;
     if (selector === '.tc-joyzone') return joystickZone;
+    if (childActions.has(selector)) return childActions.get(selector);
     return null;
   },
 };
@@ -194,9 +205,34 @@ send(input({ kind: 'camera', phase: 'move', frameGeneration: 2, gestureId: 3, x:
 send(input({ kind: 'camera', phase: 'end', frameGeneration: 2, gestureId: 3 }));
 assert.equal(eventLog.filter(({ type }) => type === 'pointerdown').length, startsBeforeStaleReloadPackets, 'packets from the pre-reload generation remain stale');
 send(input({ kind: 'camera', phase: 'start', frameGeneration: 3, gestureId: 1, x: 150, y: 160 }));
+const modeMessagesBeforeBoat = parentMessages.filter(({ message }) => message.type === 'pocketmonster:unified-mobile-input-mode-v1').length;
+childActions.get('.tc-cannon-right').style.display = 'flex';
+FakeMutationObserver.flush();
+assert.deepEqual(
+  parentMessages.filter(({ message }) => message.type === 'pocketmonster:unified-mobile-input-mode-v1').at(-1),
+  {
+    message: {
+      type: 'pocketmonster:unified-mobile-input-mode-v1',
+      frameGeneration: 3,
+      controlMode: 'boat',
+    },
+    origin: PARENT_ORIGIN,
+  },
+  'native TouchControls publishes boat mode only after the parent-established generation',
+);
+assert.equal(parentMessages.filter(({ message }) => message.type === 'pocketmonster:unified-mobile-input-mode-v1').length, modeMessagesBeforeBoat + 1);
+
+send(input({ kind: 'action', frameGeneration: 3, action: 'cannonRight', phase: 'start', pointerId: 41 }));
+send(input({ kind: 'action', frameGeneration: 3, action: 'cannonRight', phase: 'end', pointerId: 41 }));
+assert.deepEqual(
+  eventLog.filter(({ target }) => target === 'cannonRight').map(({ type }) => type),
+  ['pointerdown', 'pointerup'],
+  'boat cannon action reaches the active native cannon button',
+);
+assert.equal(eventLog.some(({ target }) => target === 'attack'), false, 'boat cannon action never falls through to hidden player attack');
 childWindow.dispatchEvent(new Event('pagehide'));
 childWindow.dispatchEvent(new Event('pagehide'));
-assert.equal(eventLog.filter(({ type }) => type === 'pointerup').length, terminalsBeforeReload + 2, 'pagehide closes an active camera exactly once');
+assert.equal(eventLog.filter(({ target, type }) => target === 'window' && type === 'pointerup').length, terminalsBeforeReload + 2, 'pagehide closes an active camera exactly once');
 
 joystickZone = new FakeTarget('joystickZone');
 send(input({ kind: 'move', frameGeneration: 1, active: true, x: 1, z: 0 }));

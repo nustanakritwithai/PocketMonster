@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 
 import {
+  PIRATE_CONTROL_MODE_EVENT,
+  PIRATE_UNIFIED_INPUT_MODE_MESSAGE,
   PIRATE_UNIFIED_INPUT_READY_MESSAGE,
   createPirateIframeInputTransport,
 } from '../unified-mobile-controls-v900.mjs';
 
 const sent = [];
 const parentResets = [];
+const windowLike = new EventTarget();
+const modeEvents = [];
+windowLike.addEventListener(PIRATE_CONTROL_MODE_EVENT, event => modeEvents.push(event.detail));
 const firstFrameWindow = {
   postMessage(message, origin) { sent.push({ message, origin, target: 'first' }); },
 };
@@ -15,6 +20,7 @@ const transport = createPirateIframeInputTransport({
   frame,
   inputMessageType: 'pocketmonster:unified-mobile-input-v1',
   resetParentInput: reason => parentResets.push(reason),
+  windowLike,
 });
 
 const readyEvent = (source = frame.contentWindow, origin = 'null') => ({
@@ -43,6 +49,21 @@ assert.deepEqual(sent.map(item => item.message), [{
   reason: 'pirate-input-ready',
 }]);
 
+const modeEvent = (controlMode, { source = frame.contentWindow, origin = 'null', frameGeneration = 1 } = {}) => ({
+  source,
+  origin,
+  data: { type: PIRATE_UNIFIED_INPUT_MODE_MESSAGE, controlMode, frameGeneration },
+});
+assert.equal(transport.acceptReady(modeEvent('boat', { source: {} })), false, 'a foreign frame cannot change Pirate controls');
+assert.equal(transport.acceptReady(modeEvent('boat', { origin: 'https://game.example' })), false, 'only the opaque active iframe may change Pirate controls');
+assert.equal(transport.acceptReady(modeEvent('boat', { frameGeneration: 2 })), false, 'a future generation cannot change controls before readiness');
+const modeEventsBeforeBoat = modeEvents.length;
+assert.equal(transport.acceptReady(modeEvent('boat')), true);
+assert.deepEqual(modeEvents.at(-1), { controlMode: 'boat', frameGeneration: 1 });
+assert.equal(transport.acceptReady(modeEvent('boat')), true, 'a duplicate mode report is accepted but does not reset parent pointers');
+assert.equal(modeEvents.length, modeEventsBeforeBoat + 1);
+assert.equal(transport.acceptReady(modeEvent('invalid')), false, 'only player and boat native modes are accepted');
+
 assert.equal(transport.camera({ phase: 'move', gestureId: 2, x: 15, y: 20 }), false);
 assert.equal(transport.camera({ phase: 'end', gestureId: 2 }), false);
 assert.equal(sent.length, 1, 'a gesture begun before ready is not partially replayed after ready');
@@ -64,6 +85,7 @@ assert.equal(transport.camera({ phase: 'start', gestureId: 4, x: 30, y: 40 }), t
 assert.equal(transport.beginGeneration('frame-load'), true);
 assert.equal(transport.diagnostics().frameGeneration, 2);
 assert.equal(transport.diagnostics().ready, false);
+assert.deepEqual(modeEvents.at(-1), { controlMode: 'player', frameGeneration: 2 }, 'a new iframe generation clears a stale boat HUD before any input is accepted');
 assert.equal(transport.camera({ phase: 'move', gestureId: 4, x: 31, y: 40 }), false);
 assert.equal(transport.camera({ phase: 'end', gestureId: 4 }), false);
 assert.equal(transport.action({ action: 'capture', phase: 'start' }), false);
