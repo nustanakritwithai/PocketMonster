@@ -5,6 +5,7 @@ const {
   WORLD_PRESENCE_PROTOCOL_VERSION,
   MAX_REMOTE_PLAYERS,
   MAX_SNAPSHOT_CANDIDATES,
+  MAX_WORLD_ROUTE_GENERATION,
   LOCOMOTION_VALUES,
   COMBAT_STATE_VALUES,
   ANIMATION_CATEGORY_VALUES,
@@ -24,6 +25,7 @@ const {
 assert.equal(WORLD_PRESENCE_PROTOCOL_VERSION, 'world-presence-protocol/v2');
 assert.equal(MAX_REMOTE_PLAYERS, 100);
 assert.equal(MAX_SNAPSHOT_CANDIDATES, 400);
+assert.equal(MAX_WORLD_ROUTE_GENERATION, 2147483647);
 assert.deepEqual(LOCOMOTION_VALUES, ['idle', 'walk', 'run', 'swim']);
 assert.deepEqual(COMBAT_STATE_VALUES, [
   'idle', 'attack1', 'attack2', 'attack3', 'attack4', 'casting', 'blocking',
@@ -74,6 +76,23 @@ assert.equal(worldSnapshotPayload({ type: 'chat', payload: { zone: 'hub', player
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot' }), null);
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub' } }), null);
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot', payload: { players: [] } }), null);
+assert.deepEqual(
+  worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation: 7, players: [] } }),
+  { zone: 'hub', generation: 7, players: [] },
+  'optional Server route generation survives the canonical snapshot sanitizer',
+);
+for (const generation of [0, -1, 1.5, Number.NaN, MAX_WORLD_ROUTE_GENERATION + 1]) {
+  assert.equal(
+    worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation, players: [] } }),
+    null,
+    `invalid route generation ${generation} fails closed`,
+  );
+}
+assert.equal(
+  'generation' in worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', players: [] } }),
+  false,
+  'legacy snapshots remain valid without inventing a route generation',
+);
 
 const snapshot = worldSnapshotPayload({
   type: 'world-snapshot',
@@ -194,7 +213,7 @@ assert.equal(selfPresenceId(null), null);
 
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=3'/, 'chat runtime owns the presence protocol');
+assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=4'/, 'chat runtime owns the presence protocol');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -202,7 +221,7 @@ assert.match(presence, /if \(!isRemoteWorldPlayer\(item, selfId\)\) continue;/, 
 assert.match(presence, /locomotion: pos\?\.locomotion/, 'published world state forwards locomotion');
 assert.match(presence, /animation: pos\?\.animation/, 'published world state forwards animation');
 const bridge = fs.readFileSync(new URL('online-world-bridge-v900.mjs', root), 'utf8');
-assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=3'/, 'online bridge imports the shared protocol');
+assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=4'/, 'online bridge imports the shared protocol');
 assert.doesNotMatch(bridge, /LOCOMOTION_VALUES = new Set/, 'online bridge does not declare a second locomotion vocabulary');
 assert.doesNotMatch(bridge, /COMBAT_STATE_VALUES = new Set/, 'online bridge does not declare a second combat vocabulary');
 const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root), 'utf8');

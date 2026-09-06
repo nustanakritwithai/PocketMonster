@@ -91,7 +91,7 @@ assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
   'scene code cannot access a second Combat global or forge Server reconciliation');
 assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
   'scene teardown closes pending Combat state without destroying the persistent host');
-assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-full-presentation-1'\)/, 'shell owns the one chat transport');
+assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-smooth-presence-1'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");
@@ -118,7 +118,7 @@ assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child ful
 assert.match(fullscreenBridge, /owner: 'opaque-parent-relay'/, 'opaque iframe patches requestFullscreen even when window.top throws');
 assert.match(fullscreenBridge, /PERSISTENT_FULLSCREEN_REQUEST_MESSAGE/, 'opaque fullscreen requests relay through a versioned parent message');
 assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=4/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
-assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-PYS02ZJs\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
+assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-YxSDH_bK\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
 assert.match(sceneEntry, /__POCKETMONSTER_RUNTIME_MANIFEST__ = config/, 'legacy scene runtimes receive the same normalized configuration');
@@ -350,17 +350,21 @@ window.POCKETMONSTER_WORLD_VISUAL_EVENTS(Array.from({ length: 70 }, (_, index) =
 await new Promise(resolve => setTimeout(resolve, 360));
 const firstVisualFrame = physicalSocket.sent.find(message => message.type === 'world-pos' && message.visual?.events?.length === 32);
 assert.ok(firstVisualFrame, 'first 32 visual events cross the real world-pos socket');
-assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 38, 'events beyond one cadence remain queued');
-for (let attempt = 0; attempt < 40 && window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending > 6; attempt += 1) {
+assert.ok(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending <= 38, '20Hz cadence drains at least one visual batch');
+for (let attempt = 0; attempt < 40 && window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending > 0; attempt += 1) {
   await new Promise(resolve => setTimeout(resolve, 25));
 }
-assert.ok(physicalSocket.sent.filter(message => message.type === 'world-pos' && message.visual?.events?.length === 32).length >= 2, 'second 32-event batch crosses the real socket');
-assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 6, 'only the final six events remain after two batches');
-await new Promise(resolve => setTimeout(resolve, 400));
-assert.ok(physicalSocket.sent.some(message => message.type === 'world-pos' && message.visual?.events?.length === 6), 'final burst events cross in a third batch');
+assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 0, '20Hz cadence drains the full visual burst');
+const burstFrames = physicalSocket.sent.filter(message => message.type === 'world-pos' && message.visual?.events?.length);
+assert.ok(burstFrames.filter(message => message.visual.events.length === 32).length >= 2, 'multiple 32-event batches cross the real socket');
+assert.deepEqual(
+  burstFrames.flatMap(message => message.visual.events.map(event => event.sequence)).sort((a, b) => a - b),
+  Array.from({ length: 70 }, (_, index) => index + 1),
+  '20Hz burst sequence crosses exactly once',
+);
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS([visualEvent(41)]);
 physicalSocket.throwNext = true;
-await new Promise(resolve => setTimeout(resolve, 120));
+await new Promise(resolve => setTimeout(resolve, 10));
 assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 1, 'failed socket send does not commit the queue');
 await new Promise(resolve => setTimeout(resolve, 700));
 assert.ok(physicalSocket.sent.some(message => message.type === 'world-pos' && message.visual?.events?.some(event => event.sequence === 41)), 'queued event retries after transport recovers');

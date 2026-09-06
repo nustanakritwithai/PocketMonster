@@ -1,7 +1,7 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
 import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
-import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=3';
-import { createVisualEventQueue } from './world-presence-protocol.mjs?v=3';
+import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=4';
+import { createVisualEventQueue } from './world-presence-protocol.mjs?v=4';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];
@@ -485,15 +485,19 @@ function connectSocket() {
         if (!frame) return;
         if (lastWorldZone && lastWorldZone !== frame.zone) worldVisualQueue.clear();
         lastWorldZone = frame.zone;
-        if (worldVisualQueue.diagnostics().pending > 0 && !frame.visual) return;
+        // Keep pose cadence independent from a pending visual batch.  The
+        // queue still waits for a valid visual envelope before peeking or
+        // committing events, so a transient pose without visual metadata
+        // cannot stall movement or discard the batch.
+        const visualEnvelopeReady = Boolean(frame.visual);
         const baseFrame = frame.visual
           ? { ...frame, visual: { ...frame.visual, events: [] } }
           : frame;
-        const queuedEvents = worldVisualQueue.peek(32, candidate => {
+        const queuedEvents = visualEnvelopeReady ? worldVisualQueue.peek(32, candidate => {
           const candidateFrame = buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: candidate } });
           if (!candidateFrame) return false;
           return new TextEncoder().encode(JSON.stringify({ type: 'world-pos', ...candidateFrame })).byteLength <= MAX_COMBAT_FRAME_BYTES;
-        });
+        }) : [];
         const outboundFrame = queuedEvents.length
           ? buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: queuedEvents } })
           : baseFrame;
@@ -510,7 +514,7 @@ function connectSocket() {
       };
       sendWorld();
       if (state.worldPulse) clearInterval(state.worldPulse);
-      state.worldPulse = setInterval(sendWorld, 250);
+      state.worldPulse = setInterval(sendWorld, 50);
     });
     socket.addEventListener('message', event => {
       if (state.socket !== socket || state.stopped || state.paused) return;

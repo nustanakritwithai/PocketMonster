@@ -27,6 +27,8 @@ for (const testFile of [
   'remote-animation-protocol-baseline.mjs',
   'remote-animation-world-publisher.mjs',
   'v90-remote-animation-round-trip.mjs',
+  'v90-world-presence-avatars.mjs',
+  'v90-sword-overlay-acceptance.mjs',
 ]) {
   assert.match(packageJson.scripts['test:remote-animation'], new RegExp(testFile.replace('.', '\\.') ));
 }
@@ -116,7 +118,7 @@ pagesFiles.set('v900.html', pagesFiles.get('index.html'));
 pagesFiles.set('scene-v900.html', '<script type="module" src="./scene-entry-v900.mjs"></script>');
 pagesFiles.set('online-world-shell-v900.mjs', "import { createCombatV91Shell } from './combat-v91-entry.mjs?v=1';\nvoid createCombatV91Shell;");
 pagesFiles.set('pirate-fruit-offline/index.html', '<script type="module" src="./pocket-bootstrap.mjs?v=4"></script>');
-pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-PYS02ZJs.js');\n");
+pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-YxSDH_bK.js');\n");
 const manifest = {
   files: [...pagesFiles].map(([relative, body]) => ({
     path: relative,

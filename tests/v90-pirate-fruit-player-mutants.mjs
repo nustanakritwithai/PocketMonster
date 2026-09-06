@@ -35,7 +35,7 @@ assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c
 assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=829', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=946', 'mutant 0e2: pirate world still boots through the cache-busted pirate boot module');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=947', 'mutant 0e2: pirate world still boots through the cache-busted pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
@@ -96,7 +96,7 @@ assert.equal(pirateSource.pocketPresentation?.createsStage, false, 'mutant 24c: 
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'mutant 24d: Pocket-built pirate island scene stays deleted');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
 assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
-assert.match(shellJs, /chat-runtime\.mjs\?v=8\.4\.0-full-presentation-1/, 'mutant 27: persistent V9 shell loads one presence-aware Pocket chat transport');
+assert.match(shellJs, /chat-runtime\.mjs\?v=8\.4\.0-smooth-presence-1/, 'mutant 27: persistent V9 shell loads one presence-aware Pocket chat transport');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
 assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
 assert.match(pirateBundle, /pocketmonster:pirate-presence-v1/, 'mutant 28a: vendored Pirate reports the real local pose');

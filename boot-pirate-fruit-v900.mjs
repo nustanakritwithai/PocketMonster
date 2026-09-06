@@ -14,7 +14,7 @@ import {
   advancePirateSnapshotVisualAge,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
-} from './pirate-presence-bridge-v900.mjs?v=4';
+} from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=938', import.meta.url).href;
@@ -187,12 +187,14 @@ function bindPocketMonsterLink(frame) {
     getDir: () => undefined,
   });
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
+    if (!pirateRuntimeActive) return false;
     const snapshot = sanitizePirateWorldSnapshot(payload);
-    if (!snapshot) return;
+    if (!snapshot) return false;
     latestPresenceSnapshot = snapshot;
     latestPresenceAt = Date.now();
     forwardPresenceStatus(true);
     forwardPresence(snapshot);
+    return true;
   };
   window.addEventListener('message', event => {
     if (!pirateRuntimeActive) return;
@@ -236,7 +238,6 @@ function bindPocketMonsterLink(frame) {
         piratePose = nextPose;
       }
       registerExternalPose(piratePose);
-      if (latestPresenceSnapshot) forwardPresence(latestPresenceSnapshot);
       return;
     }
     if (message?.type !== 'pocketmonster:world-warp-v1') return;

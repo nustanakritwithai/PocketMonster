@@ -14,9 +14,9 @@ const build = read('scripts/build-github-pages.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
 assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=4"/, 'offline HTML loads the save-aware bootstrap');
-assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-PYS02ZJs\.js"/, 'vendored bundle is never started before save hydration');
+assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
-const bundleIndex = bootstrap.indexOf("await import('./assets/index-PYS02ZJs.js')");
+const bundleIndex = bootstrap.indexOf("await import('./assets/index-YxSDH_bK.js')");
 assert.ok(hydrateIndex >= 0 && bundleIndex > hydrateIndex, 'sandbox storage installs before the real Pirate bundle executes');
 assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-busts the save bridge');
 
@@ -27,7 +27,7 @@ const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
 assert.match(boot, /index\.html\?v=938/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=946/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=947/, 'world catalog keeps the current Pirate boot module revision');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=56/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=53/, 'scene HTML cache-busts the shared transport dependency chain and fullscreen ownership');
 assert.match(sceneHtml, /style-v900\.css\?v=966/, 'scene HTML cache-busts the persistent fullscreen control layout');
