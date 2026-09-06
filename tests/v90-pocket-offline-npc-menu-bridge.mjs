@@ -74,7 +74,7 @@ const windowLike = {
 };
 
 assert.equal(POCKET_OFFLINE_NPC_MENU_BRIDGE_KIND, 'pocketmonster:offline-npc-menu-bridge-v1');
-assert.equal(POCKET_OFFLINE_NPC_MENU_MESSAGE, 'pocketmonster:pirate-dialogue-v1');
+assert.equal(POCKET_OFFLINE_NPC_MENU_MESSAGE, 'pocketmonster:legacy-npc-menu-v1');
 assert.equal(hasOpenPocketOfflineNpcMenu(documentLike), false);
 
 const bridge = installPocketOfflineNpcMenuBridge({
@@ -85,7 +85,7 @@ const bridge = installPocketOfflineNpcMenuBridge({
 assert.ok(Object.isFrozen(bridge));
 assert.equal(bridge.kind, POCKET_OFFLINE_NPC_MENU_BRIDGE_KIND);
 assert.deepEqual(sent, [{
-  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false },
+  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false, world: 'pocket-monster' },
   origin: 'https://game.example',
 }]);
 assert.deepEqual(FakeMutationObserver.instances[0].options, {
@@ -98,7 +98,7 @@ roots.get('merchantShop').classList.remove('hidden');
 FakeMutationObserver.instances[0].notify();
 assert.equal(hasOpenPocketOfflineNpcMenu(documentLike), true);
 assert.deepEqual(sent.at(-1), {
-  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: true },
+  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: true, world: 'pocket-monster' },
   origin: 'https://game.example',
 });
 
@@ -110,7 +110,7 @@ roots.get('merchantShop').classList.add('hidden');
 roots.get('trainerPanel').classList.add('hidden');
 FakeMutationObserver.instances[0].notify();
 assert.deepEqual(sent.at(-1), {
-  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false },
+  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false, world: 'pocket-monster' },
   origin: 'https://game.example',
 });
 
@@ -119,7 +119,7 @@ FakeMutationObserver.instances[0].notify();
 documentLike.body.dataset.combinedWorld = 'pirate-fruit';
 FakeMutationObserver.instances[0].notify();
 assert.deepEqual(sent.at(-1), {
-  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false },
+  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false, world: 'pocket-monster' },
   origin: 'https://game.example',
 });
 
@@ -129,7 +129,7 @@ FakeMutationObserver.instances[0].notify();
 controller.abort();
 assert.equal(bridge.diagnostics().stopped, true);
 assert.deepEqual(sent.at(-1), {
-  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false },
+  message: { type: POCKET_OFFLINE_NPC_MENU_MESSAGE, open: false, world: 'pocket-monster' },
   origin: 'https://game.example',
 });
 assert.equal(FakeMutationObserver.instances[0].connected, false);
@@ -144,8 +144,8 @@ assert.match(
 );
 assert.match(
   shell,
-  /event\.source !== sceneFrame\.contentWindow[\s\S]*pocketmonster:pirate-dialogue-v1[\s\S]*document\.body\.dataset\.pirateDialogue = 'open'/,
-  'parent already raises only the active scene through the bounded modality protocol',
+  /event\.source !== sceneFrame\.contentWindow[\s\S]*pocketmonster:legacy-npc-menu-v1[\s\S]*document\.body\.dataset\.pocketNpcMenu = 'open'/,
+  'parent records the original Pocket menu only from its active scene iframe',
 );
 
 console.log('V9 Pocket offline NPC menu modality bridge: PASS');

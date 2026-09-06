@@ -1,7 +1,7 @@
 export const POCKET_OFFLINE_NPC_MENU_BRIDGE_KIND = 'pocketmonster:offline-npc-menu-bridge-v1';
-// Reuse the existing scene-to-shell modality protocol. The shell validates the
-// sender against its active scene iframe before it raises that scene.
-export const POCKET_OFFLINE_NPC_MENU_MESSAGE = 'pocketmonster:pirate-dialogue-v1';
+// The original menu stays game-owned in game-v800.js. This scoped message only
+// lets the trusted parent shell hide its layers while that legacy menu is open.
+export const POCKET_OFFLINE_NPC_MENU_MESSAGE = 'pocketmonster:legacy-npc-menu-v1';
 export const POCKET_OFFLINE_NPC_MENU_ROOT_IDS = Object.freeze([
   'merchantShop',
   'trainerPanel',
@@ -10,6 +10,7 @@ export const POCKET_OFFLINE_NPC_MENU_ROOT_IDS = Object.freeze([
   'ranchServices',
   'ranchStoragePage',
   'monsterManager',
+  'skillItemConfirm',
   'monsterPicker',
 ]);
 
@@ -38,6 +39,7 @@ export function installPocketOfflineNpcMenuBridge({
       parentWindow?.postMessage?.({
         type: POCKET_OFFLINE_NPC_MENU_MESSAGE,
         open: open === true,
+        world: 'pocket-monster',
       }, parentOrigin || '*');
     } catch {}
   };

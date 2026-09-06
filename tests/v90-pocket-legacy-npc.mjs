@@ -113,7 +113,7 @@ assert.match(
 );
 assert.match(
   unifiedStyle,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
   'every unrelated legacy HUD sibling remains invisible and input-dead',
 );
 assert.match(
@@ -123,7 +123,7 @@ assert.match(
 );
 assert.match(
   unifiedStyle,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:is\(#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker\):not\(\.hidden\)\{visibility:visible!important;pointer-events:auto!important\}/,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:is\(#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker\):not\(\.hidden\)\{visibility:visible!important;pointer-events:auto!important\}/,
   'original Pocket NPC service roots are visible and interactive only while open',
 );
 assert.match(

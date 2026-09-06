@@ -6,6 +6,7 @@ const offlineTemplate = read('index.html');
 const activeTemplate = read('v900.html');
 const sceneHtml = read('scene-v900.html');
 const game = read('game-v800.js');
+const bridge = read('pocket-offline-npc-menu-bridge-v900.mjs');
 const shell = read('online-world-shell-v900.mjs');
 const style = read('style-v900.css');
 
@@ -18,6 +19,7 @@ const ROOTS = Object.freeze([
   'ranchServices',
   'ranchStoragePage',
   'monsterManager',
+  'skillItemConfirm',
   'monsterPicker',
 ]);
 
@@ -30,14 +32,14 @@ function stylesheetRevision(html, entry) {
 function functionBody(source, name) {
   const start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `missing ${name}() in the original PocketMonster runtime`);
+  const bodyStart = source.indexOf('{', source.indexOf(')', start));
+  assert.notEqual(bodyStart, -1, `${name}() has no opening body brace`);
   let depth = 0;
-  let opened = false;
-  for (let index = start; index < source.length; index += 1) {
+  for (let index = bodyStart; index < source.length; index += 1) {
     const char = source[index];
     if (char === '{') {
       depth += 1;
-      opened = true;
-    } else if (char === '}' && opened && --depth === 0) {
+    } else if (char === '}' && --depth === 0) {
       return source.slice(start, index + 1);
     }
   }
@@ -98,6 +100,7 @@ for (const [fn, root, openPattern] of [
   ['showRanchServices', 'ranchServices', /el\('ranchServices'\)\.classList\.remove\('hidden'\)/],
   ['showRanchStorageShell', 'ranchStoragePage', /el\('ranchStoragePage'\)\.classList\.remove\('hidden'\)/],
   ['openManager', 'monsterManager', /revealMonsterManager\(tab\)/],
+  ['showSkillItemConfirmation', 'skillItemConfirm', /el\('skillItemConfirm'\)\?\.classList\.remove\('hidden'\)/],
   ['openMonsterPicker', 'monsterPicker', /el\('monsterPicker'\)\.classList\.remove\('hidden'\)/],
 ]) {
   const body = functionBody(game, fn);
@@ -112,23 +115,14 @@ for (const [fn, root, openPattern] of [
 // persistent parent HUD.  The real menu state therefore has to be mirrored to
 // the parent.  The bridge observes only original roots/classes and carries no
 // alternative button or menu implementation.
-assert.match(
-  game,
-  new RegExp(`(?:const|let)\\s+POCKET_LEGACY_NPC_MENU_MESSAGE\\s*=\\s*['\"]${MENU_MESSAGE}['\"]`),
-  'Pocket runtime defines a dedicated parent-stack message',
-);
-assert.match(
-  game,
-  new RegExp(`postMessage\\(\\{\\s*type:\\s*POCKET_LEGACY_NPC_MENU_MESSAGE,\\s*open:`),
-  'Pocket runtime mirrors original menu open/close state to its parent',
-);
-assert.match(
-  game,
-  /new MutationObserver\([\s\S]*?attributeFilter:\s*\[['"]class['"]\]/,
-  'the bridge tracks class-based open state rather than owning click behavior',
-);
+assert.match(bridge, new RegExp(`POCKET_OFFLINE_NPC_MENU_MESSAGE\\s*=\\s*['\"]${MENU_MESSAGE}['\"]`),
+  'presentation bridge defines a dedicated parent-stack message');
+assert.match(bridge, /postMessage\?\.\(\{[\s\S]*type:\s*POCKET_OFFLINE_NPC_MENU_MESSAGE,[\s\S]*open:/,
+  'presentation bridge mirrors original menu open/close state to its parent');
+assert.match(bridge, /new MutationObserverLike\(sync\)[\s\S]*attributeFilter:\s*\['class', 'data-combined-world'\]/,
+  'presentation bridge tracks class-based open state rather than owning click behavior');
 for (const id of ROOTS) {
-  assert.match(game, new RegExp(`['\"]${id}['\"]`), `bridge includes original #${id} in its open-state set`);
+  assert.match(bridge, new RegExp(`['\"]${id}['\"]`), `bridge includes original #${id} in its open-state set`);
 }
 
 assert.match(

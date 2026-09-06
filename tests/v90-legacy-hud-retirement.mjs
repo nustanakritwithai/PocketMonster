@@ -35,7 +35,7 @@ assert.match(
 );
 assert.match(
   css,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
   'only original NPC route roots escape the retired Pocket HUD',
 );
 assert.match(
@@ -51,6 +51,7 @@ for (const root of [
   'ranchServices',
   'ranchStoragePage',
   'monsterManager',
+  'skillItemConfirm',
   'monsterPicker',
 ]) {
   assert.ok(css.includes('#' + root), 'native NPC route root #' + root + ' remains in the explicit escape hatch');

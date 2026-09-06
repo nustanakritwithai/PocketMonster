@@ -80,6 +80,11 @@ body[data-combined-world="living-world"] .help{display:none!important}
 body[data-pirate-dialogue="open"] #onlineWorldSceneFrame{z-index:40!important}
 body[data-pirate-dialogue="open"] #pirateUnifiedControls{visibility:hidden!important;pointer-events:none!important}
 body[data-pirate-dialogue="open"] .mmorpg-hud{visibility:hidden!important;pointer-events:none!important}
+/* The original Pocket NPC menu is rendered inside the scene iframe. Parent
+   layers must step aside while it is open; an iframe child z-index cannot
+   otherwise outrank them. */
+body[data-pocket-npc-menu="open"] #pirateUnifiedControls{visibility:hidden!important;pointer-events:none!important}
+body[data-pocket-npc-menu="open"] .mmorpg-hud{visibility:hidden!important;pointer-events:none!important}
 #pirateOnboardingActionProxies{position:fixed;inset:0;z-index:31;pointer-events:none}
 .pirate-onboarding-action-proxy{position:absolute;display:block;padding:0;border:0;background:transparent;color:transparent;pointer-events:auto;touch-action:manipulation}
 #pirateUnifiedControls .camera-hint{display:none}
@@ -247,9 +252,9 @@ body.unified-hud-active #hud{display:none!important;pointer-events:none!importan
    retired Pocket controls. The original route roots keep their own display,
    layout, and z-index rules; only unrelated #hud siblings remain hidden. */
 body.unified-hud-active[data-combined-world="pocket-monster"] #hud{display:contents!important;visibility:visible!important;pointer-events:none!important}
-body.unified-hud-active[data-combined-world="pocket-monster"] #hud>:not(:is(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker)){visibility:hidden!important;pointer-events:none!important}
+body.unified-hud-active[data-combined-world="pocket-monster"] #hud>:not(:is(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker)){visibility:hidden!important;pointer-events:none!important}
 body.unified-hud-active[data-combined-world="pocket-monster"] #hud>#npcBtn.npc-btn:not(.hidden){display:block!important;visibility:visible!important;pointer-events:auto!important;touch-action:manipulation;z-index:45!important}
-body.unified-hud-active[data-combined-world="pocket-monster"] #hud>:is(#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker):not(.hidden){visibility:visible!important;pointer-events:auto!important}
+body.unified-hud-active[data-combined-world="pocket-monster"] #hud>:is(#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker):not(.hidden){visibility:visible!important;pointer-events:auto!important}
 body.unified-hud-active #stageObjective{display:none!important;pointer-events:none!important}
 body.unified-hud-active #stageObjectiveToggle{display:none!important;pointer-events:none!important}
 body.unified-hud-active #targetCard{display:none!important;pointer-events:none!important}
