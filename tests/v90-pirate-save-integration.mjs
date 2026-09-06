@@ -16,7 +16,9 @@ const packageJson = JSON.parse(read('package.json'));
 assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=4"/, 'offline HTML loads the save-aware bootstrap');
 assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
-const bundleIndex = bootstrap.indexOf("await import('./assets/index-YxSDH_bK.js')");
+const bundleMatch = bootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(bundleMatch, 'save-aware bootstrap declares the compiled Pirate entry');
+const bundleIndex = bootstrap.indexOf(bundleMatch[0]);
 assert.ok(hydrateIndex >= 0 && bundleIndex > hydrateIndex, 'sandbox storage installs before the real Pirate bundle executes');
 assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-busts the save bridge');
 

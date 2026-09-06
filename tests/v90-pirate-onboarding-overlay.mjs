@@ -115,7 +115,10 @@ assert.equal(
   'failed NPC-name interaction module is removed',
 );
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-YxSDH_bK.js', import.meta.url), 'utf8');
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
+const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(pirateEntryMatch, 'Pirate bootstrap declares its compiled entry');
+const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/assets/${pirateEntryMatch[1]}`, import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
   /className="interaction-prompt",this\.element\.type="button",this\.element\.addEventListener\("pointerdown",t=>\{t\.preventDefault\(\),this\.requested=!0\}\)/,
