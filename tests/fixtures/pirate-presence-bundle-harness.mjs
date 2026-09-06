@@ -66,7 +66,16 @@ function compilePresenceRuntime(bundle, classes) {
   if (!block) throw new Error('Pirate bundle fixture could not locate the presence publisher/receiver');
 
   const messageIndex = bundle.lastIndexOf('pocketmonster:pirate-presence-v1', block.start);
-  const protocolHelperStart = bundle.lastIndexOf('const Ei=', messageIndex);
+  // The current afcd701 bundle keeps the shared presentation sanitizers
+  // (`yd`/`bd`) in the same protocol prelude, anchored by `const mn=`;
+  // older bundles used `const Ei=`.  Starting at the prelude preserves the
+  // real helper dependencies instead of evaluating an incomplete publisher.
+  const protocolAnchors = [
+    bundle.lastIndexOf('const Ei=', messageIndex),
+    bundle.lastIndexOf('const mn=', messageIndex),
+    bundle.lastIndexOf('const Ri=', messageIndex),
+  ].filter(index => index >= 0);
+  const protocolHelperStart = protocolAnchors.length > 0 ? Math.min(...protocolAnchors) : -1;
   const declarationsStart = protocolHelperStart >= 0 ? protocolHelperStart : Math.max(
     bundle.lastIndexOf('const ', messageIndex),
     bundle.lastIndexOf('let ', messageIndex),
