@@ -81,11 +81,13 @@ assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same
   const hud = {};
   const style = {};
   const attrs = new Map();
+  const clickHandler = () => 'gameplay-owned';
   const button = {
     parentNode: hud,
     style,
     dataset: {},
     textContent: 'คุย',
+    onclick: clickHandler,
     setAttribute(name, value) { attrs.set(name, value); },
   };
   const documentLike = {
@@ -94,20 +96,21 @@ assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same
   };
   const binding = installNpcOverheadAction(documentLike, {});
   assert.equal(binding.kind, NPC_OVERHEAD_ACTION_KIND);
-  assert.equal(NPC_OVERHEAD_ACTION_KIND, 'pocketmonster:npc-overhead-action-v2');
+  assert.equal(NPC_OVERHEAD_ACTION_KIND, 'pocketmonster:npc-overhead-action-v1');
   assert.equal(button.parentNode, body, 'NPC interaction leaves the retired legacy HUD');
+  assert.equal(button.onclick, clickHandler, 'overhead presentation preserves the gameplay-owned click route');
   assert.equal(style.position, 'fixed');
   assert.equal(style.bottom, 'auto', 'legacy bottom docking is removed');
-  assert.match(style.transform, /-100% - 8px/, 'screen-space head coordinate anchors the clickable name above the NPC');
-  assert.equal(style.background, 'transparent', 'NPC interaction is no longer rendered as a button pill');
-  assert.equal(style.border, '0', 'NPC interaction has no button border');
-  assert.equal(style.boxShadow, 'none', 'NPC interaction has no button card shadow');
-  assert.equal(button.textContent, 'ผู้ดูแลฟาร์ม', 'Talk action is represented by the NPC name');
-  assert.equal(attrs.get('data-npc-overhead-action'), 'name');
+  assert.match(style.transform, /-100% - 10px/, 'screen-space head coordinate anchors the action pill above the NPC');
+  assert.equal(style.background, 'rgba(15,23,42,.88)', 'NPC interaction keeps the readable action pill');
+  assert.equal(style.border, '1px solid rgba(255,255,255,.72)', 'NPC action pill keeps its visible border');
+  assert.equal(style.boxShadow, '0 5px 18px rgba(0,0,0,.45)', 'NPC action pill keeps its card shadow');
+  assert.equal(button.textContent, 'คุย', 'Talk action remains the original gameplay CTA');
+  assert.equal(attrs.get('data-npc-overhead-action'), 'true');
   button.textContent = 'ร้านค้า';
   binding.refresh();
-  assert.equal(button.textContent, 'พ่อค้าเร่เสบียง', 'Shop action is represented by the merchant name');
-  assert.match(attrs.get('aria-label'), /พ่อค้าเร่เสบียง/);
+  assert.equal(button.textContent, 'ร้านค้า', 'Shop action remains the original gameplay CTA');
+  assert.equal(button.onclick, clickHandler, 'refresh preserves the gameplay-owned click route');
 }
 
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
