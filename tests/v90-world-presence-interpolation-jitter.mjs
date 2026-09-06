@@ -29,6 +29,35 @@ const controller = createWorldPresenceController({
 });
 const snapshot = (generation, x, animation) => ({ zone: 'hub', generation, players: [{ id: 'remote-a', x, z: 0, dir: 0, locomotion: 'run', ...(animation ? { animation } : {}) }] });
 
+// Four effective position ticks per second: normal 250ms arrivals render the
+// delayed sample directly, while a 500ms legacy gap remains bounded.
+let cadenceNow = 0;
+const cadenceScene = new Group();
+const cadenceController = createWorldPresenceController({
+  THREE,
+  scene: cadenceScene,
+  getCamera: () => ({}),
+  getZone: () => 'hub',
+  now: () => cadenceNow,
+  interpolationDelayMs: 100,
+});
+assert.equal(cadenceController.acceptSnapshot({ zone: 'hub', generation: 1, players: [{ id: 'cadence', x: 0, z: 0 }] }), true);
+cadenceNow = 250;
+cadenceController.acceptSnapshot({ zone: 'hub', generation: 1, players: [{ id: 'cadence', x: 10, z: 0 }] });
+cadenceNow = 500;
+cadenceController.acceptSnapshot({ zone: 'hub', generation: 1, players: [{ id: 'cadence', x: 20, z: 0 }] });
+const cadenceAvatar = cadenceScene.children.find(item => item.name === 'remote-world-player:cadence');
+cadenceNow = 475;
+cadenceController.update(.05);
+assert.equal(cadenceAvatar.position.x, 15, '250ms samples render a continuous interpolated midpoint');
+cadenceNow = 600;
+cadenceController.update(.05);
+assert.equal(cadenceAvatar.position.x, 20, 'effective position reaches each 250ms sample without extra half-second lag');
+cadenceNow = 1000;
+cadenceController.acceptSnapshot({ zone: 'hub', generation: 1, players: [{ id: 'cadence', x: 30, z: 0 }] });
+cadenceController.update(.05);
+assert.ok(cadenceAvatar.position.x - 20 <= 5, '500ms legacy gap uses bounded correction instead of teleport');
+
 assert.equal(controller.acceptSnapshot(snapshot(1, 0)), true, 'first generation snapshot is accepted');
 const avatar = scene.children.find(item => item.name === 'remote-world-player:remote-a');
 assert.ok(avatar, 'remote avatar exists after first snapshot');
