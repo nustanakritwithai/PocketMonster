@@ -5,6 +5,7 @@ const {
   WORLD_PRESENCE_PROTOCOL_VERSION,
   MAX_REMOTE_PLAYERS,
   MAX_SNAPSHOT_CANDIDATES,
+  MAX_WORLD_ROUTE_GENERATION,
   LOCOMOTION_VALUES,
   COMBAT_STATE_VALUES,
   ANIMATION_CATEGORY_VALUES,
@@ -24,6 +25,7 @@ const {
 assert.equal(WORLD_PRESENCE_PROTOCOL_VERSION, 'world-presence-protocol/v2');
 assert.equal(MAX_REMOTE_PLAYERS, 100);
 assert.equal(MAX_SNAPSHOT_CANDIDATES, 400);
+assert.equal(MAX_WORLD_ROUTE_GENERATION, 2147483647);
 assert.deepEqual(LOCOMOTION_VALUES, ['idle', 'walk', 'run', 'swim']);
 assert.deepEqual(COMBAT_STATE_VALUES, [
   'idle', 'attack1', 'attack2', 'attack3', 'attack4', 'casting', 'blocking',
@@ -74,6 +76,23 @@ assert.equal(worldSnapshotPayload({ type: 'chat', payload: { zone: 'hub', player
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot' }), null);
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub' } }), null);
 assert.equal(worldSnapshotPayload({ type: 'world-snapshot', payload: { players: [] } }), null);
+assert.deepEqual(
+  worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation: 7, players: [] } }),
+  { zone: 'hub', generation: 7, players: [] },
+  'optional Server route generation survives the canonical snapshot sanitizer',
+);
+for (const generation of [0, -1, 1.5, Number.NaN, MAX_WORLD_ROUTE_GENERATION + 1]) {
+  assert.equal(
+    worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation, players: [] } }),
+    null,
+    `invalid route generation ${generation} fails closed`,
+  );
+}
+assert.equal(
+  'generation' in worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', players: [] } }),
+  false,
+  'legacy snapshots remain valid without inventing a route generation',
+);
 
 const snapshot = worldSnapshotPayload({
   type: 'world-snapshot',

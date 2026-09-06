@@ -5,6 +5,7 @@
 export const WORLD_PRESENCE_PROTOCOL_VERSION = 'world-presence-protocol/v2';
 export const MAX_REMOTE_PLAYERS = 100;
 export const MAX_SNAPSHOT_CANDIDATES = 400;
+export const MAX_WORLD_ROUTE_GENERATION = 2_147_483_647;
 export const MAX_PLAYER_ID_LENGTH = 80;
 export const MAX_PLAYER_NAME_LENGTH = 32;
 export const ZONE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -386,6 +387,9 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
   const zone = safeZone(payload.zone);
   if (!zone) return null;
   if (expectedZone !== undefined && zone !== expectedZone) return null;
+  const generation = payload.generation;
+  if (generation !== undefined
+    && (!Number.isSafeInteger(generation) || generation < 1 || generation > MAX_WORLD_ROUTE_GENERATION)) return null;
   if (payload.players.length > MAX_SNAPSHOT_CANDIDATES) return null;
   const players = [];
   const seen = new Set();
@@ -394,7 +398,11 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
     const player = sanitizePresencePlayer(candidate, seen);
     if (player) players.push(player);
   }
-  return Object.freeze({ zone, players: Object.freeze(players) });
+  return Object.freeze({
+    zone,
+    ...(generation === undefined ? {} : { generation }),
+    players: Object.freeze(players),
+  });
 }
 
 export function worldSnapshotPayload(message) {

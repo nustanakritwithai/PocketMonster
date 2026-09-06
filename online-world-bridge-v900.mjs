@@ -28,6 +28,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
   let scenePresenceReady = false;
   let forwardedConnected = null;
   let acceptedSnapshots = 0;
+  let routeGenerationHighWater = null;
 
   function sceneWindow() {
     try { return getSceneWindow?.() || null; } catch { return null; }
@@ -87,6 +88,10 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
     if (!pose) return false;
     const snapshot = sanitizeOnlineWorldSnapshot(payload, pose.zone);
     if (!snapshot) return false;
+    if (snapshot.generation !== undefined) {
+      if (routeGenerationHighWater !== null && snapshot.generation < routeGenerationHighWater) return false;
+      routeGenerationHighWater = snapshot.generation;
+    }
     const target = sceneWindow();
     if (typeof target?.POCKETMONSTER_WORLD_PRESENCE !== 'function') return false;
     try { target.POCKETMONSTER_WORLD_PRESENCE(snapshot); } catch { return false; }
@@ -98,6 +103,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
 
   function setTransportConnected(connected) {
     if (connected !== true) {
+      routeGenerationHighWater = null;
       scenePresenceReady = false;
       clearScenePresence();
       forwardStatus(false);
@@ -107,7 +113,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
   }
 
   function diagnostics() {
-    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots });
+    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots, routeGenerationHighWater });
   }
 
   return Object.freeze({ readPose, acceptSnapshot, setTransportConnected, reset, diagnostics });

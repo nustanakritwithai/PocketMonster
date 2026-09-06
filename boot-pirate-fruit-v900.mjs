@@ -187,12 +187,14 @@ function bindPocketMonsterLink(frame) {
     getDir: () => undefined,
   });
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
+    if (!pirateRuntimeActive) return false;
     const snapshot = sanitizePirateWorldSnapshot(payload);
-    if (!snapshot) return;
+    if (!snapshot) return false;
     latestPresenceSnapshot = snapshot;
     latestPresenceAt = Date.now();
     forwardPresenceStatus(true);
     forwardPresence(snapshot);
+    return true;
   };
   window.addEventListener('message', event => {
     if (!pirateRuntimeActive) return;

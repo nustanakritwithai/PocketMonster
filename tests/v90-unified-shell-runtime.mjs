@@ -271,6 +271,10 @@ assert.equal(onlineShell.diagnostics().activeWorld, 'pirate-fruit');
 assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'hub', players: [] }), false);
 assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', players: [{ id: 'p1', x: 1, z: 2 }] }), true);
 assert.equal(snapshots.length, 1);
+let routeGeneration = 1;
+assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', generation: routeGeneration, players: [{ id: 'p1', x: 2, z: 3 }] }), true);
+assert.equal(snapshots.at(-1).generation, routeGeneration, 'route generation reaches the active child receiver');
+assert.equal(onlineShell.diagnostics().routeGenerationHighWater, routeGeneration);
 
 const teardownCombatReopenAttempts = [];
 sceneWindow.addEventListener('pocketmonster:online-scene-teardown', event => {
@@ -334,8 +338,22 @@ for (const [world, panel, zone] of [
     'one Combat host DOM identity survives scene navigation');
   assert.equal(onlineShell.combat, combatController, 'one Combat controller identity survives scene navigation');
   assert.equal(FakeWebSocket.instances.length, 1, 'scene navigation cannot create another socket');
+  routeGeneration += 1;
+  assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone, generation: routeGeneration, players: [] }), true,
+    'the current Server route generation reaches each active scene');
   openCombatProjection();
 }
+
+const currentRouteSnapshotCount = snapshots.length;
+assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', generation: 1, players: [{ id: 'stale-a', x: 99, z: 99 }] }), false,
+  'a delayed A generation cannot regress the active A route after A to B to A');
+assert.equal(snapshots.length, currentRouteSnapshotCount, 'the stale route packet never reaches the child receiver');
+assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', generation: routeGeneration, players: [] }), true,
+  'same-generation snapshots remain valid for the 20Hz cadence');
+window.dispatchEvent(new CustomEvent('pocketmonster:world-socket-status', { detail: { connected: false } }));
+assert.equal(onlineShell.diagnostics().routeGenerationHighWater, null, 'disconnect resets route generation for the next physical socket');
+assert.equal(window.POCKETMONSTER_WORLD_PRESENCE({ zone: 'pirate-fruit', generation: 1, players: [] }), true,
+  'a reconnect may restart the per-socket route generation at one');
 
 const readyCountBeforeError = onlineShell.diagnostics().sceneReadyCount;
 assert.equal(onlineShell.navigate('pocket-monster', 'throw'), true);
