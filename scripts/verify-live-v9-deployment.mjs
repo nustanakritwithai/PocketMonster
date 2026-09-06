@@ -39,7 +39,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-PYS02ZJs.js',
+  'pirate-fruit-offline/assets/index-CbUVGL2y.js',
   'pirate-fruit-offline/assets/AzureFrostIsland-D65O0BFk.js',
   'pirate-fruit-offline/assets/EmberVolcanoIsland-BaG79ntz.js',
   'pirate-fruit-offline/assets/MistJungleIsland-DrwaDHbY.js',
