@@ -96,7 +96,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '61');
+  url.searchParams.set('shellRevision', '62');
   return url.href;
 }
 
@@ -139,11 +139,24 @@ shellStatus.id = 'onlineWorldShellStatus';
 shellStatus.textContent = 'กำลังเปิดโลกออนไลน์…';
 shell.append(sceneFrame, combatHost, shellStatus);
 document.body.replaceChildren(shell);
+function clearPocketNpcMenu() {
+  delete document.body.dataset.pocketNpcMenu;
+}
+
 window.addEventListener('message', event => {
   if (event.source !== sceneFrame.contentWindow) return;
-  if (event.data?.type !== 'pocketmonster:pirate-dialogue-v1') return;
-  if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
-  else delete document.body.dataset.pirateDialogue;
+  if (event.data?.type === 'pocketmonster:pirate-dialogue-v1') {
+    if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
+    else delete document.body.dataset.pirateDialogue;
+    return;
+  }
+  if (event.data?.type !== 'pocketmonster:legacy-npc-menu-v1') return;
+  if (activeWorld !== 'pocket-monster' || event.data.world !== 'pocket-monster') {
+    clearPocketNpcMenu();
+    return;
+  }
+  if (event.data.open === true) document.body.dataset.pocketNpcMenu = 'open';
+  else clearPocketNpcMenu();
 });
 
 function combatUnavailable() {
@@ -239,6 +252,7 @@ function showSceneLoading(message = 'กำลังเปิดโลกออ�
 
 function invalidateSceneBoot({ showLoading = false, message } = {}) {
   activeSceneLease = null;
+  clearPocketNpcMenu();
   clearSceneHudAdapters();
   if (showLoading && !sessionEnding) showSceneLoading(message);
 }

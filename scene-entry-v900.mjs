@@ -182,6 +182,12 @@ try {
   document.getElementById('gameChat')?.remove();
   document.getElementById('accountGate')?.classList.add('hidden');
   bindPersistentFullscreenControls(window, { signal: sceneLifetime.signal });
+  const { installPocketOfflineNpcMenuBridge } = await import('./pocket-offline-npc-menu-bridge-v900.mjs');
+  installPocketOfflineNpcMenuBridge({
+    documentLike: document,
+    windowLike: window,
+    signal: sceneLifetime.signal,
+  });
 
   bootStage = 'startup';
   requireLiveScene();

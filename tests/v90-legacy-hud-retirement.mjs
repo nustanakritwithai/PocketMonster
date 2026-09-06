@@ -30,8 +30,13 @@ for (const selector of retiredSelectors) {
 // ---------- Native Pocket NPC escape hatch ----------
 assert.match(
   css,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud\{display:block!important;visibility:hidden!important;pointer-events:none!important\}/,
-  'Pocket Monster keeps #hud structurally present but invisible and input-dead for its native NPC route',
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud\{display:contents!important;visibility:visible!important;pointer-events:none!important\}/,
+  'Pocket Monster restores the original NPC menu surface without restoring HUD input',
+);
+assert.match(
+  css,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
+  'only original NPC route roots escape the retired Pocket HUD',
 );
 assert.match(
   css,
@@ -46,6 +51,7 @@ for (const root of [
   'ranchServices',
   'ranchStoragePage',
   'monsterManager',
+  'skillItemConfirm',
   'monsterPicker',
 ]) {
   assert.ok(css.includes('#' + root), 'native NPC route root #' + root + ' remains in the explicit escape hatch');

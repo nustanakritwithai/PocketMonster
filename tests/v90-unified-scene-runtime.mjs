@@ -351,6 +351,13 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
         },
       });
     }
+    if (pathname === '/pocket-offline-npc-menu-bridge-v900.mjs') {
+      return makeSynthetic(resolvedUrl, {
+        installPocketOfflineNpcMenuBridge() {
+          metrics.timeline.push('module:pocket-offline-npc-menu-bridge');
+        },
+      });
+    }
     if (pathname === '/startup-errors.mjs') {
       metrics.timeline.push('module:startup-errors');
       return makeSynthetic(resolvedUrl, {});
