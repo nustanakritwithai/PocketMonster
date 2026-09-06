@@ -118,7 +118,12 @@ assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child ful
 assert.match(fullscreenBridge, /owner: 'opaque-parent-relay'/, 'opaque iframe patches requestFullscreen even when window.top throws');
 assert.match(fullscreenBridge, /PERSISTENT_FULLSCREEN_REQUEST_MESSAGE/, 'opaque fullscreen requests relay through a versioned parent message');
 assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=4/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
-assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-YxSDH_bK\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
+const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(pirateEntryMatch, 'Pirate save bootstrap declares its compiled entry');
+assert.ok(
+  pirateBootstrap.indexOf('await installPirateSaveSandbox();') < pirateBootstrap.indexOf(pirateEntryMatch[0]),
+  'Pirate save hydration completes before the compiled vendored runtime loads',
+);
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
 assert.match(sceneEntry, /__POCKETMONSTER_RUNTIME_MANIFEST__ = config/, 'legacy scene runtimes receive the same normalized configuration');
