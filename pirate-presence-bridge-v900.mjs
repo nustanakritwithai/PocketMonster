@@ -4,6 +4,7 @@ import {
   sanitizePresentation,
   sanitizeVisual,
   sanitizeLocomotion,
+  sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
 } from './world-presence-protocol.mjs?v=4';
 
@@ -42,6 +43,11 @@ export function sanitizePirateLocalPresence(message) {
   if (message.visual !== undefined) {
     const visual = sanitizeVisual(message.visual, { maxEvents: 32 });
     if (visual) pose.visual = visual;
+  }
+  if (message.actors !== undefined) {
+    const actorPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE });
+    if (!actorPose || actorPose.actors === undefined) return null;
+    pose.actors = actorPose.actors;
   }
   return Object.freeze(pose);
 }

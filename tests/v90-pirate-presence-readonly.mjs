@@ -41,6 +41,19 @@ const localPresentationPose = sanitizePirateLocalPresence({
 });
 assert.equal(localPresentationPose.presentation.appearanceId, 'player-orange', 'iframe local pose preserves presentation metadata');
 assert.equal(localPresentationPose.visual.events.length, 1, 'iframe local pose preserves visual batch for WORLD_STATE');
+const localActor = {
+  actorId: 'monster-fox-1', kind: 'monster', ownerId: 'player-self', monsterType: 'flameling',
+  zone: 'pirate-fruit', generation: 1, lifecycle: 'spawn', spawnSequence: 1, stateSequence: 1,
+  pose: { x: 4, y: 0, z: -2, dir: .5 }, locomotion: 'walk',
+  animation: { combatState: 'casting', category: 'fruit', onGround: true, dashing: false, verticalVelocity: 0 },
+  presentation: { events: [], projectiles: [] },
+};
+const localActorPose = sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0,
+  actors: [localActor],
+});
+assert.equal(localActorPose.actors[0].actorId, localActor.actorId, 'iframe actor state survives the local sanitizer');
+assert.equal(Object.hasOwn(localActorPose.actors[0], 'hp'), false, 'local actor bridge remains presentation-only');
 const agedSnapshot = advancePirateSnapshotVisualAge({ zone: 'pirate-fruit', players: [{
   id: 'remote-one', name: 'Remote', x: 1, z: 2, dir: 0,
   visual: { schemaVersion: 1, sessionId: 'visual_session_1', stateSequence: 1,
@@ -109,6 +122,7 @@ assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'frame source is checked before accepting pose');
 assert.match(boot, /event\.origin !== 'null'/, 'opaque sandbox origin is checked before accepting pose');
 assert.match(boot, /sanitizePirateLocalPresence\(message\)/, 'parent accepts only the validated local pose contract');
+assert.match(boot, /getActors: \(\) => piratePose\?\.actors/, 'parent publisher forwards actors through the existing WORLD_STATE provider');
 assert.match(boot, /sanitizePirateWorldSnapshot\(payload\)/, 'parent sanitizes Server snapshots before forwarding');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPirateSnapshotMessage\(snapshot\), '\*'\)/, 'snapshot targets the exact mounted opaque frame window');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPiratePresenceStatusMessage\(connected\), '\*'\)/, 'presence status targets the exact mounted opaque frame window');

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,7 @@ const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline Pirate Fruit bootstrap imports its main bundle after save hydration');
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/' + pirateBundleRef, import.meta.url), 'utf8');
+const pirateBundleHash = crypto.createHash('sha256').update(pirateBundle).digest('hex');
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
@@ -66,6 +68,8 @@ for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.
 assert.equal(PIRATE_FRUIT_SOURCE.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(PIRATE_FRUIT_SOURCE.visual, 'client/src/art/PiratePlayerVisual.ts');
 assert.equal(PIRATE_FRUIT_SOURCE.contract, 'presentation-only');
+assert.equal(pirateBundleRef, 'assets/index-CbUVGL2y.js', 'offline bootstrap must use the exact actor-capable Pirate bundle');
+assert.equal(pirateBundleHash, '9bc9ebee409bb11e98cba65ae59e0aabe8acf0d81d437650f2e7c9720ed2e7f3', 'Pirate artifact provenance must remain pinned');
 assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');
@@ -279,8 +283,8 @@ assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
 assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
 assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-parent-primary');
-assert.equal(pirateSource.ref, 'codex/full-player-presentation-20260906');
-assert.equal(pirateSource.commit, '8796dbab9729c95ea6e5a89a5d864068432ababa');
+assert.equal(pirateSource.ref, 'a07af2e7540f5fc25c7ad4d10491a87a4306e4d9');
+assert.equal(pirateSource.commit, 'a07af2e7540f5fc25c7ad4d10491a87a4306e4d9');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket');
