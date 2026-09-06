@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.a5f4d3af2500",
+  "buildId": "8.4.0.content.d7d3a529877e",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-06T11:22:45.828Z",
+  "publishedAtUtc": "2026-09-06T13:41:57.939Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -468,7 +468,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2323,
-      "sha256": "32b50b0c8c4b92463a94b8bc8a37f564e752c6220d931dae01ee4c775698ce95"
+      "sha256": "2a23ed1906b3a95545d57570097523782fdbcbcc51d066584a473ae17fcbc7ed"
     },
     {
       "path": "equipment.mjs",
@@ -571,11 +571,6 @@
       "sha256": "ad349029d3cd10d835fe2fd32fd81e3e1066249c16a3c840fb16d9296387eda6"
     },
     {
-      "path": "npc-overhead-action-v900.mjs",
-      "size": 3035,
-      "sha256": "9bd3cf7cf69a39dcd1261ea2425b6ba1ffd62afc817677a1e691b98b00bfe936"
-    },
-    {
       "path": "online-world-bridge-v900.mjs",
       "size": 3796,
       "sha256": "51c483b7622a58671d6bd7fc2cdbc4bab3a13398f3b96f944dc56de96641e2b9"
@@ -583,7 +578,7 @@
     {
       "path": "online-world-shell-v900.mjs",
       "size": 20928,
-      "sha256": "f86ab18a9b1891bb63ceb7f5f1d1b7a17fac887576134578628ff178cb0b39c6"
+      "sha256": "f91358c0755656452fa1dfd4003086db7131b0b113fd05b7045953c6a1ea4a44"
     },
     {
       "path": "passive-catalog.mjs",
@@ -782,8 +777,8 @@
     },
     {
       "path": "scene-v900.html",
-      "size": 1327,
-      "sha256": "5d22ad71de43ec36230b2aa41fecab8f5693c7f2a2844805d36f8310ea8e1908"
+      "size": 1252,
+      "sha256": "09585cbfc2636b1e8bb4f63436716bcb3e05d95e453fb2c319b244f3c760c001"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -902,8 +897,8 @@
     },
     {
       "path": "style-v900.css",
-      "size": 30632,
-      "sha256": "cc2a7d1526abd44dfeb951af715c45181104796d0b4b402778ab5755eb3461b4"
+      "size": 31497,
+      "sha256": "28e8252c4a5cbf7c736a9f3ab6a26de2197c3b3d2a6b826e2310d6e43e2de795"
     },
     {
       "path": "targeting-resolver.mjs",

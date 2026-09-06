@@ -8,10 +8,6 @@ import {
   REQUIRED_V9_ENTRY_FILES,
   collectPublicDependencyClosure,
 } from '../scripts/build-github-pages.mjs';
-import {
-  NPC_OVERHEAD_ACTION_KIND,
-  installNpcOverheadAction,
-} from '../npc-overhead-action-v900.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.join(root, 'dist-pages');
@@ -32,7 +28,6 @@ const required = new Set([
   'combat-v91-transport.mjs',
   'combat-v91.css',
   'scene-entry-v900.mjs',
-  'npc-overhead-action-v900.mjs',
   'style-v900.css',
   'unified-mmorpg-hud-v900.mjs',
   'worlds-v900.mjs',
@@ -74,48 +69,10 @@ const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=966/, 'scene entry loads the same HUD stylesheet revision as the parent');
-assert.match(scene, /npc-overhead-action-v900\.mjs\?v=3/, 'online scene cache-busts the restored NPC action pill');
-assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs\?v=2/, 'online scene cannot keep the NPC-name adapter cache key');
+assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
-
-{
-  const body = { append(node) { node.parentNode = body; } };
-  const hud = {};
-  const style = {};
-  const attrs = new Map();
-  const clickHandler = () => 'gameplay-owned';
-  const button = {
-    parentNode: hud,
-    style,
-    dataset: {},
-    textContent: 'คุย',
-    onclick: clickHandler,
-    setAttribute(name, value) { attrs.set(name, value); },
-  };
-  const documentLike = {
-    body,
-    getElementById(id) { return id === 'npcBtn' ? button : null; },
-  };
-  const binding = installNpcOverheadAction(documentLike, {});
-  assert.equal(binding.kind, NPC_OVERHEAD_ACTION_KIND);
-  assert.equal(NPC_OVERHEAD_ACTION_KIND, 'pocketmonster:npc-overhead-action-v1');
-  assert.equal(button.parentNode, body, 'NPC interaction leaves the retired legacy HUD');
-  assert.equal(button.onclick, clickHandler, 'overhead presentation preserves the gameplay-owned click route');
-  assert.equal(style.position, 'fixed');
-  assert.equal(style.bottom, 'auto', 'legacy bottom docking is removed');
-  assert.match(style.transform, /-100% - 10px/, 'screen-space head coordinate anchors the action pill above the NPC');
-  assert.equal(style.background, 'rgba(15,23,42,.88)', 'NPC interaction keeps the readable action pill');
-  assert.equal(style.border, '1px solid rgba(255,255,255,.72)', 'NPC action pill keeps its visible border');
-  assert.equal(style.boxShadow, '0 5px 18px rgba(0,0,0,.45)', 'NPC action pill keeps its card shadow');
-  assert.equal(button.textContent, 'คุย', 'Talk action remains the original gameplay CTA');
-  assert.equal(attrs.get('data-npc-overhead-action'), 'true');
-  button.textContent = 'ร้านค้า';
-  binding.refresh();
-  assert.equal(button.textContent, 'ร้านค้า', 'Shop action remains the original gameplay CTA');
-  assert.equal(button.onclick, clickHandler, 'refresh preserves the gameplay-owned click route');
-}
 
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
 assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'public V9 artifact requires the one Monster Life launch session');
