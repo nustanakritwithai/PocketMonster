@@ -28,6 +28,7 @@ const required = new Set([
   'combat-v91-transport.mjs',
   'combat-v91.css',
   'scene-entry-v900.mjs',
+  'pocket-offline-npc-menu-bridge-v900.mjs',
   'style-v900.css',
   'unified-mmorpg-hud-v900.mjs',
   'worlds-v900.mjs',

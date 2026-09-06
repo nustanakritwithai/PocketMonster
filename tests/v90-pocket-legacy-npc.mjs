@@ -99,9 +99,8 @@ assert.match(
   'style-v800 keeps the native Pocket NPC button interactive',
 );
 
-// The general V9 retirement remains for all worlds. PocketMonster alone gets
-// a narrow escape hatch: the legacy HUD stays invisible/input-dead, while its
-// original NPC action and service roots can opt in once not hidden.
+// The general V9 retirement remains for all worlds. PocketMonster alone keeps
+// the full original offline menu surface while hiding every non-NPC sibling.
 assert.match(
   unifiedStyle,
   /body\.unified-hud-active #hud\{display:none!important;pointer-events:none!important\}/,
@@ -109,8 +108,13 @@ assert.match(
 );
 assert.match(
   unifiedStyle,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud\{display:block!important;visibility:hidden!important;pointer-events:none!important\}/,
-  'PocketMonster keeps its legacy HUD container present but invisible/input-dead',
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud\{display:contents!important;visibility:visible!important;pointer-events:none!important\}/,
+  'PocketMonster restores the original menu surface without re-enabling legacy HUD input',
+);
+assert.match(
+  unifiedStyle,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
+  'every unrelated legacy HUD sibling remains invisible and input-dead',
 );
 assert.match(
   unifiedStyle,
