@@ -680,7 +680,9 @@ export function createUnifiedMobileControls({
 }
 
 export const unifiedMobileControls = typeof window !== 'undefined' && typeof document !== 'undefined'
-  ? createUnifiedMobileControls()
+  ? (window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.kind === UNIFIED_MOBILE_CONTROLS_KIND
+    ? window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS
+    : createUnifiedMobileControls())
   : null;
 if (typeof window !== 'undefined' && unifiedMobileControls) {
   window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS = unifiedMobileControls;

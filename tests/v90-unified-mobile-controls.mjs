@@ -59,6 +59,22 @@ documentLike.getElementById = id => elements.get(id) || null;
 const controls = createUnifiedMobileControls({ windowLike, documentLike });
 assert.equal(controls.kind, UNIFIED_MOBILE_CONTROLS_KIND);
 
+// Cache-versioned imports must share adapters, active world and DOM listeners.
+globalThis.window = windowLike;
+globalThis.document = documentLike;
+try {
+  const first = await import('../unified-mobile-controls-v900.mjs?singleton-first');
+  const second = await import('../unified-mobile-controls-v900.mjs?singleton-second');
+  assert.equal(first.unifiedMobileControls, second.unifiedMobileControls);
+  first.unifiedMobileControls.activate('pirate-fruit');
+  second.unifiedMobileControls.registerAdapter('pirate-fruit', {});
+  assert.equal(first.unifiedMobileControls.diagnostics().activeWorldId, 'pirate-fruit');
+  assert.deepEqual(first.unifiedMobileControls.diagnostics().adapters, ['pirate-fruit']);
+} finally {
+  delete globalThis.window;
+  delete globalThis.document;
+}
+
 const pocketCalls = [];
 const pirateCalls = [];
 controls.registerAdapter('pocket-monster', {
