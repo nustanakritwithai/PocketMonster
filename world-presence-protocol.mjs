@@ -3,6 +3,13 @@
 // locomotion/combat enum or drop validated action fields.
 
 export const WORLD_PRESENCE_PROTOCOL_VERSION = 'world-presence-protocol/v2';
+export const PIRATE_CENTRAL_AUTHORITY_CONTRACT = 'pirate-central-spatial/1';
+export const PIRATE_CENTRAL_AUTHORITY_SCHEMA_VERSION = 1;
+export const PIRATE_CENTRAL_AUTHORITY_CONTENT_REVISION = 'pirate-monster-catalog-2026-09-07-ai-v2';
+export const PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH = 'fnv1a-ae668b33';
+export const PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256 = '39FA9E8460EF662126534814A4A3FED4B9C4A670F0E3F707A3F643EC0733850C';
+export const PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256 = 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7';
+export const PIRATE_CENTRAL_AUTHORITY_ZONES = Object.freeze(['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky']);
 export const MAX_REMOTE_PLAYERS = 100;
 export const MAX_REMOTE_ACTORS = 128;
 export const MAX_SNAPSHOT_CANDIDATES = 400;
@@ -449,6 +456,33 @@ export function sanitizePresencePlayer(candidate, seen = null, { maxVisualEvents
   return Object.freeze(player);
 }
 
+export function sanitizeCentralAuthority(value) {
+  if (!isRecord(value)
+    || value.contract !== PIRATE_CENTRAL_AUTHORITY_CONTRACT
+    || value.schemaVersion !== PIRATE_CENTRAL_AUTHORITY_SCHEMA_VERSION
+    || value.contentRevision !== PIRATE_CENTRAL_AUTHORITY_CONTENT_REVISION
+    || value.contentHash !== PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH
+    || value.manifestSha256 !== PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256
+    || value.vectorsSha256 !== PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256
+    || !Array.isArray(value.zones)
+    || value.zones.length !== PIRATE_CENTRAL_AUTHORITY_ZONES.length
+    || value.zones.some(zone => typeof zone !== 'string' || !PIRATE_CENTRAL_AUTHORITY_ZONES.includes(zone))
+    || new Set(value.zones).size !== PIRATE_CENTRAL_AUTHORITY_ZONES.length) return null;
+  return Object.freeze({
+    contract: PIRATE_CENTRAL_AUTHORITY_CONTRACT,
+    schemaVersion: PIRATE_CENTRAL_AUTHORITY_SCHEMA_VERSION,
+    contentRevision: PIRATE_CENTRAL_AUTHORITY_CONTENT_REVISION,
+    contentHash: PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH,
+    manifestSha256: PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256,
+    vectorsSha256: PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256,
+    zones: Object.freeze([...PIRATE_CENTRAL_AUTHORITY_ZONES]),
+  });
+}
+
+export function centralAuthorityOwnsZone(capability, zone) {
+  return Boolean(sanitizeCentralAuthority(capability)?.zones.includes(zone));
+}
+
 export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
   if (!isRecord(payload) || !Array.isArray(payload.players)) return null;
   const zone = safeZone(payload.zone);
@@ -474,11 +508,13 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
     actors = sanitizePresenceActors(payload.actors, zone, undefined, { maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS });
     if (!actors) return null;
   }
+  const centralAuthority = sanitizeCentralAuthority(payload.centralAuthority);
   return Object.freeze({
     zone,
     ...(generation === undefined ? {} : { generation }),
     players: Object.freeze(players),
     ...(payload.actors === undefined ? {} : { actors }),
+    ...(centralAuthority ? { centralAuthority } : {}),
   });
 }
 
