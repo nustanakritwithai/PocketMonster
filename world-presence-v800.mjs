@@ -264,6 +264,12 @@ export function createWorldPresenceController({
     remoteActors.delete(actorId);
   }
 
+  function actorIdentity(item) {
+    const zone = typeof item?.zone === 'string' ? item.zone : getZone?.();
+    const generation = Number.isSafeInteger(item?.generation) ? item.generation : 0;
+    return `${zone}:${generation}:${String(item?.actorId ?? '')}`;
+  }
+
   function syncRemoteActors(items, selfId) {
     const incoming = Array.isArray(items) ? items.slice(0, MAX_REMOTE_ACTORS) : [];
     const seen = new Set();
@@ -273,6 +279,7 @@ export function createWorldPresenceController({
       seen.add(id);
       let actor = remoteActors.get(id);
       const generation = Number.isInteger(item.generation) ? item.generation : 0;
+      const rootIdentity = actorIdentity(item);
       if (actor && generation < actor.generation) continue;
       if (actor && generation > actor.generation) {
         removeActor(id);
@@ -285,12 +292,13 @@ export function createWorldPresenceController({
         continue;
       }
       if (!actor && typeof createActor === 'function') {
-        const created = createActor(item);
+        const created = createActor(item, rootIdentity);
         const root = created?.root || created;
         if (root) {
           root.userData = root.userData || {};
           root.userData.remoteActorId = id;
           root.userData.remoteActorKind = item.kind;
+          root.userData.remoteActorIdentity = rootIdentity;
           root.userData.presentationOnly = true;
           root.position?.set?.(item.pose.x, item.pose.y, item.pose.z);
           if (root.rotation) root.rotation.y = item.pose.dir || 0;
@@ -300,6 +308,7 @@ export function createWorldPresenceController({
             handle: created?.root ? created : null,
             actionIdentity: null,
             target: item,
+            identity: rootIdentity,
             generation,
             spawnSequence: item.spawnSequence,
             stateSequence: item.stateSequence,
@@ -310,6 +319,7 @@ export function createWorldPresenceController({
       }
       if (!actor) continue;
       actor.target = item;
+      actor.identity = rootIdentity;
       actor.generation = generation;
       actor.spawnSequence = item.spawnSequence;
       actor.stateSequence = item.stateSequence;
@@ -409,7 +419,7 @@ export function createWorldPresenceController({
         remote.avatar.userData.presenceInitialized = true;
       }
     }
-    syncRemoteActors(snapshot.actors, selfId);
+    if (snapshot.actors !== undefined) syncRemoteActors(snapshot.actors, selfId);
     for (const id of [...remoteWorldPlayers.keys()]) if (!seen.has(id)) removeRemote(id);
     return true;
   }
@@ -480,14 +490,6 @@ export function createWorldPresenceController({
         const actionLean = combatState === 'attack' || combatState === 'skill' ? Math.sin(remote.animationPhase * 12) * .12 : combatState === 'hurt' ? -.12 : 0;
         avatar.rotation.z += (actionLean - avatar.rotation.z) * .35;
       }
-      for (const actor of remoteActors.values()) {
-        applyActorPose(actor, currentTime, interpolationDelayMs);
-        actor.handle?.update?.(deltaSeconds, {
-          moving: actor.target?.locomotion !== 'idle',
-          locomotion: actor.target?.locomotion,
-          animation: actor.target?.animation,
-        });
-      }
       if (!remote.marker || !camera || !THREE?.Vector3) continue;
       const x = avatar?.position?.x ?? remote.targetX;
       const y = (avatar?.position?.y ?? remote.targetY) + 2.05;
@@ -499,6 +501,14 @@ export function createWorldPresenceController({
         remote.marker.style.left = ((point.x + 1) * 50) + '%';
         remote.marker.style.top = ((1 - point.y) * 50) + '%';
       }
+    }
+    for (const actor of remoteActors.values()) {
+      applyActorPose(actor, currentTime, interpolationDelayMs);
+      actor.handle?.update?.(deltaSeconds, {
+        moving: actor.target?.locomotion !== 'idle',
+        locomotion: actor.target?.locomotion,
+        animation: actor.target?.animation,
+      });
     }
   }
 
