@@ -48,7 +48,7 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=972/, 'active HTML cache-busts the unified ship-control entry');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=973/, 'active HTML cache-busts the unified ship-control entry');
 assert.match(indexHtml, /style-v900\.css\?v=969/, 'active HTML cache-busts the helm placement beside chat');
 assert.match(sceneHtml, /style-v900\.css\?v=969/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
@@ -67,7 +67,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=65')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=66')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -144,7 +144,7 @@ assert.match(sceneEntry, /worlds-v900\.mjs\?v=960/, 'hosted scene cache-busts th
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
 assert.match(worlds, /runtimeLifecycles\.get\(world\.id\)\?\.mount\?\.\(\)[\s\S]*applyPresenceBindings\(worldPresenceBindings\.get\(world\.id\)\)/, 'mount activates the selected world presence provider');
-const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=960')");
+const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=961')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');
 assert.doesNotMatch(sceneEntry, /prepareLaunch|redeemLaunchTicket|chat-runtime|new WebSocket|sessionStorage/, 'scene entry cannot redeem, persist, or create another transport');

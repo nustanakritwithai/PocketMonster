@@ -26,7 +26,7 @@ import {
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=941', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=942', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -128,9 +128,12 @@ function bindPocketMonsterLink(frame) {
   let frameReady = false;
   let studioPackagePromise = null;
   let studioState = 'pending';
+  let studioPackageId = null;
+  let studioError = null;
   const relayStudioPackage = () => {
     if (studioPackagePromise) return studioPackagePromise;
     studioState = 'loading';
+    studioError = null;
     studioPackagePromise = loadStudioCharacterFromEngine()
       .then(pkg => {
         if (!pirateRuntimeActive) return;
@@ -139,10 +142,12 @@ function bindPocketMonsterLink(frame) {
           capability: frame.dataset.studioCapability,
           package: pkg,
         }, '*');
+        studioPackageId = pkg?.manifest?.id || null;
         studioState = 'relayed';
       })
       .catch(error => {
         studioState = 'fallback';
+        studioError = String(error?.message || error);
         frame.contentWindow?.postMessage({
           type: PIRATE_STUDIO_CHARACTER_FAILED,
           capability: frame.dataset.studioCapability,
@@ -191,6 +196,8 @@ function bindPocketMonsterLink(frame) {
     frameReady,
     input: inputTransport.diagnostics(),
     studioState,
+    studioPackageId,
+    studioError,
   });
   const markFrameReady = () => {
     if (!pirateRuntimeActive) {
@@ -277,10 +284,15 @@ function bindPocketMonsterLink(frame) {
     }
     if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_ACCEPTED) {
       studioState = 'studio-character';
+      studioPackageId = message.id || studioPackageId;
+      studioError = null;
       return;
     }
     if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_FAILED) {
       studioState = 'fallback';
+      studioPackageId = message.id || studioPackageId;
+      studioError = message.error || message.errors?.join?.('; ') || 'Studio character install failed';
+      console.warn('Studio character child reported fallback', studioError);
       return;
     }
     const onboarding = readPirateOnboardingState(message);

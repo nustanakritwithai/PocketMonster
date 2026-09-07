@@ -25,14 +25,31 @@ export const PIRATE_FRUIT_CLIENT_BRIDGE = Object.freeze({
 // Written only by the sandboxed Pirate bootstrap after it has verified its
 // parent, per-frame capability and presentation-only payload.
 let pendingStudioCharacterPackage = null;
+let latestStudioInstallResult = null;
+let failedStudioPackageId = null;
 const studioPackageListeners = new Set();
+const studioInstallResultListeners = new Set();
+
+function publishStudioInstallResult(result) {
+  latestStudioInstallResult = Object.freeze({ ...result, updatedAt: Date.now() });
+  for (const listener of studioInstallResultListeners) listener(latestStudioInstallResult);
+  return latestStudioInstallResult;
+}
+
+export function subscribePirateStudioCharacterInstallResult(listener) {
+  studioInstallResultListeners.add(listener);
+  if (latestStudioInstallResult) queueMicrotask(() => listener(latestStudioInstallResult));
+  return () => studioInstallResultListeners.delete(listener);
+}
 
 export function receivePirateStudioCharacterPackage(pkg) {
   const validation = validateStudioCharacterPackage(pkg);
   if (!validation.valid) return Object.freeze({ accepted: false, errors: validation.errors });
   pendingStudioCharacterPackage = pkg;
+  failedStudioPackageId = null;
+  latestStudioInstallResult = null;
   for (const listener of studioPackageListeners) listener(pkg);
-  return Object.freeze({ accepted: true, id: pkg.manifest.id });
+  return Object.freeze({ accepted: true, id: pkg.manifest.id, installed: false });
 }
 
 function subscribePirateStudioCharacterPackage(listener) {
@@ -425,6 +442,7 @@ export async function installPirateFruitPocketPresentation({
       rigRetargeter,
       sourcePoseDriven,
       lastAction: null,
+      lastLocomotion: 'idle',
       lastX: host.position.x,
       lastZ: host.position.z,
       source: 'pirate-fruit',
@@ -442,7 +460,7 @@ export async function installPirateFruitPocketPresentation({
   async function replaceLocalPlayerWithStudio(item, pkg) {
     if (!item || item.kind !== 'player' || item.source === 'studio-character') return false;
     const validation = validateStudioCharacterPackage(pkg);
-    if (!validation.valid) return false;
+    if (!validation.valid) throw new Error(`Invalid Studio player package: ${validation.errors.join('; ')}`);
     await installStudioCharacterPackage(assets, pkg, { bundleName: 'studio-live-player' });
     const studio = assets.spawn(pkg.manifest.id, { role: 'player', quality: 'medium' });
     await studio.ready;
@@ -471,15 +489,40 @@ export async function installPirateFruitPocketPresentation({
     return true;
   }
 
-  let studioInstallInFlight = false;
+  let studioInstallInFlight = null;
+  function installStudioPlayer(item, pkg) {
+    const packageId = pkg?.manifest?.id || 'unknown';
+    if (!item || item.kind !== 'player') return Promise.resolve(false);
+    if (item.source === 'studio-character') return Promise.resolve(true);
+    if (failedStudioPackageId === packageId) return Promise.resolve(false);
+    if (studioInstallInFlight) return studioInstallInFlight;
+    studioInstallInFlight = replaceLocalPlayerWithStudio(item, pkg)
+      .then(installed => {
+        if (installed) {
+          failedStudioPackageId = null;
+          publishStudioInstallResult({ installed: true, source: 'studio-character', id: packageId });
+        }
+        return installed;
+      })
+      .catch(error => {
+        failedStudioPackageId = packageId;
+        publishStudioInstallResult({
+          installed: false,
+          source: 'pirate-fruit',
+          id: packageId,
+          error: String(error?.message || error),
+        });
+        console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error);
+        return false;
+      })
+      .finally(() => { studioInstallInFlight = null; });
+    return studioInstallInFlight;
+  }
+
   subscribePirateStudioCharacterPackage(pkg => {
-    if (studioInstallInFlight) return;
     const player = visuals.find(item => item.kind === 'player' && item.source !== 'studio-character');
     if (!player) return;
-    studioInstallInFlight = true;
-    replaceLocalPlayerWithStudio(player, pkg)
-      .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error))
-      .finally(() => { studioInstallInFlight = false; });
+    void installStudioPlayer(player, pkg);
   });
 
   function paintTerrain(mesh) {
@@ -526,8 +569,7 @@ export async function installPirateFruitPocketPresentation({
       }), 'player');
       if (pendingStudioCharacterPackage) {
         const player = visuals.at(-1);
-        void replaceLocalPlayerWithStudio(player, pendingStudioCharacterPackage)
-          .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error));
+        void installStudioPlayer(player, pendingStudioCharacterPackage);
       }
       return;
     }
@@ -607,10 +649,19 @@ export async function installPirateFruitPocketPresentation({
         now,
         { distanceSq, speed },
       );
-      applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
+      if (item.source === 'studio-character') {
+        if (sample.actionId != null) {
+          applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
+        } else if (item.lastAction != null || item.lastLocomotion !== sample.locomotion) {
+          item.handle.play?.(sample.locomotion, { restart: item.lastAction != null });
+        }
+      } else {
+        applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
+      }
       item.lastAction = sample.action;
+      item.lastLocomotion = sample.locomotion;
       item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
-      item.rigRetargeter.update();
+      item.rigRetargeter?.update();
     }
   }
 
@@ -626,6 +677,7 @@ export async function installPirateFruitPocketPresentation({
       providers: assets.diagnostics().providers,
       studioPlayers: visuals.filter(item => item.source === 'studio-character').length,
       playerVisualSource: visuals.find(item => item.kind === 'player')?.source || 'pending',
+      studioInstallResult: latestStudioInstallResult,
     }),
   };
 }

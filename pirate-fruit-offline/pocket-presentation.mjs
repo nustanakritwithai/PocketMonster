@@ -2,7 +2,8 @@ import * as pirateFruitThree from './assets/vendor-three-Bv6LZXUZ.js';
 import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
-} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=3';
+  subscribePirateStudioCharacterInstallResult,
+} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=4';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
   PIRATE_STUDIO_CHARACTER_FAILED,
@@ -49,12 +50,21 @@ window.addEventListener('message', event => {
   const message = event.data;
   if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_PACKAGE) {
     const result = receivePirateStudioCharacterPackage(message.package);
-    window.parent?.postMessage({
-      type: result.accepted ? PIRATE_STUDIO_CHARACTER_ACCEPTED : PIRATE_STUDIO_CHARACTER_FAILED,
-      capability: studioCapability,
-      id: result.id,
-      errors: result.errors,
-    }, parentOrigin);
+    if (!result.accepted) {
+      window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = Object.freeze({
+        source: 'pirate-fruit', state: 'validation-failed', errors: result.errors,
+      });
+      window.parent?.postMessage({
+        type: PIRATE_STUDIO_CHARACTER_FAILED,
+        capability: studioCapability,
+        errors: result.errors,
+        error: result.errors?.join?.('; ') || 'Studio package validation failed',
+      }, parentOrigin);
+    } else {
+      window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = Object.freeze({
+        source: 'pirate-fruit', state: 'installing', id: result.id,
+      });
+    }
     return;
   }
   if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_FAILED) {
@@ -75,6 +85,19 @@ window.addEventListener('message', event => {
   document.documentElement.dataset.pirateHud = 'pirate-primary-parent';
   document.documentElement.dataset.controlPanel = message.panel;
 });
+
+if (studioCapability) {
+  subscribePirateStudioCharacterInstallResult(result => {
+    window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = Object.freeze({ ...result });
+    window.parent?.postMessage({
+      type: result.installed ? PIRATE_STUDIO_CHARACTER_ACCEPTED : PIRATE_STUDIO_CHARACTER_FAILED,
+      capability: studioCapability,
+      id: result.id,
+      error: result.error,
+      installed: result.installed === true,
+    }, parentOrigin);
+  });
+}
 
 hookPirateFruitRenderer(pirateFruitThree);
 if (studioCapability) {
