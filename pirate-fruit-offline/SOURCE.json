@@ -1,11 +1,11 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "codex/v9-pirate-presence-readonly",
-  "commit": "fa71c41fa50edba67609d90ae2d5418455817c00",
+  "ref": "a07af2e7540f5fc25c7ad4d10491a87a4306e4d9",
+  "commit": "a07af2e7540f5fc25c7ad4d10491a87a4306e4d9",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Playable Pirate Fruit client built from the arrival-lock source plus the read-only Pocket Monster parent-presence bridge. Pirate save/gameplay remains local; the authenticated parent socket relays ephemeral world presence only, while Pocket overlays asset-engine visuals without replacing the client.",
+  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเท่านั้น Save และ Combat authority ยังคงปิดบน VPS",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",
@@ -38,9 +38,16 @@
     "pocketMonsterPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,
-      "position": { "x": 7, "z": 15 },
+      "position": {
+        "x": 7,
+        "z": 15
+      },
       "triggerRadius": 2.25,
-      "safeArrival": { "x": 7, "z": 11.5, "heading": 0 },
+      "safeArrival": {
+        "x": 7,
+        "z": 11.5,
+        "heading": 0
+      },
       "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "pocket-monster",
@@ -49,9 +56,16 @@
     "livingWorldPortal": {
       "contract": "presentation-only",
       "combatAuthority": false,
-      "position": { "x": -7, "z": 15 },
+      "position": {
+        "x": -7,
+        "z": 15
+      },
       "triggerRadius": 2.25,
-      "safeArrival": { "x": -7, "z": 11.5, "heading": 0 },
+      "safeArrival": {
+        "x": -7,
+        "z": 11.5,
+        "heading": 0
+      },
       "arrivalLock": "exit-before-rearm",
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "living-world",

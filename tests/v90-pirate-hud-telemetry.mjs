@@ -224,7 +224,7 @@ try {
   Date.now = realNow;
 }
 
-assert.match(entry, /unified-input-bridge-v900\.mjs\?v=6/);
+assert.match(entry, /unified-input-bridge-v900\.mjs\?v=10/);
 assert.match(child, /startPirateHudTelemetryPublisher/);
 assert.match(parent, /createPirateHudTelemetryCollector/);
 assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HUD store for the parent Dock');
@@ -235,8 +235,10 @@ assert.match(parent, /event\.origin !== 'null'/);
 assert.match(parent, /frameGeneration/);
 assert.match(parent, /pagehide/);
 assert.match(parent, /pocketmonster:world-warp-v1/);
-assert.match(parent, /frame\.addEventListener\('load',[\s\S]*if \(!pirateRuntimeActive\)[\s\S]*return;[\s\S]*activateHudTelemetry\('reload'\)/,
-  'a delayed iframe load cannot reactivate telemetry after scene teardown');
+assert.match(parent, /const markFrameReady = \(\) => \{[\s\S]*if \(!pirateRuntimeActive\)[\s\S]*return;[\s\S]*activateHudTelemetry\('reload'\)/,
+  'the centralized iframe-ready handler guards teardown and starts reload telemetry');
+assert.match(parent, /frame\.addEventListener\('load', markFrameReady\)/,
+  'iframe load is routed through the guarded ready handler');
 assert.match(parent, /mount:\(\)=>\{[\s\S]*pirateHudTelemetry\.activate\('mount'\)/, 'scene remount starts a fresh telemetry generation');
 assert.doesNotMatch(parent, /allow-same-origin/);
 assert.ok(PIRATE_HUD_MAX_PAYLOAD_BYTES > 0);

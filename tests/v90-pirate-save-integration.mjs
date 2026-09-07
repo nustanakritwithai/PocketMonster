@@ -13,10 +13,12 @@ const pirateHud = read('pirate-fruit-control-hud-v900.mjs');
 const build = read('scripts/build-github-pages.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
-assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=1"/, 'offline HTML loads the save-aware bootstrap');
-assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-C3SJLfq8\.js"/, 'vendored bundle is never started before save hydration');
+assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=4"/, 'offline HTML loads the save-aware bootstrap');
+assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
-const bundleIndex = bootstrap.indexOf("await import('./assets/index-C3SJLfq8.js')");
+const bundleMatch = bootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(bundleMatch, 'save-aware bootstrap declares the compiled Pirate entry');
+const bundleIndex = bootstrap.indexOf(bundleMatch[0]);
 assert.ok(hydrateIndex >= 0 && bundleIndex > hydrateIndex, 'sandbox storage installs before the real Pirate bundle executes');
 assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-busts the save bridge');
 
@@ -26,14 +28,14 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cach
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=935/, 'parent cache-busts the Pirate child HTML without the circular minimap');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=943/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=54/, 'top-level entry cache-busts the production Combat transport and BFCache restore behavior');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=51/, 'scene HTML cache-busts the input-recovery transport chain and fullscreen ownership');
-assert.match(sceneHtml, /style-v900\.css\?v=966/, 'scene HTML cache-busts the persistent fullscreen control layout');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=24/, 'offline HTML cache-busts presentation integration after child minimap retirement');
-assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=1/, 'presentation cache-busts static-batch classification');
-assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'presentation loads the HUD policy that retires the circular child minimap');
+assert.match(boot, /index\.html\?v=941/, 'parent cache-busts the Pirate child HTML with the ship-control mode bridge');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=952/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=64/, 'top-level entry cache-busts the unified ship-control shell');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=60/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
+assert.match(sceneHtml, /style-v900\.css\?v=969/, 'scene HTML cache-busts the helm placement beside chat');
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=27/, 'offline HTML cache-busts presentation integration after helm center-panel retirement');
+assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=2/, 'presentation cache-busts static-batch classification');
+assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=12/, 'presentation loads the HUD policy that retires the helm center-panel duplicate');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is hidden by the parent-primary HUD policy');
 assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired by parent-primary HUD policy');
 

@@ -1,11 +1,11 @@
 import * as pirateFruitThree from './assets/vendor-three-Bv6LZXUZ.js';
-import { hookPirateFruitRenderer } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=1';
+import { hookPirateFruitRenderer } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=2';
 import {
   PIRATE_FRUIT_CONTROL_HUD_CSS,
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
-} from '../pirate-fruit-control-hud-v900.mjs?v=11';
+} from '../pirate-fruit-control-hud-v900.mjs?v=12';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 let skipVendorFullscreen = false;

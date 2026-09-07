@@ -9,6 +9,10 @@ import {
 } from '../pirate-hud-telemetry-v900.mjs?v=2';
 
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
+export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
+/** The native Pirate HUD alone decides this mode.  The parent only mirrors it. */
+export const PIRATE_UNIFIED_INPUT_MODE_MESSAGE = 'pocketmonster:unified-mobile-input-mode-v1';
+export const PIRATE_UNIFIED_INPUT_INTERACTION_MESSAGE = 'pocketmonster:unified-mobile-input-interaction-v1';
 
 const query = new URLSearchParams(location.search);
 const parentOrigin = query.get('parentOrigin');
@@ -25,6 +29,9 @@ const ACTION_SELECTORS = Object.freeze({
   capture: '.tc-attack',
   summon: '.tc-dash',
   recall: '.tc-jump',
+  cannonLeft: '.tc-cannon-left',
+  cannonRight: '.tc-cannon-right',
+  interact: '.interaction-prompt',
   block: '.tc-block',
   weapon: '.tc-weapon',
   potion1: '.tc-potion1',
@@ -39,11 +46,120 @@ const ONBOARDING_ACTION_SELECTORS = Object.freeze({
 });
 
 let joystickActive = false;
-let cameraActive = false;
-let cameraPoint = { x: 0, y: 0 };
+let activeFrameGeneration = null;
+let cameraGestureHighWater = 0;
+let activeCameraGesture = null;
+let inputReadySent = false;
+let inputReadyObserver = null;
+let inputWindowLoaded = document.readyState === 'complete';
+let controlModeObserver = null;
+let reportedControlMode = null;
+let reportedHelmPrompt = null;
 let onboardingStateSignature = null;
 let onboardingObserver = null;
 let hudTelemetryPublisher = null;
+
+function isPositiveSafeInteger(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+function nativeControlMode() {
+  // TouchControls switches these native buttons synchronously in setMode().
+  // Looking at its own inline state stays valid even while the parent hides
+  // .tc-root, and never guesses from a player/boat position or an intent.
+  const starboard = document.querySelector('.tc-cannon-right');
+  return starboard?.style?.display === 'flex' ? 'boat' : 'player';
+}
+
+function nativeHelmPrompt() {
+  const prompt = document.querySelector('.interaction-prompt');
+  const text = prompt?.textContent || '';
+  if (prompt?.style?.display === 'none' || !text.includes('พวงมาลัย')) return null;
+  return nativeControlMode() === 'boat' ? 'leave' : 'enter';
+}
+
+function syncNativeHelmPromptProxy(helmPrompt) {
+  const prompt = document.querySelector('.interaction-prompt');
+  if (!prompt?.dataset) return;
+  if (helmPrompt) prompt.dataset.unifiedHelmProxy = 'true';
+  else delete prompt.dataset.unifiedHelmProxy;
+}
+
+function publishNativeControlMode(force = false) {
+  if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
+  const controlMode = nativeControlMode();
+  if (!force && controlMode === reportedControlMode) return false;
+  reportedControlMode = controlMode;
+  window.parent.postMessage({
+    type: PIRATE_UNIFIED_INPUT_MODE_MESSAGE,
+    frameGeneration: activeFrameGeneration,
+    controlMode,
+  }, allowedParentOrigin);
+  return true;
+}
+
+function publishNativeHelmPrompt(force = false) {
+  if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
+  const helmPrompt = nativeHelmPrompt();
+  // Keep the original element logically visible: its pointerdown listener is
+  // the native helm signal consumed by BoatManager.  The child HUD stylesheet
+  // hides only this tagged duplicate while the parent wheel proxies that hit.
+  syncNativeHelmPromptProxy(helmPrompt);
+  if (!force && helmPrompt === reportedHelmPrompt) return false;
+  reportedHelmPrompt = helmPrompt;
+  window.parent.postMessage({
+    type: PIRATE_UNIFIED_INPUT_INTERACTION_MESSAGE,
+    frameGeneration: activeFrameGeneration,
+    helmPrompt,
+  }, allowedParentOrigin);
+  return true;
+}
+
+function monitorNativeControlMode() {
+  controlModeObserver?.disconnect();
+  const root = document.documentElement;
+  if (!root) return;
+  controlModeObserver = new MutationObserver(() => {
+    publishNativeControlMode();
+    publishNativeHelmPrompt();
+  });
+  controlModeObserver.observe(root, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+    attributeFilter: ['class', 'style'],
+  });
+  publishNativeControlMode(true);
+  publishNativeHelmPrompt(true);
+}
+
+function announceInputReady() {
+  if (inputReadySent || !allowedParentOrigin || window.parent === window) return inputReadySent;
+  if (!inputWindowLoaded) return false;
+  if (!document.querySelector('.tc-camzone')) return false;
+  inputReadySent = true;
+  inputReadyObserver?.disconnect();
+  inputReadyObserver = null;
+  window.parent.postMessage({ type: PIRATE_UNIFIED_INPUT_READY_MESSAGE }, allowedParentOrigin);
+  return true;
+}
+
+function monitorInputReady() {
+  if (announceInputReady()) return;
+  const root = document.documentElement;
+  if (!root) {
+    window.addEventListener('DOMContentLoaded', monitorInputReady, { once: true });
+    return;
+  }
+  inputReadyObserver?.disconnect();
+  inputReadyObserver = new MutationObserver(announceInputReady);
+  inputReadyObserver.observe(root, { childList: true, subtree: true });
+}
+
+function handleInputWindowLoad() {
+  inputWindowLoaded = true;
+  announceInputReady();
+}
 
 function installCompactOnboardingStyle() {
   if (document.getElementById(PIRATE_ONBOARDING_COMPACT_STYLE_ID)) return;
@@ -125,19 +241,45 @@ function handleMove(message) {
   }
 }
 
+function closeActiveCamera() {
+  if (!activeCameraGesture) return false;
+  const { point } = activeCameraGesture;
+  activeCameraGesture = null;
+  dispatchPointer(window, 'pointerup', { pointerId: POINTERS.camera, ...point });
+  return true;
+}
+
 function handleCamera(message) {
-  const zone = document.querySelector('.tc-camzone');
+  const { frameGeneration, gestureId } = message;
+  if (!isPositiveSafeInteger(frameGeneration) || !isPositiveSafeInteger(gestureId)) return;
+
   if (message.phase === 'start') {
-    cameraPoint = { x: message.x, y: message.y };
-    cameraActive = dispatchPointer(zone, 'pointerdown', {
+    if (!Number.isFinite(message.x) || !Number.isFinite(message.y)) return;
+    if (activeFrameGeneration !== null && frameGeneration < activeFrameGeneration) return;
+    if (activeFrameGeneration === null || frameGeneration > activeFrameGeneration) {
+      closeActiveCamera();
+      activeFrameGeneration = frameGeneration;
+      cameraGestureHighWater = 0;
+    }
+    if (gestureId <= cameraGestureHighWater) return;
+    closeActiveCamera();
+    cameraGestureHighWater = gestureId;
+    const point = { x: message.x, y: message.y };
+    if (dispatchPointer(document.querySelector('.tc-camzone'), 'pointerdown', {
       pointerId: POINTERS.camera,
-      x: message.x,
-      y: message.y,
-    });
+      ...point,
+    })) {
+      activeCameraGesture = { frameGeneration, gestureId, point };
+    }
     return;
   }
-  if (message.phase === 'move' && cameraActive) {
-    cameraPoint = { x: message.x, y: message.y };
+
+  if (frameGeneration !== activeFrameGeneration
+    || activeCameraGesture?.frameGeneration !== frameGeneration
+    || activeCameraGesture?.gestureId !== gestureId) return;
+  if (message.phase === 'move') {
+    if (!Number.isFinite(message.x) || !Number.isFinite(message.y)) return;
+    activeCameraGesture.point = { x: message.x, y: message.y };
     dispatchPointer(window, 'pointermove', {
       pointerId: POINTERS.camera,
       x: message.x,
@@ -145,10 +287,7 @@ function handleCamera(message) {
     });
     return;
   }
-  if (cameraActive) {
-    dispatchPointer(window, 'pointerup', { pointerId: POINTERS.camera, ...cameraPoint });
-    cameraActive = false;
-  }
+  closeActiveCamera();
 }
 
 function handleAction(message) {
@@ -163,7 +302,18 @@ function handleAction(message) {
 
 function resetInputs() {
   handleMove({ active: false, x: 0, z: 0 });
-  handleCamera({ phase: 'end' });
+  closeActiveCamera();
+}
+
+function handleTransportReset(message) {
+  if (!isPositiveSafeInteger(message.frameGeneration)) return;
+  if (activeFrameGeneration !== null && message.frameGeneration < activeFrameGeneration) return;
+  const advancesGeneration = activeFrameGeneration === null || message.frameGeneration > activeFrameGeneration;
+  resetInputs();
+  activeFrameGeneration = message.frameGeneration;
+  if (advancesGeneration) cameraGestureHighWater = 0;
+  publishNativeControlMode(true);
+  publishNativeHelmPrompt(true);
 }
 
 window.addEventListener('message', event => {
@@ -179,16 +329,29 @@ window.addEventListener('message', event => {
     return;
   }
   if (message?.type !== PIRATE_UNIFIED_INPUT_MESSAGE) return;
+  if (message.kind === 'camera' && ['start', 'move', 'end'].includes(message.phase)) {
+    handleCamera(message);
+    return;
+  }
+  if (message.kind === 'reset') {
+    handleTransportReset(message);
+    return;
+  }
+  if (!isPositiveSafeInteger(message.frameGeneration) || message.frameGeneration !== activeFrameGeneration) return;
   if (message.kind === 'onboarding-action' && ONBOARDING_ACTION_SELECTORS[message.action]) {
     document.querySelector(ONBOARDING_ACTION_SELECTORS[message.action])?.click();
   } else if (message.kind === 'move' && Number.isFinite(message.x) && Number.isFinite(message.z)) handleMove(message);
-  else if (message.kind === 'camera' && ['start', 'move', 'end'].includes(message.phase)) handleCamera(message);
   else if (message.kind === 'action' && ACTION_SELECTORS[message.action]) handleAction(message);
-  else if (message.kind === 'reset') resetInputs();
 });
+
+window.addEventListener('blur', resetInputs);
 
 window.addEventListener('pagehide', () => {
   resetInputs();
+  inputReadyObserver?.disconnect();
+  inputReadyObserver = null;
+  controlModeObserver?.disconnect();
+  controlModeObserver = null;
   onboardingObserver?.disconnect();
   hudTelemetryPublisher?.stop();
   hudTelemetryPublisher = null;
@@ -197,6 +360,9 @@ window.addEventListener('pagehide', () => {
   }
 });
 document.documentElement.dataset.unifiedParentControls = 'active';
+if (!inputWindowLoaded) window.addEventListener('load', handleInputWindowLoad, { once: true });
+monitorInputReady();
+monitorNativeControlMode();
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', monitorOnboardingOverlay, { once: true });
 } else {

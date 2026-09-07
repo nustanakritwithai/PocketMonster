@@ -1,6 +1,7 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
 import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
-import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs';
+import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=4';
+import { createVisualEventQueue } from './world-presence-protocol.mjs?v=4';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];
@@ -46,6 +47,12 @@ const state = {
 };
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
+const worldVisualQueue = createVisualEventQueue();
+let lastWorldZone = null;
+
+window.POCKETMONSTER_WORLD_VISUAL_EVENTS = events => worldVisualQueue.push(events);
+window.POCKETMONSTER_WORLD_VISUAL_RESET = () => worldVisualQueue.clear();
+window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS = () => worldVisualQueue.diagnostics();
 
 // Unified HUD chat store (Task 3): transport/lifecycle stay authoritative here,
 // while the Dock consumes immutable snapshots instead of owning chat DOM.
@@ -472,14 +479,42 @@ function connectSocket() {
       setCombatConnected(true);
       const sendWorld = () => {
         if (!activeRequestContext()) return;
+        if (state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
         const frame = buildWorldPosFrame(snapshot);
-        if (!frame || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
-        socket.send(JSON.stringify({ type: 'world-pos', ...frame }));
+        if (!frame) return;
+        if (lastWorldZone && lastWorldZone !== frame.zone) worldVisualQueue.clear();
+        lastWorldZone = frame.zone;
+        // Keep pose cadence independent from a pending visual batch.  The
+        // queue still waits for a valid visual envelope before peeking or
+        // committing events, so a transient pose without visual metadata
+        // cannot stall movement or discard the batch.
+        const visualEnvelopeReady = Boolean(frame.visual);
+        const baseFrame = frame.visual
+          ? { ...frame, visual: { ...frame.visual, events: [] } }
+          : frame;
+        const queuedEvents = visualEnvelopeReady ? worldVisualQueue.peek(32, candidate => {
+          const candidateFrame = buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: candidate } });
+          if (!candidateFrame) return false;
+          return new TextEncoder().encode(JSON.stringify({ type: 'world-pos', ...candidateFrame })).byteLength <= MAX_COMBAT_FRAME_BYTES;
+        }) : [];
+        const outboundFrame = queuedEvents.length
+          ? buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: queuedEvents } })
+          : baseFrame;
+        if (!outboundFrame || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        const serialized = JSON.stringify({ type: 'world-pos', ...outboundFrame });
+        if (new TextEncoder().encode(serialized).byteLength > MAX_COMBAT_FRAME_BYTES) return;
+        try {
+          socket.send(serialized);
+        } catch {
+          setWorldConnected(false);
+          return;
+        }
+        worldVisualQueue.commit(queuedEvents.length, queuedEvents);
       };
       sendWorld();
       if (state.worldPulse) clearInterval(state.worldPulse);
-      state.worldPulse = setInterval(sendWorld, 250);
+      state.worldPulse = setInterval(sendWorld, 50);
     });
     socket.addEventListener('message', event => {
       if (state.socket !== socket || state.stopped || state.paused) return;

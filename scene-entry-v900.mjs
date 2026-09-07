@@ -3,7 +3,7 @@ import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
-} from './online-world-bridge-v900.mjs?v=2';
+} from './online-world-bridge-v900.mjs?v=5';
 
 export const ONLINE_WORLD_SCENE_TEARDOWN_EVENT = 'pocketmonster:online-scene-teardown';
 
@@ -162,7 +162,7 @@ try {
   window.POCKETMONSTER_SCENE_EMBEDDED = true;
 
   bootStage = 'template';
-  const templateUrl = new URL('./v900.html?v=916', import.meta.url);
+  const templateUrl = new URL('./v900.html?v=919', import.meta.url);
   const templateResponse = await fetch(templateUrl, { cache: 'no-store', signal: sceneLifetime.signal });
   requireLiveScene();
   if (!templateResponse.ok) throw new Error(`โหลดโครงฉาก V9 ไม่สำเร็จ (${templateResponse.status})`);
@@ -182,13 +182,19 @@ try {
   document.getElementById('gameChat')?.remove();
   document.getElementById('accountGate')?.classList.add('hidden');
   bindPersistentFullscreenControls(window, { signal: sceneLifetime.signal });
+  const { installPocketOfflineNpcMenuBridge } = await import('./pocket-offline-npc-menu-bridge-v900.mjs');
+  installPocketOfflineNpcMenuBridge({
+    documentLike: document,
+    windowLike: window,
+    signal: sceneLifetime.signal,
+  });
 
   bootStage = 'startup';
   requireLiveScene();
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=951');
+  await import('./worlds-v900.mjs?v=959');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });

@@ -38,6 +38,14 @@ html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt {
   pointer-events: auto !important;
   z-index: 40 !important;
 }
+/* The parent ☸ button dispatches this exact native prompt signal.  Hide only
+   the helm duplicate; generic interaction prompts (NPC, shops, boarding) keep
+   their original visible/tappable UI.  Keep its inline display state: the
+   native BoatManager reads that state. */
+html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt[data-unified-helm-proxy="true"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-root {
   inset: auto !important;
   left: 10% !important;

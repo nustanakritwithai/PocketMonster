@@ -46,10 +46,10 @@ export function bindMobileDualPointerInput({
     } catch {}
   };
 
-  // Some mobile browsers can drop capture without delivering
-  // lostpointercapture while the app is transitioning between overlays.  If a
-  // later press reaches the same surface and the old pointer is no longer
-  // captured, retire that stale gesture before accepting the new one.
+  // Some mobile browsers can drop capture while switching overlays without
+  // emitting lostpointercapture. A fresh press on the same surface proves the
+  // stale gesture can no longer own input, so retire it before accepting this
+  // drag.
   const recoverUncapturedPointer = (element, pointerId, end) => {
     if (pointerId === null || typeof element.hasPointerCapture !== 'function') return false;
     try {
@@ -126,12 +126,12 @@ export function bindMobileDualPointerInput({
     if (disposed) return false;
     const hadJoystick = joystickPointerId !== null;
     const hadCamera = cameraPointerId !== null;
-    const oldJoystick = joystickPointerId;
-    const oldCamera = cameraPointerId;
+    const joystickPointerToRelease = joystickPointerId;
+    const cameraPointerToRelease = cameraPointerId;
     joystickPointerId = null;
     cameraPointerId = null;
-    releasePointer(joystickElement, oldJoystick);
-    releasePointer(cameraElement, oldCamera);
+    releasePointer(joystickElement, joystickPointerToRelease);
+    releasePointer(cameraElement, cameraPointerToRelease);
     if (hadJoystick) onJoystickEnd(reason);
     if (hadCamera) onCameraEnd(reason);
     resetCount += 1;
@@ -140,9 +140,14 @@ export function bindMobileDualPointerInput({
 
   const onPointerUp = event => endPointer(event, 'pointerup');
   const onPointerCancel = event => endPointer(event, 'pointercancel');
+  const onJoystickLostPointerCapture = event => {
+    if (event?.pointerId === joystickPointerId) endPointer(event, 'lostpointercapture');
+  };
+  const onCameraLostPointerCapture = event => {
+    if (event?.pointerId === cameraPointerId) endPointer(event, 'lostpointercapture');
+  };
   const onBlur = () => reset('blur');
   const onPageHide = () => reset('pagehide');
-  const onLostCapture = event => endPointer(event, 'lostpointercapture');
   const onFullscreenChange = () => reset('fullscreenchange');
   const onOrientationChange = () => reset('orientationchange');
   const onVisibilityChange = () => {
@@ -151,8 +156,8 @@ export function bindMobileDualPointerInput({
 
   joystickElement.addEventListener('pointerdown', startJoystick, { passive: false });
   cameraElement.addEventListener('pointerdown', startCamera, { passive: false });
-  joystickElement.addEventListener('lostpointercapture', onLostCapture);
-  cameraElement.addEventListener('lostpointercapture', onLostCapture);
+  joystickElement.addEventListener('lostpointercapture', onJoystickLostPointerCapture);
+  cameraElement.addEventListener('lostpointercapture', onCameraLostPointerCapture);
   documentLike.addEventListener('fullscreenchange', onFullscreenChange);
   documentLike.addEventListener('webkitfullscreenchange', onFullscreenChange);
   windowLike.addEventListener('orientationchange', onOrientationChange);
@@ -173,8 +178,8 @@ export function bindMobileDualPointerInput({
       disposed = true;
       joystickElement.removeEventListener('pointerdown', startJoystick);
       cameraElement.removeEventListener('pointerdown', startCamera);
-      joystickElement.removeEventListener('lostpointercapture', onLostCapture);
-      cameraElement.removeEventListener('lostpointercapture', onLostCapture);
+      joystickElement.removeEventListener('lostpointercapture', onJoystickLostPointerCapture);
+      cameraElement.removeEventListener('lostpointercapture', onCameraLostPointerCapture);
       documentLike.removeEventListener('fullscreenchange', onFullscreenChange);
       documentLike.removeEventListener('webkitfullscreenchange', onFullscreenChange);
       windowLike.removeEventListener('orientationchange', onOrientationChange);

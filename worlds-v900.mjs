@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=945';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=953';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -7,7 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
-import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=5';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=9';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (window.POCKETMONSTER_SCENE_EMBEDDED !== true) {
-  await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
+  await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
 }
 
 const startup = document.getElementById('startupStatus');

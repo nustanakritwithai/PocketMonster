@@ -289,6 +289,16 @@ function propColor(name, mesh) {
   return Number.isFinite(hex) ? hex : 0x78716c;
 }
 
+function remoteLocomotionFor(host, moving) {
+  // Some parent world controllers annotate this presentation host; Pirate's
+  // own RemotePlayers does not, so movement remains the safe fallback.
+  const declared = host?.userData?.remoteLocomotion;
+  if (declared === 'idle' || declared === 'walk' || declared === 'run' || declared === 'swim') {
+    return declared;
+  }
+  return moving ? 'walk' : 'idle';
+}
+
 /** Convert Pocket's -Z player front to Pirate Fruit's +Z facing convention. */
 export function orientPirateFruitVisual(root, kind) {
   if ((kind === 'player' || kind === 'remote') && root?.rotation) root.rotation.y = Math.PI;
@@ -361,13 +371,22 @@ export async function installPirateFruitPocketPresentation({
     hidePirateFruitOriginalMeshes(host, new Set([handle.root]));
     attached.add(host);
     const actionTracker = kind === 'player' ? createPirateFruitActionTracker() : null;
-    const rigRetargeter = kind === 'player' ? createPirateFruitRigRetargeter(host, handle.rig) : null;
+    const rigRetargeter = kind === 'player' || kind === 'remote'
+      ? createPirateFruitRigRetargeter(host, handle.rig, {
+        sourceRootName: 'player-rig:root',
+        targetRoot: handle.root,
+        sourceRestMode: 'bind',
+        keepGroundContact: true,
+      })
+      : null;
+    const sourcePoseDriven = Boolean(rigRetargeter?.diagnostics?.().mappedRig);
     visuals.push({
       host,
       handle,
       kind,
       actionTracker,
       rigRetargeter,
+      sourcePoseDriven,
       lastAction: null,
       lastX: host.position.x,
       lastZ: host.position.z,
@@ -467,8 +486,20 @@ export async function installPirateFruitPocketPresentation({
       const moving = distanceSq > 0.00002;
       item.lastX = item.host.position.x;
       item.lastZ = item.host.position.z;
+      if (item.sourcePoseDriven) {
+        item.handle.update?.(dt, {
+          moving,
+          locomotion: item.kind === 'remote' ? remoteLocomotionFor(item.host, moving) : undefined,
+        });
+        item.rigRetargeter.update();
+        continue;
+      }
       if (!item.actionTracker) {
-        item.handle.update?.(dt, { moving });
+        item.handle.update?.(dt, {
+          moving,
+          locomotion: item.kind === 'remote' ? remoteLocomotionFor(item.host, moving) : undefined,
+        });
+        item.rigRetargeter?.update();
         continue;
       }
 

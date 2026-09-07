@@ -46,13 +46,14 @@ const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs'
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
-assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=6/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=943/);
+assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=10/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=952/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
 assert.match(childBridge, /window\.parent\.postMessage\([\s\S]*PIRATE_ONBOARDING_STATE_MESSAGE[\s\S]*allowedParentOrigin/);
 assert.match(childBridge, /PIRATE_ONBOARDING_COMPACT_CSS/);
+assert.match(childBridge, /syncNativeHelmPromptProxy\(helmPrompt\)/, 'only the native helm prompt is marked as parent-wheel-proxied');
 assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
@@ -81,6 +82,11 @@ assert.match(
   /\.interaction-prompt\s*\{[\s\S]*bottom:\s*120px/,
   'original Pirate คุยกับ prompt sits above the chat dock',
 );
+assert.match(
+  pirateHud,
+  /\.interaction-prompt\[data-unified-helm-proxy="true"\]\s*\{[\s\S]*visibility:\s*hidden\s*!important[\s\S]*pointer-events:\s*none\s*!important/,
+  'only the duplicate helm center prompt is visually retired; generic prompts remain available',
+);
 assert.match(pirateHud, /\.graphics-setting/,
   'old iframe graphics chip is retired');
 assert.match(pirateHud, /\.audio-toggle/,
@@ -95,7 +101,7 @@ assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board in
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=24/, 'Pirate child HTML cache-busts presentation after retiring the failed talk chip');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=27/, 'Pirate child HTML cache-busts presentation after retiring the helm duplicate');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
@@ -115,7 +121,10 @@ assert.equal(
   'failed NPC-name interaction module is removed',
 );
 
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-C3SJLfq8.js', import.meta.url), 'utf8');
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
+const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(pirateEntryMatch, 'Pirate bootstrap declares its compiled entry');
+const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/assets/${pirateEntryMatch[1]}`, import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
   /className="interaction-prompt",this\.element\.type="button",this\.element\.addEventListener\("pointerdown",t=>\{t\.preventDefault\(\),this\.requested=!0\}\)/,

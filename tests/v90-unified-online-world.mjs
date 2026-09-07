@@ -26,7 +26,6 @@ const shellCss = read('style-v900.css');
 const sceneEntry = read('scene-entry-v900.mjs');
 const sceneHtml = read('scene-v900.html');
 const worlds = read('worlds-v900.mjs');
-const unifiedMobileControls = read('unified-mobile-controls-v900.mjs');
 const chat = read('chat-runtime.mjs');
 const indexHtml = read('index.html');
 const v900Html = read('v900.html');
@@ -49,9 +48,9 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=962/, 'active HTML cache-busts the restored minimap entry');
-assert.match(indexHtml, /style-v900\.css\?v=966/, 'active HTML cache-busts the Pirate-primary presentation and persistent shell layout');
-assert.match(sceneHtml, /style-v900\.css\?v=966/, 'hosted scene cache-busts the same V9 stylesheet');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=971/, 'active HTML cache-busts the unified ship-control entry');
+assert.match(indexHtml, /style-v900\.css\?v=969/, 'active HTML cache-busts the helm placement beside chat');
+assert.match(sceneHtml, /style-v900\.css\?v=969/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
@@ -60,7 +59,7 @@ assert.match(minimapOwner, /pocketmonster:persistent-minimap-owner-v2/, 'product
 assert.match(minimapOwner, /MAP_RASTER_SIZE = 160/, 'production minimap owner restores the legacy 160px terrain raster');
 assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_NEAR_PADDING = 18/, 'production minimap owner restores legacy near-range padding');
 assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_LOCAL_SCALE = 1\.3/, 'production minimap owner restores legacy local island scale');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=54'\)/, 'top-level authenticates once before starting the cache-busted shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online-world-shell-v900\.mjs\?v=64'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -68,7 +67,7 @@ const parentSessionGateIndex = entry.indexOf('requireActiveOnlineLaunchSession(c
 const parentServerGateIndex = entry.indexOf('await healthVersionGate(config)');
 const parentHealthyGateIndex = entry.indexOf("serverGate.state !== 'healthy'");
 const parentPatchIndex = entry.indexOf('await applyPendingPatch()');
-const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=54')");
+const parentShellIndex = entry.indexOf("await import('./online-world-shell-v900.mjs?v=64')");
 assert.ok(parentSessionGateIndex >= 0 && parentServerGateIndex > parentSessionGateIndex, 'Server gate runs only after the parent session is valid');
 assert.ok(parentHealthyGateIndex > parentServerGateIndex, 'parent explicitly requires a healthy Server gate');
 assert.ok(parentPatchIndex > parentHealthyGateIndex, 'unhealthy Server stops before patch or scene work');
@@ -92,7 +91,7 @@ assert.doesNotMatch(shell, /POCKETMONSTER_COMBAT_V91_SHELL|\.reconcile\(/,
   'scene code cannot access a second Combat global or forge Server reconciliation');
 assert.match(shell, /function signalSceneTeardown\(reason\) \{\s*closeCombatSession\(\)/,
   'scene teardown closes pending Combat state without destroying the persistent host');
-assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-unified-world-shell-5'\)/, 'shell owns the one chat transport');
+assert.match(shell, /await import\('\.\/chat-runtime\.mjs\?v=8\.4\.0-smooth-presence-1'\)/, 'shell owns the one chat transport');
 assert.match(shell, /requireActiveOnlineLaunchSession\(window\.POCKETMONSTER_RUNTIME_CONFIG, window\.POCKETMONSTER_LAUNCH_SESSION\)/, 'shell refuses to create a scene or socket without an active parent session');
 const shellServerGateIndex = shell.indexOf('POCKETMONSTER_SERVER_GATE');
 const shellFrameIndex = shell.indexOf("createElement('iframe')");
@@ -118,8 +117,13 @@ assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: s
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
 assert.match(fullscreenBridge, /owner: 'opaque-parent-relay'/, 'opaque iframe patches requestFullscreen even when window.top throws');
 assert.match(fullscreenBridge, /PERSISTENT_FULLSCREEN_REQUEST_MESSAGE/, 'opaque fullscreen requests relay through a versioned parent message');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=1/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
-assert.match(pirateBootstrap, /await installPirateSaveSandbox\(\);[\s\S]*await import\('\.\/assets\/index-C3SJLfq8\.js'\)/, 'Pirate save hydration completes before the exact vendored runtime loads');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=4/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
+assert.ok(pirateEntryMatch, 'Pirate save bootstrap declares its compiled entry');
+assert.ok(
+  pirateBootstrap.indexOf('await installPirateSaveSandbox();') < pirateBootstrap.indexOf(pirateEntryMatch[0]),
+  'Pirate save hydration completes before the compiled vendored runtime loads',
+);
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_RUNTIME_CONFIG/, 'hosted scenes reuse the shell runtime configuration');
 assert.doesNotMatch(sceneEntry, /loadRuntimeConfig/, 'hosted scenes cannot independently load or normalize runtime configuration');
 assert.match(sceneEntry, /__POCKETMONSTER_RUNTIME_MANIFEST__ = config/, 'legacy scene runtimes receive the same normalized configuration');
@@ -127,23 +131,20 @@ assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_SERVER_GATE/, 'hosted sc
 assert.match(sceneEntry, /POCKETMONSTER_SERVER_GATE = serverGate/, 'legacy scene runtimes receive the inherited gate capability');
 assert.match(sceneEntry, /registerSceneBoot\?\.\(window, sceneHref\)/, 'child registers its exact document URL with the parent shell');
 assert.match(sceneEntry, /reportSceneBoot\?\.\(window, sceneLease/, 'child reports boot outcome with its exact lease');
-assert.match(sceneEntry, /v900\.html\?v=916/, 'hosted scene cache-busts the shared V9 DOM template');
+assert.match(sceneEntry, /v900\.html\?v=919/, 'hosted scene cache-busts the shared V9 DOM template');
 assert.match(sceneEntry, /pagehide[\s\S]*leaveParentSceneBoot\(\)[\s\S]*teardownScene\('scene-pagehide'\)/, 'pagehide revokes the lease and aborts scene capabilities before BFCache');
 assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child logout delegates cleanup to the parent session owner');
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(shell, /combined-worlds-v900\.mjs\?v=945/, 'persistent shell cache-busts the changed world catalog');
-assert.match(shell, /searchParams\.set\('shellRevision', '60'\)/, 'persistent shell cache-busts the mobile-input scene HTML');
-assert.match(worlds, /combined-worlds-v900\.mjs\?v=945/, 'scene router cache-busts the changed world catalog');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=51/, 'hosted scene cache-busts the input-recovery scene entry');
-assert.match(sceneEntry, /worlds-v900\.mjs\?v=951/, 'hosted scene cache-busts the input-recovery world router');
-assert.match(worlds, /unified-mobile-controls-v900\.mjs\?v=5/, 'world router cache-busts the unified control recovery');
-assert.match(unifiedMobileControls, /mobile-dual-pointer-input-v900\.mjs\?v=4/, 'unified controls cache-bust the pointer lifecycle recovery');
+assert.match(shell, /combined-worlds-v900\.mjs\?v=953/, 'persistent shell cache-busts the changed world catalog');
+assert.match(shell, /searchParams\.set\('shellRevision', '67'\)/, 'persistent shell cache-busts the changed scene HTML');
+assert.match(worlds, /combined-worlds-v900\.mjs\?v=953/, 'scene router cache-busts the changed world catalog');
+assert.match(sceneEntry, /worlds-v900\.mjs\?v=959/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
 assert.match(worlds, /runtimeLifecycles\.get\(world\.id\)\?\.mount\?\.\(\)[\s\S]*applyPresenceBindings\(worldPresenceBindings\.get\(world\.id\)\)/, 'mount activates the selected world presence provider');
-const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=951')");
+const childWorldImportIndex = sceneEntry.indexOf("await import('./worlds-v900.mjs?v=959')");
 const childReadyReportIndex = sceneEntry.indexOf("status: 'ready'", childWorldImportIndex);
 assert.ok(childWorldImportIndex >= 0 && childReadyReportIndex > childWorldImportIndex, 'child reports ready only after the selected world runtime finishes importing');
 assert.doesNotMatch(sceneEntry, /prepareLaunch|redeemLaunchTicket|chat-runtime|new WebSocket|sessionStorage/, 'scene entry cannot redeem, persist, or create another transport');
@@ -179,7 +180,7 @@ const parentWindow = { location: { origin: 'https://game.example' }, POCKETMONST
 assert.equal(isHostedOnlineWorldScene({ parent: parentWindow, location: { origin: 'https://game.example' } }), true);
 assert.equal(isHostedOnlineWorldScene({ parent: parentWindow, location: { origin: 'https://evil.example' } }), false);
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25 })?.zone, 'pirate-fruit');
-assert.deepEqual(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25, locomotion: 'run', animation: { combatState: 'attack', attackProgress: .5, dashing: true } }), { zone: 'pirate-fruit', x: 1, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack', attackProgress: .5, dashing: true } });
+assert.deepEqual(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: -2, dir: 0.25, locomotion: 'run', animation: { combatState: 'attack1', category: 'style', attackProgress: .5, dashing: true } }), { zone: 'pirate-fruit', x: 1, z: -2, dir: .25, locomotion: 'run', animation: { combatState: 'attack1', category: 'style', onGround: true, dashing: true, verticalVelocity: 0, attackProgress: .5 } });
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: Number.NaN, z: 0, dir: 0 }), null);
 assert.equal(sanitizeOnlineWorldPose({ zone: '../bad', x: 0, z: 0, dir: 0 }), null);
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [] }, 'pirate-fruit'), null);
@@ -291,6 +292,29 @@ globalThis.document = {
     return element;
   },
 };
+const { publishWorldState, registerExternalPose } = await import(`../world-presence-v800.mjs?presentation-integration=${Date.now()}`);
+const publishedActor = {
+  actorId: 'monster-fox-1', kind: 'monster', ownerId: 'player-other', monsterType: 'flameling',
+  zone: 'pirate-fruit', generation: 1, lifecycle: 'active', spawnSequence: 1, stateSequence: 1,
+  pose: { x: 4, y: 0, z: -2, dir: .5 }, locomotion: 'walk',
+  animation: { combatState: 'attack1', category: 'fruit', onGround: true, dashing: false, verticalVelocity: 0 },
+  presentation: { events: [], projectiles: [] },
+};
+const publishedLocalPose = { x: 9, y: 1, z: -3, locomotion: 'run', animation: null, presentation: {
+  schemaVersion: 1, avatarId: 'pirate-v1', appearanceId: 'player-orange', clothingIds: [], equipmentIds: [], activeItem: null,
+}, visual: { schemaVersion: 1, sessionId: 'visual_session_2', stateSequence: 1, events: [], projectiles: [] }, actors: [publishedActor] };
+registerExternalPose({ ...publishedLocalPose, dir: .25 });
+publishWorldState({ getZone: () => 'pirate-fruit' });
+assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
+  zone: 'pirate-fruit', x: 9, y: 1, z: -3, dir: .25, locomotion: 'run', animation: null,
+  presentation: publishedLocalPose.presentation, visual: publishedLocalPose.visual, actors: publishedLocalPose.actors,
+}, 'actual publishWorldState path preserves presentation and visual into socket hook');
+registerExternalPose({ ...publishedLocalPose, x: 10.123456789, z: -4.987654321, dir: .75, visual: {
+  ...publishedLocalPose.visual, stateSequence: 2,
+  events: [{ sequence: 1, kind: 'hit-spark', ageMs: 0, position: { x: 1, y: 2, z: 3 }, color: 0xffffff }],
+} });
+assert.equal(window.POCKETMONSTER_WORLD_STATE().x, 10.123456789, 'successive iframe poses replace the external pose before cadence');
+assert.equal(window.POCKETMONSTER_WORLD_STATE().visual.events.length, 1, 'successive iframe pose keeps its visual batch');
 globalThis.sessionStorage = {
   getItem(key) {
     if (key !== 'monsterlife.session.v1') return null;
@@ -319,11 +343,11 @@ class FakeWebSocket {
     this.listeners.set(type, handlers);
   }
   emit(type, event = {}) { for (const handler of this.listeners.get(type) || []) handler(event); }
-  send(value) { this.sent.push(JSON.parse(value)); }
+  send(value) { if (this.throwNext) { this.throwNext = false; throw new Error('send failed'); } this.sent.push(JSON.parse(value)); }
   close() { this.readyState = FakeWebSocket.CLOSED; this.emit('close'); }
 }
 globalThis.WebSocket = FakeWebSocket;
-let activePose = { zone: 'pirate-fruit', x: 1, z: 2, dir: 0 };
+let activePose = { zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [publishedActor] };
 window.POCKETMONSTER_WORLD_STATE = () => activePose;
 window.POCKETMONSTER_WORLD_PRESENCE = () => true;
 await import(`../chat-runtime.mjs?unified-test=${Date.now()}`);
@@ -332,6 +356,70 @@ assert.equal(FakeWebSocket.instances.length, 1, 'first shell transport creates o
 const physicalSocket = FakeWebSocket.instances[0];
 physicalSocket.readyState = FakeWebSocket.OPEN;
 physicalSocket.emit('open');
+const actorFrameBeforeSnapshot = physicalSocket.sent.at(-1);
+assert.equal(actorFrameBeforeSnapshot.actors[0].actorId, publishedActor.actorId, 'iframe actor state reaches the existing world-pos WSS frame');
+const receivedSnapshots = [];
+window.POCKETMONSTER_WORLD_PRESENCE = snapshot => { receivedSnapshots.push(snapshot); return true; };
+physicalSocket.emit('message', { data: JSON.stringify({
+  type: 'world-snapshot',
+  payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [publishedActor] },
+}) });
+assert.equal(receivedSnapshots.at(-1).actors[0].actorId, publishedActor.actorId, 'WSS actor snapshot reaches the parent renderer callback');
+activePose.visual = { schemaVersion: 1, sessionId: 'visual_session_1', stateSequence: 1, events: [], projectiles: [] };
+const visualEvent = sequence => ({ sequence, kind: 'hit-spark', ageMs: 0, position: { x: 1, y: 2, z: 3 }, color: 0xffffff });
+window.POCKETMONSTER_WORLD_VISUAL_EVENTS(Array.from({ length: 70 }, (_, index) => visualEvent(index + 1)));
+await new Promise(resolve => setTimeout(resolve, 360));
+const firstVisualFrame = physicalSocket.sent.find(message => message.type === 'world-pos' && message.visual?.events?.length === 32);
+assert.ok(firstVisualFrame, 'first 32 visual events cross the real world-pos socket');
+assert.ok(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending <= 38, '20Hz cadence drains at least one visual batch');
+for (let attempt = 0; attempt < 40 && window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending > 0; attempt += 1) {
+  await new Promise(resolve => setTimeout(resolve, 25));
+}
+assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 0, '20Hz cadence drains the full visual burst');
+const burstFrames = physicalSocket.sent.filter(message => message.type === 'world-pos' && message.visual?.events?.length);
+assert.ok(burstFrames.filter(message => message.visual.events.length === 32).length >= 2, 'multiple 32-event batches cross the real socket');
+assert.deepEqual(
+  burstFrames.flatMap(message => message.visual.events.map(event => event.sequence)).sort((a, b) => a - b),
+  Array.from({ length: 70 }, (_, index) => index + 1),
+  '20Hz burst sequence crosses exactly once',
+);
+window.POCKETMONSTER_WORLD_VISUAL_EVENTS([visualEvent(41)]);
+physicalSocket.throwNext = true;
+await new Promise(resolve => setTimeout(resolve, 10));
+assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 1, 'failed socket send does not commit the queue');
+await new Promise(resolve => setTimeout(resolve, 700));
+assert.ok(physicalSocket.sent.some(message => message.type === 'world-pos' && message.visual?.events?.some(event => event.sequence === 41)), 'queued event retries after transport recovers');
+
+// Worst-case actual socket frame: 96-character IDs, full-precision UTF-8 values,
+// 32 projectiles, and 70 sequential events. The sender must partition by bytes
+// without losing or duplicating any sequence.
+const longId = 'id-' + 'x'.repeat(93);
+const worstProjectiles = Array.from({ length: 32 }, (_, index) => ({
+  id: `projectile-${String(index).padStart(2, '0')}`,
+  position: { x: 9999.123456789, y: -8888.987654321, z: 7777.111111111 },
+  direction: { x: 0.6, y: 0.8, z: 0.000001 },
+  velocity: { x: 123.456789, y: -98.7654321, z: 0.000001 },
+  color: 0xffffff, scale: 1.999999, elapsed: 0, lifeFraction: 0.5, remainingMs: 120000,
+}));
+const worstEvent = sequence => ({
+  sequence, kind: 'hit-spark', ageMs: 0,
+  itemId: longId.slice(0, 96), skillId: `${longId}-skill`.slice(0, 96),
+  position: { x: 9999.123456789, y: -8888.987654321, z: 7777.111111111 }, color: 0xffffff,
+});
+activePose = {
+  zone: 'pirate-fruit', x: 1.123456789, z: 2.987654321, dir: 0.123456789,
+  visual: { schemaVersion: 1, sessionId: 'worst_case_1', stateSequence: 2, events: [], projectiles: worstProjectiles },
+};
+const worstStart = physicalSocket.sent.length;
+window.POCKETMONSTER_WORLD_VISUAL_EVENTS(Array.from({ length: 70 }, (_, index) => worstEvent(index + 1)));
+await new Promise(resolve => setTimeout(resolve, 3200));
+const worstFrames = physicalSocket.sent.slice(worstStart).filter(message => message.type === 'world-pos' && message.visual?.events?.length);
+assert.ok(worstFrames.length >= 3, 'worst-case visual burst crosses multiple real socket frames');
+const worstSequences = worstFrames.flatMap(message => message.visual.events.map(event => event.sequence));
+assert.deepEqual([...worstSequences].sort((a, b) => a - b), Array.from({ length: 70 }, (_, index) => index + 1), 'worst-case sequence 1..70 crosses exactly once');
+for (const message of worstFrames) {
+  assert.ok(new TextEncoder().encode(JSON.stringify(message)).byteLength <= 32 * 1024, 'every worst-case world frame stays within 32KiB UTF-8');
+}
 activePose = { zone: 'hub', x: 3, z: 4, dir: 0.5 };
 await new Promise(resolve => setTimeout(resolve, 280));
 await import(`../chat-runtime.mjs?duplicate-test=${Date.now()}`);

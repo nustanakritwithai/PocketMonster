@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=945';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=953';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=2';
+} from './online-world-bridge-v900.mjs?v=5';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -97,7 +97,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '60');
+  url.searchParams.set('shellRevision', '67');
   return url.href;
 }
 
@@ -140,11 +140,24 @@ shellStatus.id = 'onlineWorldShellStatus';
 shellStatus.textContent = 'กำลังเปิดโลกออนไลน์…';
 shell.append(sceneFrame, combatHost, shellStatus);
 document.body.replaceChildren(shell);
+function clearPocketNpcMenu() {
+  delete document.body.dataset.pocketNpcMenu;
+}
+
 window.addEventListener('message', event => {
   if (event.source !== sceneFrame.contentWindow) return;
-  if (event.data?.type !== 'pocketmonster:pirate-dialogue-v1') return;
-  if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
-  else delete document.body.dataset.pirateDialogue;
+  if (event.data?.type === 'pocketmonster:pirate-dialogue-v1') {
+    if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
+    else delete document.body.dataset.pirateDialogue;
+    return;
+  }
+  if (event.data?.type !== 'pocketmonster:legacy-npc-menu-v1') return;
+  if (activeWorld !== 'pocket-monster' || event.data.world !== 'pocket-monster') {
+    clearPocketNpcMenu();
+    return;
+  }
+  if (event.data.open === true) document.body.dataset.pocketNpcMenu = 'open';
+  else clearPocketNpcMenu();
 });
 
 function combatUnavailable() {
@@ -240,6 +253,7 @@ function showSceneLoading(message = 'กำลังเปิดโลกออ�
 
 function invalidateSceneBoot({ showLoading = false, message } = {}) {
   activeSceneLease = null;
+  clearPocketNpcMenu();
   clearSceneHudAdapters();
   if (showLoading && !sessionEnding) showSceneLoading(message);
 }
@@ -248,24 +262,20 @@ function sceneWindowIsCurrent(sceneWindow) {
   try { return sceneWindow === sceneFrame.contentWindow; } catch { return false; }
 }
 
-function persistentFullscreenElement() {
-  return document.fullscreenElement || document.webkitFullscreenElement || null;
-}
-
-// The top-level document owns fullscreen while the active game controls live
-// in the scene iframe. Browser lifecycle events do not reliably cross that
-// boundary on mobile, so explicitly release any captured input in the scene.
 function recoverSceneInput(reason = 'parent-input-recovery') {
-  if (sessionEnding) return false;
+  const sceneWindow = sceneFrame.contentWindow;
+  if (!sceneWindowIsCurrent(sceneWindow)) return false;
   try {
-    const controls = sceneFrame.contentWindow?.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
-    if (typeof controls?.reset !== 'function') return false;
-    controls.reset(reason);
+    sceneWindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.(reason);
     sceneInputRecoveryCount += 1;
     return true;
   } catch {
     return false;
   }
+}
+
+function persistentFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
 function requestPersistentFullscreen(options) {
@@ -568,9 +578,9 @@ for (const type of ['blur', 'pagehide', 'orientationchange']) {
   window.addEventListener(type, () => recoverSceneInput(`parent-${type}`));
 }
 for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
-  document.addEventListener?.(type, () => recoverSceneInput(`parent-${type}`));
+  document.addEventListener(type, () => recoverSceneInput(`parent-${type}`));
 }
-document.addEventListener?.('visibilitychange', () => {
+document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') recoverSceneInput('parent-visibility-hidden');
 });
 window.addEventListener('pageshow', event => {
@@ -584,7 +594,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-unified-world-shell-5');
+await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
 unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
 installUnifiedHud();
 unifiedHud.setExpanded(false);

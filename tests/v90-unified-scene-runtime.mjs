@@ -26,17 +26,17 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=943',
+    runtime: './boot-pirate-fruit-v900.mjs?v=952',
   }),
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=827',
+    runtime: './game-v800.js?v=829',
   }),
   Object.freeze({
     world: 'living-world',
     panel: 'human',
-    runtime: './world-living-v900.mjs?v=904',
+    runtime: './world-living-v900.mjs?v=906',
   }),
 ]);
 const worldRuntimePaths = new Set(worldCases.map(item => new URL(item.runtime, 'https://game.example/').pathname));
@@ -265,7 +265,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     metrics.timeline.push('fetch:template');
     assert.equal(url.origin, 'https://game.example');
     assert.equal(url.pathname, '/v900.html');
-    assert.equal(url.search, '?v=916');
+    assert.equal(url.search, '?v=919');
     assert.equal(options.cache, 'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     return {
@@ -348,6 +348,13 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
       return makeSynthetic(resolvedUrl, {
         installNpcInteractionLayer() {
           metrics.timeline.push('module:npc-interaction-layer');
+        },
+      });
+    }
+    if (pathname === '/pocket-offline-npc-menu-bridge-v900.mjs') {
+      return makeSynthetic(resolvedUrl, {
+        installPocketOfflineNpcMenuBridge() {
+          metrics.timeline.push('module:pocket-offline-npc-menu-bridge');
         },
       });
     }
