@@ -39,3 +39,5 @@ jobs:
           node tests/v80-ae0-contracts.mjs
           node tests/v80-ae1-adapter.mjs
           node tests/v90-pirate-fruit-player.mjs
+      - name: Run current Pocket release check
+        run: npm run check
