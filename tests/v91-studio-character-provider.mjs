@@ -149,6 +149,16 @@ const badProvider = structuredClone(pkg); badProvider.catalogEntry.provider = 'p
 assert.equal(validateStudioCharacterPackage(badProvider).valid, false, 'provider mismatch must be rejected');
 const noBindings = structuredClone(pkg); noBindings.rig.jointBindings = {};
 assert.equal(validateStudioCharacterPackage(noBindings).valid, false, 'joint bindings are required');
+const emptyMesh = structuredClone(pkg); emptyMesh.sceneGraph.root.children[0].geometry.attributes.position.array = [];
+assert.equal(validateStudioCharacterPackage(emptyMesh).valid, false, 'empty geometry must not replace a visible fallback');
+const badIndex = structuredClone(pkg); badIndex.sceneGraph.root.children[0].geometry.index.array = [0, 1, 99];
+assert.equal(validateStudioCharacterPackage(badIndex).valid, false, 'out-of-range geometry indices must be rejected');
+const hiddenByScale = structuredClone(pkg); hiddenByScale.sceneGraph.root.transform.scale = [0, 1, 1];
+assert.equal(validateStudioCharacterPackage(hiddenByScale).valid, false, 'zero-scale visual roots must be rejected');
+const missingJointPath = structuredClone(pkg); missingJointPath.rig.jointBindings.handR.path = [99];
+assert.equal(validateStudioCharacterPackage(missingJointPath).valid, false, 'joint bindings must resolve into the scene graph');
+const missingSocketJoint = structuredClone(pkg); missingSocketJoint.rig.sockets.rightHand.joint = 'not-a-joint';
+assert.equal(validateStudioCharacterPackage(missingSocketJoint).valid, false, 'sockets must reference declared joint bindings');
 
 const engine = createAssetEngine({ THREE });
 engine.registerProvider('studio-character', createStudioCharacterProvider({ THREE }));
