@@ -10,6 +10,7 @@ import {
   advancePirateSnapshotVisualAge,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
+  pirateCentralAuthorityOwnsZone,
 } from '../pirate-presence-bridge-v900.mjs';
 import { publishWorldState } from '../world-presence-v800.mjs';
 
@@ -18,6 +19,20 @@ const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'u
 const bridge = fs.readFileSync(new URL('../pirate-presence-bridge-v900.mjs', import.meta.url), 'utf8');
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmonster-status-v900.mjs', import.meta.url), 'utf8');
+
+const centralAuthority = {
+  contract: 'pirate-central-spatial/1', schemaVersion: 1,
+  contentRevision: 'pirate-monster-catalog-2026-09-07-ai-v2-transport-v2', contentHash: 'fnv1a-236acf41',
+  manifestSha256: '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0',
+  vectorsSha256: 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7',
+  zones: ['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky'],
+};
+assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), true, 'exact Server capability activates the Pirate transport zone');
+for (const mapZone of centralAuthority.zones) {
+  assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), true, `central map zone ${mapZone} keeps the transport gate active`);
+}
+assert.equal(pirateCentralAuthorityOwnsZone({ ...centralAuthority, contentHash: 'fnv1a-ae668b33' }, 'pirate-fruit'), false, 'stale manifest identity fails closed');
+assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'living-world'), false, 'non-Pirate transport keeps owner relay');
 
 assert.deepEqual(sanitizePirateLocalPresence({
   type: PIRATE_LOCAL_PRESENCE_MESSAGE,
@@ -86,6 +101,9 @@ const snapshot = sanitizePirateWorldSnapshot({
     { id: 'alice', name: 'Duplicate', x: 9, z: 9, dir: 0 },
   ],
 });
+const capabilitySnapshot = sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority, players: [] });
+assert.equal(capabilitySnapshot.centralAuthority.contentRevision, centralAuthority.contentRevision, 'valid capability crosses the parent snapshot sanitizer');
+assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, manifestSha256: 'bad' }, players: [] }).centralAuthority, undefined, 'mismatched capability is omitted');
 assert.deepEqual(snapshot, {
   zone: 'pirate-fruit',
   players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5, locomotion: 'idle', animation: null }],
@@ -118,11 +136,46 @@ pose = { x: 2, z: 3, dir: 0.25 };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'idle', animation: null,
 });
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+publishWorldState({
+  getZone: () => 'pirate-fruit',
+  getPosition: () => pose,
+  getDir: () => pose?.dir,
+  allowActors: false,
+});
+assert.equal(Object.hasOwn(window.POCKETMONSTER_WORLD_STATE(), 'actors'), false,
+  'central Pirate publisher suppresses iframe actor pose from outbound WORLD_STATE');
+publishWorldState({
+  getZone: () => 'living-world',
+  getPosition: () => ({ ...pose, actors: [{ ...localActor, zone: 'living-world' }] }),
+  getDir: () => pose?.dir,
+  allowActors: true,
+});
+assert.equal(window.POCKETMONSTER_WORLD_STATE().actors[0].actorId, localActor.actorId,
+  'noncentral publishers retain the existing actor compatibility gate');
+pose = { x: 2, z: 3, dir: 0.25 };
+publishWorldState({
+  getZone: () => 'pirate-fruit',
+  getPosition: () => pose,
+  getDir: () => pose?.dir,
+});
+
+let relayAllowed = true;
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+const centralPose = { ...pose, actors: [{ ...localActor, zone: 'starter-island' }] };
+publishWorldState({ getZone: () => 'starter-island', getPosition: () => centralPose, getDir: () => centralPose.dir, getAllowActors: () => relayAllowed });
+assert.equal(window.POCKETMONSTER_WORLD_STATE().actors.length, 1, 'late capability starts in compatible relay mode');
+relayAllowed = false;
+assert.equal(Object.hasOwn(window.POCKETMONSTER_WORLD_STATE(), 'actors'), false, 'central capability can suppress owner actors dynamically');
+relayAllowed = true;
+publishWorldState({ getZone: () => 'pirate-fruit', getPosition: () => pose, getDir: () => pose?.dir });
 
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'frame source is checked before accepting pose');
 assert.match(boot, /event\.origin !== 'null'/, 'opaque sandbox origin is checked before accepting pose');
 assert.match(boot, /sanitizePirateLocalPresence\(message\)/, 'parent accepts only the validated local pose contract');
-assert.match(boot, /getActors: \(\) => piratePose\?\.actors/, 'parent publisher forwards actors through the existing WORLD_STATE provider');
+assert.match(boot, /allowActors: true/, 'Pirate parent preserves actor relay until Server central-authority capability is verified');
+assert.match(boot, /getAllowActors:/, 'Pirate parent evaluates central authority dynamically per WORLD_STATE frame');
+assert.match(boot, /centralAuthorityCapability = null/, 'disconnect and cleanup clear central authority capability');
 assert.match(boot, /sanitizePirateWorldSnapshot\(payload\)/, 'parent sanitizes Server snapshots before forwarding');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPirateSnapshotMessage\(snapshot\), '\*'\)/, 'snapshot targets the exact mounted opaque frame window');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPiratePresenceStatusMessage\(connected\), '\*'\)/, 'presence status targets the exact mounted opaque frame window');

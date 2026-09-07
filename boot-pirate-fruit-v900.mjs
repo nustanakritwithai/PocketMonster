@@ -14,6 +14,7 @@ import {
   advancePirateSnapshotVisualAge,
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
+  pirateCentralAuthorityOwnsZone,
 } from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=8';
@@ -112,6 +113,7 @@ function bindPocketMonsterLink(frame) {
   let piratePose = null;
   let latestPresenceSnapshot = null;
   let latestPresenceAt = 0;
+  let centralAuthorityCapability = null;
   let frameReady = false;
   // Server snapshots carry up to 512 recent visual events; retain only the
   // newest late-boot snapshot so history is replayed once, age-adjusted.
@@ -181,6 +183,7 @@ function bindPocketMonsterLink(frame) {
     if (!connected) {
       latestPresenceSnapshot = null;
       latestPresenceAt = 0;
+      centralAuthorityCapability = null;
       pendingPresenceSnapshots.length = 0;
       window.POCKETMONSTER_WORLD_VISUAL_RESET?.();
       registerExternalPose(null);
@@ -192,16 +195,18 @@ function bindPocketMonsterLink(frame) {
     getZone: () => 'pirate-fruit',
     getPosition: () => null,
     getDir: () => undefined,
-    // The mounted Pirate iframe is the sole owner of local actor presentation.
-    // Keep actors on the existing WORLD_STATE/WSS frame; do not create a second
-    // realtime publisher or let the parent invent combat authority.
-    getActors: () => piratePose?.actors,
+    allowActors: true,
+    getAllowActors: () => !pirateCentralAuthorityOwnsZone(
+      centralAuthorityCapability,
+      latestPresenceSnapshot?.zone || PIRATE_PRESENCE_ZONE,
+    ),
   });
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
     if (!pirateRuntimeActive) return false;
     const snapshot = sanitizePirateWorldSnapshot(payload);
     if (!snapshot) return false;
     latestPresenceSnapshot = snapshot;
+    centralAuthorityCapability = snapshot.centralAuthority || null;
     latestPresenceAt = Date.now();
     forwardPresenceStatus(true);
     forwardPresence(snapshot);
@@ -279,6 +284,7 @@ function bindPocketMonsterLink(frame) {
     clearPresenceQueue: () => {
       pendingPresenceSnapshots.length = 0;
       latestPresenceSnapshot = null;
+      centralAuthorityCapability = null;
     },
   });
 }

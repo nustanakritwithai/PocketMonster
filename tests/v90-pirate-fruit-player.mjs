@@ -68,8 +68,8 @@ for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.
 assert.equal(PIRATE_FRUIT_SOURCE.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(PIRATE_FRUIT_SOURCE.visual, 'client/src/art/PiratePlayerVisual.ts');
 assert.equal(PIRATE_FRUIT_SOURCE.contract, 'presentation-only');
-assert.equal(pirateBundleRef, 'assets/index-CbUVGL2y.js', 'offline bootstrap must use the exact actor-capable Pirate bundle');
-assert.equal(pirateBundleHash, '9bc9ebee409bb11e98cba65ae59e0aabe8acf0d81d437650f2e7c9720ed2e7f3', 'Pirate artifact provenance must remain pinned');
+assert.equal(pirateBundleRef, 'assets/index-DKUYjNyH.js', 'offline bootstrap must use the exact actor-capable Pirate bundle');
+assert.equal(pirateBundleHash, 'a1352891f6029d793887db2dc0e8d9a1377ea298fa0ab47abf56f1a6e9e58d1b', 'Pirate artifact provenance must remain pinned to the manifest entry');
 assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');

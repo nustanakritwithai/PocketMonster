@@ -6,6 +6,7 @@ import {
   sanitizeLocomotion,
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
+  centralAuthorityOwnsTransportZone,
 } from './world-presence-protocol.mjs?v=4';
 
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
@@ -58,6 +59,10 @@ export function sanitizePirateLocalPresence(message) {
  */
 export function sanitizePirateWorldSnapshot(payload) {
   return sanitizeOnlineWorldSnapshot(payload, PIRATE_PRESENCE_ZONE);
+}
+
+export function pirateCentralAuthorityOwnsZone(capability, zone = PIRATE_PRESENCE_ZONE) {
+  return centralAuthorityOwnsTransportZone(capability, zone);
 }
 
 export function createPirateSnapshotMessage(snapshot) {
