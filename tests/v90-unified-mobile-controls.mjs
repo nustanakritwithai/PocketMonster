@@ -250,6 +250,7 @@ assert.match(bridgeSource, /event\.source !== window\.parent \|\| event\.origin 
 assert.match(bridgeSource, /\.tc-joyzone/);
 assert.match(bridgeSource, /block: '\.tc-block'/);
 assert.match(bridgeSource, /interact: '\.interaction-prompt'/, 'the new wheel uses the existing native interaction prompt');
+assert.match(bridgeSource, /dataset\.unifiedHelmProxy/, 'only the native helm prompt is marked for center-panel retirement');
 assert.match(htmlSource, /id="pirateUnifiedControls"[\s\S]*id="pirateJoyKnob"[\s\S]*id="captureBtn"[^>]*tc-attack[\s\S]*id="pirateHelmBtn"[^>]*tc-helm/);
 assert.match(styleSource, /#pirateUnifiedControls\{[^}]*z-index:20[^}]*pointer-events:none/);
 assert.match(styleSource, /#pirateUnifiedControls #joystick\.tc-joyzone/);
@@ -262,6 +263,6 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=57/, 'online scene cache-busts the unified Pirate ship-control bridge');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=58/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');

@@ -5,7 +5,7 @@ import {
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
-} from '../pirate-fruit-control-hud-v900.mjs?v=11';
+} from '../pirate-fruit-control-hud-v900.mjs?v=12';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 let skipVendorFullscreen = false;
