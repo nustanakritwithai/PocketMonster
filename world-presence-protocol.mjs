@@ -7,6 +7,7 @@ export const PIRATE_CENTRAL_AUTHORITY_CONTRACT = 'pirate-central-spatial/1';
 export const PIRATE_CENTRAL_AUTHORITY_SCHEMA_VERSION = 1;
 export const PIRATE_CENTRAL_AUTHORITY_CONTENT_REVISION = 'pirate-monster-catalog-2026-09-07-ai-v2';
 export const PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH = 'fnv1a-ae668b33';
+export const PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE = 'pirate-fruit';
 export const PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256 = '39FA9E8460EF662126534814A4A3FED4B9C4A670F0E3F707A3F643EC0733850C';
 export const PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256 = 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7';
 export const PIRATE_CENTRAL_AUTHORITY_ZONES = Object.freeze(['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky']);
@@ -481,6 +482,11 @@ export function sanitizeCentralAuthority(value) {
 
 export function centralAuthorityOwnsZone(capability, zone) {
   return Boolean(sanitizeCentralAuthority(capability)?.zones.includes(zone));
+}
+
+export function centralAuthorityOwnsTransportZone(capability, transportZone) {
+  return Boolean(sanitizeCentralAuthority(capability)
+    && transportZone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE);
 }
 
 export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {

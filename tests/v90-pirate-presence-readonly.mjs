@@ -27,9 +27,12 @@ const centralAuthority = {
   vectorsSha256: 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7',
   zones: ['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky'],
 };
-assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'starter-island'), true, 'exact Server capability owns a central zone');
-assert.equal(pirateCentralAuthorityOwnsZone({ ...centralAuthority, contentHash: 'fnv1a-e5197eb7' }, 'starter-island'), false, 'stale manifest identity fails closed');
-assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), false, 'noncentral Pirate zone keeps owner relay');
+assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), true, 'exact Server capability activates the Pirate transport zone');
+for (const mapZone of centralAuthority.zones) {
+  assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), true, `central map zone ${mapZone} keeps the transport gate active`);
+}
+assert.equal(pirateCentralAuthorityOwnsZone({ ...centralAuthority, contentHash: 'fnv1a-e5197eb7' }, 'pirate-fruit'), false, 'stale manifest identity fails closed');
+assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'living-world'), false, 'non-Pirate transport keeps owner relay');
 
 assert.deepEqual(sanitizePirateLocalPresence({
   type: PIRATE_LOCAL_PRESENCE_MESSAGE,
