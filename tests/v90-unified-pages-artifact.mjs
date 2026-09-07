@@ -17,6 +17,12 @@ const pirateBootstrap = fs.readFileSync(path.join(root, 'pirate-fruit-offline/po
 const pirateEntryMatch = pirateBootstrap.match(/import\('\.\/assets\/([^']+\.js)'\)/);
 assert.ok(pirateEntryMatch, 'Pirate bootstrap must declare its compiled entry asset');
 const pirateEntryAsset = `pirate-fruit-offline/assets/${pirateEntryMatch[1]}`;
+const activePirateAsset = (relative) => {
+  if (!relative.startsWith('pirate-fruit-offline/assets/')) return relative;
+  const filename = relative.slice('pirate-fruit-offline/assets/'.length);
+  const stem = filename.replace(/-[^-]+\.js$/, '');
+  return [...closure].find((candidate) => candidate.startsWith(`pirate-fruit-offline/assets/${stem}-`) && candidate.endsWith('.js')) ?? relative;
+};
 const required = new Set([
   ...REQUIRED_V9_ENTRY_FILES,
   'entry-preload-v900.mjs',
@@ -48,7 +54,7 @@ const required = new Set([
 for (const relative of required) assert.ok(closure.has(relative), `${relative} must be reachable from a shipped V9 entry`);
 
 const manifestFiles = new Map(manifest.files.map(item => [item.path, item]));
-for (const relative of PAGES_LIVE_SMOKE_FILES) {
+for (const relative of PAGES_LIVE_SMOKE_FILES.map(activePirateAsset)) {
   assert.ok(manifestFiles.has(relative), `รายการตรวจ live ต้องอยู่ใน manifest ก่อนเผยแพร่: ${relative}`);
 }
 assert.equal(manifestFiles.size, closure.size, 'patch manifest must not force-download public compatibility files outside the active V9 closure');

@@ -51,10 +51,12 @@ const providerSrc = fs.readFileSync(new URL('../asset-presentation/providers/pir
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
 const pirateSource = JSON.parse(fs.readFileSync(new URL('../pirate-fruit-offline/SOURCE.json', import.meta.url), 'utf8'));
+const pirateManifest = JSON.parse(fs.readFileSync(new URL('../patch-manifest.json', import.meta.url), 'utf8'));
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline Pirate Fruit bootstrap imports its main bundle after save hydration');
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/' + pirateBundleRef, import.meta.url), 'utf8');
 const pirateBundleHash = crypto.createHash('sha256').update(pirateBundle).digest('hex');
+const pirateManifestEntry = pirateManifest.files.find((entry) => entry.path === `pirate-fruit-offline/${pirateBundleRef}`);
 const bundle = JSON.parse(fs.readFileSync(new URL('../assets/catalog/humanoid-core.json', import.meta.url), 'utf8'));
 
 const check = spawnSync(process.execPath, ['--check', fileURLToPath(new URL('../asset-presentation/providers/pirate-fruit-player.mjs', import.meta.url))], { encoding: 'utf8' });
@@ -68,8 +70,9 @@ for (const file of ['boot-pirate-fruit-v900.mjs', 'pirate-fruit-island-map-v900.
 assert.equal(PIRATE_FRUIT_SOURCE.repo, 'https://github.com/nustanakritwithai/Pirate-fruit-');
 assert.equal(PIRATE_FRUIT_SOURCE.visual, 'client/src/art/PiratePlayerVisual.ts');
 assert.equal(PIRATE_FRUIT_SOURCE.contract, 'presentation-only');
-assert.equal(pirateBundleRef, 'assets/index-DKUYjNyH.js', 'offline bootstrap must use the exact actor-capable Pirate bundle');
-assert.equal(pirateBundleHash, 'a1352891f6029d793887db2dc0e8d9a1377ea298fa0ab47abf56f1a6e9e58d1b', 'Pirate artifact provenance must remain pinned to the manifest entry');
+assert.equal(pirateSource.commit, '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821', 'Pirate artifact source must pin the reviewed merge');
+assert.ok(pirateManifestEntry, 'active Pirate bootstrap entry must be present in patch manifest');
+assert.equal(pirateBundleHash, pirateManifestEntry.sha256, 'Pirate artifact bytes must match the active manifest entry');
 assert.ok(ALLOWED_PROVIDERS.includes('pirate-fruit'));
 assert.doesNotMatch(providerSrc, /from ['"]three['"]/, 'provider must not import the three npm package');
 assert.doesNotMatch(providerSrc, /mergeGeometries/, 'do not vendor Pirate Fruit mesh merging');
@@ -283,8 +286,8 @@ assert.equal(pirateSource.pocketPresentation.visual, 'pocket-asset-engine');
 assert.equal(pirateSource.pocketPresentation.createsStage, false);
 assert.equal(pirateSource.pocketPresentation.player, 'character.human.pirate-fruit.v1');
 assert.equal(pirateSource.pocketPresentation.ui, 'pirate-fruit-parent-primary');
-assert.equal(pirateSource.ref, 'a07af2e7540f5fc25c7ad4d10491a87a4306e4d9');
-assert.equal(pirateSource.commit, 'a07af2e7540f5fc25c7ad4d10491a87a4306e4d9');
+assert.equal(pirateSource.ref, '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821');
+assert.equal(pirateSource.commit, '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.contract, 'presentation-only');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.zone, 'pirate-fruit');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket');
