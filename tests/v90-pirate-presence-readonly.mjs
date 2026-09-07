@@ -19,9 +19,14 @@ const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'u
 const bridge = fs.readFileSync(new URL('../pirate-presence-bridge-v900.mjs', import.meta.url), 'utf8');
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmonster-status-v900.mjs', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-DKUYjNyH.js', import.meta.url), 'utf8');
+assert.match(pirateBundle, /onCentralAuthority/, 'compiled Pirate adapter exposes the central capability callback');
+assert.match(pirateBundle, /getMonsterActors/, 'compiled Pirate adapter exposes the central actor source switch');
+assert.match(pirateBundle, /generation/, 'compiled Pirate adapter carries lifecycle generation validation');
 
 const centralAuthority = {
   contract: 'pirate-central-spatial/1', schemaVersion: 1,
+  generation: 1,
   contentRevision: 'pirate-monster-catalog-2026-09-07-ai-v2-transport-v2', contentHash: 'fnv1a-236acf41',
   manifestSha256: '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0',
   vectorsSha256: 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7',
@@ -103,7 +108,9 @@ const snapshot = sanitizePirateWorldSnapshot({
 });
 const capabilitySnapshot = sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority, players: [] });
 assert.equal(capabilitySnapshot.centralAuthority.contentRevision, centralAuthority.contentRevision, 'valid capability crosses the parent snapshot sanitizer');
+assert.equal(capabilitySnapshot.centralAuthority.generation, 1, 'central capability generation crosses the parent snapshot sanitizer');
 assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, manifestSha256: 'bad' }, players: [] }).centralAuthority, undefined, 'mismatched capability is omitted');
+assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, generation: 0 }, players: [] }).centralAuthority, undefined, 'invalid central capability generation is omitted');
 assert.deepEqual(snapshot, {
   zone: 'pirate-fruit',
   players: [{ id: 'alice', name: 'Alice', x: 1, z: 2, dir: 0.5, locomotion: 'idle', animation: null }],
