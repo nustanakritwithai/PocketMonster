@@ -78,6 +78,13 @@ function nativeHelmPrompt() {
   return nativeControlMode() === 'boat' ? 'leave' : 'enter';
 }
 
+function syncNativeHelmPromptProxy(helmPrompt) {
+  const prompt = document.querySelector('.interaction-prompt');
+  if (!prompt?.dataset) return;
+  if (helmPrompt) prompt.dataset.unifiedHelmProxy = 'true';
+  else delete prompt.dataset.unifiedHelmProxy;
+}
+
 function publishNativeControlMode(force = false) {
   if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
   const controlMode = nativeControlMode();
@@ -94,6 +101,10 @@ function publishNativeControlMode(force = false) {
 function publishNativeHelmPrompt(force = false) {
   if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
   const helmPrompt = nativeHelmPrompt();
+  // Keep the original element logically visible: its pointerdown listener is
+  // the native helm signal consumed by BoatManager.  The child HUD stylesheet
+  // hides only this tagged duplicate while the parent wheel proxies that hit.
+  syncNativeHelmPromptProxy(helmPrompt);
   if (!force && helmPrompt === reportedHelmPrompt) return false;
   reportedHelmPrompt = helmPrompt;
   window.parent.postMessage({

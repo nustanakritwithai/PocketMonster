@@ -246,12 +246,24 @@ assert.deepEqual(
   },
   'only the visible native helm prompt publishes a parent wheel state',
 );
+assert.equal(
+  childActions.get('.interaction-prompt').dataset.unifiedHelmProxy,
+  'true',
+  'the child tags the existing helm prompt so only its duplicate center panel is hidden',
+);
 send(input({ kind: 'action', frameGeneration: 3, action: 'interact', phase: 'start', pointerId: 42 }));
 send(input({ kind: 'action', frameGeneration: 3, action: 'interact', phase: 'end', pointerId: 42 }));
 assert.deepEqual(
   eventLog.filter(({ target }) => target === 'helmPrompt').map(({ type }) => type),
   ['pointerdown', 'pointerup'],
   'the parent wheel dispatches the existing native interaction prompt only',
+);
+childActions.get('.interaction-prompt').textContent = '💬 คุยกับ กะลาสี';
+FakeMutationObserver.flush();
+assert.equal(
+  childActions.get('.interaction-prompt').dataset.unifiedHelmProxy,
+  undefined,
+  'a non-helm interaction restores its own original center prompt instead of being hidden',
 );
 childWindow.dispatchEvent(new Event('pagehide'));
 childWindow.dispatchEvent(new Event('pagehide'));
