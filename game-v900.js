@@ -4,6 +4,9 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
+import { createStudioCharacterProvider } from './asset-presentation/providers/studio-character.mjs';
+import { installStudioCharacterPackage } from './asset-presentation/studio-character-package.mjs';
+import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs';
 
 export const NEW_WORLD_VERSION = '9.0.0-new-world';
 export const NEW_WORLD_ID = 'pirate-fruit-new-world';
@@ -143,18 +146,40 @@ assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({
   torus: torusGeometry,
   material: mat,
 }));
-const playerVisual = assets.spawn('character.human.pirate-fruit.v1', {
-  role: 'player',
-  appearanceId: 'appearance.human.player-orange.v1',
-  quality: qualityProfile.tier,
-});
+assets.registerProvider('studio-character', createStudioCharacterProvider({ THREE }));
+
+let playerVisual;
+let playerVisualSource = 'pirate-fruit';
+try {
+  startupText('กำลังเชื่อมตัวละครจาก Character Studio…');
+  const studioPackage = await loadStudioCharacterFromEngine({
+    characterId: 'character.human.pirate.studio-live',
+    displayName: 'Studio Player',
+  });
+  await installStudioCharacterPackage(assets, studioPackage, { bundleName: 'studio-live-player' });
+  playerVisual = assets.spawn(studioPackage.manifest.id, {
+    role: 'player',
+    quality: qualityProfile.tier,
+  });
+  playerVisualSource = 'studio-character';
+  playerVisual.play('idle', { restart: true });
+} catch (error) {
+  console.warn('[StudioCharacter] live bridge unavailable; using Pirate presentation fallback', error);
+  playerVisual = assets.spawn('character.human.pirate-fruit.v1', {
+    role: 'player',
+    appearanceId: 'appearance.human.player-orange.v1',
+    quality: qualityProfile.tier,
+  });
+}
 await playerVisual.ready;
 const player = playerVisual.root;
 player.position.set(0, 0, 1.2);
 scene.add(player);
 
 if (typeof window !== 'undefined') {
-  window.MLRPG_ASSETS = { diagnostics: () => assets.diagnostics() };
+  window.MLRPG_ASSETS = {
+    diagnostics: () => ({ ...assets.diagnostics(), playerVisualSource }),
+  };
 }
 
 let cameraYaw = 0.2;
@@ -208,6 +233,7 @@ function cameraRight() { const f = forward(); return new THREE.Vector3(-f.z, 0, 
 
 const BOUNDS = Object.freeze({ minX: -8, maxX: 8, minZ: -6, maxZ: 10 });
 const speed = 5.4;
+let studioLocomotionState = null;
 
 function updatePlayer(dt) {
   let side = 0, fwd = 0;
@@ -221,6 +247,13 @@ function updatePlayer(dt) {
     player.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI;
     player.position.x = THREE.MathUtils.clamp(player.position.x, BOUNDS.minX, BOUNDS.maxX);
     player.position.z = THREE.MathUtils.clamp(player.position.z, BOUNDS.minZ, BOUNDS.maxZ);
+  }
+  if (playerVisualSource === 'studio-character') {
+    const next = moving ? 'walk' : 'idle';
+    if (next !== studioLocomotionState) {
+      playerVisual.play(next);
+      studioLocomotionState = next;
+    }
   }
   playerVisual.update(dt, { moving });
 }
@@ -241,11 +274,13 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-startupText('เข้าเกาะโจรสลัดแล้ว', 'ok');
+startupText(playerVisualSource === 'studio-character' ? 'เข้าเกาะโจรสลัดแล้ว • Studio Character' : 'เข้าเกาะโจรสลัดแล้ว', 'ok');
 const zoneLabel = document.getElementById('zoneLabel');
 if (zoneLabel) zoneLabel.textContent = 'เกาะโจรสลัด • Pirate Fruit';
 const message = document.getElementById('message');
-if (message) message.textContent = 'โลก Pirate Fruit ใน V9.0 รวม 3 โลก • เกมเดิมอยู่ที่ปุ่มเกมเดิม';
+if (message) message.textContent = playerVisualSource === 'studio-character'
+  ? 'ตัวละคร Character Studio ถูกโหลดผ่าน Pocket Asset Engine • gameplay authority ยังอยู่ที่เกม/Server'
+  : 'โลก Pirate Fruit ใน V9.0 รวม 3 โลก • Character Studio ใช้ fallback เดิมในรอบนี้';
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);

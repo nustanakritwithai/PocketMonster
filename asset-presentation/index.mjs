@@ -58,6 +58,28 @@ export { createLegacyHumanoidProvider } from './providers/legacy-humanoid.mjs';
 export { createBigheadProvider } from './providers/procedural-bighead.mjs';
 export { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';
 export { createPirateFruitPlayerProvider } from './providers/pirate-fruit-player.mjs';
+export { createStudioCharacterProvider } from './providers/studio-character.mjs';
+export {
+  STUDIO_CHARACTER_FORBIDDEN_FIELDS,
+  STUDIO_CHARACTER_PACKAGE_SCHEMA,
+  STUDIO_CHARACTER_PROVIDER,
+  STUDIO_CHARACTER_SCENE_SCHEMA,
+  createStudioCharacterBundle,
+  getStudioCharacterPackage,
+  installStudioCharacterPackage,
+  listStudioCharacterPackages,
+  loadStudioCharacterPackage,
+  registerStudioCharacterPackage,
+  resetStudioCharacterPackages,
+  validateStudioCharacterPackage,
+} from './studio-character-package.mjs';
+export {
+  STUDIO_CHARACTER_BRIDGE_ERROR,
+  STUDIO_CHARACTER_BRIDGE_REQUEST,
+  STUDIO_CHARACTER_BRIDGE_RESPONSE,
+  STUDIO_CHARACTER_BRIDGE_URL,
+  loadStudioCharacterFromEngine,
+} from './studio-character-live-bridge.mjs';
 export {
   applyMonsterFourSide,
   compileMonsterFourSideAtlas,
