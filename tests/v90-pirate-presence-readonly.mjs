@@ -118,11 +118,34 @@ pose = { x: 2, z: 3, dir: 0.25 };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'idle', animation: null,
 });
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+publishWorldState({
+  getZone: () => 'pirate-fruit',
+  getPosition: () => pose,
+  getDir: () => pose?.dir,
+  allowActors: false,
+});
+assert.equal(Object.hasOwn(window.POCKETMONSTER_WORLD_STATE(), 'actors'), false,
+  'central Pirate publisher suppresses iframe actor pose from outbound WORLD_STATE');
+publishWorldState({
+  getZone: () => 'living-world',
+  getPosition: () => ({ ...pose, actors: [{ ...localActor, zone: 'living-world' }] }),
+  getDir: () => pose?.dir,
+  allowActors: true,
+});
+assert.equal(window.POCKETMONSTER_WORLD_STATE().actors[0].actorId, localActor.actorId,
+  'noncentral publishers retain the existing actor compatibility gate');
+pose = { x: 2, z: 3, dir: 0.25 };
+publishWorldState({
+  getZone: () => 'pirate-fruit',
+  getPosition: () => pose,
+  getDir: () => pose?.dir,
+});
 
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'frame source is checked before accepting pose');
 assert.match(boot, /event\.origin !== 'null'/, 'opaque sandbox origin is checked before accepting pose');
 assert.match(boot, /sanitizePirateLocalPresence\(message\)/, 'parent accepts only the validated local pose contract');
-assert.match(boot, /getActors: \(\) => piratePose\?\.actors/, 'parent publisher forwards actors through the existing WORLD_STATE provider');
+assert.match(boot, /allowActors: true/, 'Pirate parent preserves actor relay until Server central-authority capability is verified');
 assert.match(boot, /sanitizePirateWorldSnapshot\(payload\)/, 'parent sanitizes Server snapshots before forwarding');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPirateSnapshotMessage\(snapshot\), '\*'\)/, 'snapshot targets the exact mounted opaque frame window');
 assert.match(boot, /frame\.contentWindow\?\.postMessage\(createPiratePresenceStatusMessage\(connected\), '\*'\)/, 'presence status targets the exact mounted opaque frame window');

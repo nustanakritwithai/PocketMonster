@@ -544,7 +544,7 @@ export function registerExternalPose(pose) {
   return externalPose;
 }
 
-export function publishWorldState({ getZone, getPosition, getDir, getPresentation, getVisual, getActors } = {}) {
+export function publishWorldState({ getZone, getPosition, getDir, getPresentation, getVisual, getActors, allowActors = true } = {}) {
   if (typeof window === 'undefined') return;
   window.POCKETMONSTER_WORLD_STATE = () => {
     const pos = getPosition?.() ?? externalPose;
@@ -559,7 +559,9 @@ export function publishWorldState({ getZone, getPosition, getDir, getPresentatio
       animation: pos?.animation,
       presentation: getPresentation?.() ?? pos?.presentation,
       visual: getVisual?.() ?? pos?.visual,
-      actors: getActors?.() ?? pos?.actors,
+      ...(allowActors && (getActors || pos?.actors)
+        ? { actors: getActors?.() ?? pos?.actors }
+        : {}),
     });
   };
 }

@@ -192,10 +192,9 @@ function bindPocketMonsterLink(frame) {
     getZone: () => 'pirate-fruit',
     getPosition: () => null,
     getDir: () => undefined,
-    // The mounted Pirate iframe is the sole owner of local actor presentation.
-    // Keep actors on the existing WORLD_STATE/WSS frame; do not create a second
-    // realtime publisher or let the parent invent combat authority.
-    getActors: () => piratePose?.actors,
+    // Keep the relay until the Server supplies its explicit central-authority
+    // capability and matching manifest revision; no unverified field is guessed.
+    allowActors: true,
   });
   window.POCKETMONSTER_WORLD_PRESENCE = payload => {
     if (!pirateRuntimeActive) return false;
