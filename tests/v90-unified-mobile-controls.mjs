@@ -268,6 +268,7 @@ assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'ca
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=9/, 'updated touch recovery dependency bypasses stale mobile caches');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=60/, 'online scene cache-busts the unified Pirate ship-control bridge');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'Pirate boot bypasses cached controls that predate the iframe transport');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=61/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
