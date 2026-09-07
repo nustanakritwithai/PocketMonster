@@ -5,6 +5,11 @@ import { createBigheadProvider } from './providers/procedural-bighead.mjs';
 import { createBigheadMonsterProvider } from './providers/procedural-bighead-monster.mjs';
 import { createPirateFruitActionTracker } from './pirate-fruit-action-adapter.mjs';
 import { createPirateFruitRigRetargeter } from './pirate-fruit-rig-retarget.mjs';
+import { createStudioCharacterProvider } from './providers/studio-character.mjs';
+import {
+  installStudioCharacterPackage,
+  validateStudioCharacterPackage,
+} from './studio-character-package.mjs';
 
 /** Overlay Pocket visuals on the real Pirate Fruit client. Does not replace the world. */
 export const PIRATE_FRUIT_CLIENT_BRIDGE = Object.freeze({
@@ -16,6 +21,25 @@ export const PIRATE_FRUIT_CLIENT_BRIDGE = Object.freeze({
   combatAuthority: false,
   createsStage: false,
 });
+
+// Written only by the sandboxed Pirate bootstrap after it has verified its
+// parent, per-frame capability and presentation-only payload.
+let pendingStudioCharacterPackage = null;
+const studioPackageListeners = new Set();
+
+export function receivePirateStudioCharacterPackage(pkg) {
+  const validation = validateStudioCharacterPackage(pkg);
+  if (!validation.valid) return Object.freeze({ accepted: false, errors: validation.errors });
+  pendingStudioCharacterPackage = pkg;
+  for (const listener of studioPackageListeners) listener(pkg);
+  return Object.freeze({ accepted: true, id: pkg.manifest.id });
+}
+
+function subscribePirateStudioCharacterPackage(listener) {
+  studioPackageListeners.add(listener);
+  if (pendingStudioCharacterPackage) queueMicrotask(() => listener(pendingStudioCharacterPackage));
+  return () => studioPackageListeners.delete(listener);
+}
 
 export const PIRATE_FRUIT_MONSTER_VISUALS = Object.freeze({
   crab: 'monster.slime.aquapuff.bighead.v1',
@@ -207,7 +231,11 @@ export function threeFromPirateFruitVendor(vendor) {
   const MeshBasicMaterial = find((_v, src) => src.includes('isMeshBasicMaterial') && !src.includes('isWebGLRenderer'));
   const CanvasTexture = find((_v, src) => src.includes('isCanvasTexture'));
   const Scene = find((_v, src) => src.includes('isScene=!0'));
-  if (!Object3D || !Group || !Mesh || !BoxGeometry || !MeshStandardMaterial) {
+  const BufferGeometry = find((_v, src) => src.includes('isBufferGeometry'));
+  const BufferAttribute = find((_v, src) => src.includes('isBufferAttribute'));
+  const Vector3 = find((_v, src) => src.includes('isVector3') && src.includes('this.x'));
+  const Box3 = find((_v, src) => src.includes('isBox3'));
+  if (!Object3D || !Group || !Mesh || !BoxGeometry || !MeshStandardMaterial || !BufferGeometry || !BufferAttribute) {
     throw new Error('Pocket bridge could not resolve Three constructors from the Pirate Fruit vendor');
   }
   return {
@@ -220,6 +248,10 @@ export function threeFromPirateFruitVendor(vendor) {
     MeshStandardMaterial,
     MeshBasicMaterial,
     CanvasTexture,
+    BufferGeometry,
+    BufferAttribute,
+    Vector3,
+    Box3,
   };
 }
 
@@ -329,6 +361,10 @@ export async function installPirateFruitPocketPresentation({
     MeshStandardMaterial: kit.MeshStandardMaterial,
     MeshBasicMaterial: kit.MeshBasicMaterial || kit.MeshStandardMaterial,
     CanvasTexture: kit.CanvasTexture,
+    BufferGeometry: kit.BufferGeometry,
+    BufferAttribute: kit.BufferAttribute,
+    Vector3: kit.Vector3,
+    Box3: kit.Box3,
     SRGBColorSpace: 'srgb',
     NearestFilter: 1003,
     RepeatWrapping: 1000,
@@ -357,6 +393,7 @@ export async function installPirateFruitPocketPresentation({
     basicMaterial: color => material(color, 1, 0),
   });
   assets.registerProvider('procedural', ctx => ctx.def?.kind === 'monster' ? monsterProvider(ctx) : humanoidProvider(ctx));
+  assets.registerProvider('studio-character', createStudioCharacterProvider({ THREE: engineThree }));
 
   const attached = new WeakSet();
   const visuals = [];
@@ -380,7 +417,7 @@ export async function installPirateFruitPocketPresentation({
       })
       : null;
     const sourcePoseDriven = Boolean(rigRetargeter?.diagnostics?.().mappedRig);
-    visuals.push({
+    const item = {
       host,
       handle,
       kind,
@@ -390,9 +427,60 @@ export async function installPirateFruitPocketPresentation({
       lastAction: null,
       lastX: host.position.x,
       lastZ: host.position.z,
-    });
-    return handle;
+      source: 'pirate-fruit',
+    };
+    visuals.push(item);
+    return item;
   }
+
+  function visibleStudioRoot(handle) {
+    let meshes = 0;
+    handle?.root?.traverse?.(node => { if (node?.isMesh && node.visible !== false) meshes += 1; });
+    return meshes > 0;
+  }
+
+  async function replaceLocalPlayerWithStudio(item, pkg) {
+    if (!item || item.kind !== 'player' || item.source === 'studio-character') return false;
+    const validation = validateStudioCharacterPackage(pkg);
+    if (!validation.valid) return false;
+    await installStudioCharacterPackage(assets, pkg, { bundleName: 'studio-live-player' });
+    const studio = assets.spawn(pkg.manifest.id, { role: 'player', quality: 'medium' });
+    await studio.ready;
+    studio.play?.('idle', { restart: true });
+    if (!visibleStudioRoot(studio)) {
+      studio.dispose?.();
+      throw new Error('Studio player package produced no visible meshes');
+    }
+
+    // Keep all gameplay state on the existing host. The fallback is removed
+    // only after a usable Studio visual has been constructed and attached.
+    studio.root.userData.pocketVisual = true;
+    studio.root.userData.presentationOnly = true;
+    studio.root.userData.combatAuthority = false;
+    studio.root.userData.pocketKind = 'player';
+    studio.root.userData.pocketVisualSource = 'studio-character';
+    orientPirateFruitVisual(studio.root, 'player');
+    item.host.add(studio.root);
+    item.handle.root.visible = false;
+    item.host.remove?.(item.handle.root);
+    item.handle.dispose?.();
+    item.handle = studio;
+    item.source = 'studio-character';
+    item.rigRetargeter = null; // Studio package is the single pose owner.
+    item.sourcePoseDriven = false;
+    return true;
+  }
+
+  let studioInstallInFlight = false;
+  subscribePirateStudioCharacterPackage(pkg => {
+    if (studioInstallInFlight) return;
+    const player = visuals.find(item => item.kind === 'player' && item.source !== 'studio-character');
+    if (!player) return;
+    studioInstallInFlight = true;
+    replaceLocalPlayerWithStudio(player, pkg)
+      .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error))
+      .finally(() => { studioInstallInFlight = false; });
+  });
 
   function paintTerrain(mesh) {
     if (mesh.userData.pocketTerrain) return;
@@ -436,6 +524,11 @@ export async function installPirateFruitPocketPresentation({
         role: 'player',
         appearanceId: 'appearance.human.player-orange.v1',
       }), 'player');
+      if (pendingStudioCharacterPackage) {
+        const player = visuals.at(-1);
+        void replaceLocalPlayerWithStudio(player, pendingStudioCharacterPackage)
+          .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error));
+      }
       return;
     }
     if (kind === 'remote' && !attached.has(root)) {
@@ -531,6 +624,8 @@ export async function installPirateFruitPocketPresentation({
       rigRetargeted: visuals.filter(item => item.rigRetargeter).length,
       actionDriven: visuals.filter(item => item.actionTracker).length,
       providers: assets.diagnostics().providers,
+      studioPlayers: visuals.filter(item => item.source === 'studio-character').length,
+      playerVisualSource: visuals.find(item => item.kind === 'player')?.source || 'pending',
     }),
   };
 }
