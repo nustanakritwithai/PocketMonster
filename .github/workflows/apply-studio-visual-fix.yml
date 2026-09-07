@@ -1,0 +1,55 @@
+name: Apply Studio visual hotfix
+
+on:
+  push:
+    branches:
+      - fix/studio-visual-install-ack-20260908
+    paths:
+      - scripts/apply_studio_visual_fix.py
+      - .github/workflows/apply-studio-visual-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/studio-visual-install-ack-20260908
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Apply Studio visual runtime patch
+        run: python scripts/apply_studio_visual_fix.py
+
+      - name: Run active Studio behavioral gate
+        run: node tests/v91-studio-character-active-pirate-path.mjs
+
+      - name: Run Pocket release checks
+        run: npm run check
+
+      - name: Build and verify Pages artifact
+        run: |
+          npm run build:pages
+          node tests/v90-unified-pages-artifact.mjs
+
+      - name: Commit validated hotfix
+        shell: bash
+        run: |
+          rm -f scripts/apply_studio_visual_fix.py .github/workflows/apply-studio-visual-fix.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fix Studio visual install handshake and cache chain"
+          git push origin HEAD:fix/studio-visual-install-ack-20260908
