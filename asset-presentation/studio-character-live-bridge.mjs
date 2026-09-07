@@ -23,19 +23,15 @@ export function loadStudioCharacterFromEngine({
   }
 
   const targetUrl = new URL(sourceUrl, windowRef.location?.href || STUDIO_CHARACTER_BRIDGE_URL);
+  targetUrl.searchParams.set('pocketBridge', '1');
   const targetOrigin = targetUrl.origin;
   const id = requestId();
   const frame = documentRef.createElement('iframe');
   frame.title = 'Pocket Monster Character Studio bridge';
   frame.setAttribute('aria-hidden', 'true');
   frame.tabIndex = -1;
-  frame.style.position = 'fixed';
-  frame.style.width = '1px';
-  frame.style.height = '1px';
-  frame.style.opacity = '0';
-  frame.style.pointerEvents = 'none';
-  frame.style.border = '0';
-  frame.style.left = '-10000px';
+  frame.loading = 'eager';
+  frame.style.display = 'none';
   frame.src = targetUrl.href;
 
   return new Promise((resolve, reject) => {
