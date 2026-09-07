@@ -28,11 +28,11 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cach
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /index\.html\?v=939/, 'parent cache-busts the Pirate child HTML with the ship-control mode bridge');
-assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=949/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online-world-shell-v900\.mjs\?v=60/, 'top-level entry cache-busts the unified ship-control shell');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=56/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
-assert.match(sceneHtml, /style-v900\.css\?v=967/, 'scene HTML cache-busts the restored offline NPC menu styling');
+assert.match(boot, /index\.html\?v=940/, 'parent cache-busts the Pirate child HTML with the ship-control mode bridge');
+assert.match(combined, /boot-pirate-fruit-v900\.mjs\?v=950/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online-world-shell-v900\.mjs\?v=61/, 'top-level entry cache-busts the unified ship-control shell');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=57/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
+assert.match(sceneHtml, /style-v900\.css\?v=968/, 'scene HTML cache-busts the centered Pirate helm styling');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=26/, 'offline HTML cache-busts presentation integration after child minimap retirement');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=2/, 'presentation cache-busts static-batch classification');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'presentation loads the HUD policy that retires the circular child minimap');

@@ -76,6 +76,7 @@ const childActions = new Map([
   ['.tc-dash', new FakeTarget('dash')],
   ['.tc-jump', new FakeTarget('jump')],
   ['.tc-attack', new FakeTarget('attack')],
+  ['.interaction-prompt', new FakeTarget('helmPrompt')],
 ]);
 const documentLike = {
   documentElement,
@@ -230,6 +231,28 @@ assert.deepEqual(
   'boat cannon action reaches the active native cannon button',
 );
 assert.equal(eventLog.some(({ target }) => target === 'attack'), false, 'boat cannon action never falls through to hidden player attack');
+childActions.get('.interaction-prompt').style.display = 'block';
+childActions.get('.interaction-prompt').textContent = '☸ ปล่อยพวงมาลัย';
+FakeMutationObserver.flush();
+assert.deepEqual(
+  parentMessages.filter(({ message }) => message.type === 'pocketmonster:unified-mobile-input-interaction-v1').at(-1),
+  {
+    message: {
+      type: 'pocketmonster:unified-mobile-input-interaction-v1',
+      frameGeneration: 3,
+      helmPrompt: 'leave',
+    },
+    origin: PARENT_ORIGIN,
+  },
+  'only the visible native helm prompt publishes a parent wheel state',
+);
+send(input({ kind: 'action', frameGeneration: 3, action: 'interact', phase: 'start', pointerId: 42 }));
+send(input({ kind: 'action', frameGeneration: 3, action: 'interact', phase: 'end', pointerId: 42 }));
+assert.deepEqual(
+  eventLog.filter(({ target }) => target === 'helmPrompt').map(({ type }) => type),
+  ['pointerdown', 'pointerup'],
+  'the parent wheel dispatches the existing native interaction prompt only',
+);
 childWindow.dispatchEvent(new Event('pagehide'));
 childWindow.dispatchEvent(new Event('pagehide'));
 assert.equal(eventLog.filter(({ target, type }) => target === 'window' && type === 'pointerup').length, terminalsBeforeReload + 2, 'pagehide closes an active camera exactly once');

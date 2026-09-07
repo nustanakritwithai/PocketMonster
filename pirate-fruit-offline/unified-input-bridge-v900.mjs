@@ -12,6 +12,7 @@ export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-
 export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
 /** The native Pirate HUD alone decides this mode.  The parent only mirrors it. */
 export const PIRATE_UNIFIED_INPUT_MODE_MESSAGE = 'pocketmonster:unified-mobile-input-mode-v1';
+export const PIRATE_UNIFIED_INPUT_INTERACTION_MESSAGE = 'pocketmonster:unified-mobile-input-interaction-v1';
 
 const query = new URLSearchParams(location.search);
 const parentOrigin = query.get('parentOrigin');
@@ -30,8 +31,7 @@ const ACTION_SELECTORS = Object.freeze({
   recall: '.tc-jump',
   cannonLeft: '.tc-cannon-left',
   cannonRight: '.tc-cannon-right',
-  boost: '.tc-dash',
-  anchor: '.tc-jump',
+  interact: '.interaction-prompt',
   block: '.tc-block',
   weapon: '.tc-weapon',
   potion1: '.tc-potion1',
@@ -54,6 +54,7 @@ let inputReadyObserver = null;
 let inputWindowLoaded = document.readyState === 'complete';
 let controlModeObserver = null;
 let reportedControlMode = null;
+let reportedHelmPrompt = null;
 let onboardingStateSignature = null;
 let onboardingObserver = null;
 let hudTelemetryPublisher = null;
@@ -70,6 +71,13 @@ function nativeControlMode() {
   return starboard?.style?.display === 'flex' ? 'boat' : 'player';
 }
 
+function nativeHelmPrompt() {
+  const prompt = document.querySelector('.interaction-prompt');
+  const text = prompt?.textContent || '';
+  if (prompt?.style?.display === 'none' || !text.includes('พวงมาลัย')) return null;
+  return nativeControlMode() === 'boat' ? 'leave' : 'enter';
+}
+
 function publishNativeControlMode(force = false) {
   if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
   const controlMode = nativeControlMode();
@@ -83,11 +91,27 @@ function publishNativeControlMode(force = false) {
   return true;
 }
 
+function publishNativeHelmPrompt(force = false) {
+  if (!allowedParentOrigin || !isPositiveSafeInteger(activeFrameGeneration)) return false;
+  const helmPrompt = nativeHelmPrompt();
+  if (!force && helmPrompt === reportedHelmPrompt) return false;
+  reportedHelmPrompt = helmPrompt;
+  window.parent.postMessage({
+    type: PIRATE_UNIFIED_INPUT_INTERACTION_MESSAGE,
+    frameGeneration: activeFrameGeneration,
+    helmPrompt,
+  }, allowedParentOrigin);
+  return true;
+}
+
 function monitorNativeControlMode() {
   controlModeObserver?.disconnect();
   const root = document.documentElement;
   if (!root) return;
-  controlModeObserver = new MutationObserver(() => publishNativeControlMode());
+  controlModeObserver = new MutationObserver(() => {
+    publishNativeControlMode();
+    publishNativeHelmPrompt();
+  });
   controlModeObserver.observe(root, {
     attributes: true,
     childList: true,
@@ -95,6 +119,7 @@ function monitorNativeControlMode() {
     attributeFilter: ['class', 'style'],
   });
   publishNativeControlMode(true);
+  publishNativeHelmPrompt(true);
 }
 
 function announceInputReady() {
@@ -277,6 +302,7 @@ function handleTransportReset(message) {
   activeFrameGeneration = message.frameGeneration;
   if (advancesGeneration) cameraGestureHighWater = 0;
   publishNativeControlMode(true);
+  publishNativeHelmPrompt(true);
 }
 
 window.addEventListener('message', event => {
