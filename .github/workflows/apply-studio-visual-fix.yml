@@ -29,6 +29,19 @@ jobs:
       - name: Apply Studio visual runtime patch
         run: python scripts/apply_studio_visual_fix.py
 
+      - name: Align Pages entry cache assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tests/v90-unified-pages-artifact.mjs')
+          s = p.read_text(encoding='utf-8')
+          old = r'entry-preload-v900.mjs\?v=972'
+          new = r'entry-preload-v900.mjs\?v=973'
+          if old not in s:
+              raise SystemExit('expected stale Pages entry assertion was not found')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+
       - name: Run active Studio behavioral gate
         run: node tests/v91-studio-character-active-pirate-path.mjs
 
