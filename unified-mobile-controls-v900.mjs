@@ -1,4 +1,4 @@
-import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=2';
+import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=4';
 
 export const UNIFIED_MOBILE_CONTROLS_KIND = 'monsterlife-unified-mobile-controls-v1';
 
@@ -251,26 +251,39 @@ export function createUnifiedMobileControls({
       try { button.releasePointerCapture?.(event.pointerId); } catch {}
       activeAdapter()?.action?.({
         action: active.action,
-        phase: event.type === 'pointercancel' ? 'cancel' : 'end',
+        phase: event.type === 'pointerup' ? 'end' : 'cancel',
         pointerId: event.pointerId,
       });
     };
     button.addEventListener('pointerup', finish, { capture: true, passive: false });
     button.addEventListener('pointercancel', finish, { capture: true, passive: false });
+    button.addEventListener('lostpointercapture', finish, { capture: true, passive: false });
   }
 
   const reset = (reason = 'reset') => {
     pointerInput.reset(reason);
-    for (const { action } of actionPointers.values()) {
+    const pendingActions = [...actionPointers];
+    actionPointers.clear();
+    for (const [pointerId, { action, button }] of pendingActions) {
+      try { button.releasePointerCapture?.(pointerId); } catch {}
       activeAdapter()?.action?.({ action, phase: 'cancel', reason });
     }
-    actionPointers.clear();
     cameraPoint = null;
     joystickCenter = null;
     stickElement.classList?.remove?.('tc-visible');
     joystickKnobElement.style.transform = 'translate(-50%,-50%)';
     activeAdapter()?.reset?.(reason);
   };
+
+  for (const type of ['blur', 'pagehide', 'orientationchange']) {
+    windowLike.addEventListener(type, () => reset(type));
+  }
+  for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+    documentLike.addEventListener(type, () => reset(type));
+  }
+  documentLike.addEventListener('visibilitychange', () => {
+    if (documentLike.visibilityState === 'hidden') reset('visibility-hidden');
+  });
 
   const api = Object.freeze({
     kind: UNIFIED_MOBILE_CONTROLS_KIND,

@@ -76,6 +76,10 @@ const sceneWindow = {
   dispatchEvent: sceneWindowEvents.dispatchEvent.bind(sceneWindowEvents),
   focus() { sceneFocusCount += 1; },
 };
+const sceneInputResets = [];
+sceneWindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS = {
+  reset(reason) { sceneInputResets.push(reason); },
+};
 const frameListeners = new Map();
 const sceneFrame = element('iframe', 'onlineWorldSceneFrame');
 let sceneSrcAssignments = 0;
@@ -106,6 +110,7 @@ for (const id of ['gameChat', 'chatToggleBtn', 'chatCloseBtn', 'chatForm', 'chat
   elements.set(id, id === 'gameChat' ? gameChat : element('div', id));
 }
 const body = element('body');
+const documentEvents = new EventTarget();
 let iframeCreates = 0;
 globalThis.document = {
   documentElement: { dataset: {} },
@@ -119,6 +124,9 @@ globalThis.document = {
     if (tag === 'select') node.value = 'WORLD';
     return node;
   },
+  addEventListener: documentEvents.addEventListener.bind(documentEvents),
+  dispatchEvent: documentEvents.dispatchEvent.bind(documentEvents),
+  visibilityState: 'visible',
 };
 let fullscreenRequestCount = 0;
 document.documentElement.requestFullscreen = async () => {
@@ -220,6 +228,20 @@ assert.equal(onlineShell.diagnostics().chat.socketCreates, 1);
 assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
 assert.equal(await onlineShell.requestFullscreen({ navigationUI: 'hide' }), true);
 assert.equal(fullscreenRequestCount, 1, 'persistent shell requests fullscreen once and reuses it across scene swaps');
+for (const [target, type, reason] of [
+  [window, 'blur', 'parent-blur'],
+  [window, 'orientationchange', 'parent-orientationchange'],
+  [document, 'fullscreenchange', 'parent-fullscreenchange'],
+  [document, 'webkitfullscreenchange', 'parent-webkitfullscreenchange'],
+]) {
+  target.dispatchEvent(new Event(type));
+  assert.equal(sceneInputResets.at(-1), reason, `${type} releases input captured in the scene iframe`);
+}
+document.visibilityState = 'hidden';
+document.dispatchEvent(new Event('visibilitychange'));
+assert.equal(sceneInputResets.at(-1), 'parent-visibility-hidden');
+document.visibilityState = 'visible';
+assert.equal(onlineShell.diagnostics().sceneInputRecoveryCount, 5);
 
 const combatFixture = fixtureCombat({ combatId: 'combat:v90-parent-shell' });
 const combatSessionOptions = Object.freeze({

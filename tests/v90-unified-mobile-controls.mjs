@@ -111,6 +111,24 @@ assert.ok(pocketCalls.some(([kind, payload]) => kind === 'move' && payload.activ
 assert.equal(pirateCalls.filter(([kind]) => kind === 'move').at(-1)[1].active, false, 'old world receives neutral input before adapter switch');
 
 
+controls.activate('pirate-fruit');
+const attack = elements.get('captureBtn');
+attack.dispatchEvent(pointer('pointerdown', 81, 0, 0));
+attack.releasePointerCapture(81);
+attack.dispatchEvent(pointer('lostpointercapture', 81, 0, 0));
+assert.equal(controls.diagnostics().actionPointerCount, 0);
+assert.equal(pirateCalls.filter(([kind]) => kind === 'action').at(-1)[1].phase, 'cancel');
+for (const [target, type] of [[windowLike, 'blur'], [windowLike, 'pagehide'], [windowLike, 'orientationchange'], [documentLike, 'fullscreenchange'], [documentLike, 'webkitfullscreenchange'], [documentLike, 'visibilitychange']]) {
+  documentLike.visibilityState = type === 'visibilitychange' ? 'hidden' : 'visible';
+  attack.dispatchEvent(pointer('pointerdown', 82, 0, 0));
+  elements.get('cameraPad').dispatchEvent(pointer('pointerdown', 83, 70, 40));
+  target.dispatchEvent(new Event(type));
+  assert.equal(controls.diagnostics().actionPointerCount, 0, type);
+  assert.equal(controls.diagnostics().pointerInput.cameraPointerId, null, type);
+  assert.equal(attack.capturedPointers.size, 0, type);
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').at(-1)[1].phase, 'cancel', type);
+}
+
 const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const bootSource = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const bridgeSource = fs.readFileSync(new URL('../pirate-fruit-offline/unified-input-bridge-v900.mjs', import.meta.url), 'utf8');
@@ -138,6 +156,6 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=50/, 'online scene cache-busts the Dock world-lifecycle wiring');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=51/, 'online scene cache-busts the mobile input-recovery wiring');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');

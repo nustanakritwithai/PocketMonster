@@ -37,6 +37,7 @@ let sceneReadyCount = 0;
 let sceneErrorCount = 0;
 let sceneFocusCount = 0;
 let fullscreenRequestCount = 0;
+let sceneInputRecoveryCount = 0;
 let activeSceneLease = null;
 let sessionEnding = false;
 let sessionEndReason = null;
@@ -96,7 +97,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '59');
+  url.searchParams.set('shellRevision', '60');
   return url.href;
 }
 
@@ -249,6 +250,22 @@ function sceneWindowIsCurrent(sceneWindow) {
 
 function persistentFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+// The top-level document owns fullscreen while the active game controls live
+// in the scene iframe. Browser lifecycle events do not reliably cross that
+// boundary on mobile, so explicitly release any captured input in the scene.
+function recoverSceneInput(reason = 'parent-input-recovery') {
+  if (sessionEnding) return false;
+  try {
+    const controls = sceneFrame.contentWindow?.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
+    if (typeof controls?.reset !== 'function') return false;
+    controls.reset(reason);
+    sceneInputRecoveryCount += 1;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function requestPersistentFullscreen(options) {
@@ -528,6 +545,7 @@ const publicShell = Object.freeze({
     sceneFocusCount,
     fullscreenActive: Boolean(persistentFullscreenElement()),
     fullscreenRequestCount,
+    sceneInputRecoveryCount,
     hasActiveSceneLease: Boolean(activeSceneLease),
     sessionActive: isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
     sessionEnding,
@@ -545,6 +563,15 @@ Object.defineProperty(window, 'POCKETMONSTER_ONLINE_SHELL', {
 });
 window.addEventListener('pocketmonster:session-ended', () => {
   if (!sessionEnding) endSession('session-ended');
+});
+for (const type of ['blur', 'pagehide', 'orientationchange']) {
+  window.addEventListener(type, () => recoverSceneInput(`parent-${type}`));
+}
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener?.(type, () => recoverSceneInput(`parent-${type}`));
+}
+document.addEventListener?.('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') recoverSceneInput('parent-visibility-hidden');
 });
 window.addEventListener('pageshow', event => {
   scheduleSessionExpiryCheck();

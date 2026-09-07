@@ -98,6 +98,35 @@ assert.equal(input.diagnostics().joystickPointerId, null);
 assert.equal(input.diagnostics().resetCount, 2);
 assert.equal(joystick.capturedPointers.size, 0, 'scene reset releases stale joystick capture');
 
+documentLike.visibilityState = 'visible';
+joystick.dispatchEvent(pointerEvent('pointerdown', 71, 40, 50));
+camera.dispatchEvent(pointerEvent('pointerdown', 72, 240, 90));
+camera.releasePointerCapture(72);
+camera.dispatchEvent(pointerEvent('lostpointercapture', 72, 240, 90));
+assert.equal(input.diagnostics().cameraPointerId, null);
+assert.equal(input.diagnostics().joystickPointerId, 71, 'losing camera capture preserves walking');
+camera.dispatchEvent(pointerEvent('pointerdown', 73, 240, 90));
+windowLike.dispatchEvent(pointerEvent('pointermove', 73, 250, 90));
+assert.deepEqual(calls.at(-1), ['camera-move', 73, 250], 'next drag works immediately after lost capture');
+camera.releasePointerCapture(73);
+camera.dispatchEvent(pointerEvent('pointerdown', 74, 240, 90));
+assert.equal(input.diagnostics().cameraPointerId, 74, 'a new camera drag recovers when a browser silently drops capture');
+assert.ok(calls.some(call => call[0] === 'camera-end' && call[1] === 'stale-pointercapture'));
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+  documentLike.dispatchEvent(new Event(type));
+  assert.equal(input.diagnostics().cameraPointerId, null);
+  assert.equal(input.diagnostics().joystickPointerId, null);
+  camera.dispatchEvent(pointerEvent('pointerdown', 75, 240, 90));
+}
+windowLike.dispatchEvent(new Event('orientationchange'));
+assert.equal(input.diagnostics().cameraPointerId, null);
+
+joystick.dispatchEvent(pointerEvent('pointerdown', 81, 40, 50));
+joystick.releasePointerCapture(81);
+joystick.dispatchEvent(pointerEvent('pointerdown', 82, 40, 50));
+assert.equal(input.diagnostics().joystickPointerId, 82, 'a new joystick drag also recovers from silently dropped capture');
+assert.ok(calls.some(call => call[0] === 'joy-end' && call[1] === 'stale-pointercapture'));
+
 input.dispose();
 joystick.dispatchEvent(pointerEvent('pointerdown', 66, 40, 50));
 assert.equal(input.diagnostics().joystickPointerId, null, 'disposed scene cannot retain input listeners');
