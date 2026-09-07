@@ -62,6 +62,94 @@ function validateJointBindings(bindings) {
   return errors;
 }
 
+function nodeAtPath(root, path) {
+  let node = root;
+  for (const index of path) {
+    node = node?.children?.[index];
+    if (!node) return null;
+  }
+  return node || null;
+}
+
+function isFiniteNumberArray(value, minimumLength = 0) {
+  return Array.isArray(value) && value.length >= minimumLength && value.every(Number.isFinite);
+}
+
+/**
+ * A package is only safe to replace the existing Pirate visual when it has at
+ * least one mesh that the provider can actually construct and render.  The
+ * previous validator trusted producer-provided stats, so an empty scene graph
+ * could be accepted, installed, and then hide the working fallback visual.
+ */
+function validateRenderableSceneGraph(root) {
+  const errors = [];
+  let renderableMeshes = 0;
+
+  function visit(node, path, parentVisible = true) {
+    if (!isPlainObject(node)) {
+      errors.push(`sceneGraph.${path} must be an object`);
+      return;
+    }
+    const visible = parentVisible && node.visible !== false;
+    const scale = node.transform?.scale;
+    if (visible && Array.isArray(scale) && (
+      scale.length !== 3 || !scale.every(Number.isFinite) || scale.some(value => Math.abs(value) < 0.000001)
+    )) {
+      errors.push(`sceneGraph.${path}.transform.scale must be a finite non-zero vec3 for a visible node`);
+    }
+
+    if (node.nodeType === 'mesh' && visible) {
+      const position = node.geometry?.attributes?.position;
+      const values = position?.array;
+      const itemSize = Number(position?.itemSize);
+      if (itemSize !== 3 || !isFiniteNumberArray(values, 9) || values.length % itemSize !== 0) {
+        errors.push(`sceneGraph.${path}.geometry.attributes.position must contain at least three finite vec3 vertices`);
+      } else {
+        const vertexCount = values.length / itemSize;
+        const index = node.geometry?.index;
+        if (index?.array && (!Array.isArray(index.array)
+          || index.array.length < 3
+          || index.array.length % 3 !== 0
+          || !index.array.every(value => Number.isInteger(value) && value >= 0 && value < vertexCount))) {
+          errors.push(`sceneGraph.${path}.geometry.index must contain valid triangle indices`);
+        } else {
+          renderableMeshes += 1;
+        }
+      }
+    }
+
+    if (node.children != null && !Array.isArray(node.children)) {
+      errors.push(`sceneGraph.${path}.children must be an array`);
+      return;
+    }
+    for (const [index, child] of (node.children || []).entries()) {
+      visit(child, `${path}.children[${index}]`, visible);
+    }
+  }
+
+  visit(root, 'root');
+  if (!renderableMeshes) errors.push('sceneGraph must contain at least one visible renderable mesh');
+  return errors;
+}
+
+function validateRigReferences(pkg) {
+  const errors = [];
+  const bindings = pkg.rig?.jointBindings || {};
+  const root = pkg.sceneGraph?.root;
+  for (const [name, binding] of Object.entries(bindings)) {
+    if (!Array.isArray(binding?.path) || !nodeAtPath(root, binding.path)) {
+      errors.push(`rig.jointBindings.${name}.path does not resolve in sceneGraph.root`);
+    }
+  }
+  for (const name of ['rightHand', 'leftHand', 'head', 'back', 'waist', 'vfxOrigin', 'attackOrigin', 'throwOrigin']) {
+    const joint = pkg.rig?.sockets?.[name]?.joint;
+    if (typeof joint === 'string' && !bindings[joint]) {
+      errors.push(`rig.sockets.${name}.joint must reference a declared joint binding`);
+    }
+  }
+  return errors;
+}
+
 export function validateStudioCharacterPackage(pkg) {
   const errors = [];
   const warnings = [];
@@ -82,6 +170,7 @@ export function validateStudioCharacterPackage(pkg) {
     errors.push(`sceneGraph.schema must be ${STUDIO_CHARACTER_SCENE_SCHEMA}`);
   }
   if (!isPlainObject(pkg.sceneGraph?.root)) errors.push('sceneGraph.root missing');
+  else errors.push(...validateRenderableSceneGraph(pkg.sceneGraph.root));
 
   if (!isPlainObject(pkg.catalogEntry)) errors.push('catalogEntry missing');
   else {
@@ -93,6 +182,7 @@ export function validateStudioCharacterPackage(pkg) {
   }
 
   errors.push(...validateJointBindings(pkg.rig?.jointBindings));
+  errors.push(...validateRigReferences(pkg));
   for (const name of ['rightHand', 'leftHand', 'head', 'back', 'waist', 'vfxOrigin', 'attackOrigin', 'throwOrigin']) {
     if (!validSocket(pkg.rig?.sockets?.[name])) errors.push(`rig.sockets.${name} missing or invalid`);
   }
