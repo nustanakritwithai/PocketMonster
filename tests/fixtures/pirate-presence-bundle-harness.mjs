@@ -74,6 +74,9 @@ function compilePresenceRuntime(bundle, classes) {
     bundle.lastIndexOf('const Ei=', messageIndex),
     bundle.lastIndexOf('const mn=', messageIndex),
     bundle.lastIndexOf('const Ri=', messageIndex),
+    // The merged central-transport bundle starts the shared sanitizer prelude
+    // at Oi; this keeps Cd and its real helper dependencies executable.
+    bundle.lastIndexOf('const Oi=', messageIndex),
   ].filter(index => index >= 0);
   const protocolHelperStart = protocolAnchors.length > 0 ? Math.min(...protocolAnchors) : -1;
   const declarationsStart = protocolHelperStart >= 0 ? protocolHelperStart : Math.max(
