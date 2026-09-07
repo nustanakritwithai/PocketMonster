@@ -7,6 +7,8 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
+export const EXPECTED_PIRATE_SOURCE_COMMIT = '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '4cfdee0f5d67c2c57a70f4e6a8b2724b2420bd7efa71279776cf2b783382560e';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
@@ -141,6 +143,20 @@ function sha256(body) {
   return crypto.createHash('sha256').update(body).digest('hex');
 }
 
+function resolveActivePirateAsset(relative, entries) {
+  if (!relative.startsWith('pirate-fruit-offline/assets/')) return relative;
+  const filename = relative.slice('pirate-fruit-offline/assets/'.length);
+  const stem = filename.replace(/-[^-]+\.js$/, '');
+  return [...entries.keys()].find((candidate) => candidate.startsWith(`pirate-fruit-offline/assets/${stem}-`)
+    && candidate.endsWith('.js')) || relative;
+}
+
+function parsePirateBootstrapEntry(bootstrap) {
+  const match = bootstrap.match(/await import\('\.\/(assets\/[^']+\.js)'\)/);
+  if (!match) throw new Error('Pirate Fruit bootstrap must declare its compiled entry asset');
+  return `pirate-fruit-offline/${match[1]}`;
+}
+
 export async function verifyRuntimeBackend(runtimeConfig, {
   expectedApiBaseUrl,
   fetchImpl = globalThis.fetch,
@@ -185,7 +201,23 @@ async function verifyPages(options, runtimeConfig) {
   }
 
   const bodies = new Map();
-  for (const relative of PAGES_LIVE_SMOKE_FILES) {
+  const bootstrapRelative = 'pirate-fruit-offline/pocket-bootstrap.mjs';
+  const bootstrapEntry = entries.get(bootstrapRelative);
+  if (!bootstrapEntry) throw new Error(`patch-manifest.json is missing ${bootstrapRelative}`);
+  const bootstrapBody = await fetchLiveText(bootstrapRelative, {
+    ...options,
+    validate(value) {
+      const actual = sha256(value);
+      if (actual !== bootstrapEntry.sha256.toLowerCase()) throw new Error(`manifest hash mismatch for ${bootstrapRelative}`);
+    },
+  });
+  bodies.set(bootstrapRelative, bootstrapBody);
+  const activePirateEntry = parsePirateBootstrapEntry(bootstrapBody);
+  const activePirateManifestEntry = entries.get(activePirateEntry);
+  if (!activePirateManifestEntry) throw new Error(`patch-manifest.json is missing active Pirate entry ${activePirateEntry}`);
+  const smokeFiles = [...new Set(PAGES_LIVE_SMOKE_FILES.map(relative => resolveActivePirateAsset(relative, entries)))];
+  for (const relative of smokeFiles) {
+    if (bodies.has(relative)) continue;
     const entry = entries.get(relative);
     if (!entry) throw new Error(`patch-manifest.json is missing ${relative}`);
     const body = await fetchLiveText(relative, {
@@ -214,10 +246,29 @@ async function verifyPages(options, runtimeConfig) {
   if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=4')) {
     throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
   }
-  const pirateBootstrap = bodies.get('pirate-fruit-offline/pocket-bootstrap.mjs');
+  const pirateBootstrap = bodies.get(bootstrapRelative);
   if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
     || !/await import\('\.\/assets\/[^']+\.js'\)/.test(pirateBootstrap)) {
     throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
+  }
+  if (options.expectedPirateSourceCommit || options.expectedPirateArtifactSha256) {
+    const sourceRelative = 'pirate-fruit-offline/SOURCE.json';
+    const sourceEntry = entries.get(sourceRelative);
+    const sourceBody = await fetchLiveText(sourceRelative, {
+      ...options,
+      ...(sourceEntry ? { validate(value) {
+        const actual = sha256(value);
+        if (actual !== sourceEntry.sha256.toLowerCase()) throw new Error(`manifest hash mismatch for ${sourceRelative}`);
+      } } : {}),
+    });
+    const source = parseJson(sourceBody, sourceRelative);
+    if (options.expectedPirateSourceCommit && source.commit !== options.expectedPirateSourceCommit) {
+      throw new Error(`Pirate source provenance mismatch: expected ${options.expectedPirateSourceCommit}, received ${source.commit || 'missing'}`);
+    }
+    if (options.expectedPirateArtifactSha256
+      && activePirateManifestEntry.sha256.toLowerCase() !== options.expectedPirateArtifactSha256.toLowerCase()) {
+      throw new Error(`Pirate artifact hash mismatch: expected ${options.expectedPirateArtifactSha256}, received ${activePirateManifestEntry.sha256}`);
+    }
   }
   return { runtimeConfig, manifest };
 }
@@ -248,6 +299,8 @@ export async function verifyLiveV9Deployment({
   expectedSha,
   expectedApiBaseUrl,
   expectedAssetBaseUrl = '',
+  expectedPirateSourceCommit = '',
+  expectedPirateArtifactSha256 = '',
   fetchImpl = globalThis.fetch,
   attempts = 12,
   retryDelayMs = 5_000,
@@ -262,6 +315,8 @@ export async function verifyLiveV9Deployment({
     baseUrl: checkedBaseUrl,
     expectedSha: checkedSha,
     expectedApiBaseUrl: checkedApiBaseUrl,
+    expectedPirateSourceCommit,
+    expectedPirateArtifactSha256,
     fetchImpl,
     attempts,
     retryDelayMs,
@@ -309,12 +364,16 @@ export async function runDeploymentVerifierCli(target, {
   const expectedAssetBaseUrl = target === 'firebase'
     ? (env.MONSTERLIFE_EXPECTED_ASSET_BASE_URL || PRODUCTION_PAGES_URL)
     : '';
+  const expectedPirateSourceCommit = env.MONSTERLIFE_EXPECTED_PIRATE_SOURCE_COMMIT || EXPECTED_PIRATE_SOURCE_COMMIT;
+  const expectedPirateArtifactSha256 = env.MONSTERLIFE_EXPECTED_PIRATE_ARTIFACT_SHA256 || EXPECTED_PIRATE_ARTIFACT_SHA256;
   const result = await verifyLiveV9Deployment({
     target,
     baseUrl,
     expectedSha,
     expectedApiBaseUrl,
     expectedAssetBaseUrl,
+    expectedPirateSourceCommit,
+    expectedPirateArtifactSha256,
     fetchImpl,
   });
   logger(`Verified live ${target} release ${expectedSha}`);
