@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import * as vendor from '../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js';
 import { threeFromPirateFruitVendor } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
+// Static route coverage only; mobile visual QA remains the release gate.
 const read = name => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const boot = read('boot-pirate-fruit-v900.mjs');
 const client = read('pirate-fruit-offline/pocket-presentation.mjs');
