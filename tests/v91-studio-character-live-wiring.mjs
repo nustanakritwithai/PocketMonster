@@ -24,7 +24,7 @@ assert.match(bridge, /Character Studio bridge timed out/);
 
 assert.match(packageLoader, /gameplayPolicy\?\.included !== false/);
 assert.match(packageLoader, /rig\?\.architecture !== 'THREE\.Group'/);
-assert.match(packageLoader, /rig\.sockets\.throwOrigin/);
+assert.match(packageLoader, /'throwOrigin'/, 'Studio package validator must require throwOrigin socket');
 assert.match(provider, /buildSceneNode/);
 assert.match(provider, /buildJointMap/);
 assert.match(provider, /findClip\(pkg, action\)/);
