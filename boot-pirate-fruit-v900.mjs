@@ -18,6 +18,13 @@ import {
 } from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=10';
+import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
+import {
+  PIRATE_STUDIO_CHARACTER_ACCEPTED,
+  PIRATE_STUDIO_CHARACTER_FAILED,
+  PIRATE_STUDIO_CHARACTER_PACKAGE,
+  PIRATE_STUDIO_CHARACTER_READY,
+} from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=941', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
@@ -60,6 +67,10 @@ function mountPirateOffline() {
   frame.title = 'Pirate Fruit';
   const frameUrl = new URL(PIRATE_FRUIT_OFFLINE_ENTRY);
   frameUrl.searchParams.set('parentOrigin', location.origin);
+  const studioCapability = globalThis.crypto?.randomUUID?.()
+    || `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  frameUrl.searchParams.set('studioCapability', studioCapability);
+  frame.dataset.studioCapability = studioCapability;
   frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen');
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
@@ -115,6 +126,32 @@ function bindPocketMonsterLink(frame) {
   let latestPresenceAt = 0;
   let centralAuthorityCapability = null;
   let frameReady = false;
+  let studioPackagePromise = null;
+  let studioState = 'pending';
+  const relayStudioPackage = () => {
+    if (studioPackagePromise) return studioPackagePromise;
+    studioState = 'loading';
+    studioPackagePromise = loadStudioCharacterFromEngine()
+      .then(pkg => {
+        if (!pirateRuntimeActive) return;
+        frame.contentWindow?.postMessage({
+          type: PIRATE_STUDIO_CHARACTER_PACKAGE,
+          capability: frame.dataset.studioCapability,
+          package: pkg,
+        }, '*');
+        studioState = 'relayed';
+      })
+      .catch(error => {
+        studioState = 'fallback';
+        frame.contentWindow?.postMessage({
+          type: PIRATE_STUDIO_CHARACTER_FAILED,
+          capability: frame.dataset.studioCapability,
+          error: String(error?.message || error),
+        }, '*');
+        console.warn('Studio character broker failed; Pirate fallback remains visible', error);
+      });
+    return studioPackagePromise;
+  };
   // Server snapshots carry up to 512 recent visual events; retain only the
   // newest late-boot snapshot so history is replayed once, age-adjusted.
   const pendingPresenceSnapshots = [];
@@ -153,6 +190,7 @@ function bindPocketMonsterLink(frame) {
     dropped: pendingPresenceDropped,
     frameReady,
     input: inputTransport.diagnostics(),
+    studioState,
   });
   const markFrameReady = () => {
     if (!pirateRuntimeActive) {
@@ -233,6 +271,18 @@ function bindPocketMonsterLink(frame) {
     if (event.origin !== 'null') return;
     if (hudTelemetry.accept(event)) return;
     const message = event.data;
+    if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_READY) {
+      void relayStudioPackage();
+      return;
+    }
+    if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_ACCEPTED) {
+      studioState = 'studio-character';
+      return;
+    }
+    if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_FAILED) {
+      studioState = 'fallback';
+      return;
+    }
     const onboarding = readPirateOnboardingState(message);
     if (onboarding) {
       syncPirateOnboardingActionProxies(onboarding);
