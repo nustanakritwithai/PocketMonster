@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=952';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=953';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -7,7 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
-import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=7';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=8';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {

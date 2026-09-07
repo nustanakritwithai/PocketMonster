@@ -113,7 +113,9 @@ assert.deepEqual(
 windowLike.dispatchEvent(pirateHelmPrompt('enter'));
 assert.equal(elements.get('pirateHelmBtn').getAttribute('aria-label'), 'ถือพวงมาลัย');
 assert.equal(elements.get('pirateHelmBtn').style.display, 'flex');
-assert.equal(elements.get('pirateHelmBtn').style.right, '85px', 'helm is centered between the two 62px cannon buttons');
+assert.equal(elements.get('pirateHelmBtn').style.left, 'max(8px, calc(32.5% - 72px))', 'helm sits just left of the MMORPG chat dock');
+assert.equal(elements.get('pirateHelmBtn').style.right, 'auto');
+assert.equal(elements.get('pirateHelmBtn').style.bottom, 'calc((var(--hud-dock-expanded) - 62px) / 2)', 'helm is vertically centered beside the chat dock');
 elements.get('pirateHelmBtn').dispatchEvent(pointer('pointerdown', 59, 0, 0));
 elements.get('pirateHelmBtn').dispatchEvent(pointer('pointerup', 59, 0, 0));
 assert.deepEqual(
@@ -134,7 +136,7 @@ assert.equal(controls.diagnostics().actionPointerCount, 0, 'mode change clears a
 assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบขวา');
 assert.equal(elements.get('skill1Btn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบซ้าย');
 assert.equal(elements.get('pirateHelmBtn').getAttribute('aria-label'), 'ปล่อยพวงมาลัย');
-assert.equal(elements.get('pirateHelmBtn').style.right, '85px');
+assert.equal(elements.get('pirateHelmBtn').style.left, 'max(8px, calc(32.5% - 72px))');
 assert.equal(elements.get('summonBtn').style.display, 'none', 'boat HUD removes the boost button');
 assert.equal(elements.get('recallBtn').style.display, 'none', 'boat HUD removes the anchor button');
 assert.equal(elements.get('skill2Btn').style.display, 'none', 'hidden player skills cannot remain touch targets while steering');
@@ -255,6 +257,7 @@ assert.match(htmlSource, /id="pirateUnifiedControls"[\s\S]*id="pirateJoyKnob"[\s
 assert.match(styleSource, /#pirateUnifiedControls\{[^}]*z-index:20[^}]*pointer-events:none/);
 assert.match(styleSource, /#pirateUnifiedControls #joystick\.tc-joyzone/);
 assert.match(styleSource, /#pirateUnifiedControls\[data-control-mode="capture"\] \.pirate-only/);
+assert.match(styleSource, /#pirateUnifiedControls #pirateHelmBtn\.tc-helm::after\{[^}]*font-size:36px/, 'helm icon is enlarged and styled distinctly beside chat');
 assert.match(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background-color:/);
 assert.doesNotMatch(styleSource, /#pirateUnifiedControls \.tc-btn\{[^}]*background:/, 'Pocket mode must be able to paint capture icons on the shared Pirate buttons');
 assert.doesNotMatch(styleSource, /pirate-fruit"\]\[data-control-panel="human"\] #hud,/, 'shared control ancestors cannot be display:none');
@@ -263,6 +266,6 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=58/, 'online scene cache-busts the unified Pirate ship-control bridge');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=59/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');

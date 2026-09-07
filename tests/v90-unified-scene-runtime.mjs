@@ -26,7 +26,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=951',
+    runtime: './boot-pirate-fruit-v900.mjs?v=952',
   }),
   Object.freeze({
     world: 'pocket-monster',
@@ -265,7 +265,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     metrics.timeline.push('fetch:template');
     assert.equal(url.origin, 'https://game.example');
     assert.equal(url.pathname, '/v900.html');
-    assert.equal(url.search, '?v=918');
+    assert.equal(url.search, '?v=919');
     assert.equal(options.cache, 'no-store');
     assert.ok(options.signal instanceof AbortSignal);
     return {
