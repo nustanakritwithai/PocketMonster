@@ -48,7 +48,7 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry-preload-v900\.mjs\?v=971/, 'active HTML cache-busts the unified ship-control entry');
+assert.match(indexHtml, /entry-preload-v900\.mjs\?v=972/, 'active HTML cache-busts the unified ship-control entry');
 assert.match(indexHtml, /style-v900\.css\?v=969/, 'active HTML cache-busts the helm placement beside chat');
 assert.match(sceneHtml, /style-v900\.css\?v=969/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style-v900\.css\?v=913/, 'hosted scene cannot mix a stale stylesheet');
