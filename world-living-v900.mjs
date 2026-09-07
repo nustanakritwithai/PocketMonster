@@ -1,9 +1,10 @@
 import { createSharedResourceCache, selectQualityProfile } from './performance-runtime.mjs';
 import { requireFirebaseLogin } from './firebase-auth-ui.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { loadCatalog } from './asset-presentation/catalog.mjs';
+import { getAssetDef, loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
+import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=4';
 
 export const LIVING_WORLD_VERSION = '9.0.1-living-world-portal';
@@ -70,6 +71,11 @@ const assets = createAssetEngine({ THREE, quality: qualityProfile.tier });
   const catalogRes = await fetch(new URL('./assets/catalog/humanoid-core.json', import.meta.url));
   if (!catalogRes.ok) throw new Error('โหลด humanoid catalog ไม่สำเร็จ: ' + catalogRes.status);
   loadCatalog(await catalogRes.json());
+  for (const file of ['monster-slimes.json', 'monster-animals.json']) {
+    const monsterCatalog = await fetch(new URL(`./assets/catalog/${file}`, import.meta.url));
+    if (!monsterCatalog.ok) throw new Error('โหลด monster catalog ไม่สำเร็จ: ' + file);
+    await assets.preloadBundle(file, await monsterCatalog.json());
+  }
 }
 const sharedResources = createSharedResourceCache();
 function cachedGeometry(kind, args, Factory) {
@@ -230,6 +236,15 @@ assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({
   torus: torusGeometry,
   material: mat,
 }));
+const monsterProvider = createBigheadMonsterProvider({
+  THREE,
+  box: boxGeometry,
+  cone: coneGeometry,
+  torus: torusGeometry,
+  material: mat,
+  basicMaterial: color => mat(color, 1, 0),
+});
+assets.registerProvider('procedural', context => monsterProvider(context));
 const playerVisual = assets.spawn('character.human.pirate-fruit.v1', {
   role: 'player',
   appearanceId: 'appearance.human.player-orange.v1',
@@ -242,12 +257,104 @@ scene.add(player);
 
 if (typeof window !== 'undefined') {
   window.MLRPG_ASSETS = { diagnostics: () => assets.diagnostics() };
+  const remoteMonsterVisuals = new Map();
+  const nowMs = () => performance.now();
+  const positionOf = (value, fallback) => ({
+    x: Number.isFinite(value?.x) ? value.x : fallback.x,
+    y: Number.isFinite(value?.y) ? value.y : fallback.y,
+    z: Number.isFinite(value?.z) ? value.z : fallback.z,
+  });
+  const colorOf = value => Number.isFinite(value) ? value : 0xffffff;
+  const clearMonsterVisuals = actorId => {
+    const prefix = `${actorId}:`;
+    for (const [key, effect] of remoteMonsterVisuals) {
+      if (!key.startsWith(prefix)) continue;
+      effect.root.removeFromParent();
+      effect.root.geometry?.dispose?.();
+      effect.root.material?.dispose?.();
+      remoteMonsterVisuals.delete(key);
+    }
+  };
+  const onMonsterVisual = (presentation, actor) => {
+    const origin = positionOf(actor?.pose, { x: 0, y: 0.8, z: 0 });
+    const generation = Number.isInteger(actor?.generation) ? actor.generation : 0;
+    for (const event of presentation?.events || []) {
+      const sequence = Number.isInteger(event.sequence) ? event.sequence : null;
+      if (sequence === null) continue;
+      const key = `${actor.actorId}:e:${generation}:${sequence}`;
+      if (remoteMonsterVisuals.has(key)) continue;
+      const ageMs = Math.max(0, Number(event.ageMs) || 0);
+      const ttlMs = Math.max(80, 3000 - ageMs);
+      const slash = /blade|slash|sword/i.test(String(event.kind || ''));
+      const geometry = slash ? new THREE.TorusGeometry(.28, .045, 8, 20) : new THREE.SphereGeometry(.12, 10, 8);
+      const material = new THREE.MeshBasicMaterial({ color: colorOf(event.color), transparent: true, opacity: .85, toneMapped: false });
+      const root = new THREE.Mesh(geometry, material);
+      root.name = `remote-monster-visual:${event.kind || 'event'}`;
+      root.userData.presentationOnly = true;
+      root.position.copy(positionOf(event.position, origin));
+      if (slash) root.rotation.x = Math.PI / 2;
+      scene.add(root);
+      remoteMonsterVisuals.set(key, { root, expiresAt: nowMs() + ttlMs, velocity: null });
+    }
+    for (const projectile of presentation?.projectiles || []) {
+      if (!projectile?.id || !Number.isFinite(projectile.remainingMs) || projectile.remainingMs <= 0) continue;
+      const key = `${actor.actorId}:p:${generation}:${projectile.id}`;
+      if (remoteMonsterVisuals.has(key)) continue;
+      const scale = Math.max(.04, Math.min(2, Number(projectile.scale) || 1));
+      const root = new THREE.Mesh(
+        new THREE.SphereGeometry(.10 * scale, 10, 8),
+        new THREE.MeshBasicMaterial({ color: colorOf(projectile.color), toneMapped: false }),
+      );
+      root.name = `remote-monster-projectile:${projectile.id}`;
+      root.userData.presentationOnly = true;
+      root.position.copy(positionOf(projectile.position, origin));
+      scene.add(root);
+      remoteMonsterVisuals.set(key, {
+        root,
+        expiresAt: nowMs() + Math.max(80, projectile.remainingMs),
+        velocity: positionOf(projectile.velocity, { x: 0, y: 0, z: 0 }),
+      });
+    }
+  };
+  const updateMonsterVisuals = dt => {
+    const now = nowMs();
+    for (const [key, effect] of remoteMonsterVisuals) {
+      if (now >= effect.expiresAt) {
+        effect.root.removeFromParent();
+        effect.root.geometry?.dispose?.();
+        effect.root.material?.dispose?.();
+        remoteMonsterVisuals.delete(key);
+        continue;
+      }
+      if (effect.velocity) effect.root.position.addScaledVector(effect.velocity, dt);
+      effect.root.material.opacity = Math.max(0, Math.min(1, (effect.expiresAt - now) / 3000));
+    }
+  };
+  const monsterAssetId = actor => {
+    const type = String(actor?.monsterType || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const candidates = [
+      `monster.${type}.${type}.bighead.v1`,
+      `monster.slime.${type}.bighead.v1`,
+      'monster.slime.normalooze.bighead.v1',
+    ];
+    return candidates.find(id => getAssetDef(id)) || 'monster.slime.normalooze.bighead.v1';
+  };
   publishWorldState({
     getZone: () => LIVING_WORLD_ID,
     getPosition: () => player.position,
     getDir: () => player.rotation.y,
   });
-  installWorldPresence({ THREE, scene, getCamera: () => camera, getZone: () => LIVING_WORLD_ID });
+  installWorldPresence({
+    THREE,
+    scene,
+    getCamera: () => camera,
+    getZone: () => LIVING_WORLD_ID,
+    createActor: actor => assets.spawn(monsterAssetId(actor), { role: 'wild' }),
+    onMonsterVisual,
+    onMonsterRemoved: actorId => clearMonsterVisuals(actorId),
+  });
+  window.POCKETMONSTER_LIVING_WORLD_MONSTER_DIAGNOSTICS = () => Object.freeze({ activeVisuals: remoteMonsterVisuals.size });
+  window.POCKETMONSTER_UPDATE_REMOTE_MONSTER_VISUALS = updateMonsterVisuals;
 }
 
 let cameraYaw = 0.05;
@@ -320,6 +427,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   updatePlayer(dt);
+  updateMonsterVisuals(dt);
   updatePirateFruitPortal(dt);
   updateCamera(dt);
   renderer.render(scene, camera);

@@ -19,6 +19,47 @@ function boundedApproach(current, target, factor = .35, maxStep = 5) {
   return current + Math.max(-maxStep, Math.min(maxStep, delta));
 }
 
+function interpolateActorPose(previous, next, alpha) {
+  const turn = Math.atan2(Math.sin(next.dir - previous.dir), Math.cos(next.dir - previous.dir));
+  return {
+    x: previous.x + (next.x - previous.x) * alpha,
+    y: previous.y + (next.y - previous.y) * alpha,
+    z: previous.z + (next.z - previous.z) * alpha,
+    dir: previous.dir + turn * alpha,
+  };
+}
+
+function applyActorPose(actor, now, interpolationDelayMs) {
+  const samples = actor.samples;
+  if (!samples?.length || !actor.root) return;
+  const latest = samples.at(-1);
+  const renderAt = now - Math.max(0, Number(interpolationDelayMs) || 0);
+  let rendered = latest;
+  if (samples.length > 1) {
+    const previous = samples.at(-2);
+    if (renderAt < latest.at && renderAt >= previous.at) {
+      const alpha = Math.max(0, Math.min(1, (renderAt - previous.at) / Math.max(1, latest.at - previous.at)));
+      rendered = interpolateActorPose(previous, latest, alpha);
+    } else if (renderAt > latest.at) {
+      const dt = Math.min(250, renderAt - latest.at) / 1000;
+      const span = Math.max(1, latest.at - previous.at);
+      rendered = {
+        x: latest.x + ((latest.x - previous.x) / span) * dt * 1000,
+        y: latest.y + ((latest.y - previous.y) / span) * dt * 1000,
+        z: latest.z + ((latest.z - previous.z) / span) * dt * 1000,
+        dir: latest.dir,
+      };
+    } else {
+      rendered = previous;
+    }
+  }
+  actor.root.position?.set?.(rendered.x, rendered.y, rendered.z);
+  if (actor.root.rotation) {
+    const turn = Math.atan2(Math.sin(rendered.dir - actor.root.rotation.y), Math.cos(rendered.dir - actor.root.rotation.y));
+    actor.root.rotation.y += turn * .35;
+  }
+}
+
 function actionIdentity(animation) {
   if (!animation?.actionSessionId || !Number.isInteger(animation.actionSequence)) return null;
   return `${animation.actionSessionId}:${animation.actionSequence}`;
@@ -141,6 +182,7 @@ export function createWorldPresenceController({
   interpolationDelayMs = 100,
   createActor = null,
   onMonsterVisual = null,
+  onMonsterRemoved = null,
 } = {}) {
   const remoteWorldPlayers = new Map();
   const remoteActors = new Map();
@@ -216,6 +258,7 @@ export function createWorldPresenceController({
   function removeActor(actorId) {
     const actor = remoteActors.get(actorId);
     if (!actor) return;
+    onMonsterRemoved?.(actorId, actor.target);
     actor.handle?.dispose?.();
     actor.root?.parent?.remove?.(actor.root);
     remoteActors.delete(actorId);
@@ -229,6 +272,12 @@ export function createWorldPresenceController({
       if (selfId != null && selfId !== '' && String(item.ownerId || '').toLowerCase() === String(selfId).toLowerCase()) continue;
       seen.add(id);
       let actor = remoteActors.get(id);
+      const generation = Number.isInteger(item.generation) ? item.generation : 0;
+      if (actor && generation < actor.generation) continue;
+      if (actor && generation > actor.generation) {
+        removeActor(id);
+        actor = null;
+      }
       if (actor && item.spawnSequence < actor.spawnSequence) continue;
       if (actor && item.spawnSequence === actor.spawnSequence && item.stateSequence <= actor.stateSequence) continue;
       if (item.lifecycle === 'despawn') {
@@ -246,16 +295,26 @@ export function createWorldPresenceController({
           root.position?.set?.(item.pose.x, item.pose.y, item.pose.z);
           if (root.rotation) root.rotation.y = item.pose.dir || 0;
           scene?.add?.(root);
-          actor = { root, handle: created?.root ? created : null, actionIdentity: null, target: item, spawnSequence: item.spawnSequence, stateSequence: item.stateSequence };
+          actor = {
+            root,
+            handle: created?.root ? created : null,
+            actionIdentity: null,
+            target: item,
+            generation,
+            spawnSequence: item.spawnSequence,
+            stateSequence: item.stateSequence,
+            samples: [{ ...item.pose, at: clockNow() }],
+          };
           remoteActors.set(id, actor);
         }
       }
       if (!actor) continue;
       actor.target = item;
+      actor.generation = generation;
       actor.spawnSequence = item.spawnSequence;
       actor.stateSequence = item.stateSequence;
-      actor.root.position?.set?.(item.pose.x, item.pose.y, item.pose.z);
-      if (actor.root.rotation) actor.root.rotation.y = item.pose.dir || 0;
+      actor.samples.push({ ...item.pose, at: clockNow() });
+      while (actor.samples.length > 8) actor.samples.shift();
       const identity = actionIdentity(item.animation);
       if (identity && identity !== actor.actionIdentity) {
         actor.actionIdentity = identity;
@@ -422,6 +481,7 @@ export function createWorldPresenceController({
         avatar.rotation.z += (actionLean - avatar.rotation.z) * .35;
       }
       for (const actor of remoteActors.values()) {
+        applyActorPose(actor, currentTime, interpolationDelayMs);
         actor.handle?.update?.(deltaSeconds, {
           moving: actor.target?.locomotion !== 'idle',
           locomotion: actor.target?.locomotion,
