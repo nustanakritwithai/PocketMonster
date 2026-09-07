@@ -310,6 +310,14 @@ export function createUnifiedMobileControls({
       clearInlineStyle(button, 'min-height');
     }
     setPirateButton('pirateHelmBtn', { icon: '☸', label: 'ถือพวงมาลัย' }, false);
+    const helm = documentLike.getElementById('pirateHelmBtn');
+    clearInlineStyle(helm, 'left');
+    clearInlineStyle(helm, 'right');
+    clearInlineStyle(helm, 'bottom');
+    clearInlineStyle(helm, 'width');
+    clearInlineStyle(helm, 'height');
+    clearInlineStyle(helm, 'min-width');
+    clearInlineStyle(helm, 'min-height');
   };
 
   const applyPirateBoatButtons = () => {
@@ -347,8 +355,12 @@ export function createUnifiedMobileControls({
     }, visible);
     if (!visible) return;
     const helm = documentLike.getElementById('pirateHelmBtn');
-    setImportantStyle(helm, 'right', '85px');
-    setImportantStyle(helm, 'bottom', '18px');
+    // The MMORPG chat dock begins at 32.5% of the viewport.  Park the helm
+    // just to its left, vertically centered against the chat dock, so it does
+    // not compete with either broadside cannon or the chat input itself.
+    setImportantStyle(helm, 'left', 'max(8px, calc(32.5% - 72px))');
+    setImportantStyle(helm, 'right', 'auto');
+    setImportantStyle(helm, 'bottom', 'calc((var(--hud-dock-expanded) - 62px) / 2)');
     setImportantStyle(helm, 'width', '62px');
     setImportantStyle(helm, 'height', '62px');
     setImportantStyle(helm, 'min-width', '62px');

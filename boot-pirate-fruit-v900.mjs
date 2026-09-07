@@ -16,7 +16,7 @@ import {
   sanitizePirateWorldSnapshot,
 } from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=7';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=8';
 
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=941', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
