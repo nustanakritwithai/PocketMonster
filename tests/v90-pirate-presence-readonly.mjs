@@ -22,8 +22,8 @@ const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmons
 
 const centralAuthority = {
   contract: 'pirate-central-spatial/1', schemaVersion: 1,
-  contentRevision: 'pirate-monster-catalog-2026-09-07-ai-v2', contentHash: 'fnv1a-ae668b33',
-  manifestSha256: '39FA9E8460EF662126534814A4A3FED4B9C4A670F0E3F707A3F643EC0733850C',
+  contentRevision: 'pirate-monster-catalog-2026-09-07-ai-v2-transport-v2', contentHash: 'fnv1a-236acf41',
+  manifestSha256: '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0',
   vectorsSha256: 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7',
   zones: ['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky'],
 };
@@ -31,7 +31,7 @@ assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), t
 for (const mapZone of centralAuthority.zones) {
   assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'pirate-fruit'), true, `central map zone ${mapZone} keeps the transport gate active`);
 }
-assert.equal(pirateCentralAuthorityOwnsZone({ ...centralAuthority, contentHash: 'fnv1a-e5197eb7' }, 'pirate-fruit'), false, 'stale manifest identity fails closed');
+assert.equal(pirateCentralAuthorityOwnsZone({ ...centralAuthority, contentHash: 'fnv1a-ae668b33' }, 'pirate-fruit'), false, 'stale manifest identity fails closed');
 assert.equal(pirateCentralAuthorityOwnsZone(centralAuthority, 'living-world'), false, 'non-Pirate transport keeps owner relay');
 
 assert.deepEqual(sanitizePirateLocalPresence({
