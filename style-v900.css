@@ -189,6 +189,9 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-quest-step.current::before{content:'➤ '}
 .mmorpg-minimap{position:absolute;left:84.4%;top:0;width:15.4%;height:28.1%;border:1px solid var(--hud-line);border-radius:10px;background:linear-gradient(180deg,#1a2818,var(--hud-glass));box-shadow:0 8px 20px #0007}
 .mmorpg-roster{position:absolute;left:62.5%;top:25.8%;width:14.6%;height:17.6%;display:flex;flex-direction:column;gap:4px}
+.mmorpg-monster-recall{width:100%;min-height:36px;margin-top:4px;padding:5px 9px;border:1px solid var(--hud-line);border-radius:8px;background:var(--hud-glass);color:var(--hud-text);font:600 11px system-ui;pointer-events:auto;touch-action:manipulation;cursor:pointer}
+.mmorpg-monster-recall[hidden]{display:none}
+.mmorpg-monster-recall:disabled{opacity:.6;cursor:wait}
 .mmorpg-roster-row{display:flex;align-items:center;gap:6px;min-height:32px;height:34px;padding:2px 6px;border:1px solid var(--hud-line);border-radius:8px;background:var(--hud-glass);overflow:hidden}
 .mmorpg-roster-row.target{border-color:rgba(248,113,113,.5)}
 .mmorpg-roster-row.selected{border-color:#fbbf24}

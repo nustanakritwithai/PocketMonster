@@ -7,8 +7,10 @@ function endpoint(config, path) {
 
 function stateFromPlayerPayload(payload) {
   const source = payload?.monsterControl || {};
-  const slots = Array.isArray(source.party) ? source.party.map(slot => ({ ...slot,
-    available: Boolean(slot?.instanceId) && slot?.fainted !== true })) : null;
+  const slots = Array.isArray(source.party) ? source.party.slice(0, 3).map((slot, index) => ({ ...slot,
+    slot: index, id: `slot-${index + 1}`, instanceId: typeof slot?.instanceId === 'string' ? slot.instanceId : '',
+    name: slot?.name || '', portraitKey: slot?.speciesId || '',
+    available: typeof slot?.instanceId === 'string' && /^[A-Za-z0-9._:-]{1,96}$/.test(slot.instanceId) && slot?.fainted !== true })) : null;
   const party = Array.isArray(slots) ? { available: true, slots } : source.party;
   const actors = Array.isArray(source.actors || payload?.actors) ? (source.actors || payload.actors).map(actor => {
     const { generation, ...rest } = actor || {};
@@ -18,7 +20,7 @@ function stateFromPlayerPayload(payload) {
     party: party || null,
     actors,
     skills: source.skills || payload?.skills || {},
-    capabilities: source.capabilities || payload?.capabilities || {},
+    capabilities: Object.freeze({ recall: source.capabilities?.recall === true, switch: source.capabilities?.switch === true }),
     revision: Number.isSafeInteger(source.revision) ? source.revision : 0,
     available: Array.isArray(source.party) || Boolean(party?.available),
   });

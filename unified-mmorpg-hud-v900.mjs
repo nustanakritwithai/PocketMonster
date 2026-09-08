@@ -64,6 +64,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   let drawerCollapsed = false;
   let expanded = true;
   let chatKeyboardDismiss = null;
+  let recallBinding = null;
   const unsubscribers = [];
   const lastRevisions = new Map();
   const nodes = new Map();
@@ -145,8 +146,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     recall.type = 'button';
     recall.textContent = 'เก็บมอนสเตอร์';
     recall.setAttribute('aria-label', 'เก็บมอนสเตอร์');
-    recall.addEventListener('click', () => { void partyAdapter()?.recallActive?.(); });
-    root.append(recall);
+    recall.hidden = true;
+    const onRecall = event => {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      if (!recall.hidden && !recall.disabled) void partyAdapter()?.recallActive?.();
+    };
+    recall.addEventListener('click', onRecall);
+    recallBinding = { node: recall, onRecall };
     root.append(register('mmorpgUtilities', el(documentLike, 'div', '', 'mmorpg-utilities')));
     root.append(register('mmorpgBanner', el(documentLike, 'div', '', 'mmorpg-banner hidden')));
 
@@ -450,8 +457,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     if (recallButton) {
       const canRecall = slots.some(slot => slot.active === true) && partyState.capabilities?.recall === true;
       recallButton.hidden = !canRecall;
-      recallButton.disabled = !canRecall || slots.some(slot => slot.pending === true);
-      recallButton.textContent = slots.some(slot => slot.pending === true) ? 'กำลังเก็บมอนสเตอร์…' : 'เก็บมอนสเตอร์';
+      recallButton.disabled = !canRecall || partyState.pending === true;
+      recallButton.textContent = partyState.pending === true ? 'กำลังรอยืนยัน…' : 'เก็บมอนสเตอร์';
     }
     for (const slot of slots) {
       const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
@@ -530,7 +537,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         });
         return button;
       });
-      partyPanel.replaceChildren(...controls);
+      partyPanel.replaceChildren(...controls, node('monsterRecallBtn'));
     }
     const summary = node('mmorpgDockSummary');
     if (summary) {
@@ -1001,6 +1008,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function unmount() {
+    recallBinding?.node.removeEventListener?.('click', recallBinding.onRecall);
+    recallBinding = null;
     for (const unsubscribe of unsubscribers.splice(0)) {
       try { unsubscribe(); } catch {}
     }
