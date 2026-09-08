@@ -181,6 +181,7 @@ elements.get('captureBtn').dispatchEvent(up);
 assert.equal(down.defaultPrevented, true);
 assert.deepEqual(calls.map(payload => [payload.action, payload.phase]), [['capture', 'start'], ['capture', 'end']]);
 
-assert.equal((controlsSource.match(/addEventListener\('pointerdown'/g) || []).length, 1, 'visual-state subscription cannot add a second pointer owner');
+assert.equal((controlsSource.match(/addEventListener\('pointerdown'/g) || []).length, 2, 'controls keep one audio unlock listener and one per-button interaction listener');
+assert.match(controlsSource, /controlSurface\.addEventListener\('pointerdown',\s*unlockAudioFromGesture,\s*\{\s*capture:\s*true,\s*passive:\s*true\s*\}\)/, 'audio unlock listener is a passive capture listener');
 
 console.log('V9 unified combat arc: PASS');
