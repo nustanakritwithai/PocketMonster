@@ -257,6 +257,7 @@ const styleSource = fs.readFileSync(new URL('../style-v900.css', import.meta.url
 const htmlSource = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const sceneEntrySource = fs.readFileSync(new URL('../scene-entry-v900.mjs', import.meta.url), 'utf8');
 const sceneHtmlSource = fs.readFileSync(new URL('../scene-v900.html', import.meta.url), 'utf8');
+const worldsSource = fs.readFileSync(new URL('../worlds-v900.mjs', import.meta.url), 'utf8');
 const unifiedControlsSource = fs.readFileSync(new URL('../unified-mobile-controls-v900.mjs', import.meta.url), 'utf8');
 assert.doesNotMatch(gameSource, /bindMobileDualPointerInput/, 'Pocket runtime no longer creates a second pointer lifecycle');
 assert.match(gameSource, /registerAdapter\('pocket-monster'/);
@@ -269,6 +270,7 @@ assert.match(bridgeSource, /event\.source !== window\.parent \|\| event\.origin 
 assert.match(bridgeSource, /\.tc-joyzone/);
 assert.match(bridgeSource, /block: '\.tc-block'/);
 assert.match(bridgeSource, /interact: '\.interaction-prompt'/, 'the new wheel uses the existing native interaction prompt');
+assert.match(bridgeSource, /message\.kind === 'audio-unlock'/, 'Pirate bridge accepts parent audio unlock gestures');
 assert.match(bridgeSource, /dataset\.unifiedHelmProxy/, 'only the native helm prompt is marked for center-panel retirement');
 assert.match(htmlSource, /id="pirateUnifiedControls"[\s\S]*id="pirateJoyKnob"[\s\S]*id="captureBtn"[^>]*tc-attack[\s\S]*id="pirateHelmBtn"[^>]*tc-helm/);
 assert.match(styleSource, /#pirateUnifiedControls\{[^}]*z-index:20[^}]*pointer-events:none/);
@@ -284,6 +286,8 @@ assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'ca
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=9/, 'updated touch recovery dependency bypasses stale mobile caches');
+assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'world shell cache-busts the audio-enabled controls module');
 assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'Pirate boot bypasses cached controls that predate the iframe transport');
 assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=61/, 'online scene cache-busts the unified Pirate ship-control bridge');
 

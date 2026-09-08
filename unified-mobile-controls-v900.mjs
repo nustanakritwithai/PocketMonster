@@ -1,4 +1,5 @@
 import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=9';
+import { initAudio } from './audio-engine.mjs';
 
 export const UNIFIED_MOBILE_CONTROLS_KIND = 'monsterlife-unified-mobile-controls-v1';
 export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
@@ -31,6 +32,7 @@ export function createPirateIframeInputTransport({
   let activeCameraGestureId = null;
   let cameraGestureHighWater = 0;
   let droppedInputCount = 0;
+  let pendingAudioUnlock = false;
   let nativeControlMode = 'player';
   let nativeHelmPrompt = null;
 
@@ -128,6 +130,10 @@ export function createPirateIframeInputTransport({
       activeCameraGestureId = null;
       readyGeneration = frameGeneration;
       post({ kind: 'reset', reason: 'pirate-input-ready' });
+      if (pendingAudioUnlock) {
+        pendingAudioUnlock = false;
+        post({ kind: 'audio-unlock' });
+      }
       return true;
     },
     move(payload) { return post({ kind: 'move', ...payload }); },
@@ -158,6 +164,12 @@ export function createPirateIframeInputTransport({
       return sent;
     },
     reset,
+    unlockAudio() {
+      pendingAudioUnlock = true;
+      if (!ready()) return false;
+      pendingAudioUnlock = false;
+      return post({ kind: 'audio-unlock' });
+    },
     diagnostics: () => Object.freeze({
       frameGeneration,
       readyGeneration,
@@ -165,6 +177,7 @@ export function createPirateIframeInputTransport({
       activeCameraGestureId,
       cameraGestureHighWater,
       droppedInputCount,
+      pendingAudioUnlock,
       nativeControlMode,
       nativeHelmPrompt,
     }),
@@ -268,6 +281,11 @@ export function createUnifiedMobileControls({
   let pirateHelmPrompt = null;
 
   const activeAdapter = () => adapters.get(activeWorldId) || null;
+
+  const unlockAudioFromGesture = () => {
+    try { initAudio(); } catch {}
+    try { activeAdapter()?.unlockAudio?.(); } catch {}
+  };
 
   let visualUnsubscribe = null;
 
@@ -555,6 +573,11 @@ export function createUnifiedMobileControls({
       if (gestureId !== null) activeAdapter()?.camera?.({ phase: 'end', gestureId, reason });
     },
   });
+
+  // The visible controls live in the parent document, while Pirate's audio
+  // graph lives in its sandboxed iframe. Unlock both graphs from the same
+  // real touch gesture before the action handler runs.
+  controlSurface.addEventListener('pointerdown', unlockAudioFromGesture, { capture: true, passive: true });
 
   const stopPirateAction = event => {
     if (activeAdapter()?.interceptActions !== true) return false;

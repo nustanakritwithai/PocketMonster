@@ -58,9 +58,24 @@ let reportedHelmPrompt = null;
 let onboardingStateSignature = null;
 let onboardingObserver = null;
 let hudTelemetryPublisher = null;
+let pendingAudioUnlock = false;
 
 function isPositiveSafeInteger(value) {
   return Number.isSafeInteger(value) && value > 0;
+}
+
+function requestAudioUnlock() {
+  pendingAudioUnlock = true;
+  const audio = window.__audio;
+  if (typeof audio?.unlock !== 'function') return false;
+  pendingAudioUnlock = false;
+  Promise.resolve(audio.unlock()).catch(() => { pendingAudioUnlock = true; });
+  return true;
+}
+
+function retryAudioUnlock(attempt = 0) {
+  if (!pendingAudioUnlock || requestAudioUnlock() || attempt >= 20) return;
+  setTimeout(() => retryAudioUnlock(attempt + 1), 100);
 }
 
 function nativeControlMode() {
@@ -329,6 +344,12 @@ window.addEventListener('message', event => {
     return;
   }
   if (message?.type !== PIRATE_UNIFIED_INPUT_MESSAGE) return;
+  if (message.kind === 'audio-unlock') {
+    if (!isPositiveSafeInteger(message.frameGeneration) || message.frameGeneration !== activeFrameGeneration) return;
+    requestAudioUnlock();
+    retryAudioUnlock();
+    return;
+  }
   if (message.kind === 'camera' && ['start', 'move', 'end'].includes(message.phase)) {
     handleCamera(message);
     return;
