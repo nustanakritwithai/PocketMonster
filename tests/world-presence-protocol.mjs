@@ -294,11 +294,20 @@ const playerAuthority = {
     { playerId: 'self-player', generation: 2, stateSequence: 7, hp: { current: 87.5, max: 100, revision: 3 }, resultRevision: 2, lifeState: 'alive' },
     { playerId: 'observer-player', generation: 2, stateSequence: 8, hp: { current: 0, max: 120, revision: 4 }, resultRevision: 5, lifeState: 'dead' },
   ],
+  results: [
+    { attackerId: 'monster:east-forest', targetId: 'self-player', attackId: 'hit-1', generation: 2, resultRevision: 1, authoritativeFinalHp: 87.5, serverTimeUtc: '2026-09-08T16:00:00.000Z' },
+    { attackerId: 'monster:east-forest', targetId: 'observer-player', attackId: 'hit-1', generation: 2, resultRevision: 1, authoritativeFinalHp: 0, serverTimeUtc: '2026-09-08T16:00:00.000Z' },
+  ],
 };
 const authoritySnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [{ id: 'self-player', x: 1, z: 2 }], playerAuthority });
 assert.equal(authoritySnapshot.players.length, 1, 'visual self remains independently filtered by receiver');
 assert.equal(authoritySnapshot.playerAuthority.players[0].hp.current, 87.5, 'self authoritative HP preserves fractional value');
 assert.equal(authoritySnapshot.playerAuthority.players[1].lifeState, 'dead', 'observer death state crosses separate authority channel');
+assert.equal(authoritySnapshot.playerAuthority.results.length, 2, 'same attack ID preserves results for multiple targets');
+assert.equal(authoritySnapshot.playerAuthority.results[1].targetId, 'observer-player', 'target identity remains part of result transport key');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, results: Array.from({ length: 65 }, (_, index) => ({ ...playerAuthority.results[0], attackId: `hit-${index}` })) } }), null, 'authority results are capped at 64');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, results: [{ ...playerAuthority.results[0], authoritativeFinalHp: Infinity }] } }), null, 'invalid authoritative result HP fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, results: [playerAuthority.results[0], playerAuthority.results[0]] } }), null, 'duplicate composite result fails closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [...playerAuthority.players, { ...playerAuthority.players[0], playerId: 'SELF-PLAYER' }] } }), null, 'case-insensitive duplicate authoritative player IDs fail closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], playerAuthority }).playerAuthority.players[0].playerId, 'self-player', 'authority remains valid across non-central visual zones');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], hp: { current: 101, max: 100, revision: 4 } }] } }), null, 'authoritative HP range fails closed');
