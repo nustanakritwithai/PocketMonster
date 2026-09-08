@@ -677,7 +677,7 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
   const players = [];
   const seen = new Set();
   let playerAuthority;
-  if (payload.playerAuthority !== undefined) {
+  if (payload.playerAuthority !== undefined && payload.playerAuthority !== null) {
     playerAuthority = sanitizePlayerAuthority(payload.playerAuthority);
     if (!playerAuthority) return null;
   }
