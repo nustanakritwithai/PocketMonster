@@ -1,11 +1,11 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "7986f4f70ba0d28bb64ddc2330a7bf79a54fa821",
-  "commit": "7986f4f70ba0d28bb64ddc2330a7bf79a54fa821",
+  "ref": "c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708",
+  "commit": "c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเท่านั้น Save และ Combat authority ยังคงปิดบน VPS",
+  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเป็นหลัก; Combat authority ควบคุมด้วย OwnedMonsterEnabled และ Server flags แบบ fail-closed artifact นี้ไม่เปลี่ยน flags",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",
@@ -16,6 +16,7 @@
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",
+    "artifact": "owned-monster-release-20260908/pirate-dist-c5dbb9c",
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",

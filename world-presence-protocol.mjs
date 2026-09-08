@@ -43,6 +43,11 @@ export const PRESENTATION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,96}$/;
 export const MONSTER_INSTANCE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,96}$/;
 export const ACTOR_KIND_VALUES = Object.freeze(['monster', 'summon']);
 export const ACTOR_LIFECYCLE_VALUES = Object.freeze(['spawn', 'active', 'despawn']);
+export const MONSTER_INTENT_KIND_VALUES = Object.freeze(['melee', 'skill']);
+export const MONSTER_INTENT_CATEGORY_VALUES = Object.freeze(['style', 'sword', 'gun', 'fruit', 'utility']);
+export const MONSTER_DESPAWN_REASON_VALUES = Object.freeze(['defeated', 'despawned', 'zone-change', 'reconnect', 'expired']);
+export const MAX_MONSTER_INTENTS = 32;
+export const MONSTER_AUTHORITY_VERSION = 'monster-authority/1';
 export const VISUAL_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const VISUAL_KINDS = Object.freeze([
   'slash', 'blade-trail', 'gun-shot', 'energy-launch', 'shockwave', 'beam',
@@ -62,6 +67,9 @@ const CATEGORY_SET = ANIMATION_CATEGORY_SET;
 const SPELL_FX_ASSET_SET = new Set(SPELL_FX_ASSET_IDS);
 const ACTOR_KIND_SET = new Set(ACTOR_KIND_VALUES);
 const ACTOR_LIFECYCLE_SET = new Set(ACTOR_LIFECYCLE_VALUES);
+const MONSTER_INTENT_KIND_SET = new Set(MONSTER_INTENT_KIND_VALUES);
+const MONSTER_INTENT_CATEGORY_SET = new Set(MONSTER_INTENT_CATEGORY_VALUES);
+const MONSTER_DESPAWN_REASON_SET = new Set(MONSTER_DESPAWN_REASON_VALUES);
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -118,6 +126,117 @@ function sanitizeAssetId(value) {
 
 function sanitizeMonsterInstanceId(value) {
   return typeof value === 'string' && MONSTER_INSTANCE_ID_PATTERN.test(value) ? value : null;
+}
+
+function sanitizeMonsterIntentId(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 120 && MONSTER_INSTANCE_ID_PATTERN.test(value)
+    ? value
+    : null;
+}
+
+/** Server-owned combat intent envelope; the parent only validates and forwards it. */
+export function sanitizeMonsterIntent(value) {
+  if (!isRecord(value) || value.schemaVersion !== 1
+    || !MONSTER_INTENT_KIND_SET.has(value.kind) || !MONSTER_INTENT_CATEGORY_SET.has(value.category)
+    || !Number.isSafeInteger(value.sequence) || value.sequence < 1 || value.sequence > MAX_WORLD_ROUTE_GENERATION) return null;
+  const intentId = sanitizeMonsterIntentId(value.intentId);
+  const zone = safeZone(value.zone);
+  const length = Math.hypot(Number(value.forwardX), Number(value.forwardZ));
+  if (!intentId || !zone || !isFiniteNumber(value.forwardX) || !isFiniteNumber(value.forwardZ)
+    || !Number.isFinite(length) || length < 0.0001
+    || !isFiniteNumber(value.range) || value.range < 0 || value.range > PRESENCE_COORDINATE_LIMIT
+    || (value.area !== undefined && (!isFiniteNumber(value.area) || value.area < 0 || value.area > PRESENCE_COORDINATE_LIMIT))
+    || (value.skillId !== undefined && !sanitizeMonsterIntentId(value.skillId))
+    || (value.targetActorId !== undefined && !sanitizeMonsterIntentId(value.targetActorId))
+    || (value.expectedGeneration !== undefined && (!Number.isSafeInteger(value.expectedGeneration) || value.expectedGeneration < 1 || value.expectedGeneration > MAX_WORLD_ROUTE_GENERATION))
+    || (value.expectedStateSequence !== undefined && (!Number.isSafeInteger(value.expectedStateSequence) || value.expectedStateSequence < 0 || value.expectedStateSequence > MAX_WORLD_ROUTE_GENERATION))
+    || (value.actionId !== undefined && !sanitizeMonsterIntentId(value.actionId))) return null;
+  const intent = {
+    schemaVersion: 1,
+    intentId,
+    zone,
+    kind: value.kind,
+    category: value.category,
+    forwardX: value.forwardX / length,
+    forwardZ: value.forwardZ / length,
+    range: value.range,
+    sequence: value.sequence,
+  };
+  if (value.skillId !== undefined) intent.skillId = value.skillId;
+  if (value.area !== undefined) intent.area = value.area;
+  if (value.targetActorId !== undefined) intent.targetActorId = value.targetActorId;
+  if (value.expectedGeneration !== undefined) intent.expectedGeneration = value.expectedGeneration;
+  if (value.expectedStateSequence !== undefined) intent.expectedStateSequence = value.expectedStateSequence;
+  if (value.actionId !== undefined) intent.actionId = value.actionId;
+  return Object.freeze(intent);
+}
+
+export function sanitizeMonsterIntents(value) {
+  if (!Array.isArray(value) || value.length > MAX_MONSTER_INTENTS) return null;
+  const seen = new Set();
+  const intents = [];
+  for (const candidate of value) {
+    const intent = sanitizeMonsterIntent(candidate);
+    if (!intent || seen.has(intent.intentId)) return null;
+    seen.add(intent.intentId);
+    intents.push(intent);
+  }
+  return Object.freeze(intents);
+}
+
+function sanitizeMonsterAuthority(value, actorGeneration) {
+  if (!isRecord(value) || value.authorityVersion !== MONSTER_AUTHORITY_VERSION
+    || value.generation !== actorGeneration || typeof value.serverTimeUtc !== 'string'
+    || value.serverTimeUtc.length > 80 || !Number.isFinite(Date.parse(value.serverTimeUtc))) return null;
+  const hp = value.hp;
+  if (!isRecord(hp) || !isFiniteNumber(hp.current) || !isFiniteNumber(hp.max)
+    || hp.max <= 0 || hp.current < 0 || hp.current > hp.max
+    || !Number.isSafeInteger(hp.revision) || hp.revision < 0 || hp.revision > MAX_WORLD_ROUTE_GENERATION
+    || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0 || value.resultRevision > MAX_WORLD_ROUTE_GENERATION
+    || !Number.isSafeInteger(value.actionSequence) || value.actionSequence < 0 || value.actionSequence > MAX_WORLD_ROUTE_GENERATION
+    || typeof value.hit !== 'boolean' || !isFiniteNumber(value.damage) || value.damage < 0 || value.damage > PRESENCE_COORDINATE_LIMIT
+    || typeof value.death !== 'boolean') return null;
+  const authority = {
+    authorityVersion: MONSTER_AUTHORITY_VERSION,
+    serverTimeUtc: value.serverTimeUtc,
+    generation: actorGeneration,
+    hp: Object.freeze({ current: hp.current, max: hp.max, revision: hp.revision }),
+    resultRevision: value.resultRevision,
+    actionSequence: value.actionSequence,
+    hit: value.hit,
+    damage: value.damage,
+    death: value.death,
+  };
+  if (value.actionId !== undefined) {
+    const actionId = sanitizeMonsterIntentId(value.actionId);
+    if (!actionId) return null;
+    authority.actionId = actionId;
+  }
+  if (value.despawnReason !== undefined) {
+    if (!MONSTER_DESPAWN_REASON_SET.has(value.despawnReason)) return null;
+    authority.despawnReason = value.despawnReason;
+  }
+  if (value.attack !== undefined) {
+    if (value.attack === null) authority.attack = null;
+    else {
+      const attack = value.attack;
+      if (!isRecord(attack)
+        || !['attackId', 'spawnId', 'monsterId', 'islandId', 'targetId', 'action'].every(name => sanitizeMonsterIntentId(attack[name]))
+        || !isFiniteNumber(attack.damage) || attack.damage < 0 || attack.damage > PRESENCE_COORDINATE_LIMIT
+        || !Number.isSafeInteger(attack.hitDelayMs) || attack.hitDelayMs < 0 || attack.hitDelayMs > 10000) return null;
+      authority.attack = Object.freeze({
+        attackId: attack.attackId,
+        spawnId: attack.spawnId,
+        monsterId: attack.monsterId,
+        islandId: attack.islandId,
+        targetId: attack.targetId,
+        action: attack.action,
+        damage: attack.damage,
+        hitDelayMs: attack.hitDelayMs,
+      });
+    }
+  }
+  return Object.freeze(authority);
 }
 
 export function sanitizePresentation(value) {
@@ -246,7 +365,7 @@ export function sanitizeActorPresentation(value) {
   return Object.freeze({ events: Object.freeze(events), projectiles: Object.freeze(projectiles) });
 }
 
-export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS } = {}) {
+export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS, allowAuthority = false } = {}) {
   if (!isRecord(value)) return null;
   const actorId = sanitizeMonsterInstanceId(value.actorId);
   const ownerId = value.ownerId === undefined ? null : sanitizeMonsterInstanceId(value.ownerId);
@@ -259,6 +378,8 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     || (expectedGeneration !== undefined && value.generation !== expectedGeneration)) return null;
   const pose = value.pose;
   if (!isRecord(pose) || !isFiniteNumber(pose.x) || !isFiniteNumber(pose.y) || !isFiniteNumber(pose.z) || !isFiniteNumber(pose.dir)) return null;
+  const legacyAuthorityKeys = ['authorityVersion', 'serverTimeUtc', 'hp', 'resultRevision', 'attackSequence', 'hit', 'damage', 'death'];
+  if (legacyAuthorityKeys.some(key => value[key] !== undefined)) return null;
   const actor = {
     actorId, kind: 'monster', ...(ownerId === null ? {} : { ownerId }), monsterType, zone, generation: value.generation, lifecycle: value.lifecycle,
     spawnSequence: value.spawnSequence, stateSequence: value.stateSequence,
@@ -271,6 +392,16 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
   };
+  if (value.despawnReason !== undefined) {
+    if (!MONSTER_DESPAWN_REASON_SET.has(value.despawnReason)) return null;
+    actor.despawnReason = value.despawnReason;
+  }
+  if (value.authority !== undefined && allowAuthority) {
+    if (expectedZone !== PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE) return null;
+    const authority = sanitizeMonsterAuthority(value.authority, value.generation);
+    if (!authority) return null;
+    actor.authority = authority;
+  }
   if (value.presentation !== undefined) {
     const presentation = sanitizeActorPresentation(value.presentation);
     if (presentation) actor.presentation = presentation;
@@ -408,7 +539,7 @@ export function sanitizeAnimation(value) {
   return Object.freeze(animation);
 }
 
-export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS } = {}) {
+export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS, allowAuthority = false, allowMonsterIntents = false } = {}) {
   if (!isRecord(value)) return null;
   const zone = safeZone(value.zone);
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
@@ -423,14 +554,24 @@ export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EV
   if (isFiniteNumber(value.y)) pose.y = clamp(value.y, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT);
   if (value.presentation !== undefined) { const presentation = sanitizePresentation(value.presentation); if (presentation) pose.presentation = presentation; }
   if (value.visual !== undefined) { const visual = sanitizeVisual(value.visual, { maxEvents: maxVisualEvents }); if (visual) pose.visual = visual; }
-  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents }); if (actors) pose.actors = actors; }
+  if (value.actors !== undefined) {
+    const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents, allowAuthority });
+    if (actors) pose.actors = actors;
+    else return null;
+  }
+  if (value.monsterIntents !== undefined) {
+    if (!allowMonsterIntents) return null;
+    const monsterIntents = sanitizeMonsterIntents(value.monsterIntents);
+    if (!monsterIntents) return null;
+    pose.monsterIntents = monsterIntents;
+  }
   return Object.freeze(pose);
 }
 
 export function buildWorldPosFrame(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return null;
   const dir = snapshot.dir === undefined ? 0 : snapshot.dir;
-  return sanitizeOnlineWorldPose({ ...snapshot, dir });
+  return sanitizeOnlineWorldPose({ ...snapshot, dir }, { allowMonsterIntents: true });
 }
 
 export function sanitizePresencePlayer(candidate, seen = null, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS } = {}) {
@@ -514,7 +655,10 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
     // Actor lifecycle generations belong to the actor stream and may advance
     // independently during reconnect/despawn/re-spawn. Never compare these
     // two domains or a valid actor snapshot is lost after a route reconnect.
-    actors = sanitizePresenceActors(payload.actors, zone, undefined, { maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS });
+    actors = sanitizePresenceActors(payload.actors, zone, undefined, {
+      maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS,
+      allowAuthority: zone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE,
+    });
     if (!actors) return null;
   }
   const centralAuthority = sanitizeCentralAuthority(payload.centralAuthority);
@@ -530,6 +674,132 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
 export function worldSnapshotPayload(message) {
   if (!message || message.type !== 'world-snapshot') return null;
   return sanitizeOnlineWorldSnapshot(message.payload);
+}
+
+function percentile(values, percentileRank) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentileRank) - 1));
+  return sorted[index];
+}
+
+export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamples = 256 } = {}) {
+  const intervals = [];
+  const actorSequences = new Map();
+  let lastReceivedAt = null;
+  let receivedSnapshots = 0;
+  let acceptedSnapshots = 0;
+  let rejectedSnapshots = 0;
+  let staleSnapshots = 0;
+  let duplicateActors = 0;
+  let staleActors = 0;
+  let actorSequenceGaps = 0;
+  let staleHpRevisions = 0;
+  let staleResultRevisions = 0;
+  let hpRevisionGaps = 0;
+  let resultRevisionGaps = 0;
+  let actorsOmitted = 0;
+  let actorsEmpty = 0;
+  let actorsPresent = 0;
+
+  const observeSnapshot = (snapshot, { accepted = true, receivedAt = now() } = {}) => {
+    const at = Number(receivedAt);
+    receivedSnapshots += 1;
+    if (Number.isFinite(at)) {
+      if (lastReceivedAt !== null && at >= lastReceivedAt) {
+        intervals.push(at - lastReceivedAt);
+        while (intervals.length > maxSamples) intervals.shift();
+      }
+      lastReceivedAt = at;
+    }
+    if (!accepted) {
+      rejectedSnapshots += 1;
+      staleSnapshots += 1;
+      return;
+    }
+    acceptedSnapshots += 1;
+    if (!isRecord(snapshot)) return;
+    if (!Object.prototype.hasOwnProperty.call(snapshot, 'actors')) actorsOmitted += 1;
+    else if (!Array.isArray(snapshot.actors) || snapshot.actors.length === 0) actorsEmpty += 1;
+    else actorsPresent += 1;
+    const seen = new Set();
+    for (const actor of Array.isArray(snapshot.actors) ? snapshot.actors : []) {
+      const actorId = typeof actor?.actorId === 'string' ? actor.actorId : null;
+      const generation = Number.isSafeInteger(actor?.generation) ? actor.generation : 0;
+      const stateSequence = Number.isSafeInteger(actor?.stateSequence) ? actor.stateSequence : 0;
+      if (!actorId) continue;
+      const key = `${snapshot.zone || ''}:${generation}:${actorId}`;
+      if (seen.has(key)) { duplicateActors += 1; continue; }
+      seen.add(key);
+      const previous = actorSequences.get(key);
+      if (previous !== undefined) {
+        if (stateSequence <= previous.stateSequence) staleActors += 1;
+        else if (stateSequence > previous.stateSequence + 1) actorSequenceGaps += stateSequence - previous.stateSequence - 1;
+      }
+      const hpRevision = Number.isSafeInteger(actor?.authority?.hp?.revision) ? actor.authority.hp.revision : null;
+      const resultRevision = Number.isSafeInteger(actor?.authority?.resultRevision) ? actor.authority.resultRevision : null;
+      if (previous && hpRevision !== null && previous.hpRevision !== null) {
+        if (hpRevision <= previous.hpRevision) staleHpRevisions += 1;
+        else if (hpRevision > previous.hpRevision + 1) hpRevisionGaps += hpRevision - previous.hpRevision - 1;
+      }
+      if (previous && resultRevision !== null && previous.resultRevision !== null) {
+        if (resultRevision <= previous.resultRevision) staleResultRevisions += 1;
+        else if (resultRevision > previous.resultRevision + 1) resultRevisionGaps += resultRevision - previous.resultRevision - 1;
+      }
+      actorSequences.set(key, {
+        stateSequence: Math.max(previous?.stateSequence ?? 0, stateSequence),
+        hpRevision: hpRevision === null ? previous?.hpRevision ?? null : Math.max(previous?.hpRevision ?? 0, hpRevision),
+        resultRevision: resultRevision === null ? previous?.resultRevision ?? null : Math.max(previous?.resultRevision ?? 0, resultRevision),
+      });
+    }
+  };
+
+  const recordRejected = ({ receivedAt = now() } = {}) => {
+    observeSnapshot(null, { accepted: false, receivedAt });
+  };
+  const reset = () => {
+    intervals.length = 0;
+    actorSequences.clear();
+    lastReceivedAt = null;
+    receivedSnapshots = 0;
+    acceptedSnapshots = 0;
+    rejectedSnapshots = 0;
+    staleSnapshots = 0;
+    duplicateActors = 0;
+    staleActors = 0;
+    actorSequenceGaps = 0;
+    staleHpRevisions = 0;
+    staleResultRevisions = 0;
+    hpRevisionGaps = 0;
+    resultRevisionGaps = 0;
+    actorsOmitted = 0;
+    actorsEmpty = 0;
+    actorsPresent = 0;
+  };
+  const diagnostics = () => Object.freeze({
+    receivedSnapshots,
+    acceptedSnapshots,
+    rejectedSnapshots,
+    staleSnapshots,
+    duplicateActors,
+    staleActors,
+    actorSequenceGaps,
+    staleHpRevisions,
+    staleResultRevisions,
+    hpRevisionGaps,
+    resultRevisionGaps,
+    actorsOmitted,
+    actorsEmpty,
+    actorsPresent,
+    sampleCount: intervals.length,
+    intervalMs: Object.freeze({
+      min: intervals.length ? Math.min(...intervals) : null,
+      max: intervals.length ? Math.max(...intervals) : null,
+      p95: percentile(intervals, .95),
+      p99: percentile(intervals, .99),
+    }),
+  });
+  return Object.freeze({ observeSnapshot, recordRejected, reset, diagnostics });
 }
 
 export function isRemoteWorldPlayer(item, selfId) {

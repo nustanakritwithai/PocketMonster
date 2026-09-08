@@ -45,3 +45,4 @@ assert.match(packageJson.scripts['test:v90:pirate-player'], /v90-pirate-save-bri
 assert.match(packageJson.scripts['test:v90:pirate-player'], /v90-pirate-save-integration\.mjs/);
 
 console.log('V9 Pirate save bootstrap and cache chain: PASS');
+

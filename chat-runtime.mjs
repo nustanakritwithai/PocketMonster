@@ -1,7 +1,7 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
 import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
-import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=4';
-import { createVisualEventQueue } from './world-presence-protocol.mjs?v=4';
+import { buildWorldPosFrame, createPresenceRouteDiagnostics, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=5';
+import { createVisualEventQueue } from './world-presence-protocol.mjs?v=5';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
 const existingRuntime = window[CHAT_RUNTIME_SLOT];
@@ -48,6 +48,7 @@ const state = {
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
 const worldVisualQueue = createVisualEventQueue();
+const worldPresenceDiagnostics = createPresenceRouteDiagnostics();
 let lastWorldZone = null;
 
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS = events => worldVisualQueue.push(events);
@@ -531,8 +532,12 @@ function connectSocket() {
         if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
           const payload = worldSnapshotPayload(message);
-          if (!payload) return;
+          if (!payload) {
+            worldPresenceDiagnostics.recordRejected();
+            return;
+          }
           const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
+          worldPresenceDiagnostics.observeSnapshot(filtered);
           const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(filtered);
           if (accepted !== false) setWorldConnected(true);
         }
@@ -701,6 +706,7 @@ const runtime = Object.freeze({
     chatSubscribers: chatSubscribers.size,
     chatRevision: chatStore.revision,
     chatRows: chatStore.rows.length,
+    worldPresence: worldPresenceDiagnostics.diagnostics(),
   }),
 });
 Object.defineProperty(window, CHAT_RUNTIME_SLOT, { value: runtime });

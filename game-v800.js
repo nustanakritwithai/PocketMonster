@@ -56,7 +56,7 @@ import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
-import { createWorldPresenceController } from './world-presence-v800.mjs?v=4';
+import { createWorldPresenceController } from './world-presence-v800.mjs?v=5';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
 import { evolutionContext, evaluateEvolution, listEligibleBranches, previewEvolution, previewWorkbookEvolution, commitEvolution, checkEvolutionBudget, resolveWorkbookEvolutionStage } from './evolution.mjs';
 import { eventContext, evaluateEventTriggers, rollEvent, getChoices, applyChoice, validateEventBalance } from './raising-events.mjs';
@@ -85,7 +85,7 @@ import {
   TYPE_EMOJI,
   typeEffectiveness,
 } from './type-catalog.mjs';
-import { loadCatalog } from './asset-presentation/catalog.mjs';
+import { loadCatalog, getAssetDef } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { resolveMonsterAssetId } from './asset-presentation/monster-ids.mjs';
 import { createLegacyHumanoidProvider } from './asset-presentation/providers/legacy-humanoid.mjs';
@@ -2521,7 +2521,9 @@ const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],sele
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
 window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
-const worldPresence=createWorldPresenceController({THREE,scene,getCamera:()=>camera,getZone:()=>state.currentZone});
+const worldPresence=createWorldPresenceController({THREE,scene,getCamera:()=>camera,getZone:()=>state.currentZone,
+  createActor:actor=>getAssetDef(actor.monsterType)?assets.spawn(actor.monsterType,{role:actor.actorId.startsWith('owned:')?'owned':'wild'}):null,
+});
 window.POCKETMONSTER_WORLD_PRESENCE=payload=>worldPresence.acceptSnapshot(payload);
 updateRemoteWorldMarkers=()=>worldPresence.update();
 }
@@ -2693,6 +2695,11 @@ function cancelArmedSummonCommand(){
   summonAimActive=false;
   return createHudCommandResult({ok:true,reason:'summon-aim-cancelled'});
 }
+function activatePartySlotCommand(slot){
+  const controller=window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;
+  if(controller?.activatePartySlot)return controller.activatePartySlot(slot);
+  return createHudCommandResult({ok:false,reason:'server-controller-unavailable'});
+}
 function openCharacterCommand(slot){
   if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
   const index=Number.isInteger(slot)?slot:state.selectedSlot;
@@ -2708,6 +2715,7 @@ window.POCKETMONSTER_PARTY_HUD=Object.freeze({
   armSummon:armSummonCommand,
   executeArmedSummon:executeArmedSummonCommand,
   cancelArmedSummon:cancelArmedSummonCommand,
+  activatePartySlot:activatePartySlotCommand,
   openCharacter:openCharacterCommand,
   reset:pocketPartyHud.reset,
 });

@@ -291,7 +291,7 @@ function assertRotation(actual, expected) {
 // Actual vendor-Three remote host/overlay regression: the source remote rig
 // owns the pose, while the Pocket overlay receives it without local __combat.
 {
-  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js');
   const kit = threeFromPirateFruitVendor(vendor);
   const probe = new kit.Group();
   const Quaternion = probe.quaternion.constructor;
@@ -403,7 +403,7 @@ function assertRotation(actual, expected) {
 // Actual hierarchical Three rig regression: flat target pivots must receive
 // the source ancestor-chain quaternion delta, not only the first matching node.
 {
-  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js');
   const kit = threeFromPirateFruitVendor(vendor);
   const probe = new kit.Group();
   const Quaternion = probe.quaternion.constructor;
@@ -534,7 +534,7 @@ function assertRotation(actual, expected) {
 
 // ใช้ขอบเขต geometry จริงตรวจว่าท่าล้มพ้นพื้น โดยไม่ขยับ actor/source ของเกม
 {
-  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+  const vendor = await import('../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js');
   const kit = threeFromPirateFruitVendor(vendor);
   const actor = new kit.Group(); actor.position.set(100, 7, 100); actor.rotation.y = 0.7;
   const source = new kit.Group(); source.name = 'player-rig:root'; actor.add(source);

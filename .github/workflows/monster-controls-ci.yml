@@ -1,0 +1,59 @@
+name: Monster controls integration
+
+on:
+  pull_request:
+    paths:
+      - '*monster*control*.mjs'
+      - 'monster-command-adapter.mjs'
+      - 'monster-command-http-provider-v900.mjs'
+      - 'world-presence-v800.mjs'
+      - 'unified-mmorpg-hud-v900.mjs'
+      - 'unified-mobile-controls-v900.mjs'
+      - 'online-world-shell-v900.mjs'
+      - 'pirate-fruit-offline/**'
+      - 'patch-manifest.json'
+      - 'tests/*monster*control*.mjs'
+      - 'tests/monster-command-adapter.mjs'
+      - '.github/workflows/monster-controls-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: สร้างแพตช์รวมบน runner
+        run: |
+          node scripts/build-github-pages.mjs --write-root-manifest
+          node tests/v91-combat-artifact.mjs
+      - name: ตรวจคำสั่งมอนสเตอร์
+        run: node tests/monster-command-adapter.mjs
+      - name: ตรวจการเชื่อมแผงควบคุม
+        run: |
+          node tests/v90-monster-control-controller.mjs
+          node tests/v90-monster-command-http-provider.mjs
+          node tests/v90-unified-mmorpg-hud.mjs
+          node tests/v90-unified-mobile-controls.mjs
+          node tests/v90-unified-roster-stack.mjs
+          node tests/v90-unified-hud-world-lifecycle.mjs
+          node tests/v90-remote-monster-combat-parity.mjs
+      - name: ตรวจระบบ Client ที่เกี่ยวข้อง
+        run: npm run check
+      - name: ตรวจ artifact ทุกโลก
+        run: node tests/v90-unified-pages-artifact.mjs
+      - name: เก็บแพตช์สำหรับตรวจและติดตั้ง
+        uses: actions/upload-artifact@v4
+        with:
+          name: monster-controls-client-candidate
+          path: |
+            patch-manifest.json
+            dist-pages/
+          if-no-files-found: error
+          retention-days: 14

@@ -5,7 +5,7 @@ import {
   currentSelfPresenceId,
   isRemoteWorldPlayer,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=4';
+} from './world-presence-protocol.mjs?v=5';
 
 const DEFAULT_REMOTE_ANIMATION = Object.freeze({
   combatState: 'idle',
@@ -275,7 +275,9 @@ export function createWorldPresenceController({
     const seen = new Set();
     for (const item of incoming) {
       const id = String(item.actorId);
-      if (selfId != null && selfId !== '' && String(item.ownerId || '').toLowerCase() === String(selfId).toLowerCase()) continue;
+      // มอนสเตอร์ที่เซิร์ฟเวอร์สร้างต้องแสดงให้เจ้าของเห็นด้วย ส่วน actor เดิมยังมีตัว local อยู่
+      const serverOwned = id.startsWith('owned:') && item.authority != null;
+      if (!serverOwned && selfId != null && selfId !== '' && String(item.ownerId || '').toLowerCase() === String(selfId).toLowerCase()) continue;
       seen.add(id);
       let actor = remoteActors.get(id);
       const generation = Number.isInteger(item.generation) ? item.generation : 0;
@@ -569,6 +571,7 @@ export function publishWorldState({ getZone, getPosition, getDir, getPresentatio
       animation: pos?.animation,
       presentation: getPresentation?.() ?? pos?.presentation,
       visual: getVisual?.() ?? pos?.visual,
+      monsterIntents: pos?.monsterIntents,
       ...((getAllowActors?.() ?? allowActors) && (getActors || pos?.actors)
         ? { actors: getActors?.() ?? pos?.actors }
         : {}),

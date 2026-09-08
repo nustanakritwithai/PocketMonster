@@ -62,7 +62,11 @@ function flushPendingAudio() {
 export function resumeAudio() {
   if (!ctx) return Promise.resolve(false);
   if (ctx.state === 'running') return Promise.resolve(true);
-  return Promise.resolve(ctx.resume()).then(() => ctx.state === 'running').catch(() => false);
+  return Promise.resolve(ctx.resume()).then(() => {
+    const running = ctx.state === 'running';
+    if (running) flushPendingAudio();
+    return running;
+  }).catch(() => false);
 }
 
 export function setVolume(v) {
@@ -609,7 +613,14 @@ export function playBGM(zone) {
   const pattern = BGM_PATTERNS[bgmKey];
   if (!pattern) return;
   pendingBgmZone = null;
-  if (bgmActiveZone === bgmKey && bgmTimer) return; // same zone, no-op
+  if (bgmActiveZone === bgmKey && bgmTimer) {
+    // A stop may already have scheduled this bus to fade out. Cancel that
+    // stale ramp when the same zone is requested again.
+    bgmBus.gain.cancelScheduledValues(ctx.currentTime);
+    bgmBus.gain.setValueAtTime(bgmBus.gain.value, ctx.currentTime);
+    bgmBus.gain.linearRampToValueAtTime(1, ctx.currentTime + BGM_CROSSFADE);
+    return;
+  }
 
   const t = ctx.currentTime;
   // Fade existing bus out (crossfade overlap), then schedule fade-in.

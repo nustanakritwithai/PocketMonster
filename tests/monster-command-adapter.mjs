@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import { createMonsterCommandAdapter, MONSTER_COMMAND_CONTRACT, sanitizeMonsterCommand } from '../monster-command-adapter.mjs';
+
+const base = { contract: MONSTER_COMMAND_CONTRACT, commandId: 'cmd-1', instanceId: 'monster-1', zone: 'pirate-fruit' };
+assert.equal(sanitizeMonsterCommand({ ...base, kind: 'world-monster-hit' }), null, 'ambient hit is not an owned command');
+assert.equal(sanitizeMonsterCommand({ ...base, kind: 'skill', skillId: 'Flame-Bite' }).skillId, 'Flame-Bite');
+assert.equal(sanitizeMonsterCommand({ ...base, kind: 'skill' }), null, 'skill requires skillId');
+assert.equal((await createMonsterCommandAdapter().summon({ ...base, targetPoint: { x: 1, y: 0, z: 2 }, contract: undefined })).code, 'SERVER_INGRESS_UNAVAILABLE', 'wrapper supplies contract');
+assert.equal(sanitizeMonsterCommand({ ...base, kind: 'summon' }), null, 'summon requires a target point');
+
+const sent = [];
+const adapter = createMonsterCommandAdapter({ getZone: () => 'pirate-fruit', send: async command => { sent.push(command); return { ok: true, accepted: true, commandId: command.commandId }; } });
+const first = adapter.summon({ ...base, targetPoint: { x: 1, y: 0, z: 2 } });
+const second = adapter.summon({ ...base, targetPoint: { x: 1, y: 0, z: 2 } });
+assert.equal(first, second, 'same command id is deduplicated while pending');
+assert.deepEqual(await first, { ok: true, accepted: true, commandId: 'cmd-1' });
+assert.equal(sent.length, 1, 'one transport call for duplicate summon');
+assert.equal((await adapter.summon({ ...base, targetPoint: { x: 2, y: 0, z: 3 } })).code, 'COMMAND_ID_REUSE', 'same id with changed payload is rejected');
+const skill = await adapter.skill({ ...base, commandId: 'cmd-2', skillId: 'Flame-Bite', targetActorId: 'actor-2' });
+assert.equal(skill.ok, true);
+assert.equal(sent[1].instanceId, 'monster-1');
+assert.equal(sent[1].skillId, 'Flame-Bite');
+const mismatch = createMonsterCommandAdapter({ send: async () => ({ ok: true, commandId: 'other' }) });
+assert.equal((await mismatch.skill({ ...base, commandId: 'cmd-mismatch', skillId: 'Flame-Bite' })).code, 'INVALID_SERVER_RESULT', 'server cannot acknowledge another command');
+let delayedResolve;
+const delayed = createMonsterCommandAdapter({ getZone: () => 'pirate-fruit', send: () => new Promise(resolve => { delayedResolve = resolve; }) });
+const pending = delayed.summon({ ...base, commandId: 'cmd-delayed', targetPoint: { x: 1, y: 0, z: 2 } });
+delayed.clearScene('pirate-fruit');
+await Promise.resolve();
+assert.equal(delayedResolve, undefined, 'clear before send prevents ingress call');
+assert.equal((await pending).code, 'STALE_SCENE', 'scene clear invalidates late acknowledgement');
+let fail = true;
+const retry = createMonsterCommandAdapter({ send: async command => { if (fail) { fail = false; throw new Error('private'); } return { ok: true, commandId: command.commandId }; } });
+assert.equal((await retry.skill({ ...base, commandId: 'cmd-retry', skillId: 'Flame-Bite' })).code, 'TRANSPORT_ERROR');
+assert.equal((await retry.skill({ ...base, commandId: 'cmd-retry', skillId: 'Flame-Bite' })).ok, true, 'transport error does not poison retry');
+let zone = 'pirate-fruit'; let oldResolve; let oldReject;
+const zoneAdapter = createMonsterCommandAdapter({ getZone: () => zone, timeoutMs: 50, send: () => new Promise((resolve, reject) => { oldResolve = resolve; oldReject = reject; }) });
+const old = zoneAdapter.skill({ ...base, commandId: 'cmd-zone', skillId: 'Flame-Bite' }); await Promise.resolve(); zone = 'other-zone';
+oldResolve?.({ ok: true, commandId: 'cmd-zone' });
+assert.equal((await old).code, 'STALE_SCENE', 'zone change invalidates request without explicit clear');
+assert.equal((await zoneAdapter.skill({ ...base, commandId: 'cmd-zone', skillId: 'Flame-Bite', zone: 'other-zone' })).code, 'TRANSPORT_TIMEOUT', 'new same id is independent after stale old request');
+oldReject?.(new Error('late'));
+const capped = createMonsterCommandAdapter({ maxPending: 1, timeoutMs: 5, send: () => new Promise(() => {}) });
+const stuck = capped.skill({ ...base, commandId: 'cmd-stuck', skillId: 'Flame-Bite' });
+assert.equal((await capped.skill({ ...base, commandId: 'cmd-cap', skillId: 'Flame-Bite' })).code, 'PENDING_CAPACITY');
+assert.equal((await stuck).code, 'TRANSPORT_TIMEOUT');
+let lateResolve; let firstLateResolve; let pollutionCalls = 0; const pollution = createMonsterCommandAdapter({ timeoutMs: 5, send: () => new Promise(resolve => { pollutionCalls += 1; if (pollutionCalls === 1) firstLateResolve = resolve; else lateResolve = resolve; }) });
+const timed = pollution.skill({ ...base, commandId: 'cmd-pollute', skillId: 'Flame-Bite' });
+assert.equal((await timed).code, 'TRANSPORT_TIMEOUT');
+const retryAfterTimeout = pollution.skill({ ...base, commandId: 'cmd-pollute', skillId: 'Flame-Bite' });
+await Promise.resolve(); firstLateResolve?.({ ok: true, commandId: 'cmd-pollute', accepted: true });
+assert.equal((await retryAfterTimeout).code, 'TRANSPORT_TIMEOUT', 'late result cannot poison retry cache');
+let immediateResolve; const immediate = createMonsterCommandAdapter({ send: () => new Promise(resolve => { immediateResolve = resolve; }) });
+const immediatePending = immediate.skill({ ...base, commandId: 'cmd-immediate', skillId: 'Flame-Bite' }); immediate.clearScene();
+assert.equal((await immediatePending).code, 'STALE_SCENE', 'clearScene resolves pending immediately');
+assert.equal(immediateResolve, undefined, 'immediate clear prevents send');
+assert.equal((await adapter.skill({ ...base, commandId: 'cmd-3', skillId: 'Flame-Bite', zone: 'other-zone' })).code, 'STALE_SCENE');
+console.log('Owned monster command adapter contract: PASS');
+
+for (const fields of [{ accepted: 'true' }, { code: { private: 'data' } }, { code: 'unbounded internal error' }]) {
+  const invalidAck = createMonsterCommandAdapter({ send: async command => ({ ok: true, commandId: command.commandId, ...fields }) });
+  assert.equal((await invalidAck.skill({ ...base, skillId: 'Flame-Bite' })).code, 'INVALID_SERVER_RESULT');
+}
+// Invalid timeout configuration must still allow immediate lifecycle cancellation.
+for (const timeoutMs of [0, NaN, Infinity]) {
+  const cancellable = createMonsterCommandAdapter({ timeoutMs, send: () => new Promise(() => {}) });
+  const result = cancellable.skill({ ...base, skillId: 'Flame-Bite' });
+  await Promise.resolve();
+  cancellable.clearScene();
+  assert.equal((await result).code, 'STALE_SCENE');
+  assert.deepEqual(cancellable.pendingCommandIds(), []);
+}
+console.log('Owned monster ACK validation and cancellation: PASS');

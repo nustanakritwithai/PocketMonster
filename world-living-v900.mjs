@@ -5,7 +5,7 @@ import { getAssetDef, loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
 import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
-import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=4';
+import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=5';
 
 export const LIVING_WORLD_VERSION = '9.0.1-living-world-portal';
 export const LIVING_WORLD_ID = 'living-world';
@@ -331,6 +331,7 @@ if (typeof window !== 'undefined') {
     }
   };
   const monsterAssetId = actor => {
+    if (getAssetDef(actor?.monsterType)) return actor.monsterType;
     const type = String(actor?.monsterType || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const candidates = [
       `monster.${type}.${type}.bighead.v1`,

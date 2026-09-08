@@ -7,7 +7,7 @@ import {
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
   centralAuthorityOwnsTransportZone,
-} from './world-presence-protocol.mjs?v=4';
+} from './world-presence-protocol.mjs?v=5';
 
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
 export const PIRATE_LOCAL_PRESENCE_MESSAGE = 'pocketmonster:pirate-presence-v1';
@@ -46,9 +46,14 @@ export function sanitizePirateLocalPresence(message) {
     if (visual) pose.visual = visual;
   }
   if (message.actors !== undefined) {
-    const actorPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE });
-    if (!actorPose || actorPose.actors === undefined) return null;
-    pose.actors = actorPose.actors;
+    const actorPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE }, { maxVisualEvents: 32, allowAuthority: false, allowMonsterIntents: true });
+    // Invalid optional actor authority must not discard a valid player pose.
+    if (actorPose?.actors !== undefined) pose.actors = actorPose.actors;
+  }
+  if (message.monsterIntents !== undefined) {
+    const intentPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE }, { allowMonsterIntents: true });
+    if (!intentPose || intentPose.monsterIntents === undefined) return null;
+    pose.monsterIntents = intentPose.monsterIntents;
   }
   return Object.freeze(pose);
 }

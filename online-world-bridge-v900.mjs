@@ -1,7 +1,7 @@
 import {
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=4';
+} from './world-presence-protocol.mjs?v=5';
 
 export const ONLINE_WORLD_SHELL_KIND = 'monsterlife-online-world-shell-v1';
 export const ONLINE_WORLD_SCENE_KIND = 'monsterlife-online-world-scene-v1';
@@ -11,7 +11,7 @@ export {
   MAX_SNAPSHOT_CANDIDATES,
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=4';
+} from './world-presence-protocol.mjs?v=5';
 
 export function isHostedOnlineWorldScene(windowLike = globalThis.window) {
   try {

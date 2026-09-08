@@ -578,6 +578,27 @@ export function createUnifiedMobileControls({
     },
   });
 
+  let monsterController = null;
+  let unsubscribeMonster = null;
+  const monsterPointers = new Set();
+  const monsterSkillPanel = () => monsterController?.snapshot?.()?.controlPanel?.mode === 'monster';
+  const paintMonsterSkills = () => {
+    if (!monsterSkillPanel()) return;
+    const skills = monsterController?.skills?.() || [];
+    for (let index = 0; index < 4; index += 1) {
+      const button = documentLike.getElementById(`skill${index + 1}Btn`);
+      if (!button) continue;
+      const skill = skills[index];
+      button.setAttribute?.('data-pirate-icon', skill ? `S${index + 1}` : '—');
+      button.setAttribute?.('aria-label', skill?.label || skill?.skillId || 'ช่องสกิลว่าง');
+      button.setAttribute?.('aria-disabled', String(!skill || Boolean(skill.disabledReason) || skill.cooldownRemaining > 0));
+    }
+  };
+  const stopMonsterEvent = event => {
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
+  };
   // The visible controls live in the parent document, while Pirate's audio
   // graph lives in its sandboxed iframe. Unlock both graphs from the same
   // real touch gesture before the action handler runs.
@@ -595,6 +616,13 @@ export function createUnifiedMobileControls({
     const button = documentLike.getElementById(buttonId);
     if (!button) continue;
     button.addEventListener('pointerdown', event => {
+      if (/^skill[1-4]Btn$/.test(buttonId) && monsterSkillPanel()) {
+        stopMonsterEvent(event);
+        if (monsterPointers.has(event.pointerId)) return;
+        monsterPointers.add(event.pointerId);
+        void monsterController.useSkill(Number(buttonId[5]) - 1);
+        return;
+      }
       const action = actionForButton(buttonId);
       if (!action || !stopPirateAction(event) || actionPointers.has(event.pointerId)) return;
       actionPointers.set(event.pointerId, { action, button });
@@ -602,6 +630,7 @@ export function createUnifiedMobileControls({
       activeAdapter()?.action?.({ action, phase: 'start', pointerId: event.pointerId });
     }, { capture: true, passive: false });
     const finish = event => {
+      if (monsterPointers.delete(event.pointerId)) { stopMonsterEvent(event); return; }
       const active = actionPointers.get(event.pointerId);
       if (!active || active.button !== button) return;
       stopPirateAction(event);
@@ -616,9 +645,16 @@ export function createUnifiedMobileControls({
     button.addEventListener('pointerup', finish, { capture: true, passive: false });
     button.addEventListener('pointercancel', finish, { capture: true, passive: false });
     button.addEventListener('lostpointercapture', finish, { capture: true, passive: false });
+    button.addEventListener('click', event => {
+      if (!/^skill[1-4]Btn$/.test(buttonId) || !monsterSkillPanel()) return;
+      stopMonsterEvent(event);
+      // Keyboard-generated clicks have no preceding pointerdown.
+      if (event.detail === 0) void monsterController.useSkill(Number(buttonId[5]) - 1);
+    }, { capture: true });
   }
 
   const reset = (reason = 'reset') => {
+    monsterPointers.clear();
     pointerInput.reset(reason);
     const pendingActions = [...actionPointers];
     actionPointers.clear();
@@ -671,6 +707,16 @@ export function createUnifiedMobileControls({
 
   const api = Object.freeze({
     kind: UNIFIED_MOBILE_CONTROLS_KIND,
+    setMonsterController(controller) {
+      unsubscribeMonster?.();
+      monsterController = controller || null;
+      unsubscribeMonster = monsterController?.subscribe?.(() => {
+        setControlMode(activeWorldId);
+        paintMonsterSkills();
+      }) || null;
+      setControlMode(activeWorldId);
+      paintMonsterSkills();
+    },
     registerAdapter(worldId, adapter) {
       if (typeof worldId !== 'string' || !adapter || typeof adapter !== 'object') return false;
       adapters.set(worldId, adapter);

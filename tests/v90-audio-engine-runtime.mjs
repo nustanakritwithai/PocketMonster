@@ -80,6 +80,13 @@ audio.playBGM('poison-marsh');
 runTimeouts();
 assert.equal(audio.getCurrentBGM(), 'cave');
 
+// Re-requesting the same zone cancels a pending fade-out as well.
+audio.playBGM('hub');
+audio.stopBGM();
+audio.playBGM('hub');
+runTimeouts();
+assert.equal(audio.getCurrentBGM(), 'ranch');
+
 // Rejected resume is contained and leaves the queued request available for retry.
 const rejected = await import(`../audio-engine.mjs?reject=${Date.now()}`);
 rejected.playBGM('storm-field');
@@ -88,7 +95,7 @@ rejected.initAudio();
 await flushMicrotasks();
 assert.equal(rejected.getCurrentBGM(), null);
 FakeAudioContext.rejectResume = false;
-rejected.initAudio();
+await rejected.resumeAudio();
 await flushMicrotasks();
 assert.equal(rejected.getCurrentBGM(), 'grassland');
 

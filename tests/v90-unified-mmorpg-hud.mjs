@@ -298,11 +298,11 @@ function bootWorld(hudOptions = {}) {
   assert.equal(documentLike.getElementById('mmorpgQuestPanel'), null, 'no DOM resurrects after teardown');
 }
 
-// ---------- 5. Overlay monster slots paint and arm summon ----------
+// ---------- 5. Overlay monster slots paint and activate/toggle summon ----------
 {
   const { hud, documentLike, windowLike } = bootWorld();
-  windowLike.POCKETMONSTER_PARTY_HUD.armSummon = slot => {
-    windowLike.lastPartyCommand = ['arm', slot];
+  windowLike.POCKETMONSTER_PARTY_HUD.activatePartySlot = slot => {
+    windowLike.lastPartyCommand = ['activate', slot];
     return { ok: true, reason: 'summon-aimed', message: '' };
   };
   for (const id of ['monsterSlot1Btn', 'monsterSlot2Btn', 'monsterSlot3Btn']) {
@@ -314,8 +314,8 @@ function bootWorld(hudOptions = {}) {
   const slot1 = documentLike.getElementById('monsterSlot1Btn');
   assert.equal(slot1.textContent, 'M', 'overlay slot paints the owned monster glyph');
   assert.equal(slot1.getAttribute('data-pirate-icon'), 'M', 'pirate icon follows the owned glyph');
-  slot1.dispatch('pointerdown', { preventDefault() {}, stopPropagation() {} });
-  assert.deepEqual(windowLike.lastPartyCommand, ['arm', 0], 'overlay press arms the Pocket summon for that slot');
+  slot1.dispatch('click', { preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(windowLike.lastPartyCommand, ['activate', 0], 'overlay click activates summon or toggles its control panel');
   hud.unmount();
 }
 

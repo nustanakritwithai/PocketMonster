@@ -6,7 +6,7 @@ import {
   PIRATE_HUD_INIT_MESSAGE,
   createPirateHudTelemetryCollector,
 } from './pirate-hud-telemetry-v900.mjs?v=2';
-import { publishWorldState, registerExternalPose } from './world-presence-v800.mjs?v=4';
+import { publishWorldState, registerExternalPose } from './world-presence-v800.mjs?v=5';
 import {
   PIRATE_PRESENCE_ZONE,
   createPiratePresenceStatusMessage,
@@ -15,7 +15,7 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
   pirateCentralAuthorityOwnsZone,
-} from './pirate-presence-bridge-v900.mjs?v=5';
+} from './pirate-presence-bridge-v900.mjs?v=6';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=11';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
@@ -125,6 +125,10 @@ function bindPocketMonsterLink(frame) {
   let piratePose = null;
   let latestPresenceSnapshot = null;
   let latestPresenceAt = 0;
+  let presenceForwardCount = 0;
+  let lastPresenceForwardAt = 0;
+  let lastPresenceForwardGeneration = null;
+  let lastPresenceForwardActorCount = null;
   let centralAuthorityCapability = null;
   let frameReady = false;
   let studioPackagePromise = null;
@@ -173,6 +177,14 @@ function bindPocketMonsterLink(frame) {
     hudTelemetry.reset({ frameWindow: frame.contentWindow, frameGeneration, reason });
     frame.contentWindow?.postMessage({ type: PIRATE_HUD_INIT_MESSAGE, frameGeneration }, '*');
   };
+  const notePresenceForward = snapshot => {
+    presenceForwardCount += 1;
+    lastPresenceForwardAt = Date.now();
+    lastPresenceForwardGeneration = Number.isSafeInteger(snapshot?.generation) ? snapshot.generation : null;
+    lastPresenceForwardActorCount = Object.prototype.hasOwnProperty.call(snapshot || {}, 'actors')
+      ? (Array.isArray(snapshot.actors) ? snapshot.actors.length : null)
+      : null;
+  };
   const forwardPresence = snapshot => {
     if (!frameReady) {
       if (snapshot?.zone === PIRATE_PRESENCE_ZONE && snapshot?.players?.some(player => player?.visual?.events?.length)) {
@@ -182,6 +194,7 @@ function bindPocketMonsterLink(frame) {
       return;
     }
     frame.contentWindow?.postMessage(createPirateSnapshotMessage(snapshot), '*');
+    notePresenceForward(snapshot);
   };
   const forwardPresenceStatus = connected => {
     frame.contentWindow?.postMessage(createPiratePresenceStatusMessage(connected), '*');
@@ -190,6 +203,10 @@ function bindPocketMonsterLink(frame) {
     pending: pendingPresenceSnapshots.length,
     dropped: pendingPresenceDropped,
     frameReady,
+    forwarded: presenceForwardCount,
+    lastForwardAt: lastPresenceForwardAt,
+    lastForwardGeneration: lastPresenceForwardGeneration,
+    lastForwardActorCount: lastPresenceForwardActorCount,
     input: inputTransport.diagnostics(),
     studioState,
   });
@@ -207,6 +224,7 @@ function bindPocketMonsterLink(frame) {
       const aged = advancePirateSnapshotVisualAge(pending.snapshot, now - pending.queuedAt);
       if (aged.players.some(player => player?.visual?.events?.length || player?.visual?.projectiles?.length)) {
         frame.contentWindow?.postMessage(createPirateSnapshotMessage(aged), '*');
+        notePresenceForward(aged);
       }
     }
     try { frame.contentWindow?.focus?.(); } catch {}
@@ -405,3 +423,4 @@ if (startup) {
 if (document.body?.dataset?.controlPanel === 'throw') {
   await ensurePocketAnimalControl();
 }
+
