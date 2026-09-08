@@ -8,6 +8,7 @@ import {
   PIRATE_FRUIT_MONSTER_VISUALS,
   applyPirateFruitActionTransition,
   applyPirateFruitLocomotionTransition,
+  applyPirateFruitStudioPresentation,
   classifyPirateFruitNode,
   hidePirateFruitOriginalMeshes,
   hookPirateFruitRenderer,
@@ -17,6 +18,7 @@ import {
   pocketMonsterIdFor,
   resolvePirateVisualHost,
   shouldPreservePirateSubtree,
+  selectPirateFruitStudioAction,
   threeFromPirateFruitVendor,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
@@ -190,6 +192,33 @@ assert.deepEqual(
   locomotionCalls('walk', { locomotion: 'walk', action: 'skill', actionId: 'skill:1' }),
   { calls: [], next: 'skill' },
   'combat playback remains owned by the dead-safe action transition',
+);
+
+assert.equal(selectPirateFruitStudioAction({ action: 'attack-melee', locomotion: 'run' }), 'attack', 'Studio maps both attack sources through canonical attack');
+assert.equal(selectPirateFruitStudioAction({ action: 'skill', locomotion: 'run' }), 'skill', 'skill outranks locomotion');
+assert.equal(selectPirateFruitStudioAction({ action: 'hurt', locomotion: 'run' }), 'hurt', 'hurt outranks skill/attack presentation');
+assert.equal(selectPirateFruitStudioAction({ action: 'dead', locomotion: 'run' }), 'dead', 'dead is the terminal highest-priority Studio pose');
+assert.equal(selectPirateFruitStudioAction({ action: 'skill', locomotion: 'walk' }, { action: 'skill', finished: true }), 'walk', 'completed non-loop Studio action returns to locomotion');
+assert.equal(selectPirateFruitStudioAction({ action: 'dead', locomotion: 'walk' }, { action: 'dead', finished: true }), 'dead', 'completed death pose remains dead');
+function studioPresentationCalls(previous, sample, animationState = null) {
+  const calls = [];
+  const handle = { animationState, play: (...args) => calls.push(args) };
+  return { calls, next: applyPirateFruitStudioPresentation(handle, previous, sample) };
+}
+assert.deepEqual(
+  studioPresentationCalls(null, { action: null, locomotion: 'idle' }),
+  { calls: [['idle', { restart: true }]], next: { action: 'idle', actionId: null, combatAction: null } },
+  'Studio selects its canonical default pose on the first tick',
+);
+assert.deepEqual(
+  studioPresentationCalls({ action: 'idle', actionId: null }, { action: 'attack-melee', actionId: 'swing:1', locomotion: 'run' }),
+  { calls: [['attack', { restart: true }]], next: { action: 'attack', actionId: 'swing:1', combatAction: 'attack' } },
+  'a new attack action restarts its authored canonical clip',
+);
+assert.deepEqual(
+  studioPresentationCalls({ action: 'attack', actionId: 'swing:1' }, { action: 'attack-melee', actionId: 'swing:1', locomotion: 'walk' }, { action: 'attack', finished: true }),
+  { calls: [['walk', { restart: true }]], next: { action: 'walk', actionId: 'swing:1', combatAction: 'attack' } },
+  'a completed action returns to walk even before the stale combat signal clears',
 );
 assert.deepEqual(
   actionCalls('dead', { action: 'dead', actionId: null, duration: 1 }),
