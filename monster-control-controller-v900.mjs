@@ -1,43 +1,21 @@
-/** Server-owned monster control state for the parent MMORPG HUD.
- * The controller never mutates a local monster or runs combat. `transport.send`
- * must return the server confirmation before state is advanced. */
+/** Parent-side state machine for server owned-monster controls. */
 export const MONSTER_COMMAND_CONTRACT = 'owned-monster-command/v1';
-
-export function createMonsterControlController({ commands, getParty = () => null, getZone = () => '', getConfirmedActors = () => [] } = {}) {
-  if (!commands || typeof commands.summon !== 'function' || typeof commands.skill !== 'function') throw new TypeError('monster control requires summon and skill commands');
-  let state = Object.freeze({ mode: 'character', slot: null, instanceId: null, revision: 0, available: false, slots: Object.freeze([]) });
-  const listeners = new Set();
-  const emit = () => { for (const listener of listeners) { try { listener(state); } catch {} } return state; };
-  const snapshot = () => Object.freeze({ ...state, available: getParty()?.available === true, slots: getParty()?.slots || state.slots });
-  const subscribe = listener => { if (typeof listener !== 'function') return () => {}; listeners.add(listener); listener(state); return () => listeners.delete(listener); };
-  const slotOf = slot => {
-    const entry = getParty()?.slots?.[slot];
-    return entry?.available === true && typeof entry.instanceId === 'string' ? entry : null;
-  };
-  const confirmed = (instanceId, slotIndex) => getConfirmedActors()?.some(actor => actor?.instanceId === instanceId && (actor.slot === undefined || actor.slot === slotIndex));
-  return Object.freeze({
-    snapshot, subscribe,
-    async activateSlot(slotIndex) {
-      const slot = slotOf(slotIndex);
-      if (!slot) return { ok: false, reason: 'unavailable' };
-      if (state.instanceId === slot.instanceId && state.slot === slotIndex) {
-        state = Object.freeze({ ...state, mode: state.mode === 'monster' ? 'character' : 'monster', revision: state.revision + 1 });
-        emit();
-        return { ok: true, reason: 'panel-toggled', mode: state.mode };
-      }
-      if (state.instanceId && state.instanceId !== slot.instanceId) return { ok: false, reason: 'active-monster-recall-required' };
-      const accepted = await Promise.resolve(commands.summon({ contract: MONSTER_COMMAND_CONTRACT, kind: 'summon', instanceId: slot.instanceId, slot: slot.slot, zone: getZone() }));
-      if (!accepted?.ok || !confirmed(slot.instanceId, slot.slot)) return { ok: false, reason: accepted?.reason || 'server-not-confirmed' };
-      state = Object.freeze({ ...state, mode: 'character', slot: slotIndex, instanceId: slot.instanceId, revision: state.revision + 1 });
-      emit();
-      return { ok: true, reason: 'summon-confirmed', mode: state.mode, slot: slotIndex, instanceId: slot.instanceId };
-    },
-    async useSkill(skillIndex, target = {}) {
-      if (state.mode !== 'monster' || !state.instanceId) return { ok: false, reason: 'character-panel-active' };
-      const slot = slotOf(state.slot);
-      if (!slot) return { ok: false, reason: 'unavailable' };
-      const result = await Promise.resolve(commands.skill({ contract: MONSTER_COMMAND_CONTRACT, kind: 'skill', instanceId: slot.instanceId, slot: slot.slot, zone: getZone(), skillIndex, skillId: target.skillId, targetActorId: target.targetActorId, targetPoint: target.targetPoint }));
-      return result?.ok ? result : { ok: false, reason: result?.reason || 'server-not-confirmed' };
-    },
-  });
+function commandId(){return globalThis.crypto?.randomUUID?.()||`monster-${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+function active(actors,id,zone){return actors?.some(actor=>actor?.active===true&&actor.instanceId===id&&actor.zone===zone);}
+export function createMonsterControlController({commands,getParty=()=>null,getZone=()=>'',getAim=()=>null,getSkills=()=>[],getConfirmedActors=()=>[]}={}){
+  if(!commands||typeof commands.summon!=='function'||typeof commands.skill!=='function')throw new TypeError('monster control requires Luna3 commands');
+  let epoch=0,pending=null;
+  let state=Object.freeze({mode:'character',slot:null,instanceId:null,revision:0,available:false,slots:Object.freeze([]),controlPanel:Object.freeze({mode:'character',slot:null,instanceId:''})});
+  const listeners=new Set(),party=()=>getParty?.()||null,zone=()=>{const z=getZone?.();return typeof z==='string'&&/^[a-z0-9][a-z0-9-]{0,63}$/.test(z)?z:'';};
+  const snapshot=()=>{const p=party();return Object.freeze({...state,available:p?.available===true,slots:p?.slots||state.slots});};
+  const emit=()=>{const next=snapshot();for(const listener of listeners){try{listener(next);}catch{}}return next;};
+  const subscribe=listener=>{if(typeof listener!=='function')return()=>{};listeners.add(listener);listener(snapshot());return()=>listeners.delete(listener);};
+  const slotOf=i=>{const p=party(),s=p?.slots?.[i];return s?.available===true?s:null;};
+  const panel=(mode,slot,instanceId,reason)=>{state=Object.freeze({...state,mode,slot,instanceId,revision:state.revision+1,controlPanel:Object.freeze({mode,slot,instanceId:instanceId||'',reason})});return emit();};
+  const sync=()=>{const z=zone();if(state.instanceId&&!active(getConfirmedActors?.(),state.instanceId,z)){pending=null;return panel('character',null,null,'actor-inactive');}return snapshot();};
+  const clear=reason=>{epoch+=1;pending=null;return panel('character',null,null,reason||'reset');};
+  const activateSlot=async i=>{try{const s=slotOf(i),z=zone();if(!s)return{ok:false,reason:'unavailable'};if(!z)return{ok:false,reason:'invalid-zone'};if(state.instanceId===s.instanceId&&active(getConfirmedActors?.(),s.instanceId,z)){const mode=state.mode==='monster'?'character':'monster';panel(mode,i,s.instanceId,'toggle');return{ok:true,reason:'panel-toggled',mode};}if(pending||(state.instanceId&&state.instanceId!==s.instanceId))return{ok:false,reason:'pending-or-active-monster'};const point=getAim?.();if(!point||!['x','y','z'].every(k=>Number.isFinite(point[k])))return{ok:false,reason:'aim-unavailable'};const e=epoch;pending={instanceId:s.instanceId,slot:i,epoch:e};const result=await Promise.resolve(commands.summon({contract:MONSTER_COMMAND_CONTRACT,kind:'summon',commandId:commandId(),instanceId:s.instanceId,zone:z,targetPoint:point}));if(e!==epoch||pending?.epoch!==e||zone()!==z)return{ok:false,reason:'stale-scene'};pending=null;if(!result?.ok||!active(getConfirmedActors?.(),s.instanceId,z))return{ok:false,reason:result?.code||'server-not-confirmed'};panel('character',i,s.instanceId,'summon-confirmed');return{ok:true,reason:'summon-confirmed',mode:'character',slot:i,instanceId:s.instanceId};}catch{pending=null;return{ok:false,reason:'control-error'};}};
+  const useSkill=async(i,target={})=>{try{if(state.mode!=='monster'||!state.instanceId)return{ok:false,reason:'character-panel-active'};const s=slotOf(state.slot),z=zone(),skill=getSkills?.(state.instanceId)?.[i];if(!s||!z||!active(getConfirmedActors?.(),state.instanceId,z))return{ok:false,reason:'actor-inactive'};if(!skill?.skillId)return{ok:false,reason:'skill-unavailable'};const result=await Promise.resolve(commands.skill({contract:MONSTER_COMMAND_CONTRACT,kind:'skill',commandId:commandId(),instanceId:state.instanceId,zone:z,skillId:skill.skillId,targetActorId:target.targetActorId,targetPoint:target.targetPoint}));return result?.ok?result:{ok:false,reason:result?.code||'server-not-confirmed'};}catch{return{ok:false,reason:'control-error'};}};
+  const skills=()=>state.instanceId?Object.freeze((getSkills?.(state.instanceId)||[]).map(skill=>Object.freeze({...skill}))) : Object.freeze([]);
+  return Object.freeze({snapshot,subscribe,sync,reset:()=>clear('reset'),dispose:()=>{listeners.clear();return clear('dispose');},clearScene:()=>clear('scene-change'),activateSlot,activatePartySlot:activateSlot,useSkill,skills});
 }
