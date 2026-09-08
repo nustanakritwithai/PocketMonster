@@ -1,5 +1,3 @@
-import { readPlayerState } from './server-player-data.mjs';
-
 export const MONSTER_STATE_PROVIDER_KIND = 'monsterlife-owned-monster-http-provider-v1';
 
 function endpoint(config, path) {
@@ -8,17 +6,18 @@ function endpoint(config, path) {
 }
 
 function stateFromPlayerPayload(payload) {
-  const source = payload?.monsterControl || payload?.state || payload?.profile || payload || {};
+  const source = payload?.monsterControl || {};
+  const party = Array.isArray(source.party) ? { available: true, slots: source.party } : source.party;
   return Object.freeze({
-    party: source.party || payload?.party || null,
+    party: party || null,
     actors: source.actors || payload?.actors || [],
     skills: source.skills || payload?.skills || {},
     revision: Number.isSafeInteger(source.revision) ? source.revision : 0,
-    available: Array.isArray(source.party || payload?.party),
+    available: Array.isArray(source.party) || Boolean(party?.available),
   });
 }
 
-export function createMonsterHttpProvider({ config, sessionToken, commandPath = null, fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
+export function createMonsterHttpProvider({ config, sessionToken, getZone = () => '', fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Monster HTTP provider requires fetch');
   if (typeof sessionToken !== 'string' || !sessionToken) throw new TypeError('Monster HTTP provider requires session sessionToken');
   let current = Object.freeze({ party: null, actors: [], skills: {}, revision: 0, available: false });
@@ -29,7 +28,13 @@ export function createMonsterHttpProvider({ config, sessionToken, commandPath = 
   const refresh = async () => {
     const requestGeneration = generation;
     try {
-      const payload = await readPlayerState(config, sessionToken, { fetchImpl });
+      const zone = getZone();
+      if (typeof zone !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(zone)) return Object.freeze({ ok: false, code: 'INVALID_ZONE' });
+      const url = new URL(endpoint(config, 'api/monsters/control-state'));
+      url.searchParams.set('zone', zone);
+      const response = await fetchImpl(url.href, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${sessionToken}` } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) return Object.freeze({ ok: false, code: payload?.code || 'STATE_UNAVAILABLE' });
       if (requestGeneration !== generation) return Object.freeze({ ok: false, code: 'STALE_SCENE' });
       current = stateFromPlayerPayload(payload);
       notify();
@@ -39,9 +44,8 @@ export function createMonsterHttpProvider({ config, sessionToken, commandPath = 
     }
   };
   const send = async command => {
-    if (!commandPath) return Object.freeze({ ok: false, code: 'SERVER_INGRESS_UNAVAILABLE', commandId: command?.commandId });
     try {
-      const response = await fetchImpl(endpoint(config, commandPath), {
+      const response = await fetchImpl(endpoint(config, 'api/monsters/command'), {
         method: 'POST', cache: 'no-store',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${sessionToken}` },
         body: JSON.stringify(command),
