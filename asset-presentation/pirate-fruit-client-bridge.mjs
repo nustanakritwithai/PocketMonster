@@ -26,11 +26,33 @@ export const PIRATE_FRUIT_CLIENT_BRIDGE = Object.freeze({
 // parent, per-frame capability and presentation-only payload.
 let pendingStudioCharacterPackage = null;
 const studioPackageListeners = new Set();
+const studioStatusListeners = new Set();
+let studioStatus = Object.freeze({ state: 'pending', source: 'pirate-fruit' });
+
+function publishStudioStatus(status) {
+  studioStatus = Object.freeze({ ...status });
+  for (const listener of studioStatusListeners) {
+    try { listener(studioStatus); } catch (error) { console.warn('Studio status listener failed', error); }
+  }
+}
+
+export function subscribePirateStudioCharacterStatus(listener) {
+  studioStatusListeners.add(listener);
+  listener(studioStatus);
+  return () => studioStatusListeners.delete(listener);
+}
 
 export function receivePirateStudioCharacterPackage(pkg) {
   const validation = validateStudioCharacterPackage(pkg);
-  if (!validation.valid) return Object.freeze({ accepted: false, errors: validation.errors });
+  if (!validation.valid) {
+    publishStudioStatus({ state: 'failed', source: 'pirate-fruit', errors: validation.errors });
+    return Object.freeze({ accepted: false, errors: validation.errors });
+  }
+  if (pendingStudioCharacterPackage?.manifest.id === pkg.manifest.id && studioStatus.state === 'attached') {
+    return Object.freeze({ accepted: true, id: pkg.manifest.id });
+  }
   pendingStudioCharacterPackage = pkg;
+  publishStudioStatus({ state: 'validated', source: 'pirate-fruit', id: pkg.manifest.id });
   for (const listener of studioPackageListeners) listener(pkg);
   return Object.freeze({ accepted: true, id: pkg.manifest.id });
 }
@@ -234,7 +256,16 @@ export function threeFromPirateFruitVendor(vendor) {
   const BufferGeometry = find((_v, src) => src.includes('isBufferGeometry'));
   const BufferAttribute = find((_v, src) => src.includes('isBufferAttribute'));
   const Vector3 = find((_v, src) => src.includes('isVector3') && src.includes('this.x'));
-  const Box3 = find((_v, src) => src.includes('isBox3'));
+  // Box3 is internal to this Vite bundle. A substring search also matches
+  // WebGLRenderer, which mentions isBox3 but is not a bounds constructor.
+  let Box3 = find(v => ownProto(v, 'setFromObject') && ownProto(v, 'expandByObject'));
+  if (!Box3 && BufferGeometry) {
+    const probe = new BufferGeometry();
+    try {
+      probe.computeBoundingBox();
+      Box3 = probe.boundingBox?.constructor || null;
+    } finally { probe.dispose(); }
+  }
   if (!Object3D || !Group || !Mesh || !BoxGeometry || !MeshStandardMaterial || !BufferGeometry || !BufferAttribute) {
     throw new Error('Pocket bridge could not resolve Three constructors from the Pirate Fruit vendor');
   }
@@ -439,47 +470,92 @@ export async function installPirateFruitPocketPresentation({
     return meshes > 0;
   }
 
+  function normalizeStudioVisual(studio, targetHeight) {
+    const bounds = new kit.Box3().setFromObject(studio.root);
+    const height = bounds.max.y - bounds.min.y;
+    if (!Number.isFinite(height) || height <= 0.000001 ||
+      ![bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z].every(Number.isFinite)) {
+      throw new Error('Studio player has empty or non-finite bounds');
+    }
+    const scale = targetHeight / height;
+    studio.root.scale.multiplyScalar(scale);
+    studio.root.position.y -= bounds.min.y * scale;
+    // Studio faces +Z already; only the legacy Pocket humanoid needs a PI turn.
+    studio.root.rotation.y = 0;
+    studio.root.updateMatrixWorld(true);
+    studio.root.userData.studioHeight = targetHeight;
+  }
+
   async function replaceLocalPlayerWithStudio(item, pkg) {
     if (!item || item.kind !== 'player' || item.source === 'studio-character') return false;
     const validation = validateStudioCharacterPackage(pkg);
-    if (!validation.valid) return false;
+    if (!validation.valid) throw new Error(validation.errors.join('; '));
     await installStudioCharacterPackage(assets, pkg, { bundleName: 'studio-live-player' });
     const studio = assets.spawn(pkg.manifest.id, { role: 'player', quality: 'medium' });
-    await studio.ready;
-    studio.play?.('idle', { restart: true });
-    if (!visibleStudioRoot(studio)) {
+    try {
+      await studio.ready;
+      studio.play?.('idle', { restart: true });
+      if (!visibleStudioRoot(studio)) throw new Error('Studio player package produced no visible meshes');
+      const targetHeight = positiveDuration(item.handle.rig?.metrics?.height, 1.8);
+      normalizeStudioVisual(studio, targetHeight);
+      // Sample the new pose owner before touching the working fallback.
+      studio.update?.(0, { moving: false, locomotion: 'idle' });
+      studio.root.userData.pocketVisual = true;
+      studio.root.userData.presentationOnly = true;
+      studio.root.userData.combatAuthority = false;
+      studio.root.userData.pocketKind = 'player';
+      studio.root.userData.pocketVisualSource = 'studio-character';
+      studio.root.userData.studioAssetId = pkg.manifest.id;
+      item.host.add(studio.root);
+      if (studio.root.parent !== item.host) throw new Error('Studio player could not attach to live host');
+    } catch (error) {
+      item.host.remove?.(studio.root);
       studio.dispose?.();
-      throw new Error('Studio player package produced no visible meshes');
+      throw error;
     }
 
-    // Keep all gameplay state on the existing host. The fallback is removed
-    // only after a usable Studio visual has been constructed and attached.
-    studio.root.userData.pocketVisual = true;
-    studio.root.userData.presentationOnly = true;
-    studio.root.userData.combatAuthority = false;
-    studio.root.userData.pocketKind = 'player';
-    studio.root.userData.pocketVisualSource = 'studio-character';
-    orientPirateFruitVisual(studio.root, 'player');
-    item.host.add(studio.root);
+    // All gameplay state remains on the original host. Commit only after the
+    // replacement is usable; subsequent updates must tolerate no retargeter.
+    const fallback = item.handle;
     item.handle.root.visible = false;
     item.host.remove?.(item.handle.root);
-    item.handle.dispose?.();
     item.handle = studio;
     item.source = 'studio-character';
     item.rigRetargeter = null; // Studio package is the single pose owner.
     item.sourcePoseDriven = false;
+    item.studioAssetId = pkg.manifest.id;
+    item.studioUpdates = 0;
+    item.studioRenderFrames = 0;
+    let sampledMesh = false;
+    studio.root.traverse(node => {
+      if (sampledMesh || !node.isMesh || node.visible === false) return;
+      sampledMesh = true;
+      const previous = node.onAfterRender;
+      node.onAfterRender = function (...args) {
+        item.studioRenderFrames += 1;
+        previous?.apply(this, args);
+      };
+    });
+    try { fallback.dispose?.(); } catch (error) { console.warn('Old player visual disposal failed', error); }
+    publishStudioStatus({ state: 'attached', source: 'studio-character', id: pkg.manifest.id });
     return true;
   }
 
-  let studioInstallInFlight = false;
+  function scheduleStudioReplacement(item, pkg) {
+    if (!item || item.source === 'studio-character') return;
+    if (item.studioInstallPromise) return item.studioInstallPromise;
+    item.studioInstallPromise = replaceLocalPlayerWithStudio(item, pkg)
+      .catch(error => {
+        publishStudioStatus({ state: 'failed', source: 'pirate-fruit', id: pkg.manifest.id, error: String(error?.message || error) });
+        console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error);
+      })
+      .finally(() => { item.studioInstallPromise = null; });
+    return item.studioInstallPromise;
+  }
+
   subscribePirateStudioCharacterPackage(pkg => {
-    if (studioInstallInFlight) return;
     const player = visuals.find(item => item.kind === 'player' && item.source !== 'studio-character');
-    if (!player) return;
-    studioInstallInFlight = true;
-    replaceLocalPlayerWithStudio(player, pkg)
-      .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error))
-      .finally(() => { studioInstallInFlight = false; });
+    if (player) void scheduleStudioReplacement(player, pkg);
   });
 
   function paintTerrain(mesh) {
@@ -526,8 +602,7 @@ export async function installPirateFruitPocketPresentation({
       }), 'player');
       if (pendingStudioCharacterPackage) {
         const player = visuals.at(-1);
-        void replaceLocalPlayerWithStudio(player, pendingStudioCharacterPackage)
-          .catch(error => console.warn('Pocket Studio player replacement failed; keeping Pirate fallback', error));
+        void scheduleStudioReplacement(player, pendingStudioCharacterPackage);
       }
       return;
     }
@@ -584,7 +659,7 @@ export async function installPirateFruitPocketPresentation({
           moving,
           locomotion: item.kind === 'remote' ? remoteLocomotionFor(item.host, moving) : undefined,
         });
-        item.rigRetargeter.update();
+        item.rigRetargeter?.update();
         continue;
       }
       if (!item.actionTracker) {
@@ -610,7 +685,8 @@ export async function installPirateFruitPocketPresentation({
       applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
       item.lastAction = sample.action;
       item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
-      item.rigRetargeter.update();
+      item.rigRetargeter?.update();
+      if (item.source === 'studio-character') item.studioUpdates += 1;
     }
   }
 
@@ -626,6 +702,19 @@ export async function installPirateFruitPocketPresentation({
       providers: assets.diagnostics().providers,
       studioPlayers: visuals.filter(item => item.source === 'studio-character').length,
       playerVisualSource: visuals.find(item => item.kind === 'player')?.source || 'pending',
+      studioStatus,
+      studioPlayer: (() => {
+        const item = visuals.find(entry => entry.kind === 'player' && entry.source === 'studio-character');
+        return item ? {
+          id: item.studioAssetId,
+          updates: item.studioUpdates,
+          renderFrames: item.studioRenderFrames,
+          height: item.handle.root.userData.studioHeight,
+          host: item.host.name,
+          position: { x: item.host.position.x, y: item.host.position.y, z: item.host.position.z },
+          facing: item.host.rotation.y,
+        } : null;
+      })(),
     }),
   };
 }
