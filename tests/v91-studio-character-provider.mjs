@@ -5,6 +5,7 @@ import { resetOwnership } from '../asset-presentation/ownership.mjs';
 import { createStudioCharacterProvider, findStudioCharacterClip } from '../asset-presentation/providers/studio-character.mjs';
 import {
   installStudioCharacterPackage,
+  inspectStudioCharacterMotionPack,
   resetStudioCharacterPackages,
   validateStudioCharacterPackage,
 } from '../asset-presentation/studio-character-package.mjs';
@@ -19,6 +20,10 @@ class Euler {
   constructor() { this.x = 0; this.y = 0; this.z = 0; this.order = 'XYZ'; }
   set(x, y, z, order = this.order) { this.x = x; this.y = y; this.z = z; this.order = order; return this; }
 }
+class Quaternion {
+  constructor() { this.x = 0; this.y = 0; this.z = 0; this.w = 1; }
+  set(x, y, z, w) { this.x = x; this.y = y; this.z = z; this.w = w; return this; }
+}
 
 class Node {
   constructor() {
@@ -26,6 +31,7 @@ class Node {
     this.parent = null;
     this.position = new Vec3();
     this.rotation = new Euler();
+    this.quaternion = new Quaternion();
     this.scale = new Vec3(1, 1, 1);
     this.userData = {};
     this.name = '';
@@ -163,7 +169,18 @@ function packageFixture() {
         { time: 0, joints: { handR: { position: [0, 0, 0], rotation: [0, 0, 0] } } },
         { time: 1, joints: { handR: { position: [3, 0, 0], rotation: [0, 0.6, 0] } } },
       ],
+    }, {
+      id: 'dead-1', name: 'Dead_Core', duration: 1, loop: false, interpolation: 'smooth',
+      runtime: { state: 'dead', motionClass: 'action' },
+      keyframes: [
+        { time: 0, joints: { handR: { position: [0, 0, 0], scale: [1, 1, 1] } } },
+        { time: 1, joints: { handR: { position: [0, -1, 0], scale: [1.2, .8, 1] } } },
+      ],
     }],
+    motionPack: {
+      schema: 'pocket-motion-pack-v1', defaultAction: 'idle',
+      actionMap: { idle: 'idle-1', walk: 'walk-1', run: 'run-1', attack: 'attack-1', skill: 'skill-1', hurt: 'hurt-1', dead: 'dead-1' },
+    },
     animationIndex: [
       { id: 'idle-1', name: 'Idle_Breathing', state: 'idle_breathing', duration: 1, loop: true },
       { id: 'walk-1', name: 'Walk_PoseLibrary', state: 'walk_pose_library', duration: 1, loop: true },
@@ -185,6 +202,8 @@ resetCatalog(); resetOwnership(); resetStudioCharacterPackages();
 const pkg = packageFixture();
 const validation = validateStudioCharacterPackage(pkg);
 assert.equal(validation.valid, true, validation.errors.join('; '));
+assert.equal(validation.motion.mode, 'canonical', 'fixture exports a canonical Engine-owned motion pack');
+assert.equal(inspectStudioCharacterMotionPack(pkg).actionMap.attack, 'attack-1', 'attack maps to the explicit authored clip id');
 assert.equal(findStudioCharacterClip(pkg, 'idle')?.id, 'idle-1', 'idle resolves the Studio idle_breathing state');
 assert.equal(findStudioCharacterClip(pkg, 'walk')?.id, 'walk-1', 'walk resolves the Studio pose-library state');
 assert.equal(findStudioCharacterClip(pkg, 'run')?.id, 'run-1', 'run resolves the Studio pose-library state');
@@ -209,6 +228,15 @@ const missingJointPath = structuredClone(pkg); missingJointPath.rig.jointBinding
 assert.equal(validateStudioCharacterPackage(missingJointPath).valid, false, 'joint bindings must resolve into the scene graph');
 const missingSocketJoint = structuredClone(pkg); missingSocketJoint.rig.sockets.rightHand.joint = 'not-a-joint';
 assert.equal(validateStudioCharacterPackage(missingSocketJoint).valid, false, 'sockets must reference declared joint bindings');
+const badCanonicalMotion = structuredClone(pkg); badCanonicalMotion.motionPack.actionMap.attack = 'missing-attack';
+assert.equal(validateStudioCharacterPackage(badCanonicalMotion).valid, false, 'canonical maps may not reference a missing clip');
+const incompleteLiveMotion = structuredClone(pkg);
+incompleteLiveMotion.manifest.id = incompleteLiveMotion.catalogEntry.id = 'character.human.pirate.studio-live';
+delete incompleteLiveMotion.motionPack.actionMap.dead;
+assert.equal(validateStudioCharacterPackage(incompleteLiveMotion).valid, false, 'default live player requires every canonical action');
+const legacyPackage = structuredClone(pkg); delete legacyPackage.motionPack;
+assert.equal(validateStudioCharacterPackage(legacyPackage).valid, true, 'older Studio packages remain semantic-fallback compatible');
+assert.match(validateStudioCharacterPackage(legacyPackage).warnings.join(' '), /legacy Studio package/, 'legacy fallback is exposed in diagnostics');
 
 const engine = createAssetEngine({ THREE });
 engine.registerProvider('studio-character', createStudioCharacterProvider({ THREE }));
@@ -238,6 +266,14 @@ assert.ok(anchor.y > 0.19 && anchor.y < 0.21, 'socket local offset applied');
 handle.play('walk', { restart: true });
 handle.update(0.5);
 assert.ok(handle.rig.pivots.handR.position.x > 0.95 && handle.rig.pivots.handR.position.x < 1.05, 'Studio pose-library walk resolves and samples in the consumer');
+pkg.animations.find(clip => clip.id === 'walk-1').keyframes[0].joints.handR.scale = [1, 1, 1];
+pkg.animations.find(clip => clip.id === 'walk-1').keyframes[1].joints.handR.scale = [2, 3, 4];
+pkg.animations.find(clip => clip.id === 'walk-1').keyframes[0].joints.handR.quaternion = [0, 0, 0, 1];
+pkg.animations.find(clip => clip.id === 'walk-1').keyframes[1].joints.handR.quaternion = [0, 0, 1, 0];
+handle.play('walk', { restart: true });
+handle.update(0.5);
+assert.ok(handle.rig.pivots.handR.scale.x > 1.45 && handle.rig.pivots.handR.scale.x < 1.55, 'Studio scale tracks sample with the authored pose');
+assert.ok(handle.rig.pivots.handR.quaternion.z > .69 && handle.rig.pivots.handR.quaternion.z < .72, 'Studio quaternion tracks slerp when Engine exports them');
 for (const [action, id] of [['run', 'run-1'], ['attack-melee', 'attack-1'], ['hurt', 'hurt-1'], ['skill', 'skill-1'], ['jump', 'jump-1']]) {
   handle.play(action, { restart: true });
   assert.equal(handle.animationState.clipId, id, `${action} keeps its authored Studio clip identity`);
