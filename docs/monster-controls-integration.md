@@ -23,9 +23,9 @@
 
 Canonical reader อ่าน collection + party placements, catalog stats 36 forms, learned skill slots และ basic policy เดิม: ระยะ1.35m, cooldown0.9s, power15 ส่วน runtime หาเป้าหมาย9m คงเป้าหมาย12m และใช้สูตรความเร็วเดิม
 
-สถานะ active, คูลดาวน์ และ HP ต่อสู้อยู่ใน process ของ server รุ่นนี้ ย้ายตามฉากได้ แต่ยังไม่ใช่การเพิ่ม persistence ของผลต่อสู้/รางวัลลง SQL ศัตรูที่มี target profile ในชุดนี้คือ Pirate central catalog24ชนิด; แผนที่อื่นแสดงและควบคุม owned actor ได้ แต่ต้องมี authoritative target profile จึงโจมตีศัตรูในฉากนั้นได้
+สถานะ active, คูลดาวน์ และ HP ต่อสู้อยู่ใน process ของ server รุ่นนี้ ย้ายตามฉากได้; ผลต่อสู้และรางวัลยังไม่ถูก persist ลง SQL และยังไม่มี reward settlement ในเส้นทางนี้ ศัตรูที่มี target profile ในชุดนี้คือ Pirate central catalog24ชนิด; แผนที่อื่นแสดงและควบคุม owned actor ได้ แต่ต้องมี authoritative target profile จึงโจมตีศัตรูในฉากนั้นได้
 
-เคารพ Combat.Enabled/CommitEnabled/ShadowMode เดิม ถ้าปิด combat จะไม่ commit ความเสียหายหรือใช้สกิล ไม่เปลี่ยน flags ของ production อัตโนมัติ
+เคารพ `OwnedMonsterEnabled` ร่วมกับ `Combat.Enabled`, `CommitEnabled` และ `ShadowMode` ตาม runtime policy: เมื่อ gate ที่เกี่ยวข้องปิด คำสั่งจะ fail-closed และไม่ commit ความเสียหาย; artifact นี้ไม่เปลี่ยน production flags อัตโนมัติ
 ### สถานะ runtime และขอบเขตการเปิดใช้งาน
 
 - `OwnedMonsterEnabled` เป็น feature flag แยกต่างหาก ค่าเริ่มต้น `false`; การมีโค้ดหรือ artifact นี้ไม่เปิดใช้งานเอง
