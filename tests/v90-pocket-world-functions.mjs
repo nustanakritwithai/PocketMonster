@@ -57,7 +57,7 @@ assert.match(liveJs, /text\.textContent='1\/3 ไป Grass Meadow'/, 'Ranch Hub 
 assert.doesNotMatch(liveJs, /if\(!STAGE_BY_ID\[state\.currentZone\]\)\{panel\.classList\.add\('hidden'\);return;\}/, 'Ranch Hub no longer hides the quest tracker');
 assert.match(boot, /publishWorldState\(/, 'real pirate world publishes WORLD_STATE');
 assert.match(boot, /getZone: \(\) => 'pirate-fruit'/, 'pirate presence uses the pirate-fruit zone id');
-assert.match(livingJs, /from '\.\/world-presence-v800\.mjs\?v=4'/, 'living world uses the cache-busted shared presence helper');
+assert.match(livingJs, /from '\.\/world-presence-v800\.mjs\?v=5'/, 'living world uses the cache-busted shared presence helper');
 assert.match(livingJs, /LIVING_WORLD_ID/, 'living presence uses the living-world zone id');
 assert.match(livingJs, /living-world-pirate-fruit-portal/, 'Living World ships an in-scene return portal to Pirate Fruit');
 assert.match(livingJs, /pocketmonster:world-warp-v1/, 'Living World returns directly to Pirate Fruit through the in-document route');

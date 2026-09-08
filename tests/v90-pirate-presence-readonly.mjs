@@ -74,6 +74,61 @@ const localActorPose = sanitizePirateLocalPresence({
 });
 assert.equal(localActorPose.actors[0].actorId, localActor.actorId, 'iframe actor state survives the local sanitizer');
 assert.equal(Object.hasOwn(localActorPose.actors[0], 'hp'), false, 'local actor bridge remains presentation-only');
+assert.equal(Object.hasOwn(localActorPose.actors[0], 'authority'), false, 'local actor cannot inject server authority');
+const authorityActor = {
+  ...localActor,
+  actorId: 'monster:server-crab-1',
+  lifecycle: 'active',
+  authority: {
+    authorityVersion: 'monster-authority/1',
+    serverTimeUtc: '2026-09-08T07:00:00.000Z',
+    generation: 1,
+    hp: { current: 42.5, max: 70, revision: 3 },
+    resultRevision: 8,
+    actionSequence: 9,
+    hit: true,
+    damage: 7,
+    death: false,
+    attack: {
+      attackId: 'monster:server-crab-1:attack:9',
+      spawnId: 'server-crab-1',
+      monsterId: 'crab',
+      islandId: 'starter-island',
+      targetId: 'player-1',
+      action: 'melee',
+      damage: 7,
+      hitDelayMs: 180,
+    },
+  },
+};
+const authoritySnapshot = sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [authorityActor] });
+assert.equal(authoritySnapshot.actors[0].authority.hp.current, 42.5, 'Server authority HP crosses the Parent snapshot sanitizer');
+assert.equal(authoritySnapshot.actors[0].authority.attack.targetId, 'player-1', 'target-aware attack result crosses the Parent snapshot sanitizer');
+assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authorityActor, authority: { ...authorityActor.authority, hp: { ...authorityActor.authority.hp, current: 999 } } }] }), null, 'invalid authority HP fails closed');
+const monsterIntent = {
+  schemaVersion: 1,
+  intentId: 'monster-intent:2:9',
+  zone: 'starter-island',
+  kind: 'melee',
+  category: 'sword',
+  forwardX: 3,
+  forwardZ: 4,
+  range: 4.5,
+  sequence: 9,
+  targetActorId: 'monster:server-crab-1',
+  expectedGeneration: 1,
+  expectedStateSequence: 12,
+};
+const localIntentPose = sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0,
+  monsterIntents: [monsterIntent],
+});
+assert.equal(localIntentPose.monsterIntents[0].forwardX, .6, 'Parent normalizes forwarded intent direction');
+assert.equal(localIntentPose.monsterIntents[0].targetActorId, monsterIntent.targetActorId, 'Parent preserves target identity on intent');
+assert.equal(sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0,
+  monsterIntents: [monsterIntent, monsterIntent],
+}), null, 'duplicate intent ids fail closed within one frame');
 const agedSnapshot = advancePirateSnapshotVisualAge({ zone: 'pirate-fruit', players: [{
   id: 'remote-one', name: 'Remote', x: 1, z: 2, dir: 0,
   visual: { schemaVersion: 1, sessionId: 'visual_session_1', stateSequence: 1,
@@ -143,7 +198,9 @@ pose = { x: 2, z: 3, dir: 0.25 };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'idle', animation: null,
 });
-pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor], monsterIntents: [monsterIntent] };
+assert.equal(window.POCKETMONSTER_WORLD_STATE().monsterIntents[0].intentId, monsterIntent.intentId,
+  'world-pos publisher carries validated Pirate monster intents to the shared socket');
 publishWorldState({
   getZone: () => 'pirate-fruit',
   getPosition: () => pose,
