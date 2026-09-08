@@ -16,11 +16,15 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'studio-browser-evidence'
 OUT.mkdir(exist_ok=True)
 ENTRY = ROOT / 'studio-browser-entry.html'
+ENTRY_MODULE = ROOT / 'studio-browser-entry.mjs'
 # Keep production controls/styles/CSP. This offline fixture has no login handler;
 # hide its static login overlay, not any production authorization mechanism.
 template = re.sub(r'<script\b[^>]*>[\s\S]*?</script>', '', (ROOT / 'v900.html').read_text(), flags=re.I)
 template = template.replace('class="account-gate"', 'class="account-gate hidden"')
-ENTRY.write_text(template.replace('</body>', '<script type="module" src="./boot-pirate-fruit-v900.mjs"></script></body>'))
+template = template.replace('<body>', '<body data-control-panel="human" data-combined-world="pirate-fruit">')
+# The online shell normally activates the selected world's real input adapter.
+ENTRY_MODULE.write_text("import './boot-pirate-fruit-v900.mjs';\nwindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS.activate('pirate-fruit');\n")
+ENTRY.write_text(template.replace('</body>', '<script type="module" src="./studio-browser-entry.mjs"></script></body>'))
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -89,10 +93,10 @@ try:
         assert child is not None, 'Active Pirate iframe missing'
         child.wait_for_function('window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE?.studioPlayer?.renderFrames > 3', timeout=20000)
         before = snapshot()
-        # Real input events on the actual mobile control surface.
-        stick = page.locator('#stick').bounding_box()
-        assert stick, 'Actual mobile joystick missing'
-        x, y = stick['x'] + stick['width']/2, stick['y'] + stick['height']/2
+        # The stick graphic is hidden until touch-down. Drag its real input zone.
+        zone = page.locator('#joystick').bounding_box()
+        assert zone, 'Actual mobile joystick input zone missing'
+        x, y = zone['x'] + zone['width'] * 0.3, zone['y'] + zone['height'] * 0.6
         page.mouse.move(x, y)
         page.mouse.down()
         page.mouse.move(x + 55, y, steps=5)
@@ -134,3 +138,4 @@ finally:
     (OUT / 'report.json').write_text(json.dumps(report, indent=2))
     server.shutdown()
     ENTRY.unlink(missing_ok=True)
+    ENTRY_MODULE.unlink(missing_ok=True)
