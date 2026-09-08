@@ -303,6 +303,7 @@ assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], pl
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], playerAuthority }).playerAuthority.players[0].playerId, 'self-player', 'authority remains valid across non-central visual zones');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], hp: { current: 101, max: 100, revision: 4 } }] } }), null, 'authoritative HP range fails closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, serverTimeUtc: 'invalid' } }), null, 'malformed authority timestamp fails closed');
+assert.deepEqual(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: null }), { zone: 'pirate-fruit', players: [] }, 'null authority remains an absent optional field');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], lifeState: 'dead' }] } }), null, 'dead authority must have zero HP');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[1], lifeState: 'alive' }] } }), null, 'alive authority must have positive HP');
 
