@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.62fd0abddc90",
+  "buildId": "8.4.0.content.06f1312419f5",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-07T12:00:19.745Z",
+  "publishedAtUtc": "2026-09-07T22:00:50.853Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -87,8 +87,8 @@
     },
     {
       "path": "asset-presentation/pirate-fruit-client-bridge.mjs",
-      "size": 22641,
-      "sha256": "0cf92a3605bd6d0df13a9c819c02648b99726838e2881fcf7e5e52b7d5d88cc0"
+      "size": 27011,
+      "sha256": "ac1c5d8a47107b45f41ffd78d5210e36cb7f848c75cf5e959da9437a7ad45f0a"
     },
     {
       "path": "asset-presentation/pirate-fruit-rig-retarget.mjs",
@@ -116,14 +116,34 @@
       "sha256": "0484691a5d5c77cbcc7a1e340994a56991bed0da05d197e7c3f1a62209b5ae59"
     },
     {
+      "path": "asset-presentation/providers/studio-character.mjs",
+      "size": 13362,
+      "sha256": "ac824b9341cd0ec1ce700bc5edddfe241c630df1eeae1e999b8d37b777cc7fc9"
+    },
+    {
       "path": "asset-presentation/requests.mjs",
       "size": 1296,
       "sha256": "e78fa3ca15f1390b395790e5d6722f84abf51e161d2d78c6a77a9c85e1da1dd1"
     },
     {
       "path": "asset-presentation/schema.mjs",
-      "size": 5359,
-      "sha256": "40d098a4bc5c5df442cbc41ef111f3c3b3a54683ad55cfcdf08212e91d8a2add"
+      "size": 5379,
+      "sha256": "57d8c80cd2054cc43a478d2b0b281033c4846f65f89ddc3344db30cabb7ee8f5"
+    },
+    {
+      "path": "asset-presentation/studio-character-live-bridge.mjs",
+      "size": 3130,
+      "sha256": "59265b63e49c1dbd5a7639215e494d3a8f70c2d58ccfee9bc60b9f8a8b210b42"
+    },
+    {
+      "path": "asset-presentation/studio-character-package.mjs",
+      "size": 10241,
+      "sha256": "6f096a08e37e2e6ff250978caa91e8b3d88c1bd19719aa53829ab68b79871eac"
+    },
+    {
+      "path": "asset-presentation/studio-character-pirate-channel.mjs",
+      "size": 586,
+      "sha256": "3d86e9ccc9598d374777ab2eab88bbca2909231aa75f7bc2c3b7f806b813c1d7"
     },
     {
       "path": "assets/appearances/keeper-green/appearance.json",
@@ -292,8 +312,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 14337,
-      "sha256": "a0f7d8ed7bea41287610c583cccdff5b609b0694004a2a36dcad0ed9c7be4ec2"
+      "size": 16404,
+      "sha256": "5a89ad8a65d48c6b66bdbf51db23ee833fc76068b33e237f2e14caa8573b3b81"
     },
     {
       "path": "boss-challenge.mjs",
@@ -438,7 +458,7 @@
     {
       "path": "combined-worlds-v900.mjs",
       "size": 2617,
-      "sha256": "b8f6d2fc142e3f694b966f6342e0f116d626d76ab95f94f942bd5066949ae1ae"
+      "sha256": "d4bcffdb1e40c4ede9abefbdc2c930f79a2d99850d67772627488345a93d5de4"
     },
     {
       "path": "content-catalog.mjs",
@@ -468,7 +488,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2323,
-      "sha256": "7d9e247a9482b7b9f74ef23fbcdb34b55f35f9742a227ee5d2b44f424eafdd23"
+      "sha256": "17234270537f1e280a5d98a6a6c32b0b5118561602eba2897ed16041ce7ab1cc"
     },
     {
       "path": "equipment.mjs",
@@ -513,7 +533,7 @@
     {
       "path": "index.html",
       "size": 38375,
-      "sha256": "e64338862b6c3477180949a46b0bb09c9e1b1fb28ffb346b1ea83a1b6d88da06"
+      "sha256": "b20286744129af1db3bf3690311226a20b7d85b06cfde132752d20ccf800d030"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -542,8 +562,8 @@
     },
     {
       "path": "mobile-dual-pointer-input-v900.mjs",
-      "size": 6090,
-      "sha256": "eb94e812a91968c3fde331ca4ee86f6b6c7be8151635dac77acb3b12e9e99729"
+      "size": 7783,
+      "sha256": "aac3c56d1186c95a70f704938c2dda729b6f9c8c1929185e511bf170d7cfe763"
     },
     {
       "path": "monster-catalog.mjs",
@@ -577,8 +597,8 @@
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 21350,
-      "sha256": "7c94b3fc04e96761f345076e58b802d0a8dfac34c5ddb5d015ad8870a346731c"
+      "size": 22188,
+      "sha256": "2862aa12b3802c96840c9a5994732f35c1df678083eddde07ed3815cb8a21c1d"
     },
     {
       "path": "passive-catalog.mjs",
@@ -621,19 +641,19 @@
       "sha256": "a81a1d12e0d4897fae9dcd160a7bc3aae74d278490164e3ffdceb719e9237a20"
     },
     {
-      "path": "pirate-fruit-offline/assets/AzureFrostIsland-BmBR66q3.js",
+      "path": "pirate-fruit-offline/assets/AzureFrostIsland-BdvgudeJ.js",
       "size": 5201,
-      "sha256": "2f83fdcfee16a0da09126a0fdf7759c995ed19d60881cfd544567260d9e5369a"
+      "sha256": "77eec05153ef179679f1fffcad754c9c63c043a7afb5f3bb598dde145c61896e"
     },
     {
-      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-DNJ9DnbU.js",
+      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-DB0I4yEi.js",
       "size": 6479,
-      "sha256": "d68cb919a79127e1aca36b089f862cb395352935b7be4aae626d877e625cee33"
+      "sha256": "53b6d9711b6fefbfddab74d62723194e479aef7c34499dd3bce1a92c0396763f"
     },
     {
-      "path": "pirate-fruit-offline/assets/MistJungleIsland-OCmGhKhP.js",
+      "path": "pirate-fruit-offline/assets/MistJungleIsland-Gq4P4qkj.js",
       "size": 6126,
-      "sha256": "626055e5fcb4701e1eb113b1915126f8378caa18f4cda9dec3f9ba6f0987f7b0"
+      "sha256": "06a76d15692acd1c7eee9d11369120f1923a0b1861ffdd9157ed68a255779eec"
     },
     {
       "path": "pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js",
@@ -641,19 +661,19 @@
       "sha256": "06bbfe336727de437932112f49321d1927ed7b998638b81d1c88da1294c3cb92"
     },
     {
-      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-DBMkxu6b.js",
+      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-CLDMRxAA.js",
       "size": 6375,
-      "sha256": "254533d07152a5a8f3141418aa959e069d87ca4e34e95e9741cd8b0a97796dce"
+      "sha256": "81b893f975878931d8453f10a3b5ee0c143ca04d30ed464ca9fdd6dce4320dd9"
     },
     {
-      "path": "pirate-fruit-offline/assets/TempestSkyIsland-iTSat0Th.js",
+      "path": "pirate-fruit-offline/assets/TempestSkyIsland-D5HvYK0u.js",
       "size": 5411,
-      "sha256": "340472592e4a9b767544f01f945a3fe023001c81db8b8ba9980768752865784e"
+      "sha256": "a43cc02c74ed247f6e925689e7b8cccb234f69037db7f569e84038713b3a88cb"
     },
     {
-      "path": "pirate-fruit-offline/assets/index-DKUYjNyH.js",
-      "size": 1141712,
-      "sha256": "a1352891f6029d793887db2dc0e8d9a1377ea298fa0ab47abf56f1a6e9e58d1b"
+      "path": "pirate-fruit-offline/assets/index-GlkduLul.js",
+      "size": 1142451,
+      "sha256": "4cfdee0f5d67c2c57a70f4e6a8b2724b2420bd7efa71279776cf2b783382560e"
     },
     {
       "path": "pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js",
@@ -667,13 +687,13 @@
     },
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
-      "size": 159,
-      "sha256": "16ef513e5b3b5b163a092ced9039a8eeecb764e4e07cdcc398538c5b399147ab"
+      "size": 158,
+      "sha256": "b740db213ef18d8ff1edc6c2f1d296ce0a683dd42b97f86bd985860703a3afce"
     },
     {
       "path": "pirate-fruit-offline/pocket-presentation.mjs",
-      "size": 3281,
-      "sha256": "8c99cf37ff56bf3203566b0fcc9d4d367763c61bf71ea773d02886e7b2c00224"
+      "size": 4481,
+      "sha256": "0a007e97e45d890f2d96a88d36f0d301a94d077f6293320a0c01af65dd9ad557"
     },
     {
       "path": "pirate-fruit-offline/pocketmonster-status-v900.mjs",
@@ -763,12 +783,12 @@
     {
       "path": "save-schema.mjs",
       "size": 9035,
-      "sha256": "b8fd477200e01f42b5450db9b815b3fd8df4db559b14c7d3c3f058e681df8241"
+      "sha256": "259cdf66c921e4465a9e9050bcf54f894e1ba1fbded8bc85b9574f5b2ab88265"
     },
     {
       "path": "scene-entry-v900.mjs",
       "size": 8398,
-      "sha256": "b69774782eac1db941feaaa21c191f89adaa5c83e9d4e3f16940b8f5bf01dd7d"
+      "sha256": "89f533fdb27619de7322ae16753ee968e09b69870f7fb3381251120db3e3b593"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -783,7 +803,7 @@
     {
       "path": "scene-v900.html",
       "size": 1252,
-      "sha256": "1a3fcd82d13dc25ccb0adb2fe60bdd220cbb37e9dc403a17db987aa8e5490015"
+      "sha256": "f30594ef88857865d4a2b797f0c421003d631ced1b602251d269006711e5cee2"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -942,13 +962,13 @@
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
-      "size": 26574,
-      "sha256": "13d9ece63fbb7a1f40efb1b0d0b2f8f0ad7e5f33797679933cb73bfe1c09fbc7"
+      "size": 27341,
+      "sha256": "f7f445f0134f88e1a182cbbbb3ea619a5d51d1c051aac216cf2c5e9144252607"
     },
     {
       "path": "v900.html",
       "size": 38375,
-      "sha256": "e64338862b6c3477180949a46b0bb09c9e1b1fb28ffb346b1ea83a1b6d88da06"
+      "sha256": "b20286744129af1db3bf3690311226a20b7d85b06cfde132752d20ccf800d030"
     },
     {
       "path": "warp-routes.mjs",
@@ -967,18 +987,18 @@
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 29853,
-      "sha256": "ce9c8801697175335efc0c74605f0c9c333c224a4780caa49b5e56b701d225d0"
+      "size": 29962,
+      "sha256": "54fe8a56f2b926fd5be42b411fe0625020ee7634ccb0e80fad075cf605d4c213"
     },
     {
       "path": "world-presence-v800.mjs",
-      "size": 24072,
-      "sha256": "68d9f02db1db37cb92e175405eb5983a3110b2428c878e3c4f45c4e0eeb16c06"
+      "size": 24551,
+      "sha256": "0ba56deb3ff8324a288b420f38d6467ce1e2d0623ba7a2b123687a7d8b9c05ec"
     },
     {
       "path": "worlds-v900.mjs",
       "size": 8634,
-      "sha256": "d4c1c5ac3e8ae944b0866657d0b999d75ab952d8bc565e54ec34ddf0e6e764a0"
+      "sha256": "ea7477d72e7713b753c797b02ae2e1568939de6db4b03d711957374322aadf6a"
     }
   ]
 }

@@ -1,0 +1,84 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { applyPirateFruitStudioPresentation as apply, createStudioControllerSampler } from '../asset-presentation/studio-character-action-state.mjs';
+import { inspectStudioCharacterMotionPack, registerStudioCharacterPackage, validateStudioCharacterPackage } from '../asset-presentation/studio-character-package.mjs';
+import { createStudioCharacterProvider, findStudioCharacterClip } from '../asset-presentation/providers/studio-character.mjs';
+import { threeFromPirateFruitVendor } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
+import * as vendor from '../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js';
+const calls = [];
+const fake = { animationState: { action:'idle', finished:false, motion:{} }, play(action, options) {
+  calls.push({action,options}); this.animationState={action,finished:false,motion:{}};
+} };
+let state = apply(fake, null, {action:'attack-melee',actionId:'edge-1',duration:.45,locomotion:'walk'});
+for(let i=0;i<12;i++) state=apply(fake,state,{action:'attack-melee',actionId:null,locomotion:'walk'});
+assert.equal(calls.length,1,'null edge ids must not restart one-shot playback');
+assert.equal(state.actionId,'edge-1');
+fake.animationState.finished=true;
+for(let i=0;i<12;i++) state=apply(fake,state,{action:'attack-melee',actionId:null,locomotion:'walk'});
+assert.equal(calls.length,2,'completed stale signal must not re-trigger attack');
+assert.equal(state.action,'walk');
+state=apply(fake,state,{action:'attack-melee',actionId:'edge-2',locomotion:'walk'});
+assert.equal(calls.at(-1).action,'attack');
+state=apply(fake,state,{action:'hurt',actionId:'hurt-1',locomotion:'idle'});
+state=apply(fake,state,{action:'attack-melee',actionId:'edge-3',locomotion:'idle'});
+assert.equal(state.action,'hurt','lower priority cannot cancel hurt');
+state=apply(fake,state,{action:'dead',actionId:'dead-1',locomotion:'idle'});
+assert.equal(state.action,'dead','death interrupts other poses');
+const sampler=createStudioControllerSampler(), controller={moveState:{onGround:true},verticalSpeed:0,heading:0,dashDir:{x:1,z:0}};
+const base={action:null,actionId:null,locomotion:'walk'};
+assert.equal(sampler(base,controller).locomotion,'walk');
+controller.moveState.onGround=false;controller.verticalSpeed=4;
+assert.equal(sampler(base,controller).action,'jump');
+controller.verticalSpeed=-3;
+assert.equal(sampler(base,controller).action,'fall');
+controller.moveState.onGround=true;
+assert.equal(sampler(base,controller).action,'land');
+controller.moveState.dashing=true;
+assert.equal(sampler(base,controller).action,'dodge_r');
+controller.moveState.dashing=false;controller.moveState.sprinting=true;
+assert.equal(sampler(base,controller).locomotion,'sprint');
+sampler({...base,action:'dead'},controller);
+assert.equal(sampler(base,controller).action,'get_up');
+console.log('PASS: stable action edges, completion, priority/interrupt and actual controller field mapping');
+if(process.argv[2]) {
+  const pkg=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+  assert.equal(pkg.motionPack.version,'1.1.0','this gate must use modern Engine, not older green evidence');
+  const validation=validateStudioCharacterPackage(pkg);
+  assert.equal(validation.valid,true,JSON.stringify(validation.errors));
+  const motion=inspectStudioCharacterMotionPack(pkg);
+  assert.equal(motion.missing.length,0);assert.equal(motion.invalid.length,0);
+  assert.ok(motion.unsupportedActions.skill);assert.ok(motion.unsupportedActions.attack_ranged);
+  const injected=structuredClone(pkg);injected.motionPack.extra={hp:10};
+  assert.equal(validateStudioCharacterPackage(injected).valid,false,'untrusted motionPack subtree must not bypass gameplay validation');
+  const nested=structuredClone(pkg);nested.motionPack.actionMap.skill={hp:10};
+  assert.equal(validateStudioCharacterPackage(nested).valid,false,'only string presentation labels are exempted');
+  registerStudioCharacterPackage(pkg);
+  const kit=threeFromPirateFruitVendor(vendor);
+  const handle=createStudioCharacterProvider({THREE:kit})({def:pkg.catalogEntry,request:{role:'player'}});
+  const coverage=[];
+  const pose=()=>Object.values(handle.rig.pivots).flatMap(n=>[n.position.x,n.position.y,n.position.z,n.rotation.x,n.rotation.y,n.rotation.z]);
+  for(const action of Object.keys(pkg.motionPack.actionMap)) {
+    const clip=findStudioCharacterClip(pkg,action);assert.ok(clip,action);
+    handle.play(action,{restart:true});handle.drainAnimationEvents();
+    let changed=false, prior=pose();
+    for(let i=0;i<24;i++) {
+      handle.update(clip.duration/24);const next=pose();
+      assert.ok(next.every(Number.isFinite),action+' has nonfinite joint transforms');
+      if(next.some((v,j)=>Math.abs(v-prior[j])>1e-7))changed=true;
+      prior=next;
+    }
+    const held=['crouch_idle','ball_aim'].includes(action);
+    assert.ok(changed||held,action+' must move joints or explicitly be an authored held pose');
+    const events=handle.drainAnimationEvents();
+    for(const expected of clip.events||[]) assert.equal(events.filter(e=>e.type===expected.type&&e.time===expected.time).length,1,action+' must emit exactly one authored event');
+    handle.update(clip.duration);if(!clip.loop)assert.equal(handle.drainAnimationEvents().length,0,'completed one-shot does not repeat events');
+    coverage.push({action,clip:clip.id,changedJoints:changed,heldPose:held,events,scope:'actual producer/native-vendor playback; not input reachability'});
+  }
+  handle.play('idle',{restart:true});handle.play('skill');
+  assert.equal(handle.animationState.action,'idle');assert.ok(handle.animationState.lastResolveError);
+  handle.play('attack-ranged');assert.equal(handle.animationState.action,'idle');
+  let disposed=0;handle.ownTexture({dispose(){disposed++}});handle.dispose();assert.equal(disposed,1);
+  handle.ownTexture({dispose(){disposed++}});assert.equal(disposed,2,'late owned texture is disposed immediately');
+  const out=process.argv[3];if(out)fs.writeFileSync(out,JSON.stringify({passed:true,scope:'actual package playback, not full Studio solver parity or game reachability',coverage},null,2));
+  console.log('PASS: '+coverage.length+' mapped action paths, finite/moving joints, one-shot events, unsupported semantics and resource ownership');
+}

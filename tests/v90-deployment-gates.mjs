@@ -118,7 +118,7 @@ pagesFiles.set('v900.html', pagesFiles.get('index.html'));
 pagesFiles.set('scene-v900.html', '<script type="module" src="./scene-entry-v900.mjs"></script>');
 pagesFiles.set('online-world-shell-v900.mjs', "import { createCombatV91Shell } from './combat-v91-entry.mjs?v=1';\nvoid createCombatV91Shell;");
 pagesFiles.set('pirate-fruit-offline/index.html', '<script type="module" src="./pocket-bootstrap.mjs?v=4"></script>');
-pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-YxSDH_bK.js');\n");
+pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-DKUYjNyH.js');\n");
 const manifest = {
   files: [...pagesFiles].map(([relative, body]) => ({
     path: relative,

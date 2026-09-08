@@ -7,6 +7,8 @@ import {
   PIRATE_FRUIT_CLIENT_BRIDGE,
   PIRATE_FRUIT_MONSTER_VISUALS,
   applyPirateFruitActionTransition,
+  applyPirateFruitLocomotionTransition,
+  applyPirateFruitStudioPresentation,
   classifyPirateFruitNode,
   hidePirateFruitOriginalMeshes,
   hookPirateFruitRenderer,
@@ -16,6 +18,7 @@ import {
   pocketMonsterIdFor,
   resolvePirateVisualHost,
   shouldPreservePirateSubtree,
+  selectPirateFruitStudioAction,
   threeFromPirateFruitVendor,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
@@ -158,6 +161,65 @@ assert.deepEqual(
   [],
   'a repeated action with a null action id does not replay',
 );
+
+function locomotionCalls(previousPresentation, sample) {
+  const calls = [];
+  const handle = { play: (...args) => calls.push(args) };
+  return { calls, next: applyPirateFruitLocomotionTransition(handle, previousPresentation, sample) };
+}
+
+assert.deepEqual(
+  locomotionCalls(null, { locomotion: 'idle', action: null }),
+  { calls: [['idle', { restart: true }]], next: 'idle' },
+  'Studio receives its authored idle clip after attachment',
+);
+assert.deepEqual(
+  locomotionCalls('idle', { locomotion: 'walk', action: null }),
+  { calls: [['walk', { restart: true }]], next: 'walk' },
+  'ordinary Pirate movement switches Studio to walk',
+);
+assert.deepEqual(
+  locomotionCalls('skill', { locomotion: 'idle', action: null }),
+  { calls: [['idle', { restart: true }]], next: 'idle' },
+  'Studio returns to idle when a combat action ends',
+);
+assert.deepEqual(
+  locomotionCalls('walk', { locomotion: 'walk', action: null }),
+  { calls: [], next: 'walk' },
+  'unchanged locomotion does not restart a looping authored clip every frame',
+);
+assert.deepEqual(
+  locomotionCalls('walk', { locomotion: 'walk', action: 'skill', actionId: 'skill:1' }),
+  { calls: [], next: 'skill' },
+  'combat playback remains owned by the dead-safe action transition',
+);
+
+assert.equal(selectPirateFruitStudioAction({ action: 'attack-melee', locomotion: 'run' }), 'attack', 'Studio maps both attack sources through canonical attack');
+assert.equal(selectPirateFruitStudioAction({ action: 'skill', locomotion: 'run' }), 'skill', 'skill outranks locomotion');
+assert.equal(selectPirateFruitStudioAction({ action: 'hurt', locomotion: 'run' }), 'hurt', 'hurt outranks skill/attack presentation');
+assert.equal(selectPirateFruitStudioAction({ action: 'dead', locomotion: 'run' }), 'dead', 'dead is the terminal highest-priority Studio pose');
+assert.equal(selectPirateFruitStudioAction({ action: 'skill', locomotion: 'walk' }, { action: 'skill', finished: true }), 'walk', 'completed non-loop Studio action returns to locomotion');
+assert.equal(selectPirateFruitStudioAction({ action: 'dead', locomotion: 'walk' }, { action: 'dead', finished: true }), 'dead', 'completed death pose remains dead');
+function studioPresentationCalls(previous, sample, animationState = null) {
+  const calls = [];
+  const handle = { animationState, play: (...args) => calls.push(args) };
+  return { calls, next: applyPirateFruitStudioPresentation(handle, previous, sample) };
+}
+assert.deepEqual(
+  studioPresentationCalls(null, { action: null, locomotion: 'idle' }),
+  { calls: [['idle', { restart: true }]], next: { action: 'idle', actionId: null, combatAction: null } },
+  'Studio selects its canonical default pose on the first tick',
+);
+assert.deepEqual(
+  studioPresentationCalls({ action: 'idle', actionId: null }, { action: 'attack-melee', actionId: 'swing:1', locomotion: 'run' }),
+  { calls: [['attack', { restart: true }]], next: { action: 'attack', actionId: 'swing:1', combatAction: 'attack' } },
+  'a new attack action restarts its authored canonical clip',
+);
+assert.deepEqual(
+  studioPresentationCalls({ action: 'attack', actionId: 'swing:1' }, { action: 'attack-melee', actionId: 'swing:1', locomotion: 'walk' }, { action: 'attack', finished: true }),
+  { calls: [['walk', { restart: true }]], next: { action: 'walk', actionId: 'swing:1', combatAction: 'attack' } },
+  'a completed action returns to walk even before the stale combat signal clears',
+);
 assert.deepEqual(
   actionCalls('dead', { action: 'dead', actionId: null, duration: 1 }),
   [],
@@ -210,8 +272,16 @@ assert.match(
   /applyPirateFruitActionTransition\(item\.handle,\s*item\.lastAction,\s*sample\)/,
   'the live update routes sampled edges through dead-safe playback',
 );
+assert.match(
+  bridgeSrc,
+  /applyPirateFruitLocomotionTransition\(item\.handle,\s*item\.lastPresentation,\s*sample\)/,
+  'the live update selects authored idle/walk/run clips outside combat edges',
+);
 assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*sample\.locomotion\s*\}\)/, 'adapter locomotion drives Pocket updates');
-assert.match(bridgeSrc, /rigRetargeter\.update\(\)/, 'source bones are applied after the generic Pocket update');
+// Studio deliberately removes the legacy retargeter. Keep update ordering,
+// but require the null-safe call that fixes the real post-attachment crash.
+assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*sample\.locomotion\s*\}\);\s*item\.rigRetargeter\?\.update\(\)/, 'source bones apply after generic updates only when a retargeter exists');
+assert.doesNotMatch(bridgeSrc, /item\.rigRetargeter\.update\(\)/, 'Studio replacement must not restore the unsafe null retargeter call');
 assert.match(bridgeSrc, /rigRetargeted:/, 'diagnostics report retargeted visuals');
 assert.match(bridgeSrc, /actionDriven:/, 'diagnostics report action-driven visuals');
 assert.doesNotMatch(boot, /buildPirateFruitWorld|pirate-fruit-world\.mjs/, 'pirate boot does not mount a Pocket-built island');
@@ -220,7 +290,8 @@ assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene file is gone');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=27"/, 'offline HTML cache-busts and loads the Pocket hook');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=28"/, 'offline HTML cache-busts and loads the Pocket hook');
+assert.match(hookSrc, /pirate-fruit-client-bridge\.mjs\?v=4/, 'offline hook cache-busts the active Studio animation bridge');
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline save bootstrap still boots the real Vite client');
 assert.ok(

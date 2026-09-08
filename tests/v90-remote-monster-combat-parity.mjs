@@ -92,13 +92,14 @@ assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', players: [{ id: '
 const remoteMonster = scene.children.find(node => node.name === `remote-actor:${actor.actorId}`);
 assert.ok(remoteMonster, 'remote receiver creates the monster actor presentation host');
 assert.deepEqual([remoteMonster.position.x, remoteMonster.position.z], [4, -2]);
+assert.equal(remoteMonster.userData.remoteActorIdentity, `pirate-fruit:1:${actor.actorId}`, 'remote root carries the shared transport-zone/generation/actor identity');
 assert.equal(calls[0].action, 'skill', 'skill/projectile action reaches monster presentation handle');
 controller.update(.016);
 assert.equal(calls.at(-1).state.locomotion, 'walk');
 
 clock = 250;
 assert.equal(controller.acceptSnapshot({
-  zone: 'pirate-fruit', players: [{ id: 'player-b', x: 0, z: 0, dir: 0 }],
+  zone: 'pirate-fruit', players: [],
   actors: [{ ...actor, pose: { ...actor.pose, x: 8 }, stateSequence: 2 }],
 }), true);
 clock = 275;
@@ -114,12 +115,16 @@ assert.equal(scene.children.some(node => node.name === `remote-actor:${actor.act
 const lateJoinActor = { ...actor, lifecycle: 'spawn', generation: 2, spawnSequence: 2, stateSequence: 1, monsterType: 'summoned-flameling', actorId: 'summon-fox-1' };
 assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 2, players: [], actors: [lateJoinActor] }), true);
 assert.ok(scene.children.some(node => node.name === `remote-actor:${lateJoinActor.actorId}`), 'late join recreates actor from latest snapshot');
+assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 2, players: [] }), true, 'snapshot omission keeps the existing actor stream');
+assert.equal(scene.children.some(node => node.name === `remote-actor:${lateJoinActor.actorId}`), true, 'omitted actors do not accidentally delete a live actor');
 const oldLateJoin = scene.children.find(node => node.name === `remote-actor:${lateJoinActor.actorId}`);
 assert.equal(controller.acceptSnapshot({
   zone: 'pirate-fruit', generation: 2, players: [],
   actors: [{ ...lateJoinActor, generation: 3, spawnSequence: 1, stateSequence: 1, pose: { ...lateJoinActor.pose, x: 9 } }],
 }), true, 'new actor lifecycle generation is accepted after reconnect');
 assert.equal(oldLateJoin.disposed, true, 'old actor lifecycle generation is disposed before recreation');
+const currentLateJoin = scene.children.find(node => node.name === `remote-actor:${lateJoinActor.actorId}`);
+assert.equal(currentLateJoin.userData.remoteActorIdentity, `pirate-fruit:3:${lateJoinActor.actorId}`, 'recreated actor root advances the shared lifecycle identity');
 assert.equal(controller.acceptSnapshot({
   zone: 'pirate-fruit', generation: 2, players: [],
   actors: [{ ...lateJoinActor, ownerId: 'player-self', actorId: 'self-monster', stateSequence: 2 }],
@@ -129,6 +134,8 @@ assert.equal(controller.acceptSnapshot({
   zone: 'pirate-fruit', generation: 2, players: [],
   actors: [{ ...lateJoinActor, lifecycle: 'despawn', stateSequence: 0 }],
 }), false, 'invalid stale lifecycle sequence is rejected before it can remove a live actor');
+assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 3, players: [], actors: [] }), true, 'explicit empty actors list is a valid despawn/reset boundary');
+assert.equal(scene.children.some(node => node.name === `remote-actor:${lateJoinActor.actorId}`), false, 'explicit empty actors list removes remote actor roots');
 controller.dispose();
 
 console.log('V9.0 remote monster combat parity client contract: PASS');

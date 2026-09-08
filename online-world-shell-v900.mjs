@@ -267,6 +267,9 @@ function recoverSceneInput(reason = 'parent-input-recovery') {
   if (!sceneWindowIsCurrent(sceneWindow)) return false;
   try {
     sceneWindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS?.reset?.(reason);
+    if (reason.includes('fullscreen')) {
+      try { sceneWindow.postMessage?.({ type: 'pocketmonster:parent-fullscreen-change-v1' }, '*'); } catch {}
+    }
     sceneInputRecoveryCount += 1;
     return true;
   } catch {

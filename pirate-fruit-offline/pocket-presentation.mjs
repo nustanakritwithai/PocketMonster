@@ -1,5 +1,15 @@
 import * as pirateFruitThree from './assets/vendor-three-Bv6LZXUZ.js';
-import { hookPirateFruitRenderer } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=2';
+import {
+  hookPirateFruitRenderer,
+  receivePirateStudioCharacterPackage,
+  subscribePirateStudioCharacterStatus,
+} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=4';
+import {
+  PIRATE_STUDIO_CHARACTER_ACCEPTED,
+  PIRATE_STUDIO_CHARACTER_FAILED,
+  PIRATE_STUDIO_CHARACTER_PACKAGE,
+  PIRATE_STUDIO_CHARACTER_READY,
+} from '../asset-presentation/studio-character-pirate-channel.mjs?v=1';
 import {
   PIRATE_FRUIT_CONTROL_HUD_CSS,
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
@@ -8,6 +18,19 @@ import {
 } from '../pirate-fruit-control-hud-v900.mjs?v=12';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
+const studioCapability = new URLSearchParams(location.search).get('studioCapability');
+// ACCEPTED acknowledges an attached visual, never just an accepted envelope.
+subscribePirateStudioCharacterStatus(status => {
+  window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = status;
+  if (!studioCapability || !parentOrigin || !['attached', 'failed'].includes(status.state)) return;
+  window.parent?.postMessage({
+    type: status.state === 'attached' ? PIRATE_STUDIO_CHARACTER_ACCEPTED : PIRATE_STUDIO_CHARACTER_FAILED,
+    capability: studioCapability,
+    id: status.id,
+    error: status.error,
+    errors: status.errors,
+  }, parentOrigin);
+});
 let skipVendorFullscreen = false;
 window.addEventListener('pointerdown', event => {
   const target = event.target;
@@ -37,6 +60,17 @@ setTimeout(wrapFullscreen, 400);
 window.addEventListener('message', event => {
   if (event.source !== window.parent || event.origin !== parentOrigin) return;
   const message = event.data;
+  if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_PACKAGE) {
+    receivePirateStudioCharacterPackage(message.package);
+    return;
+  }
+  if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_FAILED) {
+    window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = Object.freeze({
+      source: 'pirate-fruit',
+      error: message.error || 'Studio package unavailable',
+    });
+    return;
+  }
   if (message?.type !== PIRATE_FRUIT_CONTROL_HUD_MESSAGE || !['human', 'throw'].includes(message.panel)) return;
   let style = document.getElementById(PIRATE_FRUIT_CONTROL_HUD_STYLE_ID);
   if (!style) {
@@ -50,6 +84,9 @@ window.addEventListener('message', event => {
 });
 
 hookPirateFruitRenderer(pirateFruitThree);
+if (studioCapability) {
+  window.parent?.postMessage({ type: PIRATE_STUDIO_CHARACTER_READY, capability: studioCapability }, parentOrigin);
+}
 
 const postDialogue = open => {
   try {

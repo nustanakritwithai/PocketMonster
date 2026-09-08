@@ -465,6 +465,8 @@ export function sanitizeCentralAuthority(value) {
     || value.contentHash !== PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH
     || value.manifestSha256 !== PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256
     || value.vectorsSha256 !== PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256
+    || !Number.isSafeInteger(value.generation)
+    || value.generation < 1
     || !Array.isArray(value.zones)
     || value.zones.length !== PIRATE_CENTRAL_AUTHORITY_ZONES.length
     || value.zones.some(zone => typeof zone !== 'string' || !PIRATE_CENTRAL_AUTHORITY_ZONES.includes(zone))
@@ -476,6 +478,7 @@ export function sanitizeCentralAuthority(value) {
     contentHash: PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH,
     manifestSha256: PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256,
     vectorsSha256: PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256,
+    generation: value.generation,
     zones: Object.freeze([...PIRATE_CENTRAL_AUTHORITY_ZONES]),
   });
 }
