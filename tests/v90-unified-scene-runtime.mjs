@@ -358,6 +358,18 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
         },
       });
     }
+    if (pathname === '/audio-engine.mjs') {
+      return makeSynthetic(resolvedUrl, {
+        initAudio() {
+          metrics.timeline.push('module:audio-init');
+          return null;
+        },
+        async resumeAudio() {
+          metrics.timeline.push('module:audio-resume');
+          return false;
+        },
+      });
+    }
     if (pathname === '/startup-errors.mjs') {
       metrics.timeline.push('module:startup-errors');
       return makeSynthetic(resolvedUrl, {});
