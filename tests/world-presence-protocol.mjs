@@ -246,17 +246,23 @@ assert.equal(routeDiagnostics.diagnostics().actorsOmitted, 1, 'omitted actors ar
 assert.equal(routeDiagnostics.diagnostics().staleSnapshots, 1, 'rejected snapshots are counted as stale');
 
 const authoritativeActor = actor(4);
-authoritativeActor.authorityVersion = MONSTER_AUTHORITY_VERSION;
-authoritativeActor.hp = { current: 7, max: 10, revision: 2 };
-authoritativeActor.resultRevision = 3;
-authoritativeActor.serverTimeUtc = '2026-09-08T07:00:00.000Z';
-authoritativeActor.reason = 'expired';
+authoritativeActor.authority = {
+  authorityVersion: MONSTER_AUTHORITY_VERSION,
+  serverTimeUtc: '2026-09-08T07:00:00.000Z', generation: 1,
+  hp: { current: 7, max: 10, revision: 0 }, resultRevision: 0,
+  actionSequence: 1, hit: true, damage: 1, death: false, despawnReason: 'expired',
+  attack: { attackId: 'attack-1', spawnId: 'monster-a', monsterId: 'monster-a', islandId: 'pirate-fruit', targetId: 'player-a', action: 'melee', damage: 1, hitDelayMs: 180 },
+};
 const authoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [authoritativeActor] });
-assert.equal(authoritativeSnapshot.actors[0].hp.revision, 2, 'authoritative HP revision survives sanitization');
-assert.equal(authoritativeSnapshot.actors[0].resultRevision, 3, 'combat result revision survives sanitization');
-assert.equal(authoritativeSnapshot.actors[0].reason, 'expired', 'expired is a lifecycle reason, not a death state');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authorityVersion: 'wrong/1' }] }), null, 'unknown authority version fails closed');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, hp: { current: 11, max: 10, revision: 2 } }] }), null, 'invalid HP range fails closed');
+assert.equal(authoritativeSnapshot.actors[0].authority.hp.revision, 0, 'initial authoritative HP revision survives sanitization');
+assert.equal(authoritativeSnapshot.actors[0].authority.resultRevision, 0, 'initial combat result revision survives sanitization');
+assert.equal(authoritativeSnapshot.actors[0].authority.despawnReason, 'expired', 'expired is a lifecycle reason, not a death state');
+assert.equal(authoritativeSnapshot.actors[0].authority.attack.targetId, 'player-a', 'nested attack target survives sanitization');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, authorityVersion: 'wrong/1' } }] }), null, 'unknown authority version fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, hp: { current: 11, max: 10, revision: 2 } } }] }), null, 'invalid HP range fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }), null, 'authority generation mismatch fails closed');
+const outboundPose = sanitizeOnlineWorldPose({ zone: 'hub', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false });
+assert.equal(Object.hasOwn(outboundPose, 'actors'), false, 'client-authored authority is stripped from outbound pose');
 
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');

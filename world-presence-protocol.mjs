@@ -248,7 +248,61 @@ export function sanitizeActorPresentation(value) {
   return Object.freeze({ events: Object.freeze(events), projectiles: Object.freeze(projectiles) });
 }
 
-export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS } = {}) {
+function boundedAuthorityToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,160}$/.test(value) ? value : null;
+}
+
+function sanitizeMonsterAuthority(value) {
+  if (!isRecord(value) || value.authorityVersion !== MONSTER_AUTHORITY_VERSION
+    || typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 64
+    || !Number.isFinite(Date.parse(value.serverTimeUtc)) || !value.serverTimeUtc.endsWith('Z')
+    || !Number.isSafeInteger(value.generation) || value.generation < 1
+    || !isRecord(value.hp) || !Number.isFinite(value.hp.current) || !Number.isFinite(value.hp.max)
+    || value.hp.max <= 0 || value.hp.current < 0 || value.hp.current > value.hp.max
+    || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 0
+    || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0
+    || !Number.isSafeInteger(value.actionSequence) || value.actionSequence < 0
+    || typeof value.hit !== 'boolean' || !Number.isFinite(value.damage) || value.damage < 0
+    || !Number.isInteger(value.damage) || typeof value.death !== 'boolean') return null;
+  const authority = {
+    authorityVersion: MONSTER_AUTHORITY_VERSION,
+    serverTimeUtc: value.serverTimeUtc,
+    generation: value.generation,
+    hp: Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision }),
+    resultRevision: value.resultRevision,
+    actionSequence: value.actionSequence,
+    hit: value.hit,
+    damage: value.damage,
+    death: value.death,
+  };
+  if (value.actionId !== undefined) {
+    const actionId = boundedAuthorityToken(value.actionId);
+    if (!actionId) return null;
+    authority.actionId = actionId;
+  }
+  if (value.despawnReason !== undefined) {
+    if (typeof value.despawnReason !== 'string' || !MONSTER_STATE_REASONS.includes(value.despawnReason)) return null;
+    authority.despawnReason = value.despawnReason;
+  }
+  if (value.attack !== undefined && value.attack !== null) {
+    if (!isRecord(value.attack) || !['attackId', 'spawnId', 'monsterId', 'islandId', 'targetId'].every(name => boundedAuthorityToken(value.attack[name]))
+      || value.attack.action !== 'melee' || !Number.isInteger(value.attack.damage) || value.attack.damage < 0
+      || !Number.isInteger(value.attack.hitDelayMs) || value.attack.hitDelayMs < 0) return null;
+    authority.attack = Object.freeze({
+      attackId: value.attack.attackId,
+      spawnId: value.attack.spawnId,
+      monsterId: value.attack.monsterId,
+      islandId: value.attack.islandId,
+      targetId: value.attack.targetId,
+      action: 'melee',
+      damage: value.attack.damage,
+      hitDelayMs: value.attack.hitDelayMs,
+    });
+  }
+  return Object.freeze(authority);
+}
+
+export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const actorId = sanitizeMonsterInstanceId(value.actorId);
   const ownerId = value.ownerId === undefined ? null : sanitizeMonsterInstanceId(value.ownerId);
@@ -261,33 +315,11 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     || (expectedGeneration !== undefined && value.generation !== expectedGeneration)) return null;
   const pose = value.pose;
   if (!isRecord(pose) || !isFiniteNumber(pose.x) || !isFiniteNumber(pose.y) || !isFiniteNumber(pose.z) || !isFiniteNumber(pose.dir)) return null;
-  const authorityFieldsPresent = value.authorityVersion !== undefined || value.hp !== undefined
-    || value.serverTimeUtc !== undefined || value.resultRevision !== undefined || value.reason !== undefined;
-  if (authorityFieldsPresent && value.authorityVersion !== MONSTER_AUTHORITY_VERSION) return null;
-  let hp;
-  if (value.hp !== undefined) {
-    if (!isRecord(value.hp) || !Number.isSafeInteger(value.hp.current) || value.hp.current < 0
-      || !Number.isSafeInteger(value.hp.max) || value.hp.max < 0 || value.hp.current > value.hp.max
-      || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 1) return null;
-    hp = Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision });
-  }
-  let serverTimeUtc;
-  if (value.serverTimeUtc !== undefined) {
-    if (typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 64) return null;
-    const parsed = Date.parse(value.serverTimeUtc);
-    if (!Number.isFinite(parsed) || !value.serverTimeUtc.endsWith('Z')) return null;
-    serverTimeUtc = value.serverTimeUtc;
-  }
-  let resultRevision;
-  if (value.resultRevision !== undefined) {
-    if (!Number.isSafeInteger(value.resultRevision) || value.resultRevision < 1) return null;
-    resultRevision = value.resultRevision;
-  }
-  let reason;
-  if (value.reason !== undefined) {
-    if (typeof value.reason !== 'string' || !MONSTER_STATE_REASONS.includes(value.reason)) return null;
-    reason = value.reason;
-  }
+  if (value.authority !== undefined && !allowAuthority) return null;
+  const authority = value.authority === undefined ? null : sanitizeMonsterAuthority(value.authority);
+  if (value.authority !== undefined && !authority) return null;
+  if (authority && authority.generation !== value.generation) return null;
+  if (authority?.attack && authority.attack.monsterId !== actorId) return null;
   const actor = {
     actorId, kind: 'monster', ...(ownerId === null ? {} : { ownerId }), monsterType, zone, generation: value.generation, lifecycle: value.lifecycle,
     spawnSequence: value.spawnSequence, stateSequence: value.stateSequence,
@@ -300,11 +332,7 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
   };
-  if (authorityFieldsPresent) actor.authorityVersion = MONSTER_AUTHORITY_VERSION;
-  if (hp) actor.hp = hp;
-  if (serverTimeUtc !== undefined) actor.serverTimeUtc = serverTimeUtc;
-  if (resultRevision !== undefined) actor.resultRevision = resultRevision;
-  if (reason !== undefined) actor.reason = reason;
+  if (authority) actor.authority = authority;
   if (value.presentation !== undefined) {
     const presentation = sanitizeActorPresentation(value.presentation);
     if (presentation) actor.presentation = presentation;
@@ -442,7 +470,7 @@ export function sanitizeAnimation(value) {
   return Object.freeze(animation);
 }
 
-export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS } = {}) {
+export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const zone = safeZone(value.zone);
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
@@ -457,7 +485,7 @@ export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EV
   if (isFiniteNumber(value.y)) pose.y = clamp(value.y, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT);
   if (value.presentation !== undefined) { const presentation = sanitizePresentation(value.presentation); if (presentation) pose.presentation = presentation; }
   if (value.visual !== undefined) { const visual = sanitizeVisual(value.visual, { maxEvents: maxVisualEvents }); if (visual) pose.visual = visual; }
-  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents }); if (actors) pose.actors = actors; }
+  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents, allowAuthority }); if (actors) pose.actors = actors; }
   return Object.freeze(pose);
 }
 
@@ -630,8 +658,8 @@ export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamp
         if (stateSequence <= previous.stateSequence) staleActors += 1;
         else if (stateSequence > previous.stateSequence + 1) actorSequenceGaps += stateSequence - previous.stateSequence - 1;
       }
-      const hpRevision = Number.isSafeInteger(actor?.hp?.revision) ? actor.hp.revision : null;
-      const resultRevision = Number.isSafeInteger(actor?.resultRevision) ? actor.resultRevision : null;
+      const hpRevision = Number.isSafeInteger(actor?.authority?.hp?.revision) ? actor.authority.hp.revision : null;
+      const resultRevision = Number.isSafeInteger(actor?.authority?.resultRevision) ? actor.authority.resultRevision : null;
       if (previous && hpRevision !== null && previous.hpRevision !== null) {
         if (hpRevision <= previous.hpRevision) staleHpRevisions += 1;
         else if (hpRevision > previous.hpRevision + 1) hpRevisionGaps += hpRevision - previous.hpRevision - 1;

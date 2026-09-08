@@ -88,8 +88,8 @@ try {
     actorId: 'monster-observer-a', kind: 'monster', monsterType: 'flameling', zone: 'pirate-fruit', generation: 1,
     spawnSequence: 1, stateSequence: 1, lifecycle: 'active',
     pose: { x: 1, y: 0, z: 2, dir: 0 }, locomotion: 'run',
-    authorityVersion: 'monster-authority/1', hp: { current: 9, max: 10, revision: 1 }, resultRevision: 1,
-    serverTimeUtc: '2026-09-08T07:00:00.000Z',
+    authority: { authorityVersion: 'monster-authority/1', serverTimeUtc: '2026-09-08T07:00:00.000Z', generation: 1,
+      hp: { current: 9, max: 10, revision: 1 }, resultRevision: 1, actionSequence: 1, hit: true, damage: 1, death: false },
   };
   socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
   socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
