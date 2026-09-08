@@ -298,7 +298,7 @@ assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
   'Pocket hook is listed before the save bootstrap that imports the Pirate Fruit bundle',
 );
-assert.match(hookSrc, /vendor-three-Bv6LZXUZ\.js/, 'hook shares the Pirate Fruit vendor Three instance');
+assert.match(hookSrc, /vendor-three-RYo9rfeI\.js/, 'hook shares the Pirate Fruit vendor Three instance');
 assert.match(hookSrc, /hookPirateFruitRenderer/, 'hook installs the Pocket overlay before the client renders');
 
 const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/${pirateBundleRef}`, import.meta.url), 'utf8');
@@ -329,7 +329,7 @@ for (const id of Object.values(PIRATE_FRUIT_MONSTER_VISUALS)) {
   assert.equal(catalogIds.has(id), true, `mapped monster visual ${id} exists in Pocket catalogs`);
 }
 
-const vendor = await import('../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js');
+const vendor = await import('../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js');
 const kit = threeFromPirateFruitVendor(vendor);
 assert.equal(typeof kit.Object3D, 'function');
 assert.equal(typeof kit.Group, 'function');
