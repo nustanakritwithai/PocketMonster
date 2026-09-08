@@ -1,0 +1,55 @@
+name: Studio real browser acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'asset-presentation/**'
+      - 'pirate-fruit-offline/pocket-presentation.mjs'
+      - 'boot-pirate-fruit-v900.mjs'
+      - 'tests/v91-studio-browser-acceptance.py'
+      - 'tests/v91-studio-real-vendor.mjs'
+      - '.github/workflows/studio-browser-acceptance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: nustanakritwithai/3JS-player-block-asset-engine-
+          ref: 6914ee65dbc572f474734159fe369d22178e539f
+          path: .ci-studio-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser dependencies
+        run: |
+          pip install playwright==1.62.0 numpy pillow
+          python -m playwright install --with-deps chromium
+          npm install --prefix /tmp/studio-browser --no-package-lock --ignore-scripts three@0.169.0
+      - name: Build exact Studio producer
+        run: |
+          python .ci-studio-source/scripts/generate_textures.py --output .ci-studio-source/assets/textures --resolution 2048
+          python .ci-studio-source/scripts/build_pages.py
+      - name: Real Studio to sandboxed Pirate browser acceptance
+        run: python tests/v91-studio-browser-acceptance.py
+      - name: Actual exported package through native vendor regression
+        if: always()
+        run: node tests/v91-studio-real-vendor.mjs studio-browser-evidence/actual-studio-package.json
+      - name: Preserve actual screenshot, exported package and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-browser-evidence
+          path: studio-browser-evidence/
+          retention-days: 7

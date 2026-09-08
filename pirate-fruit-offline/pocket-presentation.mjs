@@ -2,6 +2,7 @@ import * as pirateFruitThree from './assets/vendor-three-Bv6LZXUZ.js';
 import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
+  subscribePirateStudioCharacterStatus,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=3';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
@@ -18,6 +19,18 @@ import {
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 const studioCapability = new URLSearchParams(location.search).get('studioCapability');
+// ACCEPTED acknowledges an attached visual, never just an accepted envelope.
+subscribePirateStudioCharacterStatus(status => {
+  window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = status;
+  if (!studioCapability || !parentOrigin || !['attached', 'failed'].includes(status.state)) return;
+  window.parent?.postMessage({
+    type: status.state === 'attached' ? PIRATE_STUDIO_CHARACTER_ACCEPTED : PIRATE_STUDIO_CHARACTER_FAILED,
+    capability: studioCapability,
+    id: status.id,
+    error: status.error,
+    errors: status.errors,
+  }, parentOrigin);
+});
 let skipVendorFullscreen = false;
 window.addEventListener('pointerdown', event => {
   const target = event.target;
@@ -48,13 +61,7 @@ window.addEventListener('message', event => {
   if (event.source !== window.parent || event.origin !== parentOrigin) return;
   const message = event.data;
   if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_PACKAGE) {
-    const result = receivePirateStudioCharacterPackage(message.package);
-    window.parent?.postMessage({
-      type: result.accepted ? PIRATE_STUDIO_CHARACTER_ACCEPTED : PIRATE_STUDIO_CHARACTER_FAILED,
-      capability: studioCapability,
-      id: result.id,
-      errors: result.errors,
-    }, parentOrigin);
+    receivePirateStudioCharacterPackage(message.package);
     return;
   }
   if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_FAILED) {
