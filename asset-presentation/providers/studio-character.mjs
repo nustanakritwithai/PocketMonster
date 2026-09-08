@@ -1,7 +1,7 @@
 import { LEGACY_FALLBACKS } from '../anchors.mjs';
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { disposeHandle, registerOwned } from '../ownership.mjs';
-import { getStudioCharacterPackage } from '../studio-character-package.mjs';
+import { getStudioCharacterPackage, inspectStudioCharacterMotionPack } from '../studio-character-package.mjs';
 
 const ARRAY_TYPES = Object.freeze({
   Float32Array,
@@ -164,6 +164,14 @@ const CLIP_STATE_ALIASES = Object.freeze({
   skill: ['skill', 'cast', 'ability'],
 });
 
+function canonicalMotionAction(action) {
+  const wanted = normalizeAction(action);
+  if (wanted === 'attack_melee' || wanted === 'attack_ranged') return 'attack';
+  if (wanted === 'hit_react') return 'hurt';
+  if (wanted === 'death' || wanted === 'faint') return 'dead';
+  return wanted;
+}
+
 /**
  * Studio names authored clips descriptively (for example walk_pose_library),
  * while Pirate requests gameplay states (walk). Resolve those semantic forms
@@ -172,6 +180,13 @@ const CLIP_STATE_ALIASES = Object.freeze({
 export function findStudioCharacterClip(pkg, action) {
   const wanted = normalizeAction(action);
   const clips = Array.isArray(pkg?.animations) ? pkg.animations : [];
+  const motion = inspectStudioCharacterMotionPack(pkg);
+  const canonical = canonicalMotionAction(wanted);
+  const canonicalId = motion.actionMap?.[canonical];
+  if (canonicalId) {
+    const mapped = clips.find(clip => clip?.id === canonicalId);
+    if (mapped) return mapped;
+  }
   const exact = clips.find(clip => clipState(clip) === wanted)
     || clips.find(clip => normalizeAction(clip?.name) === wanted);
   if (exact) return exact;
@@ -201,18 +216,48 @@ export function findStudioCharacterClip(pkg, action) {
 }
 
 function transformFromPose(value) {
-  if (!value || typeof value !== 'object') return { rotation: null, position: null };
+  if (!value || typeof value !== 'object') return {
+    rotation: null, quaternion: null, position: null, scale: null,
+  };
   const rotation = Array.isArray(value.rotation) ? value.rotation
     : Array.isArray(value.rot) ? value.rot
       : Array.isArray(value.r) ? value.r : null;
   const position = Array.isArray(value.position) ? value.position
     : Array.isArray(value.pos) ? value.pos
       : Array.isArray(value.p) ? value.p : null;
-  return { rotation, position };
+  const scale = Array.isArray(value.scale) ? value.scale
+    : Array.isArray(value.scl) ? value.scl
+      : Array.isArray(value.s) ? value.s : null;
+  const quaternion = Array.isArray(value.quaternion) ? value.quaternion
+    : Array.isArray(value.quat) ? value.quat
+      : Array.isArray(value.q) ? value.q : null;
+  return { rotation, quaternion, position, scale };
 }
 
 function lerp(a, b, t) {
   return (Number(a) || 0) + ((Number(b) || 0) - (Number(a) || 0)) * t;
+}
+
+function finiteVector(value, size) {
+  return Array.isArray(value) && value.length >= size && value.slice(0, size).every(Number.isFinite);
+}
+
+function slerpQuaternion(a, b, t) {
+  if (!finiteVector(a, 4) || !finiteVector(b, 4)) return null;
+  let [ax, ay, az, aw] = a;
+  let [bx, by, bz, bw] = b;
+  let dot = ax * bx + ay * by + az * bz + aw * bw;
+  if (dot < 0) { dot = -dot; bx = -bx; by = -by; bz = -bz; bw = -bw; }
+  if (dot > 0.9995) {
+    const q = [lerp(ax, bx, t), lerp(ay, by, t), lerp(az, bz, t), lerp(aw, bw, t)];
+    const length = Math.hypot(...q) || 1;
+    return q.map(value => value / length);
+  }
+  const theta = Math.acos(Math.min(1, Math.max(-1, dot)));
+  const sinTheta = Math.sin(theta) || 1;
+  const left = Math.sin((1 - t) * theta) / sinTheta;
+  const right = Math.sin(t * theta) / sinTheta;
+  return [ax * left + bx * right, ay * left + by * right, az * left + bz * right, aw * left + bw * right];
 }
 
 function sampleClip(clip, time, joints) {
@@ -239,7 +284,10 @@ function sampleClip(clip, time, joints) {
     if (!node) continue;
     const a = transformFromPose(left.joints?.[name] || right.joints?.[name]);
     const b = transformFromPose(right.joints?.[name] || left.joints?.[name]);
-    if (a.rotation && b.rotation) {
+    const quaternion = slerpQuaternion(a.quaternion, b.quaternion, alpha);
+    if (quaternion && node.quaternion?.set) {
+      node.quaternion.set(...quaternion);
+    } else if (finiteVector(a.rotation, 3) && finiteVector(b.rotation, 3)) {
       node.rotation?.set?.(
         lerp(a.rotation[0], b.rotation[0], alpha),
         lerp(a.rotation[1], b.rotation[1], alpha),
@@ -252,6 +300,13 @@ function sampleClip(clip, time, joints) {
         lerp(a.position[0], b.position[0], alpha),
         lerp(a.position[1], b.position[1], alpha),
         lerp(a.position[2], b.position[2], alpha),
+      );
+    }
+    if (finiteVector(a.scale, 3) && finiteVector(b.scale, 3)) {
+      node.scale?.set?.(
+        lerp(a.scale[0], b.scale[0], alpha),
+        lerp(a.scale[1], b.scale[1], alpha),
+        lerp(a.scale[2], b.scale[2], alpha),
       );
     }
   }
@@ -284,6 +339,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
     root.add(sceneRoot);
 
     const joints = buildJointMap(sceneRoot, pkg);
+    const motion = inspectStudioCharacterMotionPack(pkg);
     const height = Number(pkg.manifest?.metrics?.height) || 1.8;
     const initialClip = findStudioCharacterClip(pkg, 'idle');
     const animation = {
@@ -392,6 +448,13 @@ export function createStudioCharacterProvider({ THREE } = {}) {
           time: animation.time,
           finished: animation.finished,
           lastResolveError: animation.lastResolveError,
+          motion: {
+            mode: motion.mode,
+            defaultAction: motion.defaultAction,
+            available: motion.available,
+            missing: motion.missing,
+            invalid: motion.invalid,
+          },
         });
       },
     };
