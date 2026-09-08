@@ -60,7 +60,6 @@ export function createMonsterControlController({ commands, getParty = () => null
       const slot = slotOf(index);
       if (disposed || !slot?.available || !slot.instanceId || slot.fainted) return { ok: false, reason: 'unavailable' };
       if (isActive(slot.instanceId)) {
-        waiting = null;
         panel = panel.mode === 'monster' && panel.instanceId === slot.instanceId ? emptyPanel()
           : { mode: 'monster', slot: index, instanceId: slot.instanceId };
         emit();
@@ -72,13 +71,15 @@ export function createMonsterControlController({ commands, getParty = () => null
       if (current && (!Number.isSafeInteger(current.generation) || current.generation < 1)) return { ok: false, reason: 'generation-unavailable' };
       const targetPoint = pointOf(getAim());
       if (!targetPoint) return { ok: false, reason: 'aim-unavailable' };
-      const command = retryable.get(slot.instanceId) || { commandId: globalThis.crypto.randomUUID(),
+      const retryCommand = retryable.get(slot.instanceId);
+      const command = retryCommand || { commandId: globalThis.crypto.randomUUID(),
         instanceId: slot.instanceId, zone: zone(), targetPoint,
         ...(current ? { expectedActiveInstanceId: current.instanceId, expectedActiveGeneration: current.generation } : {}) };
-      request = { instanceId: slot.instanceId, command, kind: current ? 'switch' : 'summon', epoch: requestEpoch };
+      const commandKind = retryCommand?.expectedActiveInstanceId ? 'switch' : (current ? 'switch' : 'summon');
+      request = { instanceId: slot.instanceId, command, kind: commandKind, epoch: requestEpoch };
       waiting = request;
       emit();
-      const result = current
+      const result = commandKind === 'switch'
         ? (typeof commands.switch === 'function' ? await commands.switch({ ...command, contract: MONSTER_COMMAND_CONTRACT, kind: 'switch' }) : { ok: false, code: 'SWITCH_UNAVAILABLE' })
         : await commands.summon(command);
       if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
@@ -119,13 +120,18 @@ export function createMonsterControlController({ commands, getParty = () => null
     if (!supports('recall')) return { ok: false, reason: 'recall-unavailable' };
     if (waiting) return { ok: false, reason: 'command-pending' };
     if (!Number.isSafeInteger(current.generation) || current.generation < 1) return { ok: false, reason: 'generation-unavailable' };
-    const command = { commandId: globalThis.crypto.randomUUID(), instanceId: current.instanceId, zone: zone(), expectedActiveGeneration: current.generation };
+    const command = retryable.get(current.instanceId) || { commandId: globalThis.crypto.randomUUID(), instanceId: current.instanceId, zone: zone(), expectedActiveGeneration: current.generation };
     waiting = { instanceId: current.instanceId, command, kind: 'recall', epoch: requestEpoch };
     emit();
     try {
       const result = await commands.recall({ ...command, contract: MONSTER_COMMAND_CONTRACT, kind: 'recall' });
       if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
-      if (!result?.ok) { if (waiting?.command === command) waiting = null; emit(); return { ok: false, reason: result?.code || 'recall-rejected' }; }
+      if (!result?.ok) {
+        if (waiting?.command === command) waiting = null;
+        if (['TRANSPORT_ERROR', 'TRANSPORT_TIMEOUT'].includes(result?.code)) retryable.set(current.instanceId, command);
+        else retryable.delete(current.instanceId);
+        emit(); return { ok: false, reason: result?.code || 'recall-rejected' };
+      }
       if (!isActive(current.instanceId)) {
         if (waiting?.command === command) waiting = null;
         panel = emptyPanel();

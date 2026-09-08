@@ -100,9 +100,10 @@ export function createMonsterCommandAdapter({ send = null, getZone = null, timeo
         request.finish(failure('INVALID_SERVER_RESULT'));
         return;
       }
-      request.finish(Object.freeze({ ok: result.ok,
+      const normalized = Object.freeze({ ok: result.ok,
         ...(result.accepted === undefined ? {} : { accepted: result.accepted }),
-        ...(result.code === undefined ? {} : { code: result.code }), commandId: command.commandId }), true);
+        ...(result.code === undefined ? {} : { code: result.code }), commandId: command.commandId });
+      request.finish(normalized, !['TRANSPORT_ERROR', 'TRANSPORT_TIMEOUT'].includes(result.code));
     }).catch(() => request.finish(failure(stale() ? 'STALE_SCENE' : 'TRANSPORT_ERROR')));
     return request.promise;
   };

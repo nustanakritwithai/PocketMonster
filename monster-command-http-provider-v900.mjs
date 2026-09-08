@@ -7,9 +7,13 @@ function endpoint(config, path) {
 
 function stateFromPlayerPayload(payload) {
   const source = payload?.monsterControl || {};
-  const party = Array.isArray(source.party) ? { available: true, slots: source.party } : source.party;
-  const actors = Array.isArray(source.actors || payload?.actors) ? (source.actors || payload.actors).map(actor => ({ ...actor,
-    ...(Number.isSafeInteger(actor?.generation) && actor.generation > 0 ? { generation: actor.generation } : {}) })) : [];
+  const slots = Array.isArray(source.party) ? source.party.map(slot => ({ ...slot,
+    available: Boolean(slot?.instanceId) && slot?.fainted !== true })) : null;
+  const party = Array.isArray(slots) ? { available: true, slots } : source.party;
+  const actors = Array.isArray(source.actors || payload?.actors) ? (source.actors || payload.actors).map(actor => {
+    const { generation, ...rest } = actor || {};
+    return { ...rest, ...(Number.isSafeInteger(generation) && generation > 0 ? { generation } : {}) };
+  }) : [];
   return Object.freeze({
     party: party || null,
     actors,
