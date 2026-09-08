@@ -49,7 +49,7 @@ function fillBar(documentLike, className, value, maximum, label) {
   return bar;
 }
 
-export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}) {
+export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monsterController = null } = {}) {
   if (!windowLike || !documentLike) {
     throw new TypeError('createUnifiedMmorpgHud requires windowLike and documentLike');
   }
@@ -227,7 +227,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
   }
 
   function partyAdapter() {
-    return windowLike.POCKETMONSTER_PARTY_HUD || null;
+    return monsterController || windowLike.POCKETMONSTER_PARTY_HUD || null;
   }
 
   function pocketAdapter() {

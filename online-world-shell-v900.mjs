@@ -18,6 +18,7 @@ import {
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=948';
+import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -598,7 +599,18 @@ window.addEventListener('pageshow', event => {
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
 await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
-unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
+const monsterCommands = window.POCKETMONSTER_MONSTER_COMMANDS || {
+  summon: async () => ({ ok: false, reason: 'server-transport-unavailable' }),
+  skill: async () => ({ ok: false, reason: 'server-transport-unavailable' }),
+};
+const monsterController = createMonsterControlController({
+  commands: monsterCommands,
+  getParty: () => window.POCKETMONSTER_PARTY_HUD?.snapshot?.() || null,
+  getConfirmedActors: () => window.POCKETMONSTER_MONSTER_ACTORS || [],
+  getZone: () => document.body?.dataset?.zone || activeWorld,
+});
+window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = monsterController;
+unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document, monsterController });
 installUnifiedHud();
 unifiedHud.setExpanded(false);
 const combatTransportStarted = combatTransport.start({

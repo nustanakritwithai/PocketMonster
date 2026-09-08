@@ -48,12 +48,19 @@ function emptySlot(slot, selected) {
   });
 }
 
+function normalizeControlPanel(value) {
+  const mode = value?.mode === 'monster' ? 'monster' : 'character';
+  const slot = Number.isInteger(value?.slot) && value.slot >= 0 && value.slot < PARTY_SLOT_COUNT ? value.slot : null;
+  const instanceId = stableInstanceId(value?.instanceId);
+  return Object.freeze({ mode, slot, instanceId });
+}
+
 /**
  * Build the contract-shaped party feature input from a safe projection of
  * live Pocket state. `slots` must already be plain primitives extracted by
  * game-v800.js — no monster instances or DOM may cross this boundary.
  */
-export function buildPocketPartyHudFeature({ selectedSlot = null, activeInstanceId = '', canSwitch = false, slots = [] } = {}) {
+export function buildPocketPartyHudFeature({ selectedSlot = null, activeInstanceId = '', canSwitch = false, slots = [], controlPanel = null } = {}) {
   const selected = Number.isInteger(selectedSlot) && selectedSlot >= 0 && selectedSlot < PARTY_SLOT_COUNT
     ? selectedSlot
     : null;
@@ -62,6 +69,7 @@ export function buildPocketPartyHudFeature({ selectedSlot = null, activeInstance
     available: true,
     selectedSlot: selected,
     activeInstanceId: activeId,
+    controlPanel: normalizeControlPanel(controlPanel),
     canSwitch: canSwitch === true,
     slots: Array.from({ length: PARTY_SLOT_COUNT }, (_, slot) => {
       const source = slots?.[slot];
@@ -113,6 +121,7 @@ function unavailablePartySnapshot(revision) {
     selectedSlot: null,
     activeInstanceId: '',
     canSwitch: false,
+    controlPanel: normalizeControlPanel(null),
     slots: Object.freeze(Array.from({ length: PARTY_SLOT_COUNT }, (_, slot) => emptySlot(slot, false))),
   });
 }
@@ -133,6 +142,7 @@ function normalizePartyForStore(input, revision) {
     selectedSlot,
     activeInstanceId,
     canSwitch: input.canSwitch === true,
+    controlPanel: normalizeControlPanel(input.controlPanel),
     slots: Object.freeze(slots),
   });
 }

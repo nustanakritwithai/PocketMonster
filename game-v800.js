@@ -2705,6 +2705,9 @@ function cancelArmedSummonCommand(){
 function activatePartySlotCommand(slot){
   const index=Number.isInteger(slot)?slot:-1;
   if(index<0||index>=state.party.length)return createHudCommandResult({ok:false,reason:'invalid-slot'});
+  const external=window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;
+  if(external?.activateSlot) return external.activateSlot(index);
+  if(pirateThrowWorld)return createHudCommandResult({ok:false,reason:'server-transport-unavailable'});
   const inst=getInst(state.party[index]);
   if(!inst)return createHudCommandResult({ok:false,reason:'empty-slot'});
   const activeId=activeSummon?.inst?.instanceId||null;
