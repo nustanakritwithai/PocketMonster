@@ -4,7 +4,7 @@ import { applyPirateFruitStudioPresentation as apply, createStudioControllerSamp
 import { inspectStudioCharacterMotionPack, registerStudioCharacterPackage, validateStudioCharacterPackage } from '../asset-presentation/studio-character-package.mjs';
 import { createStudioCharacterProvider, findStudioCharacterClip } from '../asset-presentation/providers/studio-character.mjs';
 import { threeFromPirateFruitVendor } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
-import * as vendor from '../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js';
+import * as vendor from '../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js';
 const calls = [];
 const fake = { animationState: { action:'idle', finished:false, motion:{} }, play(action, options) {
   calls.push({action,options}); this.animationState={action,finished:false,motion:{}};

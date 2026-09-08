@@ -5,7 +5,7 @@
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
-  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเท่านั้น Save และ Combat authority ยังคงปิดบน VPS",
+  "note": "Pirate client จาก commit ที่ระบุ เพิ่มข้อมูลภาพผู้เล่นผ่าน authenticated parent presence: pose/animation อุปกรณ์ที่ถือ โล่ เอฟเฟกต์สกิล และลูกพลัง ใช้ geometry/material และ animator เดียวกับผู้เล่นเอง พร้อมคิวเหตุการณ์ตามลำดับและล้างเมื่อเปลี่ยนโลก ข้อมูลนี้ใช้แสดงภาพเป็นหลัก; Combat authority ควบคุมด้วย OwnedMonsterEnabled และ Server flags แบบ fail-closed artifact นี้ไม่เปลี่ยน flags",
   "islandMap": {
     "matchesLiveOnline": true,
     "liveOrigin": "https://pirate-fruit-u555.onrender.com",
