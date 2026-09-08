@@ -149,14 +149,55 @@ function normalizeAction(action) {
 }
 
 function clipState(clip) {
-  return clip?.runtime?.transition?.state || clip?.runtime?.state || normalizeAction(clip?.name || '');
+  return normalizeAction(clip?.runtime?.transition?.state || clip?.runtime?.state || clip?.name || '');
 }
 
-function findClip(pkg, action) {
+function clipMotionClass(clip) {
+  return normalizeAction(clip?.runtime?.motionClass || '');
+}
+
+const CLIP_STATE_ALIASES = Object.freeze({
+  attack_melee: ['attack', 'melee', 'slash', 'swing'],
+  attack_ranged: ['attack', 'ranged', 'shoot', 'gun'],
+  hurt: ['hurt', 'hit_react', 'hit'],
+  dead: ['dead', 'death', 'faint'],
+  skill: ['skill', 'cast', 'ability'],
+});
+
+/**
+ * Studio names authored clips descriptively (for example walk_pose_library),
+ * while Pirate requests gameplay states (walk). Resolve those semantic forms
+ * without inventing a pose when the package did not author one.
+ */
+export function findStudioCharacterClip(pkg, action) {
   const wanted = normalizeAction(action);
-  return (pkg.animations || []).find(clip => clipState(clip) === wanted)
-    || (pkg.animations || []).find(clip => normalizeAction(clip.name) === wanted)
-    || null;
+  const clips = Array.isArray(pkg?.animations) ? pkg.animations : [];
+  const exact = clips.find(clip => clipState(clip) === wanted)
+    || clips.find(clip => normalizeAction(clip?.name) === wanted);
+  if (exact) return exact;
+
+  // Templates use stable state prefixes even when their motion class predates
+  // the current Studio metadata migration.
+  const prefixed = clips.find(clip => clipState(clip).startsWith(`${wanted}_`))
+    || clips.find(clip => normalizeAction(clip?.name).startsWith(`${wanted}_`));
+  if (prefixed) return prefixed;
+
+  const aliases = CLIP_STATE_ALIASES[wanted] || [];
+  const aliased = clips.find(clip => aliases.some(alias => {
+    const state = clipState(clip);
+    const name = normalizeAction(clip?.name);
+    return state === alias || state.startsWith(`${alias}_`)
+      || name === alias || name.startsWith(`${alias}_`);
+  }));
+  if (aliased) return aliased;
+
+  if (wanted === 'idle' || wanted === 'walk' || wanted === 'run') {
+    return clips.find(clip => clipMotionClass(clip) === wanted) || null;
+  }
+  if (wanted.startsWith('attack_')) {
+    return clips.find(clip => clipMotionClass(clip) === 'action') || null;
+  }
+  return null;
 }
 
 function transformFromPose(value) {
@@ -244,7 +285,14 @@ export function createStudioCharacterProvider({ THREE } = {}) {
 
     const joints = buildJointMap(sceneRoot, pkg);
     const height = Number(pkg.manifest?.metrics?.height) || 1.8;
-    const animation = { clip: findClip(pkg, 'idle'), time: 0, action: 'idle', finished: false };
+    const initialClip = findStudioCharacterClip(pkg, 'idle');
+    const animation = {
+      clip: initialClip,
+      time: 0,
+      action: 'idle',
+      finished: false,
+      lastResolveError: initialClip ? null : 'No authored Studio clip resolves idle',
+    };
     const rest = Object.freeze({
       headY: height * 0.80,
       throwY: height * 0.64,
@@ -265,14 +313,17 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         sceneRoot,
       }),
       play(action, options = {}) {
-        const next = findClip(pkg, action);
+        const next = findStudioCharacterClip(pkg, action);
+        animation.action = normalizeAction(action);
         if (next) {
           const changed = next !== animation.clip;
           animation.clip = next;
-          animation.action = normalizeAction(action);
           animation.finished = false;
+          animation.lastResolveError = null;
           if (changed || options.restart) animation.time = Math.max(0, Number(options.time) || 0);
           sampleClip(animation.clip, animation.time, joints);
+        } else {
+          animation.lastResolveError = `No authored Studio clip resolves ${animation.action}`;
         }
         return handle;
       },
@@ -333,7 +384,15 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         return handle;
       },
       get animationState() {
-        return Object.freeze({ action: animation.action, time: animation.time, finished: animation.finished });
+        return Object.freeze({
+          action: animation.action,
+          clipId: animation.clip?.id || null,
+          resolvedState: animation.clip ? clipState(animation.clip) : null,
+          hasClip: Boolean(animation.clip),
+          time: animation.time,
+          finished: animation.finished,
+          lastResolveError: animation.lastResolveError,
+        });
       },
     };
 
