@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.4ab2bd351688",
+  "buildId": "8.4.0.content.334e4779f417",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-08T17:33:54.266Z",
+  "publishedAtUtc": "2026-09-08T17:43:54.811Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -1012,8 +1012,8 @@
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 43576,
-      "sha256": "5c61c6a0cd271036b1dd7bd9b6722622ffa92e59ceac1a80049c7119b84aa2c7"
+      "size": 43714,
+      "sha256": "c36f21a3257517ecfbafc6712dd930eb770359c658a331dd0f0bac2c288f2fb4"
     },
     {
       "path": "world-presence-v800.mjs",
