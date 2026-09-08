@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: nustanakritwithai/3JS-player-block-asset-engine-
-          ref: 6914ee65dbc572f474734159fe369d22178e539f
+          ref: a8e3b904928989856a5804a64e1a42ae1ad84ed4
           path: .ci-studio-source
       - uses: actions/setup-python@v5
         with:
