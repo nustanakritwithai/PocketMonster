@@ -186,7 +186,8 @@ const pirateAuthoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-
 assert.equal(pirateAuthoritativeSnapshot.actors[0].authority.hp.current, 41.5, 'nested Server authority preserves fractional HP');
 assert.equal(pirateAuthoritativeSnapshot.actors[0].authority.attack.targetId, 'player-1', 'nested Server attack preserves target identity');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', generation: 7, players: [], actors: [{ ...pirateAuthoritativeActor, authority: { ...pirateAuthoritativeActor.authority, generation: 2 } }] }, 'pirate-fruit'), null, 'authority generation mismatch fails closed');
-assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [pirateAuthoritativeActor] }, { allowAuthority: false }).actors, undefined, 'outbound local pose cannot author authority');
+const outboundActorPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [pirateAuthoritativeActor] }, { allowAuthority: false });
+assert.equal(outboundActorPose.actors[0].authority, undefined, 'outbound local pose strips client-authored authority');
 const actualWireFixtureText = fs.readFileSync(new URL('./fixtures/monster-authority-wire.actual.json', import.meta.url));
 assert.equal(crypto.createHash('sha256').update(actualWireFixtureText).digest('hex').toUpperCase(), 'E4A27463A9226226610075037E5E8EE97356009D48E7C2B5D3DC9617F785E450', 'actual Server/Pirate fixture bytes remain pinned');
 const actualWireFixture = JSON.parse(actualWireFixtureText);
@@ -271,7 +272,7 @@ assert.equal(routeDiagnostics.diagnostics().duplicateActors, 1, 'duplicate actor
 assert.equal(routeDiagnostics.diagnostics().actorsOmitted, 1, 'omitted actors are distinguished from empty actors');
 assert.equal(routeDiagnostics.diagnostics().staleSnapshots, 1, 'rejected snapshots are counted as stale');
 
-const authoritativeActor = actor(4);
+const authoritativeActor = { ...actor(4), zone: 'pirate-fruit' };
 authoritativeActor.authority = {
   authorityVersion: MONSTER_AUTHORITY_VERSION,
   serverTimeUtc: '2026-09-08T07:00:00.000Z', generation: 1,
@@ -279,20 +280,27 @@ authoritativeActor.authority = {
   actionSequence: 1, hit: true, damage: 1, death: false, despawnReason: 'expired',
   attack: { attackId: 'attack-1', spawnId: 'monster-a', monsterId: 'monster-a', islandId: 'pirate-fruit', targetId: 'player-a', action: 'melee', damage: 1, hitDelayMs: 180 },
 };
-const authoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [authoritativeActor] });
+const authoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [authoritativeActor] });
 assert.equal(authoritativeSnapshot.actors[0].authority.hp.revision, 0, 'initial authoritative HP revision survives sanitization');
 assert.equal(authoritativeSnapshot.actors[0].authority.resultRevision, 0, 'initial combat result revision survives sanitization');
 assert.equal(authoritativeSnapshot.actors[0].authority.despawnReason, 'expired', 'expired is a lifecycle reason, not a death state');
 assert.equal(authoritativeSnapshot.actors[0].authority.attack.targetId, 'player-a', 'nested attack target survives sanitization');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, authorityVersion: 'wrong/1' } }] }), null, 'unknown authority version fails closed');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, hp: { current: 11, max: 10, revision: 2 } } }] }), null, 'invalid HP range fails closed');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }), null, 'authority generation mismatch fails closed');
-const outboundPose = sanitizeOnlineWorldPose({ zone: 'hub', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false });
-assert.equal(Object.hasOwn(outboundPose, 'actors'), false, 'client-authored authority is stripped from outbound pose');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, authorityVersion: 'wrong/1' } }] }), null, 'unknown authority version fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, hp: { current: 11, max: 10, revision: 2 } } }] }), null, 'invalid HP range fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }), null, 'authority generation mismatch fails closed');
+const outboundPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false });
+assert.equal(outboundPose.actors[0].authority, undefined, 'client-authored authority is stripped from outbound pose');
 
+const intentPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [{
+  schemaVersion: 1, intentId: 'monster-intent:2:9', zone: 'starter-island', kind: 'melee', category: 'sword',
+  forwardX: 3, forwardZ: 4, range: 4.5, sequence: 9, targetActorId: 'monster:server-crab-1',
+  expectedGeneration: 1, expectedStateSequence: 12,
+}] }, { allowMonsterIntents: true });
+assert.equal(intentPose.monsterIntents[0].forwardX, .6, 'monster intent direction is normalized');
+assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [] }), null, 'monster intents require explicit outbound opt-in');
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /createPresenceRouteDiagnostics.*world-presence-protocol\.mjs\?v=4/, 'chat runtime owns local route diagnostics');
+assert.match(chat, /createPresenceRouteDiagnostics.*world-presence-protocol\.mjs\?v=5/, 'chat runtime owns local route diagnostics');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -300,7 +308,7 @@ assert.match(presence, /if \(!isRemoteWorldPlayer\(item, selfId\)\) continue;/, 
 assert.match(presence, /locomotion: pos\?\.locomotion/, 'published world state forwards locomotion');
 assert.match(presence, /animation: pos\?\.animation/, 'published world state forwards animation');
 const bridge = fs.readFileSync(new URL('online-world-bridge-v900.mjs', root), 'utf8');
-assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=4'/, 'online bridge imports the shared protocol');
+assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=5'/, 'online bridge imports the shared protocol');
 assert.doesNotMatch(bridge, /LOCOMOTION_VALUES = new Set/, 'online bridge does not declare a second locomotion vocabulary');
 assert.doesNotMatch(bridge, /COMBAT_STATE_VALUES = new Set/, 'online bridge does not declare a second combat vocabulary');
 const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root), 'utf8');

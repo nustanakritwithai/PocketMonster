@@ -5,7 +5,7 @@ import {
   currentSelfPresenceId,
   isRemoteWorldPlayer,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=4';
+} from './world-presence-protocol.mjs?v=5';
 
 const DEFAULT_REMOTE_ANIMATION = Object.freeze({
   combatState: 'idle',
@@ -571,6 +571,7 @@ export function publishWorldState({ getZone, getPosition, getDir, getPresentatio
       animation: pos?.animation,
       presentation: getPresentation?.() ?? pos?.presentation,
       visual: getVisual?.() ?? pos?.visual,
+      monsterIntents: pos?.monsterIntents,
       ...((getAllowActors?.() ?? allowActors) && (getActors || pos?.actors)
         ? { actors: getActors?.() ?? pos?.actors }
         : {}),
