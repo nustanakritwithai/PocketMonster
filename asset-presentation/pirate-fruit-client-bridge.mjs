@@ -229,6 +229,19 @@ export function applyPirateFruitActionTransition(handle, previousAction, sample)
   }
 }
 
+/**
+ * The Pirate action tracker emits edges only for combat. Studio owns its pose
+ * after replacement, so it also needs an explicit idle/walk/run clip switch
+ * whenever ordinary movement changes. Combat playback remains owned by the
+ * existing dead-safe action transition above.
+ */
+export function applyPirateFruitLocomotionTransition(handle, previousPresentation, sample) {
+  const next = sample?.action || sample?.locomotion || 'idle';
+  if (sample?.action) return next;
+  if (next !== previousPresentation) handle?.play?.(next, { restart: true });
+  return next;
+}
+
 function srcOf(value) {
   try { return Function.prototype.toString.call(value); } catch { return ''; }
 }
@@ -456,6 +469,7 @@ export async function installPirateFruitPocketPresentation({
       rigRetargeter,
       sourcePoseDriven,
       lastAction: null,
+      lastPresentation: null,
       lastX: host.position.x,
       lastZ: host.position.z,
       source: 'pirate-fruit',
@@ -526,6 +540,7 @@ export async function installPirateFruitPocketPresentation({
     item.studioAssetId = pkg.manifest.id;
     item.studioUpdates = 0;
     item.studioRenderFrames = 0;
+    item.lastPresentation = null;
     let sampledMesh = false;
     studio.root.traverse(node => {
       if (sampledMesh || !node.isMesh || node.visible === false) return;
@@ -684,6 +699,7 @@ export async function installPirateFruitPocketPresentation({
       );
       applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
       item.lastAction = sample.action;
+      item.lastPresentation = applyPirateFruitLocomotionTransition(item.handle, item.lastPresentation, sample);
       item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
       item.rigRetargeter?.update();
       if (item.source === 'studio-character') item.studioUpdates += 1;
@@ -713,6 +729,7 @@ export async function installPirateFruitPocketPresentation({
           host: item.host.name,
           position: { x: item.host.position.x, y: item.host.position.y, z: item.host.position.z },
           facing: item.host.rotation.y,
+          animation: item.handle.animationState || null,
         } : null;
       })(),
     }),
