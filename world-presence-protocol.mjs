@@ -406,7 +406,8 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     actor.despawnReason = value.despawnReason;
   }
   if (value.authority !== undefined && allowAuthority) {
-    const centralAuthority = !ownedNamespace && ownerId === null && expectedZone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE;
+    // ฉาก Pirate ยังรับ actor รูปแบบเดิมจาก Server; zone อื่นเปิดเฉพาะ owned namespace
+    const centralAuthority = !ownedNamespace && expectedZone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE;
     const ownedAuthority = ownedNamespace && ownerId !== null && OWNED_MONSTER_AUTHORITY_ZONE_SET.has(expectedZone);
     if (!centralAuthority && !ownedAuthority) return null;
     const authority = sanitizeMonsterAuthority(value.authority, value.generation);
