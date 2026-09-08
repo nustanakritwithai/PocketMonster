@@ -11,6 +11,8 @@ export const PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE = 'pirate-fruit';
 export const PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256 = '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0';
 export const PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256 = 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7';
 export const PIRATE_CENTRAL_AUTHORITY_ZONES = Object.freeze(['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky']);
+export const MONSTER_AUTHORITY_VERSION = 'monster-authority/1';
+export const MONSTER_STATE_REASONS = Object.freeze(['defeated', 'despawned', 'zone-change', 'reconnect', 'expired']);
 export const MAX_REMOTE_PLAYERS = 100;
 export const MAX_REMOTE_ACTORS = 128;
 export const MAX_SNAPSHOT_CANDIDATES = 400;
@@ -259,6 +261,33 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     || (expectedGeneration !== undefined && value.generation !== expectedGeneration)) return null;
   const pose = value.pose;
   if (!isRecord(pose) || !isFiniteNumber(pose.x) || !isFiniteNumber(pose.y) || !isFiniteNumber(pose.z) || !isFiniteNumber(pose.dir)) return null;
+  const authorityFieldsPresent = value.authorityVersion !== undefined || value.hp !== undefined
+    || value.serverTimeUtc !== undefined || value.resultRevision !== undefined || value.reason !== undefined;
+  if (authorityFieldsPresent && value.authorityVersion !== MONSTER_AUTHORITY_VERSION) return null;
+  let hp;
+  if (value.hp !== undefined) {
+    if (!isRecord(value.hp) || !Number.isSafeInteger(value.hp.current) || value.hp.current < 0
+      || !Number.isSafeInteger(value.hp.max) || value.hp.max < 0 || value.hp.current > value.hp.max
+      || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 1) return null;
+    hp = Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision });
+  }
+  let serverTimeUtc;
+  if (value.serverTimeUtc !== undefined) {
+    if (typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 64) return null;
+    const parsed = Date.parse(value.serverTimeUtc);
+    if (!Number.isFinite(parsed) || !value.serverTimeUtc.endsWith('Z')) return null;
+    serverTimeUtc = value.serverTimeUtc;
+  }
+  let resultRevision;
+  if (value.resultRevision !== undefined) {
+    if (!Number.isSafeInteger(value.resultRevision) || value.resultRevision < 1) return null;
+    resultRevision = value.resultRevision;
+  }
+  let reason;
+  if (value.reason !== undefined) {
+    if (typeof value.reason !== 'string' || !MONSTER_STATE_REASONS.includes(value.reason)) return null;
+    reason = value.reason;
+  }
   const actor = {
     actorId, kind: 'monster', ...(ownerId === null ? {} : { ownerId }), monsterType, zone, generation: value.generation, lifecycle: value.lifecycle,
     spawnSequence: value.spawnSequence, stateSequence: value.stateSequence,
@@ -271,6 +300,11 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
   };
+  if (authorityFieldsPresent) actor.authorityVersion = MONSTER_AUTHORITY_VERSION;
+  if (hp) actor.hp = hp;
+  if (serverTimeUtc !== undefined) actor.serverTimeUtc = serverTimeUtc;
+  if (resultRevision !== undefined) actor.resultRevision = resultRevision;
+  if (reason !== undefined) actor.reason = reason;
   if (value.presentation !== undefined) {
     const presentation = sanitizeActorPresentation(value.presentation);
     if (presentation) actor.presentation = presentation;
@@ -554,6 +588,10 @@ export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamp
   let duplicateActors = 0;
   let staleActors = 0;
   let actorSequenceGaps = 0;
+  let staleHpRevisions = 0;
+  let staleResultRevisions = 0;
+  let hpRevisionGaps = 0;
+  let resultRevisionGaps = 0;
   let actorsOmitted = 0;
   let actorsEmpty = 0;
   let actorsPresent = 0;
@@ -589,10 +627,24 @@ export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamp
       seen.add(key);
       const previous = actorSequences.get(key);
       if (previous !== undefined) {
-        if (stateSequence <= previous) staleActors += 1;
-        else if (stateSequence > previous + 1) actorSequenceGaps += stateSequence - previous - 1;
+        if (stateSequence <= previous.stateSequence) staleActors += 1;
+        else if (stateSequence > previous.stateSequence + 1) actorSequenceGaps += stateSequence - previous.stateSequence - 1;
       }
-      actorSequences.set(key, Math.max(previous ?? 0, stateSequence));
+      const hpRevision = Number.isSafeInteger(actor?.hp?.revision) ? actor.hp.revision : null;
+      const resultRevision = Number.isSafeInteger(actor?.resultRevision) ? actor.resultRevision : null;
+      if (previous && hpRevision !== null && previous.hpRevision !== null) {
+        if (hpRevision <= previous.hpRevision) staleHpRevisions += 1;
+        else if (hpRevision > previous.hpRevision + 1) hpRevisionGaps += hpRevision - previous.hpRevision - 1;
+      }
+      if (previous && resultRevision !== null && previous.resultRevision !== null) {
+        if (resultRevision <= previous.resultRevision) staleResultRevisions += 1;
+        else if (resultRevision > previous.resultRevision + 1) resultRevisionGaps += resultRevision - previous.resultRevision - 1;
+      }
+      actorSequences.set(key, {
+        stateSequence: Math.max(previous?.stateSequence ?? 0, stateSequence),
+        hpRevision: hpRevision === null ? previous?.hpRevision ?? null : Math.max(previous?.hpRevision ?? 0, hpRevision),
+        resultRevision: resultRevision === null ? previous?.resultRevision ?? null : Math.max(previous?.resultRevision ?? 0, resultRevision),
+      });
     }
   };
 
@@ -610,6 +662,10 @@ export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamp
     duplicateActors = 0;
     staleActors = 0;
     actorSequenceGaps = 0;
+    staleHpRevisions = 0;
+    staleResultRevisions = 0;
+    hpRevisionGaps = 0;
+    resultRevisionGaps = 0;
     actorsOmitted = 0;
     actorsEmpty = 0;
     actorsPresent = 0;
@@ -622,6 +678,10 @@ export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamp
     duplicateActors,
     staleActors,
     actorSequenceGaps,
+    staleHpRevisions,
+    staleResultRevisions,
+    hpRevisionGaps,
+    resultRevisionGaps,
     actorsOmitted,
     actorsEmpty,
     actorsPresent,
