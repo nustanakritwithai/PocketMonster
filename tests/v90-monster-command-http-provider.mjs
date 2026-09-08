@@ -25,4 +25,29 @@ const closed = createMonsterHttpProvider({ config: { apiBaseUrl: 'https://server
 assert.equal((await closed.send({ commandId: 'cmd-2' })).ok, true);
 provider.reset();
 assert.equal(provider.snapshot().available, false);
+
+let accountToken = 'account-a';
+let accountActive = true;
+let releaseState;
+const delayedFetch = async (url, init) => {
+  if (init.method === 'GET') {
+    await new Promise(resolve => { releaseState = resolve; });
+    return new Response(JSON.stringify({ ok: true, monsterControl: { party: [{ instanceId: 'old' }], actors: [], skills: {}, revision: 4 } }), { status: 200 });
+  }
+  return new Response(JSON.stringify({ ok: true, accepted: true, commandId: 'late' }), { status: 200 });
+};
+const guarded = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' }, sessionToken: accountToken,
+  getSessionToken: () => accountToken, isSessionActive: () => accountActive, getZone: () => 'pirate-fruit', fetchImpl: delayedFetch,
+});
+const pendingRefresh = guarded.refresh();
+guarded.reset();
+releaseState();
+assert.equal((await pendingRefresh).code, 'STALE_SCENE');
+assert.equal(guarded.snapshot().available, false);
+accountActive = false;
+const denied = await guarded.send({ commandId: 'after-logout' });
+assert.equal(denied.code, 'SESSION_UNAVAILABLE');
+assert.equal(calls.some(call => call.init?.headers?.Authorization === 'Bearer after-logout'), false);
+guarded.dispose();
 console.log('V9 monster HTTP provider: PASS');

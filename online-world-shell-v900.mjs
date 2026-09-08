@@ -48,6 +48,7 @@ let sessionEndReason = null;
 let sessionExpiryTimer = null;
 let unifiedHud = null;
 let monsterController = null;
+let monsterStateProvider = null;
 let unbindMonsterScene = null;
 let unsubscribeMonsterParty = null;
 let unsubscribeMonsterState = null;
@@ -622,9 +623,11 @@ window.addEventListener('pageshow', event => {
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
 await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
-const monsterStateProvider = createMonsterHttpProvider({
+monsterStateProvider = createMonsterHttpProvider({
   config: window.POCKETMONSTER_RUNTIME_CONFIG,
   sessionToken: window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
+  getSessionToken: () => window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
+  isSessionActive: () => isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
   pollMs: 2000,
 });
