@@ -6,13 +6,14 @@
  * calls fail closed with SERVER_INGRESS_UNAVAILABLE.
  */
 export const MONSTER_COMMAND_CONTRACT = 'owned-monster-command/v1';
-export const MONSTER_COMMAND_KINDS = Object.freeze(['summon', 'skill']);
+export const MONSTER_COMMAND_KINDS = Object.freeze(['summon', 'skill', 'recall', 'switch']);
 
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,96}$/;
 const ZONE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 function record(value) { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
 function id(value) { return typeof value === 'string' && ID_PATTERN.test(value) ? value : null; }
+function generation(value) { return Number.isSafeInteger(value) && value > 0 ? value : null; }
 
 export function sanitizeMonsterCommand(value) {
   if (!record(value) || value.contract !== MONSTER_COMMAND_CONTRACT
@@ -35,6 +36,15 @@ export function sanitizeMonsterCommand(value) {
     command.skillId = value.skillId;
     if (value.targetActorId !== undefined && !id(value.targetActorId)) return null;
     if (value.targetActorId !== undefined) command.targetActorId = value.targetActorId;
+  }
+  if (value.kind === 'recall') {
+    if (value.targetPoint !== undefined || !generation(value.expectedActiveGeneration)) return null;
+    command.expectedActiveGeneration = value.expectedActiveGeneration;
+  }
+  if (value.kind === 'switch') {
+    if (!id(value.expectedActiveInstanceId) || !generation(value.expectedActiveGeneration) || value.targetPoint === undefined) return null;
+    command.expectedActiveInstanceId = value.expectedActiveInstanceId;
+    command.expectedActiveGeneration = value.expectedActiveGeneration;
   }
   if (value.kind === 'summon' && command.targetPoint === undefined) return null;
   return Object.freeze(command);
@@ -99,6 +109,8 @@ export function createMonsterCommandAdapter({ send = null, getZone = null, timeo
   return Object.freeze({
     summon(input) { return dispatch({ ...input, kind: 'summon', contract: MONSTER_COMMAND_CONTRACT }); },
     skill(input) { return dispatch({ ...input, kind: 'skill', contract: MONSTER_COMMAND_CONTRACT }); },
+    recall(input) { return dispatch({ ...input, kind: 'recall', contract: MONSTER_COMMAND_CONTRACT }); },
+    switch(input) { return dispatch({ ...input, kind: 'switch', contract: MONSTER_COMMAND_CONTRACT }); },
     pendingCommandIds: () => Object.freeze([...pending.keys()]),
     clearScene() {
       sceneEpoch += 1;

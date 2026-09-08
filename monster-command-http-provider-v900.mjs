@@ -8,10 +8,13 @@ function endpoint(config, path) {
 function stateFromPlayerPayload(payload) {
   const source = payload?.monsterControl || {};
   const party = Array.isArray(source.party) ? { available: true, slots: source.party } : source.party;
+  const actors = Array.isArray(source.actors || payload?.actors) ? (source.actors || payload.actors).map(actor => ({ ...actor,
+    ...(Number.isSafeInteger(actor?.generation) && actor.generation > 0 ? { generation: actor.generation } : {}) })) : [];
   return Object.freeze({
     party: party || null,
-    actors: source.actors || payload?.actors || [],
+    actors,
     skills: source.skills || payload?.skills || {},
+    capabilities: source.capabilities || payload?.capabilities || {},
     revision: Number.isSafeInteger(source.revision) ? source.revision : 0,
     available: Array.isArray(source.party) || Boolean(party?.available),
   });
@@ -20,7 +23,7 @@ function stateFromPlayerPayload(payload) {
 export function createMonsterHttpProvider({ config, sessionToken, getSessionToken = null, isSessionActive = () => true, getZone = () => '', fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Monster HTTP provider requires fetch');
   if (typeof sessionToken !== 'string' || !sessionToken) throw new TypeError('Monster HTTP provider requires session sessionToken');
-  let current = Object.freeze({ party: null, actors: [], skills: {}, revision: 0, available: false });
+  let current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false });
   let pollTimer = null;
   let generation = 0;
   let disposed = false;
@@ -32,7 +35,7 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
   const sessionReady = token => (typeof isSessionActive !== 'function' || isSessionActive() === true)
     && typeof token === 'string' && token.length > 0;
   const stale = requestGeneration => disposed || requestGeneration !== generation;
-  const clearState = () => { current = Object.freeze({ party: null, actors: [], skills: {}, revision: 0, available: false }); notify(); };
+  const clearState = () => { current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false }); notify(); };
   const fetchBounded = async (url, init) => {
     const abort = new AbortController();
     requests.add(abort);

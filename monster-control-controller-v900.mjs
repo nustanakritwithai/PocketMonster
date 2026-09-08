@@ -5,7 +5,7 @@ const pointOf = value => value && ['x', 'y', 'z'].every(key => Number.isFinite(v
   ? { x: value.x, y: value.y, z: value.z } : null;
 
 export function createMonsterControlController({ commands, getParty = () => null, getZone = () => '',
-  getAim = () => null, getSkills = () => [], getConfirmedActors = () => [] } = {}) {
+  getAim = () => null, getSkills = () => [], getConfirmedActors = () => [], getCapabilities = () => null } = {}) {
   if (!commands?.summon || !commands?.skill) throw new TypeError('summon and skill commands are required');
   let panel = emptyPanel();
   let revision = 0;
@@ -16,8 +16,11 @@ export function createMonsterControlController({ commands, getParty = () => null
   const listeners = new Set();
   const zone = () => getZone();
   const actors = () => Array.isArray(getConfirmedActors()) ? getConfirmedActors() : [];
+  const capabilities = () => getCapabilities() || {};
+  const supports = kind => capabilities()[kind] === true;
   const isActive = id => actors().some(actor => actor?.active === true && actor.instanceId === id && actor.zone === zone());
   const slotOf = index => Number.isInteger(index) && index >= 0 ? getParty()?.slots?.[index] : null;
+  const activeActor = () => actors().find(actor => actor?.active === true && actor.zone === zone()) || null;
   const snapshot = () => {
     const party = getParty();
     const slots = Object.freeze((party?.slots || []).map(slot => Object.freeze({ ...slot,
@@ -36,7 +39,9 @@ export function createMonsterControlController({ commands, getParty = () => null
   };
   const sync = () => {
     if (disposed) return snapshot();
-    if (waiting && isActive(waiting.instanceId)) { retryable.delete(waiting.instanceId); waiting = null; }
+    if (waiting && (waiting.kind === 'recall' ? !isActive(waiting.instanceId) : isActive(waiting.instanceId))) {
+      retryable.delete(waiting.instanceId); waiting = null;
+    }
     if (panel.instanceId && (!isActive(panel.instanceId) || slotOf(panel.slot)?.instanceId !== panel.instanceId)) panel = emptyPanel();
     return emit();
   };
@@ -62,16 +67,20 @@ export function createMonsterControlController({ commands, getParty = () => null
         return { ok: true, reason: 'panel-toggled', mode: panel.mode };
       }
       if (waiting) return { ok: false, reason: 'summon-pending' };
-      // ข้อจำกัดเดิม: เรียกได้ครั้งละหนึ่งตัว; ไม่ใช้ปุ่มสลับแผงเป็น recall
-      if (actors().some(actor => actor?.active === true && actor.zone === zone())) return { ok: false, reason: 'active-monster-recall-required' };
+      const current = activeActor();
+      if (current && !supports('switch')) return { ok: false, reason: 'switch-unavailable' };
+      if (current && (!Number.isSafeInteger(current.generation) || current.generation < 1)) return { ok: false, reason: 'generation-unavailable' };
       const targetPoint = pointOf(getAim());
       if (!targetPoint) return { ok: false, reason: 'aim-unavailable' };
       const command = retryable.get(slot.instanceId) || { commandId: globalThis.crypto.randomUUID(),
-        instanceId: slot.instanceId, zone: zone(), targetPoint };
-      request = { instanceId: slot.instanceId, command, epoch: requestEpoch };
+        instanceId: slot.instanceId, zone: zone(), targetPoint,
+        ...(current ? { expectedActiveInstanceId: current.instanceId, expectedActiveGeneration: current.generation } : {}) };
+      request = { instanceId: slot.instanceId, command, kind: current ? 'switch' : 'summon', epoch: requestEpoch };
       waiting = request;
       emit();
-      const result = await commands.summon(command);
+      const result = current
+        ? (typeof commands.switch === 'function' ? await commands.switch({ ...command, contract: MONSTER_COMMAND_CONTRACT, kind: 'switch' }) : { ok: false, code: 'SWITCH_UNAVAILABLE' })
+        : await commands.summon(command);
       if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
       if (!result?.ok) {
         if (waiting === request) waiting = null;
@@ -79,6 +88,13 @@ export function createMonsterControlController({ commands, getParty = () => null
         else retryable.delete(slot.instanceId);
         emit();
         return { ok: false, reason: result?.code || 'summon-rejected' };
+      }
+      if (current && isActive(slot.instanceId)) {
+        if (waiting === request) waiting = null;
+        retryable.delete(slot.instanceId);
+        panel = emptyPanel();
+        emit();
+        return { ok: true, reason: 'switch-confirmed', mode: panel.mode };
       }
       if (isActive(slot.instanceId)) {
         if (waiting === request) waiting = null;
@@ -94,6 +110,31 @@ export function createMonsterControlController({ commands, getParty = () => null
       if (epoch === requestEpoch) emit();
       return { ok: false, reason: 'control-error' };
     }
+  };
+  const recall = async () => {
+    const requestEpoch = epoch;
+    const current = activeActor();
+    if (disposed || !current) return { ok: false, reason: 'actor-inactive' };
+    if (typeof commands.recall !== 'function') return { ok: false, reason: 'recall-unavailable' };
+    if (!supports('recall')) return { ok: false, reason: 'recall-unavailable' };
+    if (waiting) return { ok: false, reason: 'command-pending' };
+    if (!Number.isSafeInteger(current.generation) || current.generation < 1) return { ok: false, reason: 'generation-unavailable' };
+    const command = { commandId: globalThis.crypto.randomUUID(), instanceId: current.instanceId, zone: zone(), expectedActiveGeneration: current.generation };
+    waiting = { instanceId: current.instanceId, command, kind: 'recall', epoch: requestEpoch };
+    emit();
+    try {
+      const result = await commands.recall({ ...command, contract: MONSTER_COMMAND_CONTRACT, kind: 'recall' });
+      if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
+      if (!result?.ok) { if (waiting?.command === command) waiting = null; emit(); return { ok: false, reason: result?.code || 'recall-rejected' }; }
+      if (!isActive(current.instanceId)) {
+        if (waiting?.command === command) waiting = null;
+        panel = emptyPanel();
+        emit();
+        return result;
+      }
+      emit();
+      return { ok: true, reason: 'awaiting-snapshot' };
+    } catch { if (waiting?.command === command) waiting = null; emit(); return { ok: false, reason: 'control-error' }; }
   };
   const skills = () => Object.freeze((panel.instanceId ? getSkills(panel.instanceId) || [] : [])
     .map(skill => Object.freeze({ ...skill })));
@@ -117,7 +158,7 @@ export function createMonsterControlController({ commands, getParty = () => null
       return result?.ok ? result : { ok: false, reason: result?.code || 'skill-rejected' };
     } catch { return { ok: false, reason: 'control-error' }; }
   };
-  return Object.freeze({ snapshot, sync, skills, useSkill, activateSlot, activatePartySlot: activateSlot,
+  return Object.freeze({ snapshot, sync, skills, useSkill, recall, recallActive: recall, activateSlot, activatePartySlot: activateSlot,
     reset: clear, clearScene: clear,
     subscribe(listener) { if (disposed || typeof listener !== 'function') return () => {}; listeners.add(listener); listener(snapshot()); return () => listeners.delete(listener); },
     dispose() { disposed = true; clear(); listeners.clear(); },
