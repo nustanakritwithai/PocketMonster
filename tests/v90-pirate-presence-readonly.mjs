@@ -17,6 +17,7 @@ import { publishWorldState } from '../world-presence-v800.mjs';
 const boot = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'utf8');
 const bridge = fs.readFileSync(new URL('../pirate-presence-bridge-v900.mjs', import.meta.url), 'utf8');
+const actualWireFixture = JSON.parse(fs.readFileSync(new URL('./fixtures/monster-authority-wire.actual.json', import.meta.url), 'utf8'));
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmonster-status-v900.mjs', import.meta.url), 'utf8');
 const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-DKUYjNyH.js', import.meta.url), 'utf8');
@@ -106,6 +107,10 @@ const snapshot = sanitizePirateWorldSnapshot({
     { id: 'alice', name: 'Duplicate', x: 9, z: 9, dir: 0 },
   ],
 });
+const actualPirateSnapshot = sanitizePirateWorldSnapshot(actualWireFixture.payload);
+assert.equal(actualPirateSnapshot.actors[0].actorId, 'monster:east-forest', 'Pirate bridge accepts the exact producer actor identity');
+assert.equal(actualPirateSnapshot.actors[0].authority.attack.targetId, 'player-1', 'Pirate bridge preserves exact producer attack target');
+assert.equal(createPirateSnapshotMessage(actualPirateSnapshot).payload.actors[0].authority.hp.revision, 0, 'Pirate iframe message preserves initial HP revision');
 const capabilitySnapshot = sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority, players: [] });
 assert.equal(capabilitySnapshot.centralAuthority.contentRevision, centralAuthority.contentRevision, 'valid capability crosses the parent snapshot sanitizer');
 assert.equal(capabilitySnapshot.centralAuthority.generation, 1, 'central capability generation crosses the parent snapshot sanitizer');

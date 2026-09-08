@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 
 const {
@@ -185,6 +186,12 @@ assert.equal(authoritativeSnapshot.actors[0].authority.hp.current, 41.5, 'nested
 assert.equal(authoritativeSnapshot.actors[0].authority.attack.targetId, 'player-1', 'nested Server attack preserves target identity');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', generation: 7, players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }, 'pirate-fruit'), null, 'authority generation mismatch fails closed');
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false }).actors, undefined, 'outbound local pose cannot author authority');
+const actualWireFixtureText = fs.readFileSync(new URL('./fixtures/monster-authority-wire.actual.json', import.meta.url));
+assert.equal(crypto.createHash('sha256').update(actualWireFixtureText).digest('hex').toUpperCase(), 'E4A27463A9226226610075037E5E8EE97356009D48E7C2B5D3DC9617F785E450', 'actual Server/Pirate fixture bytes remain pinned');
+const actualWireFixture = JSON.parse(actualWireFixtureText);
+const actualWireSnapshot = sanitizeOnlineWorldSnapshot(actualWireFixture.payload, 'pirate-fruit');
+assert.equal(actualWireSnapshot.actors[0].actorId, 'monster:east-forest', 'actual producer actor identity crosses the parent sanitizer');
+assert.equal(actualWireSnapshot.actors[0].authority.attack.targetId, 'player-1', 'actual producer attack target crosses the parent sanitizer');
 assert.equal(
   worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation: 3, players: [], actors: [actorWithIndependentLifecycleGeneration] } })?.actors[0].generation,
   9,
