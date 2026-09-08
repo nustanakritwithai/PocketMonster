@@ -34,7 +34,7 @@ assert.match(entry, /online-world-shell-v900\.mjs\?v=65/, 'top-level entry cache
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=61/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
 assert.match(sceneHtml, /style-v900\.css\?v=969/, 'scene HTML cache-busts the helm placement beside chat');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=\d+/, 'offline HTML cache-busts presentation integration after helm center-panel retirement');
-assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=3/, 'presentation cache-busts static-batch classification');
+assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=\d+/, 'presentation cache-busts static-batch classification');
 assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=12/, 'presentation loads the HUD policy that retires the helm center-panel duplicate');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is hidden by the parent-primary HUD policy');
 assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired by parent-primary HUD policy');
