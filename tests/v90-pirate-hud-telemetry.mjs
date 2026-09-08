@@ -224,7 +224,7 @@ try {
   Date.now = realNow;
 }
 
-assert.match(entry, /unified-input-bridge-v900\.mjs\?v=10/);
+assert.match(entry, /unified-input-bridge-v900\.mjs\?v=11/);
 assert.match(child, /startPirateHudTelemetryPublisher/);
 assert.match(parent, /createPirateHudTelemetryCollector/);
 assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HUD store for the parent Dock');

@@ -46,7 +46,7 @@ const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs'
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
-assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=10/);
+assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=11/);
 assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=953/);
 
 assert.match(childBridge, /MutationObserver/);
@@ -137,4 +137,3 @@ assert.match(
 );
 
 console.log('V9 Pirate onboarding overlay and original talk path: PASS');
-
