@@ -19,6 +19,7 @@ const {
   sanitizePresentation,
   sanitizeVisual,
   createVisualEventQueue,
+  createPresenceRouteDiagnostics,
   SPELL_FX_ASSET_IDS,
 } = await import('../world-presence-protocol.mjs');
 
@@ -223,9 +224,29 @@ assert.equal(selfPresenceId({ username: 'c' }), 'c');
 assert.equal(selfPresenceId({ displayName: 'Tester' }), null);
 assert.equal(selfPresenceId(null), null);
 
+let diagnosticsNow = 1000;
+const routeDiagnostics = createPresenceRouteDiagnostics({ now: () => diagnosticsNow, maxSamples: 8 });
+const actor = (stateSequence, generation = 1) => ({
+  actorId: 'monster-a', kind: 'monster', monsterType: 'flameling', zone: 'hub', generation,
+  spawnSequence: 1, stateSequence, lifecycle: 'active',
+  pose: { x: stateSequence, y: 0, z: 0, dir: 0 },
+});
+routeDiagnostics.observeSnapshot({ zone: 'hub', generation: 1, players: [], actors: [actor(1)] });
+diagnosticsNow = 1250;
+routeDiagnostics.observeSnapshot({ zone: 'hub', generation: 1, players: [], actors: [actor(3), actor(3)] });
+diagnosticsNow = 1600;
+routeDiagnostics.observeSnapshot({ zone: 'hub', generation: 1, players: [] });
+diagnosticsNow = 2200;
+routeDiagnostics.recordRejected();
+assert.deepEqual(routeDiagnostics.diagnostics().intervalMs, { min: 250, max: 600, p95: 600, p99: 600 }, 'route intervals expose percentile evidence');
+assert.equal(routeDiagnostics.diagnostics().actorSequenceGaps, 1, 'actor sequence gaps are counted');
+assert.equal(routeDiagnostics.diagnostics().duplicateActors, 1, 'duplicate actor identities are counted');
+assert.equal(routeDiagnostics.diagnostics().actorsOmitted, 1, 'omitted actors are distinguished from empty actors');
+assert.equal(routeDiagnostics.diagnostics().staleSnapshots, 1, 'rejected snapshots are counted as stale');
+
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /import \{ buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload \} from '\.\/world-presence-protocol\.mjs\?v=4'/, 'chat runtime owns the presence protocol');
+assert.match(chat, /createPresenceRouteDiagnostics.*world-presence-protocol\.mjs\?v=4/, 'chat runtime owns local route diagnostics');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -240,3 +261,4 @@ const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root
 assert.match(bootstrap, /'world-presence-protocol\.mjs'/, 'pages artifact ships the protocol module');
 
 console.log('World presence protocol owner: PASS');
+
