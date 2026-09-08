@@ -204,6 +204,13 @@ const validation = validateStudioCharacterPackage(pkg);
 assert.equal(validation.valid, true, validation.errors.join('; '));
 assert.equal(validation.motion.mode, 'canonical', 'fixture exports a canonical Engine-owned motion pack');
 assert.equal(inspectStudioCharacterMotionPack(pkg).actionMap.attack, 'attack-1', 'attack maps to the explicit authored clip id');
+const engineStateMapped = structuredClone(pkg);
+engineStateMapped.motionPack = {
+  schema: 'pocket-character-motion-pack-v1',
+  actionMap: { idle: 'idle_breathing', walk: 'walk_pose_library', run: 'run_poselibrary', attack: 'attack_pose_library', skill: 'skill_cast_core', hurt: 'hit_react', dead: 'dead' },
+};
+assert.equal(validateStudioCharacterPackage(engineStateMapped).valid, true, 'current Engine state-based motion map is accepted');
+assert.equal(inspectStudioCharacterMotionPack(engineStateMapped).actionMap.attack, 'attack-1', 'Engine state map resolves to the runtime clip id');
 assert.equal(findStudioCharacterClip(pkg, 'idle')?.id, 'idle-1', 'idle resolves the Studio idle_breathing state');
 assert.equal(findStudioCharacterClip(pkg, 'walk')?.id, 'walk-1', 'walk resolves the Studio pose-library state');
 assert.equal(findStudioCharacterClip(pkg, 'run')?.id, 'run-1', 'run resolves the Studio pose-library state');
