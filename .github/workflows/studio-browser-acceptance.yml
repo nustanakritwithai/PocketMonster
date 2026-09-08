@@ -24,8 +24,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: nustanakritwithai/3JS-player-block-asset-engine-
-          ref: a8e3b904928989856a5804a64e1a42ae1ad84ed4
+          ref: c347b62aadbada50568ffd3de94982519e59040f
           path: .ci-studio-source
+      - name: Capture exact tracked sources for reproducible paired diagnosis
+        run: |
+          mkdir -p studio-source-evidence
+          git rev-parse HEAD > studio-source-evidence/pocket-sha.txt
+          git -C .ci-studio-source rev-parse HEAD > studio-source-evidence/engine-sha.txt
+          git archive --format=tar.gz --output=studio-source-evidence/pocket-source.tar.gz HEAD
+          git -C .ci-studio-source archive --format=tar.gz --output=../studio-source-evidence/engine-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-source-evidence
+          path: studio-source-evidence/
+          retention-days: 7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
