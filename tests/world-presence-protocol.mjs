@@ -20,6 +20,7 @@ const {
   sanitizeVisual,
   createVisualEventQueue,
   createPresenceRouteDiagnostics,
+  MONSTER_AUTHORITY_VERSION,
   SPELL_FX_ASSET_IDS,
 } = await import('../world-presence-protocol.mjs');
 
@@ -243,6 +244,19 @@ assert.equal(routeDiagnostics.diagnostics().actorSequenceGaps, 1, 'actor sequenc
 assert.equal(routeDiagnostics.diagnostics().duplicateActors, 1, 'duplicate actor identities are counted');
 assert.equal(routeDiagnostics.diagnostics().actorsOmitted, 1, 'omitted actors are distinguished from empty actors');
 assert.equal(routeDiagnostics.diagnostics().staleSnapshots, 1, 'rejected snapshots are counted as stale');
+
+const authoritativeActor = actor(4);
+authoritativeActor.authorityVersion = MONSTER_AUTHORITY_VERSION;
+authoritativeActor.hp = { current: 7, max: 10, revision: 2 };
+authoritativeActor.resultRevision = 3;
+authoritativeActor.serverTimeUtc = '2026-09-08T07:00:00.000Z';
+authoritativeActor.reason = 'expired';
+const authoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [authoritativeActor] });
+assert.equal(authoritativeSnapshot.actors[0].hp.revision, 2, 'authoritative HP revision survives sanitization');
+assert.equal(authoritativeSnapshot.actors[0].resultRevision, 3, 'combat result revision survives sanitization');
+assert.equal(authoritativeSnapshot.actors[0].reason, 'expired', 'expired is a lifecycle reason, not a death state');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, authorityVersion: 'wrong/1' }] }), null, 'unknown authority version fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], actors: [{ ...authoritativeActor, hp: { current: 11, max: 10, revision: 2 } }] }), null, 'invalid HP range fails closed');
 
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
