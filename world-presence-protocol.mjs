@@ -635,11 +635,38 @@ export function centralAuthorityOwnsTransportZone(capability, transportZone) {
     && transportZone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE);
 }
 
+function sanitizePlayerAuthorityResult(value) {
+  if (!isRecord(value)
+    || typeof value.attackerId !== 'string' || typeof value.targetId !== 'string' || typeof value.attackId !== 'string'
+    || !Number.isSafeInteger(value.generation) || value.generation < 1
+    || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0
+    || !isFiniteNumber(value.authoritativeFinalHp) || value.authoritativeFinalHp < 0
+    || value.authoritativeFinalHp > PRESENCE_COORDINATE_LIMIT
+    || typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 80
+    || !Number.isFinite(Date.parse(value.serverTimeUtc))) return null;
+  const attackerId = value.attackerId.trim();
+  const targetId = value.targetId.trim();
+  const attackId = value.attackId.trim();
+  if (!attackerId || attackerId.length > MAX_PLAYER_ID_LENGTH
+    || !targetId || targetId.length > MAX_PLAYER_ID_LENGTH
+    || !attackId || attackId.length > MAX_ACTION_DURATION_MS) return null;
+  return Object.freeze({
+    attackerId,
+    targetId,
+    attackId,
+    generation: value.generation,
+    resultRevision: value.resultRevision,
+    authoritativeFinalHp: value.authoritativeFinalHp,
+    serverTimeUtc: value.serverTimeUtc,
+  });
+}
+
 export function sanitizePlayerAuthority(value) {
   if (!isRecord(value) || value.schemaVersion !== PLAYER_AUTHORITY_SCHEMA_VERSION
     || typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 80
     || !Number.isFinite(Date.parse(value.serverTimeUtc)) || !Array.isArray(value.players)
-    || value.players.length > MAX_PLAYER_AUTHORITIES) return null;
+    || value.players.length > MAX_PLAYER_AUTHORITIES
+    || (value.results !== undefined && (!Array.isArray(value.results) || value.results.length > 64))) return null;
   const players = [];
   const seen = new Set();
   for (const candidate of value.players) {
@@ -662,7 +689,22 @@ export function sanitizePlayerAuthority(value) {
       resultRevision: candidate.resultRevision, lifeState: candidate.lifeState,
     }));
   }
-  return Object.freeze({ schemaVersion: PLAYER_AUTHORITY_SCHEMA_VERSION, serverTimeUtc: value.serverTimeUtc, players: Object.freeze(players) });
+  const results = [];
+  const resultKeys = new Set();
+  for (const candidate of value.results || []) {
+    const result = sanitizePlayerAuthorityResult(candidate);
+    if (!result) return null;
+    const key = `${result.attackerId.toLowerCase()}:${result.targetId.toLowerCase()}:${result.generation}:${result.attackId}`;
+    if (resultKeys.has(key)) return null;
+    resultKeys.add(key);
+    results.push(result);
+  }
+  return Object.freeze({
+    schemaVersion: PLAYER_AUTHORITY_SCHEMA_VERSION,
+    serverTimeUtc: value.serverTimeUtc,
+    players: Object.freeze(players),
+    ...(value.results === undefined ? {} : { results: Object.freeze(results) }),
+  });
 }
 
 export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
