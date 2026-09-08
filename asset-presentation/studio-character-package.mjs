@@ -1,9 +1,14 @@
 import { findGameplayFields, validateAssetDefinition } from './schema.mjs';
+import { validateStudioCharacterRenderProfile } from './studio-character-render-profile.mjs';
 
 export const STUDIO_CHARACTER_PACKAGE_SCHEMA = 'pocket-character-runtime-v1';
 export const STUDIO_CHARACTER_SCENE_SCHEMA = 'three-group-scenegraph-v1';
 export const STUDIO_CHARACTER_PROVIDER = 'studio-character';
-export const STUDIO_CHARACTER_MOTION_PACK_SCHEMA = 'pocket-motion-pack-v1';
+// `pocket-character-motion-pack-v1` is the Engine export.  The short-lived
+// early consumer spelling remains accepted so an already-downloaded package
+// can still run through the safe semantic path during rollout.
+export const STUDIO_CHARACTER_MOTION_PACK_SCHEMA = 'pocket-character-motion-pack-v1';
+const LEGACY_STUDIO_CHARACTER_MOTION_PACK_SCHEMA = 'pocket-motion-pack-v1';
 export const STUDIO_CHARACTER_LIVE_PLAYER_ID = 'character.human.pirate.studio-live';
 
 // These are presentation names only.  They deliberately do not expose a
@@ -91,6 +96,11 @@ function clipById(pkg, id) {
   return (pkg?.animations || []).find(clip => clip?.id === id) || null;
 }
 
+function normalizedMotionState(clip) {
+  return String(clip?.runtime?.transition?.state || clip?.runtime?.state || clip?.name || '')
+    .trim().replace(/[\s-]+/g, '_').toLowerCase();
+}
+
 function clipHasUsableKeyframes(clip) {
   if (!Array.isArray(clip?.keyframes) || clip.keyframes.length < 2) return false;
   return clip.keyframes.every(frame => Number.isFinite(frame?.time) && isPlainObject(frame?.joints)
@@ -124,7 +134,7 @@ export function inspectStudioCharacterMotionPack(pkg) {
     report.invalid.push('motionPack must be an object');
     return Object.freeze(report);
   }
-  if (pack.schema !== STUDIO_CHARACTER_MOTION_PACK_SCHEMA) {
+  if (pack.schema !== STUDIO_CHARACTER_MOTION_PACK_SCHEMA && pack.schema !== LEGACY_STUDIO_CHARACTER_MOTION_PACK_SCHEMA) {
     report.invalid.push(`motionPack.schema must be ${STUDIO_CHARACTER_MOTION_PACK_SCHEMA}`);
   }
   if (!isPlainObject(pack.actionMap)) {
@@ -137,18 +147,24 @@ export function inspectStudioCharacterMotionPack(pkg) {
       report.missing.push(action);
       continue;
     }
-    report.actionMap[action] = clipId;
-    const clip = clipById(pkg, clipId);
+    const clip = clipById(pkg, clipId)
+      || (pack.schema === STUDIO_CHARACTER_MOTION_PACK_SCHEMA
+        ? (pkg?.animations || []).find(candidate => normalizedMotionState(candidate) === clipId) : null);
     if (!clip) {
       report.invalid.push(`motionPack.actionMap.${action} references missing clip ${clipId}`);
     } else if (!clipHasUsableKeyframes(clip)) {
       report.invalid.push(`motionPack.actionMap.${action} clip ${clipId} needs at least two non-empty keyframes`);
+    } else {
+      // Consumers always receive the real clip id, whether Engine's map named
+      // the clip id (legacy) or the stable runtime state (current export).
+      report.actionMap[action] = clip.id;
     }
   }
-  if (typeof pack.defaultAction !== 'string' || !pack.defaultAction.trim()) {
-    report.missing.push('defaultAction');
-  } else if (!report.actionMap[pack.defaultAction]) {
-    report.invalid.push(`motionPack.defaultAction must name a mapped action (${pack.defaultAction})`);
+  const defaultAction = typeof pack.defaultAction === 'string' && pack.defaultAction.trim()
+    ? pack.defaultAction : 'idle';
+  report.defaultAction = defaultAction;
+  if (!report.actionMap[defaultAction]) {
+    report.invalid.push(`motionPack.defaultAction must name a mapped action (${defaultAction})`);
   }
   return Object.freeze(report);
 }
@@ -276,6 +292,12 @@ export function validateStudioCharacterPackage(pkg) {
 
   if (!Array.isArray(pkg.animations)) errors.push('animations must be an array');
   const motion = inspectStudioCharacterMotionPack(pkg);
+  const renderProfile = validateStudioCharacterRenderProfile(pkg.renderProfile);
+  if (renderProfile.present && !renderProfile.valid) {
+    // Render fidelity is optional. Ignore only the profile and retain the
+    // already-validated scalar PBR material rather than hiding the character.
+    warnings.push(`renderProfile ignored: ${renderProfile.errors.join('; ')}`);
+  }
   const isDefaultLivePlayer = pkg.manifest?.id === STUDIO_CHARACTER_LIVE_PLAYER_ID;
   if (motion.mode === 'canonical') {
     errors.push(...motion.invalid);
@@ -294,7 +316,7 @@ export function validateStudioCharacterPackage(pkg) {
     warnings.push(`${pkg.sceneGraph.stats.externalTextureRefs} external texture reference(s) will use scalar PBR fallback until loaded`);
   }
 
-  return { valid: errors.length === 0, errors, warnings, motion };
+  return { valid: errors.length === 0, errors, warnings, motion, renderProfile };
 }
 
 export function resetStudioCharacterPackages() {
