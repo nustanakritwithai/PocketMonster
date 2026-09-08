@@ -288,3 +288,69 @@ assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'Pirate boot
 assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=61/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
+
+// เส้นทางจริงของ scene buttons → parent controller → command adapter
+{
+  const { createMonsterControlController } = await import('../monster-control-controller-v900.mjs');
+  const { createMonsterCommandAdapter } = await import('../monster-command-adapter.mjs');
+  const { bindMonsterControlScene, monsterThrowAimFromPose } = await import('../monster-control-scene-binding-v900.mjs');
+  assert.deepEqual(monsterThrowAimFromPose({ x: 0, z: 0, dir: 0 }).targetPoint, { x: 0, y: 0, z: 4 });
+  assert.equal(monsterThrowAimFromPose({ x: 0, y: NaN, z: 0, dir: 0 }), null);
+  let actors = [];
+  const commands = [];
+  const party = { available: true, slots: [{ slot: 0, available: true, instanceId: 'owned-a', name: 'คู่หู' }] };
+  const transport = createMonsterCommandAdapter({ getZone: () => 'pirate-fruit', send: async command => {
+    commands.push(command); return { ok: true, accepted: true, commandId: command.commandId };
+  } });
+  const monster = createMonsterControlController({ commands: transport, getParty: () => party,
+    getZone: () => 'pirate-fruit', getConfirmedActors: () => actors,
+    getAim: () => monsterThrowAimFromPose({ x: 1, y: 2, z: 3, dir: 0 }).targetPoint,
+    getSkills: () => [{ skillId: 'claw', label: 'กรงเล็บ' }],
+  });
+  const flush = async () => { for (let i = 0; i < 12; i += 1) await Promise.resolve(); };
+  documentLike.body.dataset.controlPanel = 'human';
+  windowLike.dispatchEvent(pirateControlMode('player'));
+  controls.activate('pirate-fruit');
+  windowLike.document = documentLike;
+  windowLike.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS = controls;
+  const monsterButton = new FakeTarget('monsterSlot1Btn');
+  elements.set('monsterSlot1Btn', monsterButton);
+  const detach = bindMonsterControlScene({ sceneWindow: windowLike, controller: monster });
+  monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].kind, 'summon');
+  assert.deepEqual(commands[0].targetPoint, { x: 1, y: 2, z: 7 });
+  assert.equal(monster.snapshot().controlPanel.mode, 'character');
+  monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(commands.length, 1, 'repeat while awaiting snapshot does not throw twice');
+  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', active: true }];
+  monster.sync();
+  monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(monster.snapshot().controlPanel.mode, 'monster');
+  assert.equal(elements.get('skill1Btn').getAttribute('aria-label'), 'กรงเล็บ');
+  const playerActions = pirateCalls.filter(([kind]) => kind === 'action').length;
+  elements.get('skill1Btn').dispatchEvent(pointer('pointerdown', 901, 0, 0));
+  elements.get('skill1Btn').dispatchEvent(pointer('pointerup', 901, 0, 0));
+  await flush();
+  assert.equal(commands.length, 2);
+  assert.equal(commands[1].skillId, 'claw');
+  assert.equal(commands[1].instanceId, 'owned-a');
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions, 'monster skill never triggers a character action');
+  elements.get('joystick').dispatchEvent(pointer('pointerdown', 902, 80, 50));
+  windowLike.dispatchEvent(pointer('pointermove', 902, 90, 50));
+  windowLike.dispatchEvent(pointer('pointerup', 902, 90, 50));
+  assert.ok(pirateCalls.some(([kind, payload]) => kind === 'move' && payload.active === true));
+  monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(monster.snapshot().controlPanel.mode, 'character');
+  assert.equal(elements.get('skill1Btn').getAttribute('aria-label'), 'สกิล Pirate 1');
+  elements.get('skill1Btn').dispatchEvent(pointer('pointerdown', 903, 0, 0));
+  elements.get('skill1Btn').dispatchEvent(pointer('pointerup', 903, 0, 0));
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions + 2);
+  detach();
+  monster.dispose();
+  console.log('Scene buttons → parent controller → command adapter: PASS (injected backend)');
+}

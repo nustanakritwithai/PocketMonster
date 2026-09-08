@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
 import { createMonsterControlController, MONSTER_COMMAND_CONTRACT } from '../monster-control-controller-v900.mjs';
-const { createMonsterCommandAdapter } = await import(pathToFileURL('C:/Users/Administrator/Desktop/เซิพจารย/.worktrees/monster-controls-integration-20260908/monster-command-adapter.mjs').href);
+import { createMonsterCommandAdapter } from '../monster-command-adapter.mjs';
 
 let zone = 'pirate-fruit';
 let actors = [];
@@ -31,7 +30,14 @@ controller.sync();
 assert.equal(controller.snapshot().controlPanel.mode, 'character');
 assert.equal(controller.snapshot().instanceId, null);
 actors = [];
-assert.equal((await controller.activateSlot(0)).reason, 'ACCEPTED');
+assert.equal((await controller.activateSlot(0)).reason, 'awaiting-snapshot');
+const sendCount = sent.length;
+assert.equal((await controller.activateSlot(0)).reason, 'summon-pending');
+assert.equal(sent.length, sendCount, 'ACK before snapshot cannot trigger another summon');
+actors = [{ instanceId: 'mon-a', zone, active: true }];
+controller.sync();
+assert.equal(controller.snapshot().controlPanel.mode, 'character', 'late spawn confirmation keeps character panel');
+assert.equal((await controller.activateSlot(0)).mode, 'monster', 'confirmed snapshot makes button a toggle');
 controller.reset();
 assert.equal(controller.snapshot().controlPanel.mode, 'character');
 console.log('V9 monster control controller: PASS');
