@@ -645,15 +645,17 @@ export function sanitizePlayerAuthority(value) {
   for (const candidate of value.players) {
     if (!isRecord(candidate) || typeof candidate.playerId !== 'string') return null;
     const playerId = candidate.playerId.trim();
-    if (!playerId || playerId.length > MAX_PLAYER_ID_LENGTH || seen.has(playerId)
+    const identityKey = playerId.toLowerCase();
+    if (!playerId || playerId.length > MAX_PLAYER_ID_LENGTH || seen.has(identityKey)
       || !Number.isSafeInteger(candidate.generation) || candidate.generation < 1
       || !Number.isSafeInteger(candidate.stateSequence) || candidate.stateSequence < 0
       || !isRecord(candidate.hp) || !isFiniteNumber(candidate.hp.current) || !isFiniteNumber(candidate.hp.max)
       || candidate.hp.max <= 0 || candidate.hp.current < 0 || candidate.hp.current > candidate.hp.max
       || !Number.isSafeInteger(candidate.hp.revision) || candidate.hp.revision < 0
       || !Number.isSafeInteger(candidate.resultRevision) || candidate.resultRevision < 0
-      || (candidate.lifeState !== 'alive' && candidate.lifeState !== 'dead')) return null;
-    seen.add(playerId);
+      || (candidate.lifeState !== 'alive' && candidate.lifeState !== 'dead')
+      || ((candidate.lifeState === 'dead') !== (candidate.hp.current === 0))) return null;
+    seen.add(identityKey);
     players.push(Object.freeze({
       playerId, generation: candidate.generation, stateSequence: candidate.stateSequence,
       hp: Object.freeze({ current: candidate.hp.current, max: candidate.hp.max, revision: candidate.hp.revision }),
