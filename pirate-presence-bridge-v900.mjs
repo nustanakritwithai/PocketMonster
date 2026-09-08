@@ -47,7 +47,7 @@ export function sanitizePirateLocalPresence(message) {
   }
   if (message.actors !== undefined) {
     const actorPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE }, { maxVisualEvents: 32, allowAuthority: false });
-    // A malformed optional actor extension must not discard the valid player pose.
+    // Invalid optional actor authority must not discard a valid player pose.
     if (actorPose?.actors !== undefined) pose.actors = actorPose.actors;
   }
   return Object.freeze(pose);

@@ -269,7 +269,9 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateBootstrap, /import\('\.\/assets\/index-/, 'offline bootstrap imports the relative playable Vite bundle');
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=\d+"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
+// Cache revisions advance with presentation releases; require a versioned
+// module hook without pinning the release gate to one obsolete revision.
+assert.match(pirateOfflineHtml, /<script\s+type="module"\s+src="\.\/pocket-presentation\.mjs\?v=[1-9]\d*"\s*>/, 'offline client loads the Pocket visual hook as a cache-versioned module');
 assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
   'Pocket visual hook is listed before the save bootstrap that loads the real Pirate Fruit bundle',

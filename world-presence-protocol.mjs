@@ -262,42 +262,26 @@ function sanitizeMonsterAuthority(value) {
     || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 0
     || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0
     || !Number.isSafeInteger(value.actionSequence) || value.actionSequence < 0
-    || typeof value.hit !== 'boolean' || !Number.isFinite(value.damage) || value.damage < 0
-    || !Number.isInteger(value.damage) || typeof value.death !== 'boolean') return null;
+    || typeof value.hit !== 'boolean' || !Number.isFinite(value.damage) || !Number.isInteger(value.damage) || value.damage < 0
+    || typeof value.death !== 'boolean') return null;
   const authority = {
-    authorityVersion: MONSTER_AUTHORITY_VERSION,
-    serverTimeUtc: value.serverTimeUtc,
+    authorityVersion: MONSTER_AUTHORITY_VERSION, serverTimeUtc: value.serverTimeUtc,
     generation: value.generation,
     hp: Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision }),
-    resultRevision: value.resultRevision,
-    actionSequence: value.actionSequence,
-    hit: value.hit,
-    damage: value.damage,
-    death: value.death,
+    resultRevision: value.resultRevision, actionSequence: value.actionSequence,
+    hit: value.hit, damage: value.damage, death: value.death,
   };
-  if (value.actionId !== undefined) {
-    const actionId = boundedAuthorityToken(value.actionId);
-    if (!actionId) return null;
-    authority.actionId = actionId;
-  }
+  if (value.actionId !== undefined) { const actionId = boundedAuthorityToken(value.actionId); if (!actionId) return null; authority.actionId = actionId; }
   if (value.despawnReason !== undefined) {
-    if (typeof value.despawnReason !== 'string' || !MONSTER_STATE_REASONS.includes(value.despawnReason)) return null;
+    if (!MONSTER_STATE_REASONS.includes(value.despawnReason)) return null;
     authority.despawnReason = value.despawnReason;
   }
   if (value.attack !== undefined && value.attack !== null) {
     if (!isRecord(value.attack) || !['attackId', 'spawnId', 'monsterId', 'islandId', 'targetId'].every(name => boundedAuthorityToken(value.attack[name]))
       || value.attack.action !== 'melee' || !Number.isInteger(value.attack.damage) || value.attack.damage < 0
       || !Number.isInteger(value.attack.hitDelayMs) || value.attack.hitDelayMs < 0) return null;
-    authority.attack = Object.freeze({
-      attackId: value.attack.attackId,
-      spawnId: value.attack.spawnId,
-      monsterId: value.attack.monsterId,
-      islandId: value.attack.islandId,
-      targetId: value.attack.targetId,
-      action: 'melee',
-      damage: value.attack.damage,
-      hitDelayMs: value.attack.hitDelayMs,
-    });
+    authority.attack = Object.freeze({ attackId: value.attack.attackId, spawnId: value.attack.spawnId, monsterId: value.attack.monsterId,
+      islandId: value.attack.islandId, targetId: value.attack.targetId, action: 'melee', damage: value.attack.damage, hitDelayMs: value.attack.hitDelayMs });
   }
   return Object.freeze(authority);
 }
@@ -743,4 +727,3 @@ export function currentSelfPresenceId() {
   if (typeof window === 'undefined') return null;
   return selfPresenceId(window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile, window.POCKETMONSTER_SELF_PRESENCE_ID);
 }
-
