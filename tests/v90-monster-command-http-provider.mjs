@@ -50,4 +50,29 @@ const denied = await guarded.send({ commandId: 'after-logout' });
 assert.equal(denied.code, 'SESSION_UNAVAILABLE');
 assert.equal(calls.some(call => call.init?.headers?.Authorization === 'Bearer after-logout'), false);
 guarded.dispose();
+// การ reset ต้องยกเลิกได้แม้รับ headers แล้วแต่ body ยังไม่เสร็จ
+let releaseBody;
+let bodySignal;
+let bodyCalls = 0;
+let currentZone = 'pirate-fruit';
+const bodyPending = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' }, sessionToken: 'fixture',
+  getZone: () => currentZone,
+  fetchImpl: async (_url, init) => {
+    bodyCalls += 1;
+    bodySignal = init.signal;
+    return { ok: true, json: () => new Promise(resolve => { releaseBody = resolve; }) };
+  },
+});
+const pendingBody = bodyPending.refresh();
+assert.equal(bodyPending.refresh(), pendingBody);
+await Promise.resolve();
+assert.equal(bodyCalls, 1);
+currentZone = 'hub';
+bodyPending.reset();
+assert.equal(bodySignal.aborted, true);
+releaseBody({ ok: true, monsterControl: { party: [{ instanceId: 'old-scene' }], revision: 9 } });
+assert.equal((await pendingBody).code, 'STALE_SCENE');
+assert.equal(bodyPending.snapshot().available, false);
+bodyPending.dispose();
 console.log('V9 monster HTTP provider: PASS');

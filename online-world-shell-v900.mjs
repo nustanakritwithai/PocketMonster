@@ -79,10 +79,14 @@ function bindSceneHudAdapters(sceneWindow) {
     try { window[name] = sceneWindow?.[name]; } catch { window[name] = undefined; }
   }
   unsubscribeMonsterParty?.();
+  unsubscribeMonsterState?.();
+  unsubscribeMonsterState = null;
   unbindMonsterScene?.();
   if (monsterController) {
     unsubscribeMonsterParty = window.POCKETMONSTER_PARTY_HUD?.subscribe?.(() => monsterController.sync()) || null;
     unsubscribeMonsterState = monsterStateProvider?.subscribe?.(() => monsterController.sync()) || null;
+    void monsterStateProvider?.refresh?.();
+    monsterStateProvider?.start?.();
     unbindMonsterScene = bindMonsterControlScene({ sceneWindow, controller: monsterController });
     monsterController.sync();
   }

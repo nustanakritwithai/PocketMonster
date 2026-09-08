@@ -331,6 +331,7 @@ if (typeof window !== 'undefined') {
     }
   };
   const monsterAssetId = actor => {
+    if (getAssetDef(actor?.monsterType)) return actor.monsterType;
     const type = String(actor?.monsterType || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const candidates = [
       `monster.${type}.${type}.bighead.v1`,

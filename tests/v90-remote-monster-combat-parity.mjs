@@ -130,6 +130,18 @@ assert.equal(controller.acceptSnapshot({
   actors: [{ ...lateJoinActor, ownerId: 'player-self', actorId: 'self-monster', stateSequence: 2 }],
 }), true);
 assert.equal(scene.children.some(node => node.name === 'remote-actor:self-monster'), false, 'sender-owned actor is filtered from remote rendering');
+const ownedActor = {
+  ...lateJoinActor, ownerId: 'player-self', actorId: 'owned:self:party1',
+  authority: {
+    authorityVersion: 'monster-authority/1', serverTimeUtc: '2026-09-08T10:00:00Z',
+    generation: 2, hp: { current: 80, max: 100, revision: 1 },
+    resultRevision: 1, actionSequence: 0, hit: false, damage: 0, death: false,
+  },
+};
+assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 2, players: [], actors: [ownedActor] }), true);
+assert.ok(scene.children.some(node => node.name === 'remote-actor:owned:self:party1'), 'เจ้าของเห็นมอนสเตอร์ที่เซิร์ฟเวอร์สร้างให้');
+assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 2, players: [], actors: [{ ...ownedActor, authority: undefined, stateSequence: 2 }] }), true);
+assert.equal(scene.children.some(node => node.name === 'remote-actor:owned:self:party1'), false, 'ชื่อ actor อย่างเดียวไม่เพียงพอ ต้องมีสถานะ authoritative ที่ผ่าน sanitizer');
 assert.equal(controller.acceptSnapshot({
   zone: 'pirate-fruit', generation: 2, players: [],
   actors: [{ ...lateJoinActor, lifecycle: 'despawn', stateSequence: 0 }],

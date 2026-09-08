@@ -1,36 +1,42 @@
-# การเชื่อมแผงมอนสเตอร์ทุกฉาก — งานแรก
+# ระบบปาและสั่งมอนสเตอร์ผ่านเซิร์ฟเวอร์
 
-ปุ่มมอนสเตอร์ใหม่เชื่อมกับ controller กลางของ parent แล้ว ปาครั้งแรกคงแผงตัวละคร หลัง snapshot ยืนยัน active กดซ้ำสลับสกิลมอนสเตอร์/ตัวละคร การสลับไม่ส่ง summon/recall และไม่เปลี่ยนเจ้าของการเดิน
+## พฤติกรรม
 
-## สิ่งที่ทดสอบแล้ว
+1. กดช่องมอนสเตอร์ที่ยังไม่ออกมา ส่ง summon โดยใช้ instanceId ของทีมที่เซิร์ฟเวอร์ยืนยัน
+2. เมื่อเซิร์ฟเวอร์ยืนยัน มอนสเตอร์เริ่ม Basic AI และแผงยังเป็นสกิลตัวละคร
+3. กดช่องเดิมสลับไปแผงมอนสเตอร์ กดอีกครั้งสลับกลับ การสลับไม่ส่ง summon/recall และไม่แย่งปุ่มเดิน
+4. คำสั่งสกิลส่ง skillId ของ loadout มอนสเตอร์ เซิร์ฟเวอร์ตรวจเจ้าของ ฉาก เป้าหมาย คูลดาวน์ และจำนวนครั้ง
+5. เปลี่ยนฉากล้างคำสั่งค้างและเริ่มอ่านสถานะใหม่ มอนสเตอร์ใน server runtime ย้ายตามตำแหน่งเจ้าของที่ยอมรับแล้ว
 
-- ปุ่ม scene → controller จริง → command adapter จริง → ตัวรับคำสั่งทดสอบ
-- ACK มาก่อน snapshot, กดรัว, คำสั่งซ้ำ, timeout/retry, reset ระหว่างรอผล
-- ปุ่ม skill1 ส่ง instanceId/skillId ของมอนสเตอร์ แล้วสลับกลับคำสั่งสกิลตัวละคร
-- ชุด HUD/mobile/roster/lifecycle/party adapter เดิม
+## เส้นทางจริง
 
-ผลเหล่านี้ไม่ใช่การตรวจเกมออนไลน์จริงหรือ Browser สองผู้เล่น
+- GET /api/monsters/control-state?zone=... ใช้ Bearer session และ X-API-Version
+- POST /api/monsters/command ใช้ contract owned-monster-command/v1 พร้อม commandId, instanceId, zone, kind, targetPoint และ skillId ตามชนิดคำสั่ง
+- ACK: {ok, accepted, code, commandId}; active และ loadout มาจาก state API
+- server world-snapshot ส่ง actorId ขึ้นต้น owned: พร้อม ownerId, exact asset ID, pose, animation และ monster-authority/1
+- Client ใช้ monster-command-http-provider-v900.mjs จริง ไม่มี transport/state global ที่ต้องตั้งเอง
+- game-v800 และ living-world รับ owned actor ของตนเองจากเซิร์ฟเวอร์; Pirate ต้องใช้ source candidate renderer ใหม่ตามรายงานทีม
 
-## จุดเชื่อม backend ที่ยังขาด
+## การออกแบบและขอบเขต
 
-ใน Server candidate ที่ตรวจพบ `MonsterAuthorityIntent` มี actor/target/generation/actionSequence/intentId แต่ไม่มี owned summon ที่รับ instanceId และไม่มี skillId จึงยังไม่ได้ผูก endpoint หรือ WebSocket message ใหม่จากการเดา
+ใช้ปุ่มและความสามารถแสดงผลเดิมผ่าน controller กลาง ส่วนเซิร์ฟเวอร์เพิ่ม owner ของสถานะ summon/AI เพราะ candidate เดิมไม่มี owned command ingress ใช้ CentralCombatSimulator และ CombatRulesV91 ร่วมกันสำหรับ auto/manual ไม่รับ HP/damage จาก client
 
-งานนี้เพิ่มจุดเชื่อม Client ภายในต่อไปนี้เพื่อให้ผู้ทำ backend ต่อเส้นทางจริง ไม่ใช่การประกาศว่า API เหล่านี้มีอยู่บน Server แล้ว:
+Canonical reader อ่าน collection + party placements, catalog stats 36 forms, learned skill slots และ basic policy เดิม: ระยะ1.35m, cooldown0.9s, power15 ส่วน runtime หาเป้าหมาย9m คงเป้าหมาย12m และใช้สูตรความเร็วเดิม
 
-- `window.POCKETMONSTER_MONSTER_COMMAND_TRANSPORT.send(command)` ต้องส่งผ่าน authenticated transport เดิมและคืน ACK `{ok, commandId, accepted?, code?}` ไม่คืน state ที่ Client สร้างเอง
-- คำสั่งกลาง `{contract:'owned-monster-command/v1', kind:'summon'|'skill', commandId, instanceId, zone, targetPoint?, skillId?, targetActorId?}`; summon ต้องมี targetPoint
-- `window.POCKETMONSTER_MONSTER_CONTROL_STATE` รับ projection ที่ผ่านการยืนยันจากเซิร์ฟเวอร์: `party`, `actors`, `skills`
-- party ใช้รูปแบบ HUD slots เดิมพร้อม instanceId; actors สำหรับ owned control ต้องผูก instanceId กับ owner ที่ยืนยันแล้วและมี `{instanceId, zone, active}`; ห้ามส่ง ambient actors ทั้งหมดเข้ามาโดยไม่มีการตรวจเจ้าของ
-- skills เป็นรายการ loadout ตาม instanceId: `{skillId, label?, cooldownRemaining?, disabledReason?}`
-- เมื่อ projection เปลี่ยน dispatch `pocketmonster:monster-control-state` เพื่อให้ controller.sync(); ต้องล้างข้อมูลนี้เมื่อเปลี่ยนบัญชีและจัด revision/generation ก่อนเผยแพร่
+สถานะ active, คูลดาวน์ และ HP ต่อสู้อยู่ใน process ของ server รุ่นนี้ ย้ายตามฉากได้ แต่ยังไม่ใช่การเพิ่ม persistence ของผลต่อสู้/รางวัลลง SQL ศัตรูที่มี target profile ในชุดนี้คือ Pirate central catalog24ชนิด; แผนที่อื่นแสดงและควบคุม owned actor ได้ แต่ต้องมี authoritative target profile จึงโจมตีศัตรูในฉากนั้นได้
 
-ปัจจุบันยังไม่มี production producer ของ transport/state สองส่วนนี้ใน PR ดังนั้นการปา/สกิลออนไลน์ยังใช้งานไม่ครบ เมื่อไม่มี provider จะคืน `SERVER_INGRESS_UNAVAILABLE` และไม่คำนวณ HP/damage ออฟไลน์แทน
+เคารพ Combat.Enabled/CommitEnabled/ShadowMode เดิม ถ้าปิด combat จะไม่ commit ความเสียหายหรือใช้สกิล ไม่เปลี่ยน flags ของ production อัตโนมัติ
 
-## ขั้นถัดไปก่อนพร้อมใช้งานจริง
+## หลักฐานและขั้นรับรุ่น
 
-1. ผูก owned-monster identity/party/loadout ที่เซิร์ฟเวอร์มีอยู่กับ command ingress และ snapshot projection ข้างต้น โดยตรวจเจ้าของ ฉาก คูลดาวน์ จำนวนที่เรียกได้ และ idempotency
-2. ผูก transport/state producer ของ Client ให้ครบ พร้อม snapshot revision และ session/scene generation; ไม่ย้าย local authority จากเกมเดิมเข้ามา
-3. ตรวจสกิลตามชนิดเป้าหมายจริง รวม skill ที่ต้องเลือกตัว เป้าหมายพื้นที่ และการจัดคิวร่วมกับ AI
-4. build/Browser QA บน CI หรือเครื่องอื่น ตรวจภาพทุกฉากและสองผู้เล่นจริง จากนั้น release tester/patch gates ตามโครงการ
+| รายการ | ผล |
+|---|---|
+| npm run check และ focused controls/provider/HUD | PASS |
+| OwnedMonsterWorldHarness | PASS: summon, replay/concurrency, owner, actual HP, cooldown, empty ground, 7 zones, disconnect |
+| OwnedMonsterCanonicalHarness | PASS: stored schema, stages/assets, basic, loadout และ legacy compatibility |
+| Pirate focused renderer | PASS 5 tests และ strict focused TypeScript |
+| release preflight / health / version | PASS เฉพาะรุ่นเดิมที่เปิดใช้งานอยู่ ไม่ใช่การรับรอง candidate |
+| full build / nested Pirate bundle / Browser สองผู้เล่น | ต้องทำบน CI หรือเครื่องอื่นตาม PROJECT_MEMORY.md |
+| deploy / SQL / เปลี่ยน flags | ยังไม่ได้ทำ |
 
-ฐาน PR นี้คือ Client `56a22a5` จาก PR538 ซึ่งยังเปิดอยู่ตอนเริ่มงาน ไม่ใช่หลักฐานว่า source นี้เผยแพร่แล้ว ห้าม merge/deploy ขณะ backend dependencies และ Browser acceptance ยังไม่ผ่าน
+เวอร์ชัน client/server ยังคงตรงกัน8.4.0 ต้องสร้าง nested Pirate bundle จาก candidateใหม่ก่อน build:pages; build:pages จะสร้าง manifestตาม content และรวม HTTPproviderใหม่ ห้ามนำ manifestหรือbinaryรุ่นเดิมมาอ้างเป็น candidateที่ผ่านแล้ว
