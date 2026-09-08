@@ -6,6 +6,7 @@ import { createBigheadMonsterProvider } from './providers/procedural-bighead-mon
 import { createPirateFruitActionTracker } from './pirate-fruit-action-adapter.mjs';
 import { createPirateFruitRigRetargeter } from './pirate-fruit-rig-retarget.mjs';
 import { createStudioCharacterProvider } from './providers/studio-character.mjs';
+import { applyStudioCharacterRenderProfile } from './studio-character-render-profile.mjs';
 import {
   installStudioCharacterPackage,
   validateStudioCharacterPackage,
@@ -582,6 +583,7 @@ export async function installPirateFruitPocketPresentation({
     item.studioRenderFrames = 0;
     item.lastPresentation = null;
     item.lastStudioPresentation = null;
+    item.renderProfile = Object.freeze({ state: studio.renderProfile ? 'loading' : 'skipped', assigned: 0, failed: [] });
     let sampledMesh = false;
     studio.root.traverse(node => {
       if (sampledMesh || !node.isMesh || node.visible === false) return;
@@ -594,6 +596,15 @@ export async function installPirateFruitPocketPresentation({
     });
     try { fallback.dispose?.(); } catch (error) { console.warn('Old player visual disposal failed', error); }
     publishStudioStatus({ state: 'attached', source: 'studio-character', id: pkg.manifest.id });
+    // This is intentionally non-blocking: geometry/scalar PBR is already
+    // visible, and a failed image fetch must never remove the live player.
+    if (studio.renderProfile) {
+      void applyStudioCharacterRenderProfile(studio.root, studio.renderProfile, { THREE: engineThree })
+        .then(report => { item.renderProfile = report; })
+        .catch(error => {
+          item.renderProfile = Object.freeze({ state: 'failed', assigned: 0, failed: [String(error?.message || error)] });
+        });
+    }
     return true;
   }
 
@@ -781,6 +792,7 @@ export async function installPirateFruitPocketPresentation({
           facing: item.host.rotation.y,
           animation: item.handle.animationState || null,
           desiredAction: item.lastStudioPresentation?.action || null,
+          renderProfile: item.renderProfile || null,
         } : null;
       })(),
     }),
