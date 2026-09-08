@@ -33,6 +33,8 @@ assert.match(bridge, /visibleStudioRoot\(studio\)/);
 assert.match(bridge, /item\.host\.add\(studio\.root\)/);
 assert.match(bridge, /item\.handle\.root\.visible = false/);
 assert.match(bridge, /item\.rigRetargeter = null/);
+assert.match(bridge, /applyPirateFruitStudioPresentation/);
+assert.match(bridge, /selectPirateFruitStudioAction/);
 
 const kit = threeFromPirateFruitVendor(vendor);
 for (const name of ['Group', 'Mesh', 'BufferGeometry', 'BufferAttribute', 'Vector3', 'Box3']) {
