@@ -100,9 +100,21 @@ const localSpoofPose = sanitizePirateLocalPresence({
   type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0,
   actors: [serverActor],
 });
-assert.equal(Object.hasOwn(localSpoofPose, 'actors'), false,
-  'client-authored authority is rejected without dropping the local pose');
-const agedSnapshot = advancePirateSnapshotVisualAge({ zone: 'pirate-fruit', players: [{
+assert.equal(localSpoofPose.actors[0].authority, undefined,
+  'client-authored authority is stripped without dropping the local pose');
+const monsterIntent = {
+  schemaVersion: 1, intentId: 'monster-intent:2:9', zone: 'starter-island', kind: 'melee', category: 'sword',
+  forwardX: 3, forwardZ: 4, range: 4.5, sequence: 9, targetActorId: 'monster:server-crab-1',
+  expectedGeneration: 1, expectedStateSequence: 12,
+};
+const localIntentPose = sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [monsterIntent],
+});
+assert.equal(localIntentPose.monsterIntents[0].forwardX, .6, 'Parent normalizes forwarded intent direction');
+assert.equal(localIntentPose.monsterIntents[0].targetActorId, monsterIntent.targetActorId, 'Parent preserves target identity on intent');
+assert.equal(sanitizePirateLocalPresence({
+  type: PIRATE_LOCAL_PRESENCE_MESSAGE, zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [monsterIntent, monsterIntent],
+}), null, 'duplicate intent ids fail closed within one frame');const agedSnapshot = advancePirateSnapshotVisualAge({ zone: 'pirate-fruit', players: [{
   id: 'remote-one', name: 'Remote', x: 1, z: 2, dir: 0,
   visual: { schemaVersion: 1, sessionId: 'visual_session_1', stateSequence: 1,
     events: [{ sequence: 1, kind: 'hit-spark', ageMs: 100, position: { x: 1, y: 2, z: 3 }, color: 0xffffff }], projectiles: [{ id: 'projectile-1', position: { x: 1, y: 2, z: 3 }, direction: { x: 0, y: 0, z: 1 }, velocity: { x: 0, y: 0, z: 1 }, color: 0xffffff, scale: 1, elapsed: 0, lifeFraction: .8, remainingMs: 5000 }] },
@@ -189,7 +201,8 @@ pose = { x: 2, z: 3, dir: 0.25 };
 assert.deepEqual(window.POCKETMONSTER_WORLD_STATE(), {
   zone: 'pirate-fruit', x: 2, z: 3, dir: 0.25, locomotion: 'idle', animation: null,
 });
-pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor], monsterIntents: [monsterIntent] };
+assert.equal(window.POCKETMONSTER_WORLD_STATE().monsterIntents[0].intentId, monsterIntent.intentId, 'world-pos publisher carries validated monster intent');
 publishWorldState({
   getZone: () => 'pirate-fruit',
   getPosition: () => pose,
@@ -214,7 +227,8 @@ publishWorldState({
 });
 
 let relayAllowed = true;
-pose = { x: 2, z: 3, dir: 0.25, actors: [localActor] };
+pose = { x: 2, z: 3, dir: 0.25, actors: [localActor], monsterIntents: [monsterIntent] };
+assert.equal(window.POCKETMONSTER_WORLD_STATE().monsterIntents[0].intentId, monsterIntent.intentId, 'world-pos publisher carries validated monster intent');
 const centralPose = { ...pose, actors: [{ ...localActor, zone: 'starter-island' }] };
 publishWorldState({ getZone: () => 'starter-island', getPosition: () => centralPose, getDir: () => centralPose.dir, getAllowActors: () => relayAllowed });
 assert.equal(window.POCKETMONSTER_WORLD_STATE().actors.length, 1, 'late capability starts in compatible relay mode');

@@ -6,7 +6,7 @@ import {
   PIRATE_HUD_INIT_MESSAGE,
   createPirateHudTelemetryCollector,
 } from './pirate-hud-telemetry-v900.mjs?v=2';
-import { publishWorldState, registerExternalPose } from './world-presence-v800.mjs?v=4';
+import { publishWorldState, registerExternalPose } from './world-presence-v800.mjs?v=5';
 import {
   PIRATE_PRESENCE_ZONE,
   createPiratePresenceStatusMessage,
@@ -15,7 +15,7 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
   pirateCentralAuthorityOwnsZone,
-} from './pirate-presence-bridge-v900.mjs?v=5';
+} from './pirate-presence-bridge-v900.mjs?v=6';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=10';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
