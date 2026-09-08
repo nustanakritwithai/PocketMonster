@@ -141,6 +141,12 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
     root.append(register('mmorpgRoster', el(documentLike, 'div', '', 'mmorpg-roster')));
     root.append(register('mmorpgCompanions', el(documentLike, 'div', '', 'mmorpg-companions')));
+    const recall = register('monsterRecallBtn', el(documentLike, 'button', '', 'mmorpg-monster-recall'));
+    recall.type = 'button';
+    recall.textContent = 'เก็บมอนสเตอร์';
+    recall.setAttribute('aria-label', 'เก็บมอนสเตอร์');
+    recall.addEventListener('click', () => { void partyAdapter()?.recallActive?.(); });
+    root.append(recall);
     root.append(register('mmorpgUtilities', el(documentLike, 'div', '', 'mmorpg-utilities')));
     root.append(register('mmorpgBanner', el(documentLike, 'div', '', 'mmorpg-banner hidden')));
 
@@ -439,6 +445,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
   function paintOverlayMonsterSlots(slots) {
     const controlPanel = partyAdapter()?.snapshot?.()?.controlPanel || { mode: 'character', slot: null };
+    const partyState = partyAdapter()?.snapshot?.() || {};
+    const recallButton = documentLike.getElementById?.('monsterRecallBtn');
+    if (recallButton) {
+      const canRecall = slots.some(slot => slot.active === true) && partyState.capabilities?.recall === true;
+      recallButton.hidden = !canRecall;
+      recallButton.disabled = !canRecall || slots.some(slot => slot.pending === true);
+      recallButton.textContent = slots.some(slot => slot.pending === true) ? 'กำลังเก็บมอนสเตอร์…' : 'เก็บมอนสเตอร์';
+    }
     for (const slot of slots) {
       const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
       if (!button) continue;
