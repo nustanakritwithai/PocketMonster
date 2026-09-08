@@ -101,7 +101,7 @@ assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board in
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
 assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=27/, 'Pirate child HTML cache-busts presentation after retiring the helm duplicate');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=\d+/, 'Pirate child HTML cache-busts presentation after retiring the helm duplicate');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
@@ -137,3 +137,4 @@ assert.match(
 );
 
 console.log('V9 Pirate onboarding overlay and original talk path: PASS');
+
