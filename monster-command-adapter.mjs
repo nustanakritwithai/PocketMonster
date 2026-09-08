@@ -26,24 +26,21 @@ export function sanitizeMonsterCommand(value) {
     instanceId: value.instanceId,
     zone: value.zone,
   };
+  if (value.targetPoint !== undefined) {
+    if (!record(value.targetPoint) || !['x', 'y', 'z'].every(key => Number.isFinite(value.targetPoint[key]))) return null;
+    command.targetPoint = Object.freeze({ x: value.targetPoint.x, y: value.targetPoint.y, z: value.targetPoint.z });
+  }
   if (value.kind === 'skill') {
     if (!id(value.skillId)) return null;
     command.skillId = value.skillId;
     if (value.targetActorId !== undefined && !id(value.targetActorId)) return null;
     if (value.targetActorId !== undefined) command.targetActorId = value.targetActorId;
-    if (value.targetPoint !== undefined) {
-      if (!record(value.targetPoint) || !['x', 'y', 'z'].every(key => Number.isFinite(value.targetPoint[key]))) return null;
-      command.targetPoint = Object.freeze({ x: value.targetPoint.x, y: value.targetPoint.y, z: value.targetPoint.z });
-    }
   }
-  if (value.targetPoint !== undefined) {
-    if (!record(value.targetPoint) || !['x', 'y', 'z'].every(key => Number.isFinite(value.targetPoint[key]))) return null;
-    command.targetPoint = Object.freeze({ x: value.targetPoint.x, y: value.targetPoint.y, z: value.targetPoint.z });
-  } else if (value.kind === 'summon') return null;
+  if (value.kind === 'summon' && command.targetPoint === undefined) return null;
   return Object.freeze(command);
 }
 
-export function createMonsterCommandAdapter({ send = null, getZone = null } = {}) {
+export function createMonsterCommandAdapter({ send = null, getZone = null, timeoutMs = 10000, maxPending = 64 } = {}) {
   const pending = new Map();
   const resolved = new Map();
   let sceneEpoch = 0;
@@ -58,28 +55,34 @@ export function createMonsterCommandAdapter({ send = null, getZone = null } = {}
     const active = pending.get(command.commandId);
     if (active) return active.fingerprint === fingerprint ? active.promise : Object.freeze({ ok: false, code: 'COMMAND_ID_REUSE' });
     if (typeof send !== 'function') return Object.freeze({ ok: false, code: 'SERVER_INGRESS_UNAVAILABLE' });
+    if (pending.size >= maxPending) return Object.freeze({ ok: false, code: 'PENDING_CAPACITY' });
     const requestEpoch = sceneEpoch;
-    const operation = Promise.resolve().then(() => send(command)).then(result => {
-      if (requestEpoch !== sceneEpoch || currentZone() !== null && currentZone() !== command.zone) return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command.commandId });
+    const request = { fingerprint, epoch: requestEpoch };
+    const cleanup = () => { if (pending.get(command.commandId) === request) pending.delete(command.commandId); };
+    const operation = Promise.resolve().then(() => {
+      if (request.epoch !== sceneEpoch || currentZone() !== null && currentZone() !== command.zone) return { ok: false, code: 'STALE_SCENE', commandId: command.commandId, skipSend: true };
+      return send(command);
+    }).then(result => {
+      if (request.epoch !== sceneEpoch || currentZone() !== null && currentZone() !== command.zone) { cleanup(); return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command.commandId }); }
       const normalized = record(result) && typeof result.ok === 'boolean' && result.commandId === command.commandId
-        ? Object.freeze({ ...result })
+        ? Object.freeze({ ok: result.ok, ...(result.accepted === undefined ? {} : { accepted: result.accepted }), ...(result.code === undefined ? {} : { code: result.code }), commandId: command.commandId })
         : Object.freeze({ ok: false, code: 'INVALID_SERVER_RESULT', commandId: command.commandId });
-      pending.delete(command.commandId);
+      cleanup();
       if (normalized.code !== 'STALE_SCENE') {
         resolved.set(command.commandId, { fingerprint, result: normalized });
         while (resolved.size > 128) resolved.delete(resolved.keys().next().value);
       }
       return normalized;
-    }, error => {
-      pending.delete(command.commandId);
-      return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command.commandId });
-    });
-    pending.set(command.commandId, { fingerprint, promise: operation });
-    return operation;
+    }, () => { cleanup(); return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command.commandId }); });
+    const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? new Promise(resolve => setTimeout(() => { cleanup(); resolve(Object.freeze({ ok: false, code: 'TRANSPORT_TIMEOUT', commandId: command.commandId })); }, timeoutMs)) : null;
+    const promise = timeout ? Promise.race([operation, timeout]) : operation;
+    request.promise = promise;
+    pending.set(command.commandId, request);
+    return promise;
   };
   return Object.freeze({
-    summon(input) { return dispatch({ ...input, kind: 'summon' }); },
-    skill(input) { return dispatch({ ...input, kind: 'skill' }); },
+    summon(input) { return dispatch({ ...input, kind: 'summon', contract: MONSTER_COMMAND_CONTRACT }); },
+    skill(input) { return dispatch({ ...input, kind: 'skill', contract: MONSTER_COMMAND_CONTRACT }); },
     pendingCommandIds: () => Object.freeze([...pending.keys()]),
     clearScene() { sceneEpoch += 1; pending.clear(); resolved.clear(); },
   });
