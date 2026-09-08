@@ -108,12 +108,12 @@ try {
   assert.equal(authoritySnapshot.playerAuthority.players[0].hp.current, 87.5, 'bridge preserves authoritative self HP');
   assert.equal(authoritySnapshot.playerAuthority.players[1].lifeState, 'dead', 'bridge preserves observer death state');
   const route = window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldPresence;
-  assert.equal(route.acceptedSnapshots, 3, 'inbound world snapshots reach local route diagnostics');
+  assert.equal(route.acceptedSnapshots, 4, 'inbound world snapshots reach local route diagnostics');
   assert.equal(route.staleActors, 1, 'duplicate actor sequence is observable at the parent ingress');
   assert.equal(route.staleHpRevisions, 1, 'duplicate HP revisions are observable at the parent ingress');
   assert.equal(route.staleResultRevisions, 1, 'duplicate combat result revisions are observable at the parent ingress');
   assert.equal(route.actorsOmitted, 1, 'omitted actors are observable separately from actors[]');
-  assert.equal(route.sampleCount, 2, 'snapshot receive intervals are retained for p95/p99 capture');
+  assert.equal(route.sampleCount, 3, 'snapshot receive intervals are retained for p95/p99 capture');
   console.log('V9 chat WORLD_STATE 20Hz and visual-envelope guard: PASS');
 } finally {
   globalThis.setInterval = realSetInterval;
