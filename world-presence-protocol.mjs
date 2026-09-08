@@ -43,6 +43,7 @@ export const PRESENTATION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,96}$/;
 export const MONSTER_INSTANCE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,96}$/;
 export const ACTOR_KIND_VALUES = Object.freeze(['monster', 'summon']);
 export const ACTOR_LIFECYCLE_VALUES = Object.freeze(['spawn', 'active', 'despawn']);
+export const MONSTER_AUTHORITY_VERSION = 'monster-authority/1';
 export const VISUAL_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const VISUAL_KINDS = Object.freeze([
   'slash', 'blade-trail', 'gun-shot', 'energy-launch', 'shockwave', 'beam',
@@ -62,6 +63,7 @@ const CATEGORY_SET = ANIMATION_CATEGORY_SET;
 const SPELL_FX_ASSET_SET = new Set(SPELL_FX_ASSET_IDS);
 const ACTOR_KIND_SET = new Set(ACTOR_KIND_VALUES);
 const ACTOR_LIFECYCLE_SET = new Set(ACTOR_LIFECYCLE_VALUES);
+const MONSTER_STATE_REASONS = Object.freeze(['defeated', 'despawned', 'zone-change', 'reconnect', 'expired']);
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -246,7 +248,45 @@ export function sanitizeActorPresentation(value) {
   return Object.freeze({ events: Object.freeze(events), projectiles: Object.freeze(projectiles) });
 }
 
-export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS } = {}) {
+function boundedAuthorityToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,160}$/.test(value) ? value : null;
+}
+
+function sanitizeMonsterAuthority(value) {
+  if (!isRecord(value) || value.authorityVersion !== MONSTER_AUTHORITY_VERSION
+    || typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 64
+    || !Number.isFinite(Date.parse(value.serverTimeUtc)) || !value.serverTimeUtc.endsWith('Z')
+    || !Number.isSafeInteger(value.generation) || value.generation < 1
+    || !isRecord(value.hp) || !Number.isFinite(value.hp.current) || !Number.isFinite(value.hp.max)
+    || value.hp.max <= 0 || value.hp.current < 0 || value.hp.current > value.hp.max
+    || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 0
+    || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0
+    || !Number.isSafeInteger(value.actionSequence) || value.actionSequence < 0
+    || typeof value.hit !== 'boolean' || !Number.isFinite(value.damage) || !Number.isInteger(value.damage) || value.damage < 0
+    || typeof value.death !== 'boolean') return null;
+  const authority = {
+    authorityVersion: MONSTER_AUTHORITY_VERSION, serverTimeUtc: value.serverTimeUtc,
+    generation: value.generation,
+    hp: Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision }),
+    resultRevision: value.resultRevision, actionSequence: value.actionSequence,
+    hit: value.hit, damage: value.damage, death: value.death,
+  };
+  if (value.actionId !== undefined) { const actionId = boundedAuthorityToken(value.actionId); if (!actionId) return null; authority.actionId = actionId; }
+  if (value.despawnReason !== undefined) {
+    if (!MONSTER_STATE_REASONS.includes(value.despawnReason)) return null;
+    authority.despawnReason = value.despawnReason;
+  }
+  if (value.attack !== undefined && value.attack !== null) {
+    if (!isRecord(value.attack) || !['attackId', 'spawnId', 'monsterId', 'islandId', 'targetId'].every(name => boundedAuthorityToken(value.attack[name]))
+      || value.attack.action !== 'melee' || !Number.isInteger(value.attack.damage) || value.attack.damage < 0
+      || !Number.isInteger(value.attack.hitDelayMs) || value.attack.hitDelayMs < 0) return null;
+    authority.attack = Object.freeze({ attackId: value.attack.attackId, spawnId: value.attack.spawnId, monsterId: value.attack.monsterId,
+      islandId: value.attack.islandId, targetId: value.attack.targetId, action: 'melee', damage: value.attack.damage, hitDelayMs: value.attack.hitDelayMs });
+  }
+  return Object.freeze(authority);
+}
+
+export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const actorId = sanitizeMonsterInstanceId(value.actorId);
   const ownerId = value.ownerId === undefined ? null : sanitizeMonsterInstanceId(value.ownerId);
@@ -259,6 +299,11 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     || (expectedGeneration !== undefined && value.generation !== expectedGeneration)) return null;
   const pose = value.pose;
   if (!isRecord(pose) || !isFiniteNumber(pose.x) || !isFiniteNumber(pose.y) || !isFiniteNumber(pose.z) || !isFiniteNumber(pose.dir)) return null;
+  if (value.authority !== undefined && !allowAuthority) return null;
+  const authority = value.authority === undefined ? null : sanitizeMonsterAuthority(value.authority);
+  if (value.authority !== undefined && !authority) return null;
+  if (authority && authority.generation !== value.generation) return null;
+  if (authority?.attack && authority.attack.monsterId !== actorId) return null;
   const actor = {
     actorId, kind: 'monster', ...(ownerId === null ? {} : { ownerId }), monsterType, zone, generation: value.generation, lifecycle: value.lifecycle,
     spawnSequence: value.spawnSequence, stateSequence: value.stateSequence,
@@ -271,6 +316,7 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
   };
+  if (authority) actor.authority = authority;
   if (value.presentation !== undefined) {
     const presentation = sanitizeActorPresentation(value.presentation);
     if (presentation) actor.presentation = presentation;
@@ -408,7 +454,7 @@ export function sanitizeAnimation(value) {
   return Object.freeze(animation);
 }
 
-export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS } = {}) {
+export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const zone = safeZone(value.zone);
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
@@ -423,7 +469,7 @@ export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EV
   if (isFiniteNumber(value.y)) pose.y = clamp(value.y, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT);
   if (value.presentation !== undefined) { const presentation = sanitizePresentation(value.presentation); if (presentation) pose.presentation = presentation; }
   if (value.visual !== undefined) { const visual = sanitizeVisual(value.visual, { maxEvents: maxVisualEvents }); if (visual) pose.visual = visual; }
-  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents }); if (actors) pose.actors = actors; }
+  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents, allowAuthority }); if (actors) pose.actors = actors; }
   return Object.freeze(pose);
 }
 

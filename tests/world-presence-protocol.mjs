@@ -18,6 +18,7 @@ const {
   selfPresenceId,
   sanitizePresentation,
   sanitizeVisual,
+  MONSTER_AUTHORITY_VERSION,
   createVisualEventQueue,
   SPELL_FX_ASSET_IDS,
 } = await import('../world-presence-protocol.mjs');
@@ -165,6 +166,25 @@ const actorWithIndependentLifecycleGeneration = {
   pose: { x: 0, y: 0, z: 0, dir: 0 }, locomotion: 'idle', animation: null,
   presentation: { events: [], projectiles: [] },
 };
+const authoritativeActor = {
+  ...actorWithIndependentLifecycleGeneration,
+  actorId: 'monster:east-forest:1',
+  monsterType: 'crab',
+  zone: 'pirate-fruit',
+  generation: 1,
+  authority: {
+    authorityVersion: MONSTER_AUTHORITY_VERSION,
+    serverTimeUtc: '2026-09-08T12:00:00Z', generation: 1,
+    hp: { current: 41.5, max: 100, revision: 0 }, resultRevision: 2,
+    actionSequence: 1, actionId: 'melee', hit: true, damage: 5, death: false,
+    attack: { attackId: 'monster:east-forest:1:hit', spawnId: 'monster:east-forest:1', monsterId: 'monster:east-forest:1', islandId: 'pirate-fruit', targetId: 'player-1', action: 'melee', damage: 5, hitDelayMs: 180 },
+  },
+};
+const authoritativeSnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', generation: 7, players: [], actors: [authoritativeActor] }, 'pirate-fruit');
+assert.equal(authoritativeSnapshot.actors[0].authority.hp.current, 41.5, 'nested Server authority preserves fractional HP');
+assert.equal(authoritativeSnapshot.actors[0].authority.attack.targetId, 'player-1', 'nested Server attack preserves target identity');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', generation: 7, players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }, 'pirate-fruit'), null, 'authority generation mismatch fails closed');
+assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false }).actors, undefined, 'outbound local pose cannot author authority');
 assert.equal(
   worldSnapshotPayload({ type: 'world-snapshot', payload: { zone: 'hub', generation: 3, players: [], actors: [actorWithIndependentLifecycleGeneration] } })?.actors[0].generation,
   9,
