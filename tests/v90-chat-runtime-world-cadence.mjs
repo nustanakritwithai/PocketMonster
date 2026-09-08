@@ -84,8 +84,22 @@ try {
   assert.equal(poseFrames.length, 20, 'fake one-second clock emits 20 deterministic 20Hz pose ticks');
   assert.deepEqual(poseFrames.map(frame => frame.x), Array.from({ length: 20 }, (_, index) => index + 1), 'each cadence tick carries the latest pose');
   assert.equal(new Set(poseFrames.map(frame => frame.x)).size, 20, 'pose cadence does not duplicate a prior sample');
+  const actor = {
+    actorId: 'monster-observer-a', kind: 'monster', monsterType: 'flameling', zone: 'pirate-fruit', generation: 1,
+    spawnSequence: 1, stateSequence: 1, lifecycle: 'active',
+    pose: { x: 1, y: 0, z: 2, dir: 0 }, locomotion: 'run',
+  };
+  socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
+  socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
+  socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [] } }) });
+  const route = window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldPresence;
+  assert.equal(route.acceptedSnapshots, 3, 'inbound world snapshots reach local route diagnostics');
+  assert.equal(route.staleActors, 1, 'duplicate actor sequence is observable at the parent ingress');
+  assert.equal(route.actorsOmitted, 1, 'omitted actors are observable separately from actors[]');
+  assert.equal(route.sampleCount, 2, 'snapshot receive intervals are retained for p95/p99 capture');
   console.log('V9 chat WORLD_STATE 20Hz and visual-envelope guard: PASS');
 } finally {
   globalThis.setInterval = realSetInterval;
   globalThis.clearInterval = realClearInterval;
 }
+
