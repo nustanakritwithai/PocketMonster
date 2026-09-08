@@ -98,7 +98,7 @@ function buildMaterial(THREE, snapshot, resources) {
   return material;
 }
 
-function buildSceneNode(THREE, snapshot, resources) {
+function buildSceneNode(THREE, snapshot, resources, path = []) {
   const isMesh = snapshot?.nodeType === 'mesh';
   const node = isMesh
     ? new THREE.Mesh(
@@ -108,13 +108,15 @@ function buildSceneNode(THREE, snapshot, resources) {
     : new THREE.Group();
   node.name = snapshot?.name || '';
   node.visible = snapshot?.visible !== false;
-  node.userData = { ...(snapshot?.userData || {}) };
+  node.userData = { ...(snapshot?.userData || {}), studioScenePath: [...path] };
   applyTransform(node, snapshot?.transform);
   if (isMesh) {
     node.castShadow = !!snapshot.castShadow;
     node.receiveShadow = !!snapshot.receiveShadow;
   }
-  for (const child of snapshot?.children || []) node.add(buildSceneNode(THREE, child, resources));
+  for (const [index, child] of (snapshot?.children || []).entries()) {
+    node.add(buildSceneNode(THREE, child, resources, [...path, index]));
+  }
   return node;
 }
 
@@ -457,6 +459,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
           },
         });
       },
+      get renderProfile() { return pkg.renderProfile || null; },
     };
 
     for (const resource of resources) registerOwned(handle, resource);
