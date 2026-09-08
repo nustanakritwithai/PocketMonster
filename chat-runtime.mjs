@@ -48,6 +48,7 @@ const state = {
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
 const worldVisualQueue = createVisualEventQueue();
+const worldPresenceDiagnostics = createPresenceRouteDiagnostics();
 let lastWorldZone = null;
 
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS = events => worldVisualQueue.push(events);
@@ -531,8 +532,12 @@ function connectSocket() {
         if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
           const payload = worldSnapshotPayload(message);
-          if (!payload) return;
+          if (!payload) {
+            worldPresenceDiagnostics.recordRejected();
+            return;
+          }
           const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
+          worldPresenceDiagnostics.observeSnapshot(filtered);
           const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(filtered);
           if (accepted !== false) setWorldConnected(true);
         }
@@ -701,6 +706,7 @@ const runtime = Object.freeze({
     chatSubscribers: chatSubscribers.size,
     chatRevision: chatStore.revision,
     chatRows: chatStore.rows.length,
+    worldPresence: worldPresenceDiagnostics.diagnostics(),
   }),
 });
 Object.defineProperty(window, CHAT_RUNTIME_SLOT, { value: runtime });
