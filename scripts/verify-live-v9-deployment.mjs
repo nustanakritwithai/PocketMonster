@@ -7,8 +7,8 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
-export const EXPECTED_PIRATE_SOURCE_COMMIT = '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821';
-export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '4cfdee0f5d67c2c57a70f4e6a8b2724b2420bd7efa71279776cf2b783382560e';
+export const EXPECTED_PIRATE_SOURCE_COMMIT = 'c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'e0ddda08106ed834728ec9d163069eb96828ab5deabf3e5c5c428901f9b5806a';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
