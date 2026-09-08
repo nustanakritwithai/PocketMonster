@@ -36,8 +36,12 @@ assert.match(packageJson.scripts.check, /npm run test:remote-animation/, 'defaul
 assert.match(pagesWorkflow, /npm run test:remote-animation/, 'Pages deploy gates remote animation regressions');
 assert.match(firebaseWorkflow, /npm run test:remote-animation/, 'Firebase deploy gates remote animation regressions');
 assert.ok(
-  PAGES_LIVE_SMOKE_FILES.includes('pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js'),
-  'live verifier hashes the entry-referenced onboarding chunk',
+  PAGES_LIVE_SMOKE_FILES.includes('asset-presentation/providers/procedural-bighead-monster.mjs'),
+  'live verifier hashes the active procedural monster provider',
+);
+assert.ok(
+  !PAGES_LIVE_SMOKE_FILES.includes('pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js'),
+  'live verifier does not require the disabled onboarding chunk',
 );
 
 function runtimeConfig(overrides = {}, configOverrides = {}) {
@@ -118,7 +122,7 @@ pagesFiles.set('v900.html', pagesFiles.get('index.html'));
 pagesFiles.set('scene-v900.html', '<script type="module" src="./scene-entry-v900.mjs"></script>');
 pagesFiles.set('online-world-shell-v900.mjs', "import { createCombatV91Shell } from './combat-v91-entry.mjs?v=1';\nvoid createCombatV91Shell;");
 pagesFiles.set('pirate-fruit-offline/index.html', '<script type="module" src="./pocket-bootstrap.mjs?v=4"></script>');
-pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-DKUYjNyH.js');\n");
+pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-B4TDjvel.js');\n");
 const manifest = {
   files: [...pagesFiles].map(([relative, body]) => ({
     path: relative,

@@ -40,6 +40,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'game-v800.js',
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
+  'asset-presentation/providers/procedural-bighead-monster.mjs',
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
