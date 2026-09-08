@@ -288,7 +288,25 @@ assert.equal(authoritativeSnapshot.actors[0].authority.attack.targetId, 'player-
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, authorityVersion: 'wrong/1' } }] }), null, 'unknown authority version fails closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, hp: { current: 11, max: 10, revision: 2 } } }] }), null, 'invalid HP range fails closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], actors: [{ ...authoritativeActor, authority: { ...authoritativeActor.authority, generation: 2 } }] }), null, 'authority generation mismatch fails closed');
+const playerAuthority = {
+  schemaVersion: 1, serverTimeUtc: '2026-09-08T16:00:00.000Z',
+  players: [
+    { playerId: 'self-player', generation: 2, stateSequence: 7, hp: { current: 87.5, max: 100, revision: 3 }, resultRevision: 2, lifeState: 'alive' },
+    { playerId: 'observer-player', generation: 2, stateSequence: 8, hp: { current: 0, max: 120, revision: 4 }, resultRevision: 5, lifeState: 'dead' },
+  ],
+};
+const authoritySnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [{ id: 'self-player', x: 1, z: 2 }], playerAuthority });
+assert.equal(authoritySnapshot.players.length, 1, 'visual self remains independently filtered by receiver');
+assert.equal(authoritySnapshot.playerAuthority.players[0].hp.current, 87.5, 'self authoritative HP preserves fractional value');
+assert.equal(authoritySnapshot.playerAuthority.players[1].lifeState, 'dead', 'observer death state crosses separate authority channel');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [...playerAuthority.players, playerAuthority.players[0]] } }), null, 'duplicate authoritative player IDs fail closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], playerAuthority }).playerAuthority.players[0].playerId, 'self-player', 'authority remains valid across non-central visual zones');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], hp: { current: 101, max: 100, revision: 4 } }] } }), null, 'authoritative HP range fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, serverTimeUtc: 'invalid' } }), null, 'malformed authority timestamp fails closed');
+
 const outboundPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false });
+const outboundAuthorityPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, playerAuthority }, { allowAuthority: false });
+assert.equal(Object.hasOwn(outboundAuthorityPose, 'playerAuthority'), false, 'outbound local pose cannot author player HP authority');
 assert.equal(outboundPose.actors[0].authority, undefined, 'client-authored authority is stripped from outbound pose');
 
 const intentPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [{
