@@ -7,8 +7,8 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
-export const EXPECTED_PIRATE_SOURCE_COMMIT = '7986f4f70ba0d28bb64ddc2330a7bf79a54fa821';
-export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '4cfdee0f5d67c2c57a70f4e6a8b2724b2420bd7efa71279776cf2b783382560e';
+export const EXPECTED_PIRATE_SOURCE_COMMIT = 'c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'e0ddda08106ed834728ec9d163069eb96828ab5deabf3e5c5c428901f9b5806a';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
@@ -27,6 +27,8 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'launch-bootstrap.mjs',
   'server-sync.mjs',
   'online-world-shell-v900.mjs',
+  'monster-control-controller-v900.mjs',
+  'monster-command-http-provider-v900.mjs',
   'combat-v91-entry.mjs',
   'combat-v91.css',
   'online-world-bridge-v900.mjs',
@@ -38,17 +40,17 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'game-v800.js',
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
+  'asset-presentation/providers/procedural-bighead-monster.mjs',
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-DKUYjNyH.js',
-  'pirate-fruit-offline/assets/AzureFrostIsland-BmBR66q3.js',
-  'pirate-fruit-offline/assets/EmberVolcanoIsland-DNJ9DnbU.js',
-  'pirate-fruit-offline/assets/MistJungleIsland-OCmGhKhP.js',
-  'pirate-fruit-offline/assets/SunscarDesertIsland-DBMkxu6b.js',
-  'pirate-fruit-offline/assets/TempestSkyIsland-iTSat0Th.js',
-  'pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js',
-  'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
+  'pirate-fruit-offline/assets/index-B4TDjvel.js',
+  'pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js',
+  'pirate-fruit-offline/assets/EmberVolcanoIsland-Dwvxnue6.js',
+  'pirate-fruit-offline/assets/MistJungleIsland-iKbiMxA3.js',
+  'pirate-fruit-offline/assets/SunscarDesertIsland-DRO7IMVp.js',
+  'pirate-fruit-offline/assets/TempestSkyIsland-BdTzGlWY.js',
+  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
 ]);
 
 function secureBaseUrl(value, label) {

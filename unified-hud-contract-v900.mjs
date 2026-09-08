@@ -240,12 +240,18 @@ function normalizeParty(source) {
   ));
   const selectedSlot = Number.isInteger(input.selectedSlot)
     && input.selectedSlot >= 0 && input.selectedSlot < HUD_LIMITS.partySlots ? input.selectedSlot : null;
+  const controlPanel = isRecord(input.controlPanel) ? Object.freeze({
+    mode: input.controlPanel.mode === 'monster' ? 'monster' : 'character',
+    slot: Number.isInteger(input.controlPanel.slot) && input.controlPanel.slot >= 0 && input.controlPanel.slot < HUD_LIMITS.partySlots ? input.controlPanel.slot : null,
+    instanceId: stableId(input.controlPanel.instanceId) || '',
+  }) : Object.freeze({ mode: 'character', slot: null, instanceId: '' });
   return Object.freeze({
     revision: featureRevision(input),
     available: input.available === true,
     selectedSlot,
     activeInstanceId: stableId(input.activeInstanceId) || '',
     canSwitch: input.canSwitch === true,
+    controlPanel,
     slots,
   });
 }

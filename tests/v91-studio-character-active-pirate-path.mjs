@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import * as vendor from '../pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js';
+import * as vendor from '../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js';
 import { threeFromPirateFruitVendor } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 
 // Static route coverage only; mobile visual QA remains the release gate.

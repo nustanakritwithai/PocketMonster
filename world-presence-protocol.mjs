@@ -11,6 +11,8 @@ export const PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE = 'pirate-fruit';
 export const PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256 = '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0';
 export const PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256 = 'A3571B1D11E8EBFF68F9B1A027EF847E74D33B93B861D083D450910ADB4B4DF7';
 export const PIRATE_CENTRAL_AUTHORITY_ZONES = Object.freeze(['azure-frost', 'ember-volcano', 'mist-jungle', 'starter-island', 'sunscar-desert', 'tempest-sky']);
+export const MONSTER_AUTHORITY_VERSION = 'monster-authority/1';
+export const MONSTER_STATE_REASONS = Object.freeze(['defeated', 'despawned', 'zone-change', 'reconnect', 'expired']);
 export const MAX_REMOTE_PLAYERS = 100;
 export const MAX_REMOTE_ACTORS = 128;
 export const MAX_SNAPSHOT_CANDIDATES = 400;
@@ -246,7 +248,45 @@ export function sanitizeActorPresentation(value) {
   return Object.freeze({ events: Object.freeze(events), projectiles: Object.freeze(projectiles) });
 }
 
-export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS } = {}) {
+function boundedAuthorityToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,160}$/.test(value) ? value : null;
+}
+
+function sanitizeMonsterAuthority(value) {
+  if (!isRecord(value) || value.authorityVersion !== MONSTER_AUTHORITY_VERSION
+    || typeof value.serverTimeUtc !== 'string' || value.serverTimeUtc.length > 64
+    || !Number.isFinite(Date.parse(value.serverTimeUtc)) || !value.serverTimeUtc.endsWith('Z')
+    || !Number.isSafeInteger(value.generation) || value.generation < 1
+    || !isRecord(value.hp) || !Number.isFinite(value.hp.current) || !Number.isFinite(value.hp.max)
+    || value.hp.max <= 0 || value.hp.current < 0 || value.hp.current > value.hp.max
+    || !Number.isSafeInteger(value.hp.revision) || value.hp.revision < 0
+    || !Number.isSafeInteger(value.resultRevision) || value.resultRevision < 0
+    || !Number.isSafeInteger(value.actionSequence) || value.actionSequence < 0
+    || typeof value.hit !== 'boolean' || !Number.isFinite(value.damage) || !Number.isInteger(value.damage) || value.damage < 0
+    || typeof value.death !== 'boolean') return null;
+  const authority = {
+    authorityVersion: MONSTER_AUTHORITY_VERSION, serverTimeUtc: value.serverTimeUtc,
+    generation: value.generation,
+    hp: Object.freeze({ current: value.hp.current, max: value.hp.max, revision: value.hp.revision }),
+    resultRevision: value.resultRevision, actionSequence: value.actionSequence,
+    hit: value.hit, damage: value.damage, death: value.death,
+  };
+  if (value.actionId !== undefined) { const actionId = boundedAuthorityToken(value.actionId); if (!actionId) return null; authority.actionId = actionId; }
+  if (value.despawnReason !== undefined) {
+    if (!MONSTER_STATE_REASONS.includes(value.despawnReason)) return null;
+    authority.despawnReason = value.despawnReason;
+  }
+  if (value.attack !== undefined && value.attack !== null) {
+    if (!isRecord(value.attack) || !['attackId', 'spawnId', 'monsterId', 'islandId', 'targetId'].every(name => boundedAuthorityToken(value.attack[name]))
+      || value.attack.action !== 'melee' || !Number.isInteger(value.attack.damage) || value.attack.damage < 0
+      || !Number.isInteger(value.attack.hitDelayMs) || value.attack.hitDelayMs < 0) return null;
+    authority.attack = Object.freeze({ attackId: value.attack.attackId, spawnId: value.attack.spawnId, monsterId: value.attack.monsterId,
+      islandId: value.attack.islandId, targetId: value.attack.targetId, action: 'melee', damage: value.attack.damage, hitDelayMs: value.attack.hitDelayMs });
+  }
+  return Object.freeze(authority);
+}
+
+export function sanitizePresenceActor(value, expectedZone, expectedGeneration, { maxVisualEvents = MAX_VISUAL_SNAPSHOT_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const actorId = sanitizeMonsterInstanceId(value.actorId);
   const ownerId = value.ownerId === undefined ? null : sanitizeMonsterInstanceId(value.ownerId);
@@ -259,6 +299,11 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     || (expectedGeneration !== undefined && value.generation !== expectedGeneration)) return null;
   const pose = value.pose;
   if (!isRecord(pose) || !isFiniteNumber(pose.x) || !isFiniteNumber(pose.y) || !isFiniteNumber(pose.z) || !isFiniteNumber(pose.dir)) return null;
+  if (value.authority !== undefined && !allowAuthority) return null;
+  const authority = value.authority === undefined ? null : sanitizeMonsterAuthority(value.authority);
+  if (value.authority !== undefined && !authority) return null;
+  if (authority && authority.generation !== value.generation) return null;
+  if (authority?.attack && authority.attack.monsterId !== actorId) return null;
   const actor = {
     actorId, kind: 'monster', ...(ownerId === null ? {} : { ownerId }), monsterType, zone, generation: value.generation, lifecycle: value.lifecycle,
     spawnSequence: value.spawnSequence, stateSequence: value.stateSequence,
@@ -271,6 +316,7 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     locomotion: sanitizeLocomotion(value.locomotion),
     animation: sanitizeAnimation(value.animation),
   };
+  if (authority) actor.authority = authority;
   if (value.presentation !== undefined) {
     const presentation = sanitizeActorPresentation(value.presentation);
     if (presentation) actor.presentation = presentation;
@@ -408,7 +454,7 @@ export function sanitizeAnimation(value) {
   return Object.freeze(animation);
 }
 
-export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS } = {}) {
+export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EVENTS, allowAuthority = true } = {}) {
   if (!isRecord(value)) return null;
   const zone = safeZone(value.zone);
   if (!zone || !isFiniteNumber(value.x) || !isFiniteNumber(value.z) || !isFiniteNumber(value.dir)) return null;
@@ -423,7 +469,7 @@ export function sanitizeOnlineWorldPose(value, { maxVisualEvents = MAX_VISUAL_EV
   if (isFiniteNumber(value.y)) pose.y = clamp(value.y, -PRESENCE_COORDINATE_LIMIT, PRESENCE_COORDINATE_LIMIT);
   if (value.presentation !== undefined) { const presentation = sanitizePresentation(value.presentation); if (presentation) pose.presentation = presentation; }
   if (value.visual !== undefined) { const visual = sanitizeVisual(value.visual, { maxEvents: maxVisualEvents }); if (visual) pose.visual = visual; }
-  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents }); if (actors) pose.actors = actors; }
+  if (value.actors !== undefined) { const actors = sanitizePresenceActors(value.actors, zone, undefined, { maxVisualEvents, allowAuthority }); if (actors) pose.actors = actors; }
   return Object.freeze(pose);
 }
 
@@ -530,6 +576,136 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
 export function worldSnapshotPayload(message) {
   if (!message || message.type !== 'world-snapshot') return null;
   return sanitizeOnlineWorldSnapshot(message.payload);
+}
+
+function percentile(values, percentileRank) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentileRank) - 1));
+  return sorted[index];
+}
+
+/**
+ * Local-only route measurements. These counters never enter the world wire
+ * contract; they make live two-client captures explain cadence and drops.
+ */
+export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamples = 256 } = {}) {
+  const intervals = [];
+  const actorSequences = new Map();
+  let lastReceivedAt = null;
+  let receivedSnapshots = 0;
+  let acceptedSnapshots = 0;
+  let rejectedSnapshots = 0;
+  let staleSnapshots = 0;
+  let duplicateActors = 0;
+  let staleActors = 0;
+  let actorSequenceGaps = 0;
+  let staleHpRevisions = 0;
+  let staleResultRevisions = 0;
+  let hpRevisionGaps = 0;
+  let resultRevisionGaps = 0;
+  let actorsOmitted = 0;
+  let actorsEmpty = 0;
+  let actorsPresent = 0;
+
+  const observeSnapshot = (snapshot, { accepted = true, receivedAt = now() } = {}) => {
+    const at = Number(receivedAt);
+    receivedSnapshots += 1;
+    if (Number.isFinite(at)) {
+      if (lastReceivedAt !== null && at >= lastReceivedAt) {
+        intervals.push(at - lastReceivedAt);
+        while (intervals.length > maxSamples) intervals.shift();
+      }
+      lastReceivedAt = at;
+    }
+    if (!accepted) {
+      rejectedSnapshots += 1;
+      staleSnapshots += 1;
+      return;
+    }
+    acceptedSnapshots += 1;
+    if (!isRecord(snapshot)) return;
+    if (!Object.prototype.hasOwnProperty.call(snapshot, 'actors')) actorsOmitted += 1;
+    else if (!Array.isArray(snapshot.actors) || snapshot.actors.length === 0) actorsEmpty += 1;
+    else actorsPresent += 1;
+    const seen = new Set();
+    for (const actor of Array.isArray(snapshot.actors) ? snapshot.actors : []) {
+      const actorId = typeof actor?.actorId === 'string' ? actor.actorId : null;
+      const generation = Number.isSafeInteger(actor?.generation) ? actor.generation : 0;
+      const stateSequence = Number.isSafeInteger(actor?.stateSequence) ? actor.stateSequence : 0;
+      if (!actorId) continue;
+      const key = `${snapshot.zone || ''}:${generation}:${actorId}`;
+      if (seen.has(key)) { duplicateActors += 1; continue; }
+      seen.add(key);
+      const previous = actorSequences.get(key);
+      if (previous !== undefined) {
+        if (stateSequence <= previous.stateSequence) staleActors += 1;
+        else if (stateSequence > previous.stateSequence + 1) actorSequenceGaps += stateSequence - previous.stateSequence - 1;
+      }
+      const hpRevision = Number.isSafeInteger(actor?.authority?.hp?.revision) ? actor.authority.hp.revision : null;
+      const resultRevision = Number.isSafeInteger(actor?.authority?.resultRevision) ? actor.authority.resultRevision : null;
+      if (previous && hpRevision !== null && previous.hpRevision !== null) {
+        if (hpRevision <= previous.hpRevision) staleHpRevisions += 1;
+        else if (hpRevision > previous.hpRevision + 1) hpRevisionGaps += hpRevision - previous.hpRevision - 1;
+      }
+      if (previous && resultRevision !== null && previous.resultRevision !== null) {
+        if (resultRevision <= previous.resultRevision) staleResultRevisions += 1;
+        else if (resultRevision > previous.resultRevision + 1) resultRevisionGaps += resultRevision - previous.resultRevision - 1;
+      }
+      actorSequences.set(key, {
+        stateSequence: Math.max(previous?.stateSequence ?? 0, stateSequence),
+        hpRevision: hpRevision === null ? previous?.hpRevision ?? null : Math.max(previous?.hpRevision ?? 0, hpRevision),
+        resultRevision: resultRevision === null ? previous?.resultRevision ?? null : Math.max(previous?.resultRevision ?? 0, resultRevision),
+      });
+    }
+  };
+
+  const recordRejected = ({ receivedAt = now() } = {}) => {
+    observeSnapshot(null, { accepted: false, receivedAt });
+  };
+  const reset = () => {
+    intervals.length = 0;
+    actorSequences.clear();
+    lastReceivedAt = null;
+    receivedSnapshots = 0;
+    acceptedSnapshots = 0;
+    rejectedSnapshots = 0;
+    staleSnapshots = 0;
+    duplicateActors = 0;
+    staleActors = 0;
+    actorSequenceGaps = 0;
+    staleHpRevisions = 0;
+    staleResultRevisions = 0;
+    hpRevisionGaps = 0;
+    resultRevisionGaps = 0;
+    actorsOmitted = 0;
+    actorsEmpty = 0;
+    actorsPresent = 0;
+  };
+  const diagnostics = () => Object.freeze({
+    receivedSnapshots,
+    acceptedSnapshots,
+    rejectedSnapshots,
+    staleSnapshots,
+    duplicateActors,
+    staleActors,
+    actorSequenceGaps,
+    staleHpRevisions,
+    staleResultRevisions,
+    hpRevisionGaps,
+    resultRevisionGaps,
+    actorsOmitted,
+    actorsEmpty,
+    actorsPresent,
+    sampleCount: intervals.length,
+    intervalMs: Object.freeze({
+      min: intervals.length ? Math.min(...intervals) : null,
+      max: intervals.length ? Math.max(...intervals) : null,
+      p95: percentile(intervals, .95),
+      p99: percentile(intervals, .99),
+    }),
+  });
+  return Object.freeze({ observeSnapshot, recordRejected, reset, diagnostics });
 }
 
 export function isRemoteWorldPlayer(item, selfId) {

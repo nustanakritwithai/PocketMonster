@@ -137,3 +137,4 @@ assert.match(
 );
 
 console.log('V9 Pirate onboarding overlay and original talk path: PASS');
+

@@ -47,7 +47,7 @@ const required = new Set([
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
   pirateEntryAsset,
-  'pirate-fruit-offline/assets/vendor-three-Bv6LZXUZ.js',
+  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
   'assets/catalog/humanoid-core.json',
 ]);
 

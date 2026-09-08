@@ -18,6 +18,10 @@ import {
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=948';
+import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
+import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
+import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=1';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -43,6 +47,11 @@ let sessionEnding = false;
 let sessionEndReason = null;
 let sessionExpiryTimer = null;
 let unifiedHud = null;
+let monsterController = null;
+let monsterStateProvider = null;
+let unbindMonsterScene = null;
+let unsubscribeMonsterParty = null;
+let unsubscribeMonsterState = null;
 const SCENE_HUD_ADAPTERS = Object.freeze([
   'POCKETMONSTER_QUEST_HUD',
   'POCKETMONSTER_PARTY_HUD',
@@ -51,6 +60,14 @@ const SCENE_HUD_ADAPTERS = Object.freeze([
 ]);
 
 function clearSceneHudAdapters() {
+  unsubscribeMonsterParty?.();
+  unsubscribeMonsterParty = null;
+  unsubscribeMonsterState?.();
+  unsubscribeMonsterState = null;
+  unbindMonsterScene?.();
+  unbindMonsterScene = null;
+  monsterStateProvider?.reset?.();
+  monsterController?.reset?.();
   for (const name of SCENE_HUD_ADAPTERS) {
     try { delete window[name]; } catch { window[name] = undefined; }
   }
@@ -60,6 +77,18 @@ function clearSceneHudAdapters() {
 function bindSceneHudAdapters(sceneWindow) {
   for (const name of SCENE_HUD_ADAPTERS) {
     try { window[name] = sceneWindow?.[name]; } catch { window[name] = undefined; }
+  }
+  unsubscribeMonsterParty?.();
+  unsubscribeMonsterState?.();
+  unsubscribeMonsterState = null;
+  unbindMonsterScene?.();
+  if (monsterController) {
+    unsubscribeMonsterParty = window.POCKETMONSTER_PARTY_HUD?.subscribe?.(() => monsterController.sync()) || null;
+    unsubscribeMonsterState = monsterStateProvider?.subscribe?.(() => monsterController.sync()) || null;
+    void monsterStateProvider?.refresh?.();
+    monsterStateProvider?.start?.();
+    unbindMonsterScene = bindMonsterControlScene({ sceneWindow, controller: monsterController });
+    monsterController.sync();
   }
   unifiedHud?.rebind?.();
 }
@@ -598,7 +627,30 @@ window.addEventListener('pageshow', event => {
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
 await import('./chat-runtime.mjs?v=8.4.0-smooth-presence-1');
-unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
+monsterStateProvider = createMonsterHttpProvider({
+  config: window.POCKETMONSTER_RUNTIME_CONFIG,
+  sessionToken: window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
+  getSessionToken: () => window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
+  isSessionActive: () => isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
+  getZone: () => presenceBridge.readPose()?.zone || activeWorld,
+  pollMs: 2000,
+});
+const monsterCommands = createMonsterCommandAdapter({
+  getZone: () => presenceBridge.readPose()?.zone || activeWorld,
+  send: command => monsterStateProvider.send(command),
+});
+monsterController = createMonsterControlController({
+  commands: monsterCommands,
+  getParty: () => monsterStateProvider.snapshot().party || window.POCKETMONSTER_PARTY_HUD?.snapshot?.() || null,
+  getConfirmedActors: () => monsterStateProvider.snapshot().actors || [],
+  getSkills: instanceId => monsterStateProvider.snapshot().skills?.[instanceId] || [],
+  getAim: () => monsterThrowAimFromPose(presenceBridge.readPose())?.targetPoint || null,
+  getZone: () => presenceBridge.readPose()?.zone || activeWorld,
+});
+window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = monsterController;
+void monsterStateProvider.refresh();
+monsterStateProvider.start();
+unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document, monsterController });
 installUnifiedHud();
 unifiedHud.setExpanded(false);
 const combatTransportStarted = combatTransport.start({

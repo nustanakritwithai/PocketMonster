@@ -1,6 +1,6 @@
 import { isActiveLaunchSession } from './launch-bootstrap.mjs?v=912';
 import { createHudCommandResult, HUD_LIMITS } from './unified-hud-contract-v900.mjs';
-import { buildWorldPosFrame, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=4';
+import { buildWorldPosFrame, createPresenceRouteDiagnostics, currentSelfPresenceId, filterRemotePlayers, worldSnapshotPayload } from './world-presence-protocol.mjs?v=4';
 import { createVisualEventQueue } from './world-presence-protocol.mjs?v=4';
 
 const CHAT_RUNTIME_SLOT = Symbol.for('monsterlife.chat-runtime.singleton.v1');
@@ -48,6 +48,7 @@ const state = {
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
 const worldVisualQueue = createVisualEventQueue();
+const worldPresenceDiagnostics = createPresenceRouteDiagnostics();
 let lastWorldZone = null;
 
 window.POCKETMONSTER_WORLD_VISUAL_EVENTS = events => worldVisualQueue.push(events);
@@ -531,9 +532,13 @@ function connectSocket() {
         if (message?.type === 'chat') safelyPullMessages();
         if (message?.type === 'world-snapshot') {
           const payload = worldSnapshotPayload(message);
-          if (!payload) return;
+          if (!payload) {
+            worldPresenceDiagnostics.recordRejected();
+            return;
+          }
           const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
           const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(filtered);
+          worldPresenceDiagnostics.observeSnapshot(filtered, { accepted: accepted !== false });
           if (accepted !== false) setWorldConnected(true);
         }
       } catch {}
@@ -690,6 +695,7 @@ const runtime = Object.freeze({
     combatConnected: state.combatConnected,
     combatPredictionSends: state.combatPredictionSends,
     combatAuthorityMessages: state.combatAuthorityMessages,
+    worldPresence: worldPresenceDiagnostics.diagnostics(),
     stopped: state.stopped,
     paused: state.paused,
     stopReason: state.stopReason,
@@ -710,3 +716,4 @@ window.addEventListener('pagehide', suspend);
 window.addEventListener('pageshow', resume);
 void start().catch(error => console.warn('Chat runtime unavailable', error));
 }
+
