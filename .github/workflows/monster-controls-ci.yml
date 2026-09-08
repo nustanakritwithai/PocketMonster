@@ -38,12 +38,14 @@ jobs:
       - name: ตรวจการเชื่อมแผงควบคุม
         run: |
           node tests/v90-monster-control-controller.mjs
+          node tests/v90-monster-recall-races.mjs
           node tests/v90-monster-command-http-provider.mjs
           node tests/v90-unified-mmorpg-hud.mjs
           node tests/v90-unified-mobile-controls.mjs
           node tests/v90-unified-roster-stack.mjs
           node tests/v90-unified-hud-world-lifecycle.mjs
           node tests/v90-remote-monster-combat-parity.mjs
+          node tests/v90-pirate-presence-readonly.mjs
       - name: ตรวจระบบ Client ที่เกี่ยวข้อง
         run: npm run check
       - name: ตรวจ artifact ทุกโลก

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createMonsterControlController } from '../monster-control-controller-v900.mjs';
 import {
   UNIFIED_MMORPG_HUD_KIND,
   createUnifiedMmorpgHud,
@@ -363,6 +364,51 @@ function bootWorld(hudOptions = {}) {
   assert.match(banner.textContent, /กิจกรรมจำลอง/, 'timer shows mock activity text');
   assert.equal(banner.classList.contains('hidden'), false, 'timer reveals the activity toast');
   hud.unmount();
+}
+
+// ปุ่มที่ production สร้างเองต้องแสดงและส่งคำสั่งจริงผ่าน controller
+{
+  let actors = [{ instanceId: 'mon-a', zone: 'hub', active: true, generation: 22 }];
+  let capabilities = { recall: true, switch: true };
+  let release;
+  const calls = [];
+  const controller = createMonsterControlController({
+    getZone: () => 'hub', getConfirmedActors: () => actors, getCapabilities: () => capabilities,
+    getParty: () => ({ available: true, slots: [{ slot: 0, instanceId: 'mon-a', name: 'Flameling', available: true }] }),
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }),
+      recall: command => { calls.push(command); return new Promise(resolve => { release = resolve; }); } },
+  });
+  const { hud, documentLike } = bootWorld({ monsterController: controller });
+  hud.mount();
+  hud.setTab('party');
+  const recall = documentLike.getElementById('monsterRecallBtn');
+  assert.ok(recall, 'HUD ต้องสร้างปุ่มเอง');
+  assert.equal(recall.parentNode.id, 'mmorpgPartyPanel');
+  assert.equal(recall.hidden, false, 'capability จาก controller ต้องถึงปุ่ม');
+  assert.equal(recall.disabled, false);
+  recall.dispatch('click');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].expectedActiveGeneration, 22);
+  assert.equal(recall.disabled, true, 'pending ต้องกันการกดซ้ำ');
+  recall.dispatch('click');
+  assert.equal(calls.length, 1);
+  release({ ok: true });
+  await Promise.resolve();
+  assert.equal(recall.disabled, true, 'ACK อย่างเดียวไม่ใช่ snapshot ยืนยัน');
+  actors = [];
+  controller.sync();
+  assert.equal(recall.hidden, true);
+  actors = [{ instanceId: 'mon-a', zone: 'hub', active: true, generation: 23 }];
+  capabilities = {};
+  controller.sync();
+  assert.equal(recall.hidden, true, 'Server เก่าไม่ประกาศ capability ต้องไม่เปิดปุ่ม');
+  capabilities = { recall: true };
+  controller.sync();
+  assert.equal(recall.hidden, false);
+  hud.unmount();
+  recall.dispatch('click');
+  assert.equal(calls.length, 1, 'teardown ต้องถอด listener ปุ่ม');
+  controller.dispose();
 }
 
 // ---------- 6. Entry wiring ----------

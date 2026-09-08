@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.6f17f5b9be30",
+  "buildId": "8.4.0.content.334e4779f417",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-08T14:30:58.750Z",
+  "publishedAtUtc": "2026-09-08T17:43:54.811Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -292,8 +292,8 @@
     },
     {
       "path": "audio-engine.mjs",
-      "size": 29156,
-      "sha256": "9f2e6cf4db059e0239c7e62628fd826cb0bc30ae1da94e79128861cdb2e8d780"
+      "size": 30096,
+      "sha256": "b27efcf9eba7efbc85a99815df88480f54160db0183b68441cf7940a0ca262a0"
     },
     {
       "path": "balance-capture.mjs",
@@ -323,7 +323,7 @@
     {
       "path": "boot-pirate-fruit-v900.mjs",
       "size": 17291,
-      "sha256": "631776d86892dcfd211c66e44883db760b07ad07715b4ff58a5b3ac4e8ca9b6b"
+      "sha256": "c01cba5875f44e2c9066625d2b54643345e84c6ff382639831a260b30b19c288"
     },
     {
       "path": "boss-challenge.mjs",
@@ -352,8 +352,8 @@
     },
     {
       "path": "chat-runtime.mjs",
-      "size": 30310,
-      "sha256": "17acfd0541033d7c86a2cc3e549f0fc0a391039bc24cc40aa8cb09ccd8785506"
+      "size": 30274,
+      "sha256": "79a8d0108b001b04bfb0d0f3f338cb46a0bd7a745769ff0adcd5bc03fc8f8044"
     },
     {
       "path": "combat-rating.mjs",
@@ -537,8 +537,8 @@
     },
     {
       "path": "game-v800.js",
-      "size": 525423,
-      "sha256": "9596d43fb117ee499a29699f36f26a1ef61fd4562bf8df37f0dd19acb3ecd1a9"
+      "size": 525534,
+      "sha256": "4aec5e7d49ad1454e8dacf9f4f27d6fa88cafcdb99f9254a71a5e3aa54e3b7ea"
     },
     {
       "path": "index.html",
@@ -582,23 +582,23 @@
     },
     {
       "path": "monster-command-adapter.mjs",
-      "size": 5833,
-      "sha256": "93f391831b8ea7b410b9fc898635025669031ce2fc2e50b8eff1b194c0988862"
+      "size": 6784,
+      "sha256": "19258306c637f98b085928bc355553ea8754a451fe62cdeeba53a4cdc65fcab1"
     },
     {
       "path": "monster-command-http-provider-v900.mjs",
-      "size": 6537,
-      "sha256": "869c9ccaf7e5e2f4ffbc5d4f2cb401b6752b51cdc60d861e4298418cbbda1b40"
+      "size": 7344,
+      "sha256": "47a6ec216a5a66d1195326a286fa258e06ab48fd46fe268e5424d35f1d4df107"
     },
     {
       "path": "monster-control-controller-v900.mjs",
-      "size": 6954,
-      "sha256": "cdc891a2370b5ea9429c10257aa45533b26a7f6963e045d28f2d6ffa36c30124"
+      "size": 10262,
+      "sha256": "885f157bd716c30d446f006bf61fcceb432334cafb19b173a80de379ea41f5e1"
     },
     {
       "path": "monster-control-scene-binding-v900.mjs",
-      "size": 3145,
-      "sha256": "4ef154dd9c07938508bda2e0ce2e3ee910105678192cbb20f7a827c4cf92d672"
+      "size": 3874,
+      "sha256": "b92990f993dd5c09dfa27537b877a858757f18e11d3c47390d5473d45d873baf"
     },
     {
       "path": "monster-instance.mjs",
@@ -623,12 +623,12 @@
     {
       "path": "online-world-bridge-v900.mjs",
       "size": 3796,
-      "sha256": "51c483b7622a58671d6bd7fc2cdbc4bab3a13398f3b96f944dc56de96641e2b9"
+      "sha256": "a25b5ae6891d77d506ebf0b25985f79ccaab243d8d8618c31c0e043a52558d25"
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 24983,
-      "sha256": "da9f34180c05bc3dad8dfb4e52e2c92d2ba93fafae8e1c22be1d74433f7eb6c4"
+      "size": 25012,
+      "sha256": "01b94b93a5c16b03a6c1f4c29dd2767f07711e9dcea0d7894bf4581d24ac417c"
     },
     {
       "path": "passive-catalog.mjs",
@@ -708,7 +708,7 @@
     {
       "path": "pirate-fruit-offline/index.html",
       "size": 1238,
-      "sha256": "1ad12369f87c5825b483ad8e93c85aa669e19ef04ed29bcfa354ff14824192e3"
+      "sha256": "0441178ed63bfdb6b1c02a8d6c7a8f0f39fe65ea0bd0ea79e4d9b10896fea45b"
     },
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
@@ -727,8 +727,8 @@
     },
     {
       "path": "pirate-fruit-offline/unified-input-bridge-v900.mjs",
-      "size": 14319,
-      "sha256": "4e7fe4969b43c3881458738faab1ee7a0f5d6704fcce2fb26e241122af41d63e"
+      "size": 15530,
+      "sha256": "149546a87c7a32e97dfbba0d6d4b0fe0a00443f1dbbe383df6b4d6e735315a4c"
     },
     {
       "path": "pirate-hud-telemetry-v900.mjs",
@@ -747,8 +747,8 @@
     },
     {
       "path": "pirate-presence-bridge-v900.mjs",
-      "size": 4852,
-      "sha256": "d4e0d7a7b05c92dda1e94085f25f6bf62e9c08725a793f09da103c831e05ed6f"
+      "size": 5182,
+      "sha256": "82e6b06af1f94bfa5722fdc7d06f8e80e797e31e74c778e97de48fd8103a4ce8"
     },
     {
       "path": "pirate-save-bridge-v900.mjs",
@@ -947,8 +947,8 @@
     },
     {
       "path": "style-v900.css",
-      "size": 32708,
-      "sha256": "db5984967474927d5889aa9962507af24ca390bb387865be0049ccb65446b2dc"
+      "size": 33077,
+      "sha256": "72ede9fd0a5e14819799c6248e02213921bbb77fd36e2e25417c4780dbe311ec"
     },
     {
       "path": "targeting-resolver.mjs",
@@ -982,13 +982,13 @@
     },
     {
       "path": "unified-mmorpg-hud-v900.mjs",
-      "size": 42029,
-      "sha256": "27d3f5ead564f7d87517bad16f48f3a5ff71132c8d1d56f1d1a6cf0fbce0ab3f"
+      "size": 43325,
+      "sha256": "07fedf027e58372189f723f4a8888c387ac6efb1c830ba6f3f820132af7e6578"
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
-      "size": 30493,
-      "sha256": "7a1144b700f8798ce19ba0c6cf54305a4662751e3a45645bea542db57c2df922"
+      "size": 30527,
+      "sha256": "c2bc41523366373476f6732d15a41abb97a5a506ae220872f4447fdfc92799b9"
     },
     {
       "path": "v900.html",
@@ -1008,22 +1008,22 @@
     {
       "path": "world-living-v900.mjs",
       "size": 19024,
-      "sha256": "f13f1b52dee3cc1c09e0db0b5ef5b31341160a1243f55ce2fefb01b823c03903"
+      "sha256": "abd4cc4efe83efc05d2ded41b047f99cf8dc9a4af4fba0eea0a34d60b478befd"
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 38349,
-      "sha256": "c96860c68a82db50e370abd123f0d2bcef75c0329064511a6a352041a95bb9c7"
+      "size": 43714,
+      "sha256": "c36f21a3257517ecfbafc6712dd930eb770359c658a331dd0f0bac2c288f2fb4"
     },
     {
       "path": "world-presence-v800.mjs",
-      "size": 24891,
-      "sha256": "b811914ffb9547f7d267d2251e7c21f2da4e37881aca752861a5e39c72c552a4"
+      "size": 24934,
+      "sha256": "829b2111cb1823de8f7c41d7cce82284400b4895232556b810644b993c07ad32"
     },
     {
       "path": "worlds-v900.mjs",
       "size": 8635,
-      "sha256": "47b42dcf26f2f75597410a261b309f34be53c711b06b0d10b9ba7974ad5b2113"
+      "sha256": "a820b7f0e5bf74a3a53eb5de19dea8c429ca67b2014dc50e4064de3103373460"
     }
   ]
 }

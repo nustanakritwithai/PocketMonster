@@ -64,6 +64,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   let drawerCollapsed = false;
   let expanded = true;
   let chatKeyboardDismiss = null;
+  let recallBinding = null;
   const unsubscribers = [];
   const lastRevisions = new Map();
   const nodes = new Map();
@@ -141,6 +142,18 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
     root.append(register('mmorpgRoster', el(documentLike, 'div', '', 'mmorpg-roster')));
     root.append(register('mmorpgCompanions', el(documentLike, 'div', '', 'mmorpg-companions')));
+    const recall = register('monsterRecallBtn', el(documentLike, 'button', '', 'mmorpg-monster-recall'));
+    recall.type = 'button';
+    recall.textContent = 'เก็บมอนสเตอร์';
+    recall.setAttribute('aria-label', 'เก็บมอนสเตอร์');
+    recall.hidden = true;
+    const onRecall = event => {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      if (!recall.hidden && !recall.disabled) void partyAdapter()?.recallActive?.();
+    };
+    recall.addEventListener('click', onRecall);
+    recallBinding = { node: recall, onRecall };
     root.append(register('mmorpgUtilities', el(documentLike, 'div', '', 'mmorpg-utilities')));
     root.append(register('mmorpgBanner', el(documentLike, 'div', '', 'mmorpg-banner hidden')));
 
@@ -439,6 +452,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
   function paintOverlayMonsterSlots(slots) {
     const controlPanel = partyAdapter()?.snapshot?.()?.controlPanel || { mode: 'character', slot: null };
+    const partyState = partyAdapter()?.snapshot?.() || {};
+    const recallButton = documentLike.getElementById?.('monsterRecallBtn');
+    if (recallButton) {
+      const canRecall = slots.some(slot => slot.active === true) && partyState.capabilities?.recall === true;
+      recallButton.hidden = !canRecall;
+      recallButton.disabled = !canRecall || partyState.pending === true;
+      recallButton.textContent = partyState.pending === true ? 'กำลังรอยืนยัน…' : 'เก็บมอนสเตอร์';
+    }
     for (const slot of slots) {
       const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
       if (!button) continue;
@@ -516,7 +537,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         });
         return button;
       });
-      partyPanel.replaceChildren(...controls);
+      partyPanel.replaceChildren(...controls, node('monsterRecallBtn'));
     }
     const summary = node('mmorpgDockSummary');
     if (summary) {
@@ -987,6 +1008,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function unmount() {
+    recallBinding?.node.removeEventListener?.('click', recallBinding.onRecall);
+    recallBinding = null;
     for (const unsubscribe of unsubscribers.splice(0)) {
       try { unsubscribe(); } catch {}
     }

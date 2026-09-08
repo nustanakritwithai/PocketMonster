@@ -641,7 +641,8 @@ const monsterCommands = createMonsterCommandAdapter({
 });
 monsterController = createMonsterControlController({
   commands: monsterCommands,
-  getParty: () => monsterStateProvider.snapshot().party || window.POCKETMONSTER_PARTY_HUD?.snapshot?.() || null,
+  getParty: () => monsterStateProvider.snapshot().party || null,
+  getCapabilities: () => monsterStateProvider.snapshot().capabilities || {},
   getConfirmedActors: () => monsterStateProvider.snapshot().actors || [],
   getSkills: instanceId => monsterStateProvider.snapshot().skills?.[instanceId] || [],
   getAim: () => monsterThrowAimFromPose(presenceBridge.readPose())?.targetPoint || null,

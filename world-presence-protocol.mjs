@@ -48,6 +48,11 @@ export const MONSTER_INTENT_CATEGORY_VALUES = Object.freeze(['style', 'sword', '
 export const MONSTER_DESPAWN_REASON_VALUES = Object.freeze(['defeated', 'despawned', 'zone-change', 'reconnect', 'expired']);
 export const MAX_MONSTER_INTENTS = 32;
 export const MONSTER_AUTHORITY_VERSION = 'monster-authority/1';
+// ส่วนขยาย HP/Combat ของมอนที่ผู้เล่นเป็นเจ้าของใช้ presence stream ร่วมกับ
+// authority ศัตรูกลางของ Pirate แต่แยก namespace actor และ allowlist zone
+export const OWNED_MONSTER_AUTHORITY_ZONES = Object.freeze([
+  'hub', 'grassland', 'grass-meadow', 'ranch', 'stage', 'pirate-fruit', 'living-world',
+]);
 export const VISUAL_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const VISUAL_KINDS = Object.freeze([
   'slash', 'blade-trail', 'gun-shot', 'energy-launch', 'shockwave', 'beam',
@@ -70,6 +75,7 @@ const ACTOR_LIFECYCLE_SET = new Set(ACTOR_LIFECYCLE_VALUES);
 const MONSTER_INTENT_KIND_SET = new Set(MONSTER_INTENT_KIND_VALUES);
 const MONSTER_INTENT_CATEGORY_SET = new Set(MONSTER_INTENT_CATEGORY_VALUES);
 const MONSTER_DESPAWN_REASON_SET = new Set(MONSTER_DESPAWN_REASON_VALUES);
+const OWNED_MONSTER_AUTHORITY_ZONE_SET = new Set(OWNED_MONSTER_AUTHORITY_ZONES);
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -372,6 +378,9 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
   const monsterType = sanitizeMonsterInstanceId(value.monsterType);
   const zone = safeZone(value.zone);
   if (!actorId || (value.ownerId !== undefined && !ownerId) || !monsterType || zone !== expectedZone || value.kind !== 'monster' || !ACTOR_LIFECYCLE_SET.has(value.lifecycle)) return null;
+  const ownedNamespace = actorId.startsWith('owned:');
+  const centralNamespace = actorId.startsWith('monster:');
+  if ((ownedNamespace && ownerId === null) || (centralNamespace && ownerId !== null)) return null;
   if (!Number.isSafeInteger(value.spawnSequence) || value.spawnSequence < 1
     || !Number.isSafeInteger(value.stateSequence) || value.stateSequence < 1
     || !Number.isSafeInteger(value.generation) || value.generation < 1
@@ -397,7 +406,10 @@ export function sanitizePresenceActor(value, expectedZone, expectedGeneration, {
     actor.despawnReason = value.despawnReason;
   }
   if (value.authority !== undefined && allowAuthority) {
-    if (expectedZone !== PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE) return null;
+    // ฉาก Pirate ยังรับ actor รูปแบบเดิมจาก Server; zone อื่นเปิดเฉพาะ owned namespace
+    const centralAuthority = !ownedNamespace && expectedZone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE;
+    const ownedAuthority = ownedNamespace && ownerId !== null && OWNED_MONSTER_AUTHORITY_ZONE_SET.has(expectedZone);
+    if (!centralAuthority && !ownedAuthority) return null;
     const authority = sanitizeMonsterAuthority(value.authority, value.generation);
     if (!authority) return null;
     actor.authority = authority;
@@ -655,9 +667,11 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
     // Actor lifecycle generations belong to the actor stream and may advance
     // independently during reconnect/despawn/re-spawn. Never compare these
     // two domains or a valid actor snapshot is lost after a route reconnect.
+    const allowActorAuthority = zone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE || OWNED_MONSTER_AUTHORITY_ZONE_SET.has(zone);
+    if (!allowActorAuthority && payload.actors.some(actor => actor?.authority !== undefined)) return null;
     actors = sanitizePresenceActors(payload.actors, zone, undefined, {
       maxVisualEvents: MAX_VISUAL_SNAPSHOT_EVENTS,
-      allowAuthority: zone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE,
+      allowAuthority: allowActorAuthority,
     });
     if (!actors) return null;
   }

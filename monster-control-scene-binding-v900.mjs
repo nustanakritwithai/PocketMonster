@@ -31,6 +31,20 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
       button.classList?.toggle?.('monster-control-open', opened);
     }
   });
+  for (const id of ['monsterRecallBtn', 'monsterReleaseBtn', 'monsterStoreBtn']) {
+    const button = documentLike.getElementById(id);
+    if (!button) continue;
+    const click = event => {
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      void Promise.resolve(controller.recallActive?.()).then(result => {
+        const status = documentLike.getElementById('actionReason');
+        if (status && result?.ok === false) status.textContent = 'ยังเก็บมอนไม่ได้ กรุณารอการเชื่อมต่อระบบมอนสเตอร์';
+      });
+    };
+    button.addEventListener('click', click, true);
+    buttons.push({ button, click });
+  }
   return () => {
     unsubscribe?.();
     for (const { button, click } of buttons) button.removeEventListener('click', click, true);
