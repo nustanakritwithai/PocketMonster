@@ -26,6 +26,13 @@ Canonical reader อ่าน collection + party placements, catalog stats 36 fo
 สถานะ active, คูลดาวน์ และ HP ต่อสู้อยู่ใน process ของ server รุ่นนี้ ย้ายตามฉากได้ แต่ยังไม่ใช่การเพิ่ม persistence ของผลต่อสู้/รางวัลลง SQL ศัตรูที่มี target profile ในชุดนี้คือ Pirate central catalog24ชนิด; แผนที่อื่นแสดงและควบคุม owned actor ได้ แต่ต้องมี authoritative target profile จึงโจมตีศัตรูในฉากนั้นได้
 
 เคารพ Combat.Enabled/CommitEnabled/ShadowMode เดิม ถ้าปิด combat จะไม่ commit ความเสียหายหรือใช้สกิล ไม่เปลี่ยน flags ของ production อัตโนมัติ
+### สถานะ runtime และขอบเขตการเปิดใช้งาน
+
+- `OwnedMonsterEnabled` เป็น feature flag แยกต่างหาก ค่าเริ่มต้น `false`; การมีโค้ดหรือ artifact นี้ไม่เปิดใช้งานเอง
+- `Combat.Enabled`, `CommitEnabled` และ `ShadowMode` ของ generic combat/player ยังคงปิดตาม runtime configuration เดิม
+- HP ต่อสู้และรางวัลยังอยู่ใน server process และยังไม่ persist ลง SQL; Client ห้ามส่งผล HP/damage เพื่อให้ Server เชื่อถือ
+- เส้นทาง enemy → player HP authority ยังไม่มีใน candidate นี้ จึงไม่อ้างว่า auto AI หรือสกิลมอนสเตอร์ทำความเสียหายผู้เล่นได้ครบทุกฉาก
+- CI artifact และ focused tests เป็นหลักฐานการรวมโค้ดเท่านั้น ยังไม่ใช่หลักฐาน deploy หรือ Browser user acceptance
 
 ## หลักฐานและขั้นรับรุ่น
 
