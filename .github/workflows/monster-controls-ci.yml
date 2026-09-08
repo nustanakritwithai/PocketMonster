@@ -30,7 +30,9 @@ jobs:
         with:
           node-version: 22
       - name: สร้างแพตช์รวมบน runner
-        run: npm run build:pages -- --write-root-manifest
+        run: |
+          node scripts/build-github-pages.mjs --write-root-manifest
+          node tests/v91-combat-artifact.mjs
       - name: ตรวจคำสั่งมอนสเตอร์
         run: node tests/monster-command-adapter.mjs
       - name: ตรวจการเชื่อมแผงควบคุม
