@@ -119,18 +119,27 @@ assert.deepEqual(opaquePosted[0].data.options, { navigationUI: 'hide' });
 assert.equal(opaquePosted[0].origin, 'https://parent.example');
 
 const parentListeners = [];
+const parentWindowEvents = new EventTarget();
+let parentResizeCount = 0;
+const parentRafCallbacks = [];
 const parentLocal = createDocument();
 const parentWindow = {
   document: parentLocal.document,
   top: ownerWindow,
   parent: ownerWindow,
+  dispatchEvent: parentWindowEvents.dispatchEvent.bind(parentWindowEvents),
+  Event,
+  innerWidth: 1024,
+  innerHeight: 768,
+  requestAnimationFrame(callback) { parentRafCallbacks.push(callback); return parentRafCallbacks.length; },
   addEventListener(type, listener) {
     if (type === 'message') parentListeners.push(listener);
   },
 };
+parentWindowEvents.addEventListener('resize', () => { parentResizeCount += 1; });
 const parentBridge = installPersistentFullscreenBridge(parentWindow);
 assert.equal(parentBridge?.owner, 'parent-shell');
-assert.equal(parentListeners.length, 1, 'same-origin parent accepts opaque child fullscreen relays');
+assert.equal(parentListeners.length, 2, 'same-origin parent accepts opaque child fullscreen and viewport relays');
 owner.document.fullscreenElement = null;
 parentListeners[0]({
   origin: 'null',
@@ -139,6 +148,34 @@ parentListeners[0]({
 });
 assert.equal(owner.calls.length, 2, 'opaque child relay uses the persistent parent fullscreen owner');
 assert.deepEqual(owner.calls[1], { navigationUI: 'hide' });
+parentListeners[1]({
+  source: ownerWindow,
+  data: { type: 'pocketmonster:parent-fullscreen-change-v1' },
+});
+parentListeners[1]({
+  source: ownerWindow,
+  data: { type: 'pocketmonster:parent-fullscreen-change-v1' },
+});
+assert.equal(parentResizeCount, 0, 'viewport relay waits for a stable animation frame');
+assert.equal(parentRafCallbacks.length, 1, 'duplicate fullscreen relays coalesce before the next frame');
+parentRafCallbacks.shift()();
+assert.equal(parentResizeCount, 1, 'child viewport relay dispatches resize after parent fullscreen change');
+parentWindow.innerWidth = 0;
+parentListeners[1]({ source: ownerWindow, data: { type: 'pocketmonster:parent-fullscreen-change-v1' } });
+assert.equal(parentRafCallbacks.length, 1, 'zero-sized viewport schedules a bounded retry');
+parentRafCallbacks.shift()();
+parentWindow.innerWidth = 1024;
+parentRafCallbacks.shift()?.();
+assert.equal(parentResizeCount, 2, 'zero-sized viewport retries after dimensions become valid');
+parentWindow.innerWidth = Number.NaN;
+parentListeners[1]({ source: ownerWindow, data: { type: 'pocketmonster:parent-fullscreen-change-v1' } });
+parentRafCallbacks.shift()();
+assert.equal(parentResizeCount, 2, 'NaN viewport dimensions are rejected');
+parentWindow.innerWidth = Number.POSITIVE_INFINITY;
+parentListeners[1]({ source: ownerWindow, data: { type: 'pocketmonster:parent-fullscreen-change-v1' } });
+parentRafCallbacks.shift()();
+assert.equal(parentResizeCount, 2, 'infinite viewport dimensions are rejected');
+parentWindow.innerWidth = 1024;
 parentListeners[0]({
   origin: 'https://evil.example',
   source: opaqueWindow,

@@ -69,11 +69,13 @@ function element(tag, id = '') {
 
 const sceneWindowEvents = new EventTarget();
 let sceneFocusCount = 0;
+const sceneMessages = [];
 const sceneWindow = {
   location: { href: 'about:blank' },
   CustomEvent: globalThis.CustomEvent,
   addEventListener: sceneWindowEvents.addEventListener.bind(sceneWindowEvents),
   dispatchEvent: sceneWindowEvents.dispatchEvent.bind(sceneWindowEvents),
+  postMessage(message, origin) { sceneMessages.push({ message, origin }); },
   focus() { sceneFocusCount += 1; },
 };
 const sceneInputResets = [];
@@ -237,6 +239,8 @@ for (const [target, type, reason] of [
   target.dispatchEvent(new Event(type));
   assert.equal(sceneInputResets.at(-1), reason, `${type} releases input captured in the scene iframe`);
 }
+assert.equal(sceneMessages.length, 2, 'fullscreen transitions relay viewport changes into opaque scene iframe');
+assert.ok(sceneMessages.every(({ message, origin }) => message.type === 'pocketmonster:parent-fullscreen-change-v1' && origin === '*'));
 document.visibilityState = 'hidden';
 document.dispatchEvent(new Event('visibilitychange'));
 assert.equal(sceneInputResets.at(-1), 'parent-visibility-hidden');

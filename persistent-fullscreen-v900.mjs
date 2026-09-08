@@ -1,5 +1,6 @@
 export const PERSISTENT_FULLSCREEN_BRIDGE_KIND = 'monsterlife-persistent-fullscreen-bridge-v1';
 export const PERSISTENT_FULLSCREEN_REQUEST_MESSAGE = 'monsterlife-persistent-fullscreen-request-v1';
+export const PERSISTENT_FULLSCREEN_CHANGE_MESSAGE = 'pocketmonster:parent-fullscreen-change-v1';
 
 const FULLSCREEN_CONTROL_IDS = Object.freeze([
   'enterImmersiveBtn',
@@ -94,6 +95,48 @@ function bindOpaqueFullscreenListener(windowLike, request) {
   });
 }
 
+function bindParentFullscreenChange(windowLike) {
+  if (typeof windowLike?.addEventListener !== 'function') return;
+  let pendingResize = false;
+  let retryCount = 0;
+  const maxRetries = 3;
+  const scheduleResize = () => {
+    if (pendingResize) return;
+    pendingResize = true;
+    const run = () => {
+      pendingResize = false;
+      const width = Number(windowLike.innerWidth);
+      const height = Number(windowLike.innerHeight);
+      if (!(Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0)) {
+        if (retryCount >= maxRetries) {
+          retryCount = 0;
+          return;
+        }
+        retryCount += 1;
+        scheduleResize();
+        return;
+      }
+      retryCount = 0;
+      try {
+        const SceneEvent = windowLike.Event || Event;
+        windowLike.dispatchEvent?.(new SceneEvent('resize'));
+      } catch {}
+    };
+    if (typeof windowLike.requestAnimationFrame === 'function') {
+      windowLike.requestAnimationFrame(run);
+    } else if (typeof windowLike.setTimeout === 'function') {
+      windowLike.setTimeout(run, 0);
+    } else {
+      setTimeout(run, 0);
+    }
+  };
+  windowLike.addEventListener('message', event => {
+    if (event?.source !== windowLike.parent) return;
+    if (event?.data?.type !== PERSISTENT_FULLSCREEN_CHANGE_MESSAGE) return;
+    scheduleResize();
+  });
+}
+
 export function installPersistentFullscreenBridge(windowLike = globalThis.window) {
   const localRoot = windowLike?.document?.documentElement;
   if (!localRoot) return null;
@@ -105,7 +148,9 @@ export function installPersistentFullscreenBridge(windowLike = globalThis.window
     if (!ownerWindow || ownerWindow === windowLike) return null;
     shell = ownerWindow.POCKETMONSTER_ONLINE_SHELL;
   } catch {
-    return installOpaqueFullscreenRelay(windowLike, localRoot);
+    const bridge = installOpaqueFullscreenRelay(windowLike, localRoot);
+    bindParentFullscreenChange(windowLike);
+    return bridge;
   }
 
   if (shell?.kind !== 'monsterlife-online-world-shell-v1'
@@ -114,6 +159,7 @@ export function installPersistentFullscreenBridge(windowLike = globalThis.window
   const request = options => shell.requestFullscreen(options);
   if (!patchFullscreenRequest(localRoot, request)) return null;
   bindOpaqueFullscreenListener(windowLike, request);
+  bindParentFullscreenChange(windowLike);
 
   return publishBridge(windowLike, Object.freeze({
     kind: PERSISTENT_FULLSCREEN_BRIDGE_KIND,
