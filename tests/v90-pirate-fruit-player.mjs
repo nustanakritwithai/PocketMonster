@@ -269,7 +269,7 @@ assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_
 }
 assert.match(pirateOfflineHtml, /Pirate Fruit/, 'offline client page remains vendored for later use');
 assert.match(pirateBootstrap, /import\('\.\/assets\/index-/, 'offline bootstrap imports the relative playable Vite bundle');
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=27"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=\d+"/, 'offline client cache-busts and loads the Pocket visual hook before the save bootstrap');
 assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
   'Pocket visual hook is listed before the save bootstrap that loads the real Pirate Fruit bundle',
@@ -547,3 +547,4 @@ assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');
 player.dispose();
 
 console.log('V9.0 pirate-fruit player presentation: PASS');
+
