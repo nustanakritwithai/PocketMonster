@@ -201,7 +201,18 @@ function validateRenderableSceneGraph(root) {
       } else {
         const vertexCount = values.length / itemSize;
         const index = node.geometry?.index;
-        if (index?.array && (!Array.isArray(index.array)
+        const min = [Infinity, Infinity, Infinity];
+        const max = [-Infinity, -Infinity, -Infinity];
+        for (let offset = 0; offset < values.length; offset += itemSize) {
+          for (let axis = 0; axis < 3; axis++) {
+            min[axis] = Math.min(min[axis], values[offset + axis]);
+            max[axis] = Math.max(max[axis], values[offset + axis]);
+          }
+        }
+        const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+        if (!(extent > 0.000001)) {
+          errors.push(`sceneGraph.${path}.geometry.attributes.position must span non-zero geometry extent`);
+        } else if (index?.array && (!Array.isArray(index.array)
           || index.array.length < 3
           || index.array.length % 3 !== 0
           || !index.array.every(value => Number.isInteger(value) && value >= 0 && value < vertexCount))) {
