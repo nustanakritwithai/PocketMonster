@@ -6,6 +6,9 @@ on:
     paths:
       - 'asset-presentation/**'
       - 'game-v900.js'
+      - 'boot-pirate-fruit-v900.mjs'
+      - 'pirate-fruit-offline/pocket-presentation.mjs'
+      - 'tests/v90-pirate-fruit-client-bridge.mjs'
       - 'tests/v91-studio-character-provider.mjs'
       - 'tests/v91-studio-character-live-wiring.mjs'
       - '.github/workflows/studio-character-provider-ci.yml'
@@ -41,3 +44,12 @@ jobs:
           node tests/v90-pirate-fruit-player.mjs
       - name: Run current Pocket release check
         run: npm run check
+      - name: Run the complete hosting release gates before merge
+        run: |
+          node tests/deployment-runtime-config.mjs
+          node tests/production-launch-workflows.mjs
+          node tests/hosting-architecture.mjs
+          node tests/v90-deployment-gates.mjs
+          npm run test:v90:pirate-player
+          npm run test:v91:combat
+          npm run build:pages
