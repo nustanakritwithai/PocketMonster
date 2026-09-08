@@ -4087,8 +4087,9 @@ function clearBossChallengeCombatEffects(){clearSkillFields();clearSkillSwarms()
 let cameraYaw=0,cameraPitch=.48;
 cameraPitch=.28;
 const keys={};
-addEventListener('pointerdown',()=>initAudio(),{once:true});
-addEventListener('keydown',()=>initAudio(),{once:true});
+// Keep gesture unlock listeners alive so a rejected resume can retry on the next gesture.
+addEventListener('pointerdown',()=>{initAudio();void resumeAudio();});
+addEventListener('keydown',()=>{initAudio();void resumeAudio();});
 const recoverAudio=()=>{void resumeAudio();};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)recoverAudio();});
 addEventListener('pageshow',recoverAudio);

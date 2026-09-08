@@ -13,13 +13,18 @@ let muted = false;
 let volume = 0.6;
 let pendingBgmZone = null;
 let pendingAmbientZone = null;
+let bgmStopGeneration = 0;
 
 const SFX_HANDLERS = {};
 
 // ── Init ──────────────────────────────────────────────────────
 export function initAudio() {
   if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'suspended') {
+      Promise.resolve(ctx.resume()).then(flushPendingAudio).catch(() => {});
+    } else {
+      flushPendingAudio();
+    }
     return;
   }
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -33,7 +38,16 @@ export function initAudio() {
   sfxBus.connect(masterGain);
   registerCombatSFX();
   // Zone transitions can happen during boot before the first user gesture.
-  // Replay the latest requested tracks as soon as the graph exists.
+  // Replay the latest requested tracks after the graph is unlocked.
+  if (ctx.state === 'suspended') {
+    Promise.resolve(ctx.resume()).then(flushPendingAudio).catch(() => {});
+  } else {
+    flushPendingAudio();
+  }
+}
+
+function flushPendingAudio() {
+  if (!ctx || ctx.state === 'suspended') return;
   const queuedBgm = pendingBgmZone;
   const queuedAmbient = pendingAmbientZone;
   pendingBgmZone = null;
@@ -587,6 +601,7 @@ function bgmTick() {
 
 // ── Export: playBGM(zone) ─────────────────────────────────────
 export function playBGM(zone) {
+  bgmStopGeneration++;
   const bgmKey = resolveBgmZone(zone);
   pendingBgmZone = bgmKey;
   if (!ctx) return;
@@ -617,6 +632,8 @@ export function playBGM(zone) {
 
 // ── Export: stopBGM() ─────────────────────────────────────────
 export function stopBGM() {
+  pendingBgmZone = null;
+  const stopGeneration = ++bgmStopGeneration;
   if (!ctx || !bgmTimer) return;
   const t = ctx.currentTime;
   bgmBus.gain.cancelScheduledValues(t);
@@ -624,6 +641,7 @@ export function stopBGM() {
   bgmBus.gain.linearRampToValueAtTime(0, t + BGM_CROSSFADE);
   const fadeMs = (BGM_CROSSFADE + 0.05) * 1000;
   setTimeout(() => {
+    if (stopGeneration !== bgmStopGeneration) return;
     if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
     bgmPattern = null;
     bgmActiveZone = null;
@@ -641,11 +659,11 @@ let ambTimer = null;
 let ambActiveZone = null;
 
 export function startAmbient(zone) {
+  stopAmbient();
   const ambientZone = resolveBgmZone(zone);
   pendingAmbientZone = ambientZone;
   if (!ctx) return;
   pendingAmbientZone = null;
-  stopAmbient();
   const ambientPattern = ['ranch', 'grassland', 'cave'].includes(ambientZone) ? ambientZone : 'grassland';
   ambBus = ctx.createGain();
   ambBus.gain.value = 0;
@@ -691,6 +709,7 @@ export function startAmbient(zone) {
 }
 
 export function stopAmbient() {
+  pendingAmbientZone = null;
   if (ambTimer) { clearTimeout(ambTimer); ambTimer = null; }
   if (ambBus && ctx) {
     ambBus.gain.cancelScheduledValues(ctx.currentTime);
