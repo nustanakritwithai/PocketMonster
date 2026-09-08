@@ -44,5 +44,15 @@ const capped = createMonsterCommandAdapter({ maxPending: 1, timeoutMs: 5, send: 
 const stuck = capped.skill({ ...base, commandId: 'cmd-stuck', skillId: 'Flame-Bite' });
 assert.equal((await capped.skill({ ...base, commandId: 'cmd-cap', skillId: 'Flame-Bite' })).code, 'PENDING_CAPACITY');
 assert.equal((await stuck).code, 'TRANSPORT_TIMEOUT');
+let lateResolve; let firstLateResolve; let pollutionCalls = 0; const pollution = createMonsterCommandAdapter({ timeoutMs: 5, send: () => new Promise(resolve => { pollutionCalls += 1; if (pollutionCalls === 1) firstLateResolve = resolve; else lateResolve = resolve; }) });
+const timed = pollution.skill({ ...base, commandId: 'cmd-pollute', skillId: 'Flame-Bite' });
+assert.equal((await timed).code, 'TRANSPORT_TIMEOUT');
+const retryAfterTimeout = pollution.skill({ ...base, commandId: 'cmd-pollute', skillId: 'Flame-Bite' });
+await Promise.resolve(); firstLateResolve?.({ ok: true, commandId: 'cmd-pollute', accepted: true });
+assert.equal((await retryAfterTimeout).code, 'TRANSPORT_TIMEOUT', 'late result cannot poison retry cache');
+let immediateResolve; const immediate = createMonsterCommandAdapter({ send: () => new Promise(resolve => { immediateResolve = resolve; }) });
+const immediatePending = immediate.skill({ ...base, commandId: 'cmd-immediate', skillId: 'Flame-Bite' }); immediate.clearScene();
+assert.equal((await immediatePending).code, 'STALE_SCENE', 'clearScene resolves pending immediately');
+assert.equal(immediateResolve, undefined, 'immediate clear prevents send');
 assert.equal((await adapter.skill({ ...base, commandId: 'cmd-3', skillId: 'Flame-Bite', zone: 'other-zone' })).code, 'STALE_SCENE');
 console.log('Owned monster command adapter contract: PASS');
