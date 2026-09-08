@@ -10,6 +10,8 @@ on:
       - 'unified-mmorpg-hud-v900.mjs'
       - 'unified-mobile-controls-v900.mjs'
       - 'online-world-shell-v900.mjs'
+      - 'pirate-fruit-offline/**'
+      - 'patch-manifest.json'
       - 'tests/*monster*control*.mjs'
       - 'tests/monster-command-adapter.mjs'
       - '.github/workflows/monster-controls-ci.yml'
@@ -27,6 +29,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: สร้างแพตช์รวมบน runner
+        run: npm run build:pages -- --write-root-manifest
       - name: ตรวจคำสั่งมอนสเตอร์
         run: node tests/monster-command-adapter.mjs
       - name: ตรวจการเชื่อมแผงควบคุม
@@ -40,3 +44,14 @@ jobs:
           node tests/v90-remote-monster-combat-parity.mjs
       - name: ตรวจระบบ Client ที่เกี่ยวข้อง
         run: npm run check
+      - name: ตรวจ artifact ทุกโลก
+        run: node tests/v90-unified-pages-artifact.mjs
+      - name: เก็บแพตช์สำหรับตรวจและติดตั้ง
+        uses: actions/upload-artifact@v4
+        with:
+          name: monster-controls-client-candidate
+          path: |
+            patch-manifest.json
+            dist-pages/
+          if-no-files-found: error
+          retention-days: 14
