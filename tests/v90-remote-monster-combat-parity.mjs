@@ -68,9 +68,10 @@ const scene = new Node('scene');
 const calls = [];
 const visuals = [];
 let clock = 0;
+let activeZone = 'pirate-fruit';
 const controller = createWorldPresenceController({
   scene,
-  getZone: () => 'pirate-fruit',
+  getZone: () => activeZone,
   getSelfId: () => 'player-self',
   now: () => clock,
   interpolationDelayMs: 100,
@@ -148,6 +149,40 @@ assert.equal(controller.acceptSnapshot({
 }), false, 'invalid stale lifecycle sequence is rejected before it can remove a live actor');
 assert.equal(controller.acceptSnapshot({ zone: 'pirate-fruit', generation: 3, players: [], actors: [] }), true, 'explicit empty actors list is a valid despawn/reset boundary');
 assert.equal(scene.children.some(node => node.name === `remote-actor:${lateJoinActor.actorId}`), false, 'explicit empty actors list removes remote actor roots');
+
+const ownedAuthority = (generation = 1) => ({
+  authorityVersion: 'monster-authority/1', serverTimeUtc: '2026-09-08T10:00:00Z', generation,
+  hp: { current: 80, max: 100, revision: 1 }, resultRevision: 1, actionSequence: 0,
+  hit: false, damage: 0, death: false,
+});
+for (const zone of ['hub', 'grassland', 'grass-meadow', 'ranch', 'stage', 'pirate-fruit', 'living-world']) {
+  const owned = {
+    ...ownedActor, actorId: `owned:player-self:${zone}`, ownerId: 'player-self', zone,
+    authority: ownedAuthority(ownedActor.generation), stateSequence: 1,
+  };
+  const accepted = sanitizeOnlineWorldSnapshot({ zone, players: [], actors: [owned] }, zone);
+  assert.equal(accepted?.actors?.[0]?.authority?.hp?.current, 80, `owned authority survives ${zone} snapshot`);
+}
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'living-world', players: [], actors: [{
+  ...ownedActor, actorId: 'owned:missing-owner', ownerId: undefined, zone: 'living-world', authority: ownedAuthority(ownedActor.generation),
+}] }, 'living-world'), null, 'owned namespace requires authenticated owner identity');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'living-world', players: [], actors: [{
+  ...ownedActor, actorId: 'monster:spoofed-owner', ownerId: 'player-self', zone: 'living-world', authority: ownedAuthority(ownedActor.generation),
+}] }, 'living-world'), null, 'central monster namespace cannot carry an owner');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'unknown-zone', players: [], actors: [{
+  ...ownedActor, actorId: 'owned:player-self:unknown', ownerId: 'player-self', zone: 'unknown-zone', authority: ownedAuthority(ownedActor.generation),
+}] }, 'unknown-zone'), null, 'owned authority is rejected outside the seven supported zones');
+
+for (const zone of ['hub', 'grassland', 'grass-meadow', 'ranch', 'stage', 'pirate-fruit', 'living-world']) {
+  activeZone = zone;
+  const owned = { ...ownedActor, actorId: `owned:player-self:scene:${zone}`, ownerId: 'player-self', zone, authority: ownedAuthority(ownedActor.generation), stateSequence: 1 };
+  assert.equal(controller.acceptSnapshot({ zone, players: [], actors: [owned] }), true, `controller accepts owned actor in ${zone}`);
+  const root = scene.children.find(node => node.name === `remote-actor:${owned.actorId}`);
+  assert.ok(root, `controller creates owned actor presentation in ${zone}`);
+  assert.equal(controller.acceptSnapshot({ zone, players: [], actors: [] }), true, `empty actor snapshot is accepted in ${zone}`);
+  assert.equal(root.disposed, true, `empty actor snapshot disposes owned actor in ${zone}`);
+}
+
 controller.dispose();
 
 console.log('V9.0 remote monster combat parity client contract: PASS');
