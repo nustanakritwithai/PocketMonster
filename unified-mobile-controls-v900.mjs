@@ -1,5 +1,6 @@
 import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=9';
 import { initAudio } from './audio-engine.mjs';
+import { resumeAudio } from './audio-engine.mjs';
 
 export const UNIFIED_MOBILE_CONTROLS_KIND = 'monsterlife-unified-mobile-controls-v1';
 export const PIRATE_UNIFIED_INPUT_READY_MESSAGE = 'pocketmonster:unified-mobile-input-ready-v1';
@@ -284,6 +285,7 @@ export function createUnifiedMobileControls({
 
   const unlockAudioFromGesture = () => {
     try { initAudio(); } catch {}
+    try { void resumeAudio(); } catch {}
     try { activeAdapter()?.unlockAudio?.(); } catch {}
   };
 
@@ -662,6 +664,7 @@ export function createUnifiedMobileControls({
   }
   documentLike.addEventListener('visibilitychange', () => {
     if (documentLike.visibilityState === 'hidden') reset('visibility-hidden');
+    else { try { void resumeAudio(); } catch {} try { activeAdapter()?.unlockAudio?.(); } catch {} }
   });
 
   const api = Object.freeze({

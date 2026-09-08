@@ -42,6 +42,15 @@ export function initAudio() {
   if (queuedAmbient) startAmbient(queuedAmbient);
 }
 
+// Mobile browsers can suspend an already unlocked context after app switching,
+// screen lock, or fullscreen changes. Resume only an existing graph here so a
+// lifecycle event never bypasses the browser's first-gesture autoplay policy.
+export function resumeAudio() {
+  if (!ctx) return Promise.resolve(false);
+  if (ctx.state === 'running') return Promise.resolve(true);
+  return Promise.resolve(ctx.resume()).then(() => ctx.state === 'running').catch(() => false);
+}
+
 export function setVolume(v) {
   volume = Math.max(0, Math.min(1, v));
   if (masterGain && !muted) masterGain.gain.setTargetAtTime(volume, ctx.currentTime, 0.05);
