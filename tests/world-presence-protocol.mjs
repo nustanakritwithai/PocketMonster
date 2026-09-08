@@ -299,10 +299,12 @@ const authoritySnapshot = sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', pl
 assert.equal(authoritySnapshot.players.length, 1, 'visual self remains independently filtered by receiver');
 assert.equal(authoritySnapshot.playerAuthority.players[0].hp.current, 87.5, 'self authoritative HP preserves fractional value');
 assert.equal(authoritySnapshot.playerAuthority.players[1].lifeState, 'dead', 'observer death state crosses separate authority channel');
-assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [...playerAuthority.players, playerAuthority.players[0]] } }), null, 'duplicate authoritative player IDs fail closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [...playerAuthority.players, { ...playerAuthority.players[0], playerId: 'SELF-PLAYER' }] } }), null, 'case-insensitive duplicate authoritative player IDs fail closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'hub', players: [], playerAuthority }).playerAuthority.players[0].playerId, 'self-player', 'authority remains valid across non-central visual zones');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], hp: { current: 101, max: 100, revision: 4 } }] } }), null, 'authoritative HP range fails closed');
 assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, serverTimeUtc: 'invalid' } }), null, 'malformed authority timestamp fails closed');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[0], lifeState: 'dead' }] } }), null, 'dead authority must have zero HP');
+assert.equal(sanitizeOnlineWorldSnapshot({ zone: 'pirate-fruit', players: [], playerAuthority: { ...playerAuthority, players: [{ ...playerAuthority.players[1], lifeState: 'alive' }] } }), null, 'alive authority must have positive HP');
 
 const outboundPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, actors: [authoritativeActor] }, { allowAuthority: false });
 const outboundAuthorityPose = sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, playerAuthority }, { allowAuthority: false });
