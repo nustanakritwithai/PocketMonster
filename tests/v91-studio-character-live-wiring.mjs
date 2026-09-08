@@ -34,7 +34,8 @@ assert.match(packageLoader, /rig\?\.architecture !== 'THREE\.Group'/);
 assert.match(packageLoader, /'throwOrigin'/, 'Studio package validator must require throwOrigin socket');
 assert.match(provider, /buildSceneNode/);
 assert.match(provider, /buildJointMap/);
-assert.match(provider, /findClip\(pkg, action\)/);
+assert.match(provider, /findStudioCharacterClip\(pkg, action\)/);
+assert.match(packageLoader, /pocket-motion-pack-v1/);
 assert.match(provider, /anchor\(name, target\)/);
 
 function validPackage() {
@@ -81,7 +82,18 @@ function validPackage() {
       jointBindings: { rootJoint: { path: [], nodeName: 'characterRoot' } },
       sockets,
     },
-    animations: [],
+    animations: ['idle', 'walk', 'run', 'attack', 'skill', 'hurt', 'dead'].map(action => ({
+      id: `${action}-clip`, name: action, duration: 1,
+      loop: ['idle', 'walk', 'run'].includes(action),
+      keyframes: [
+        { time: 0, joints: { rootJoint: { position: [0, 0, 0] } } },
+        { time: 1, joints: { rootJoint: { position: [0, 0, 0] } } },
+      ],
+    })),
+    motionPack: {
+      schema: 'pocket-motion-pack-v1', defaultAction: 'idle',
+      actionMap: Object.fromEntries(['idle', 'walk', 'run', 'attack', 'skill', 'hurt', 'dead'].map(action => [action, `${action}-clip`])),
+    },
     gameplayPolicy: { included: false },
   };
 }

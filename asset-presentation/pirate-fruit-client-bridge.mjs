@@ -6,6 +6,7 @@ import { createBigheadMonsterProvider } from './providers/procedural-bighead-mon
 import { createPirateFruitActionTracker } from './pirate-fruit-action-adapter.mjs';
 import { createPirateFruitRigRetargeter } from './pirate-fruit-rig-retarget.mjs';
 import { createStudioCharacterProvider } from './providers/studio-character.mjs';
+import { applyStudioCharacterRenderProfile } from './studio-character-render-profile.mjs';
 import {
   installStudioCharacterPackage,
   validateStudioCharacterPackage,
@@ -227,6 +228,59 @@ export function applyPirateFruitActionTransition(handle, previousAction, sample)
   if (sample?.actionId != null && sample?.action != null) {
     handle?.play?.(sample.action, { duration: sample.duration });
   }
+}
+
+/**
+ * The Pirate action tracker emits edges only for combat. Studio owns its pose
+ * after replacement, so it also needs an explicit idle/walk/run clip switch
+ * whenever ordinary movement changes. Combat playback remains owned by the
+ * existing dead-safe action transition above.
+ */
+export function applyPirateFruitLocomotionTransition(handle, previousPresentation, sample) {
+  const next = sample?.action || sample?.locomotion || 'idle';
+  if (sample?.action) return next;
+  if (next !== previousPresentation) handle?.play?.(next, { restart: true });
+  return next;
+}
+
+const STUDIO_ACTION_PRIORITY = Object.freeze(['dead', 'hurt', 'skill', 'attack', 'run', 'walk', 'idle']);
+
+function studioLocomotionFor(sample) {
+  return sample?.locomotion === 'run' ? 'run'
+    : sample?.locomotion === 'walk' ? 'walk' : 'idle';
+}
+
+function studioCombatActionFor(sample) {
+  if (sample?.dead === true || sample?.action === 'dead') return 'dead';
+  if (sample?.hurt === true || sample?.action === 'hurt') return 'hurt';
+  if (sample?.skill === true || sample?.action === 'skill') return 'skill';
+  if (sample?.attack === true || sample?.action === 'attack-melee' || sample?.action === 'attack-ranged' || sample?.action === 'attack') return 'attack';
+  return null;
+}
+
+/**
+ * Choose the Studio pose once per renderer tick.  Combat only supplies a
+ * presentation signal; it never changes movement, combat, or save authority.
+ * A completed one-shot returns to the current locomotion pose even if a stale
+ * host signal lingers for a frame or two.  Dead is intentionally terminal.
+ */
+export function selectPirateFruitStudioAction(sample, animationState = null) {
+  const action = studioCombatActionFor(sample);
+  const locomotion = studioLocomotionFor(sample);
+  if (!action) return locomotion;
+  if (action !== 'dead' && animationState?.finished === true
+    && animationState.action === action) return locomotion;
+  return STUDIO_ACTION_PRIORITY.includes(action) ? action : locomotion;
+}
+
+export function applyPirateFruitStudioPresentation(handle, previous = null, sample = null) {
+  const desired = selectPirateFruitStudioAction(sample, handle?.animationState);
+  const combatAction = studioCombatActionFor(sample);
+  const actionId = combatAction ? sample?.actionId || null : null;
+  const changed = previous?.action !== desired;
+  const newAction = combatAction && actionId !== previous?.actionId;
+  if (changed || newAction) handle?.play?.(desired, { restart: changed || newAction });
+  return Object.freeze({ action: desired, actionId, combatAction });
 }
 
 function srcOf(value) {
@@ -456,6 +510,7 @@ export async function installPirateFruitPocketPresentation({
       rigRetargeter,
       sourcePoseDriven,
       lastAction: null,
+      lastPresentation: null,
       lastX: host.position.x,
       lastZ: host.position.z,
       source: 'pirate-fruit',
@@ -526,6 +581,9 @@ export async function installPirateFruitPocketPresentation({
     item.studioAssetId = pkg.manifest.id;
     item.studioUpdates = 0;
     item.studioRenderFrames = 0;
+    item.lastPresentation = null;
+    item.lastStudioPresentation = null;
+    item.renderProfile = Object.freeze({ state: studio.renderProfile ? 'loading' : 'skipped', assigned: 0, failed: [] });
     let sampledMesh = false;
     studio.root.traverse(node => {
       if (sampledMesh || !node.isMesh || node.visible === false) return;
@@ -538,6 +596,15 @@ export async function installPirateFruitPocketPresentation({
     });
     try { fallback.dispose?.(); } catch (error) { console.warn('Old player visual disposal failed', error); }
     publishStudioStatus({ state: 'attached', source: 'studio-character', id: pkg.manifest.id });
+    // This is intentionally non-blocking: geometry/scalar PBR is already
+    // visible, and a failed image fetch must never remove the live player.
+    if (studio.renderProfile) {
+      void applyStudioCharacterRenderProfile(studio.root, studio.renderProfile, { THREE: engineThree })
+        .then(report => { item.renderProfile = report; })
+        .catch(error => {
+          item.renderProfile = Object.freeze({ state: 'failed', assigned: 0, failed: [String(error?.message || error)] });
+        });
+    }
     return true;
   }
 
@@ -682,11 +749,21 @@ export async function installPirateFruitPocketPresentation({
         now,
         { distanceSq, speed },
       );
+      if (item.source === 'studio-character') {
+        item.lastStudioPresentation = applyPirateFruitStudioPresentation(
+          item.handle,
+          item.lastStudioPresentation,
+          sample,
+        );
+        item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
+        item.studioUpdates += 1;
+        continue;
+      }
       applyPirateFruitActionTransition(item.handle, item.lastAction, sample);
       item.lastAction = sample.action;
+      item.lastPresentation = applyPirateFruitLocomotionTransition(item.handle, item.lastPresentation, sample);
       item.handle.update?.(dt, { moving, locomotion: sample.locomotion });
       item.rigRetargeter?.update();
-      if (item.source === 'studio-character') item.studioUpdates += 1;
     }
   }
 
@@ -713,6 +790,9 @@ export async function installPirateFruitPocketPresentation({
           host: item.host.name,
           position: { x: item.host.position.x, y: item.host.position.y, z: item.host.position.z },
           facing: item.host.rotation.y,
+          animation: item.handle.animationState || null,
+          desiredAction: item.lastStudioPresentation?.action || null,
+          renderProfile: item.renderProfile || null,
         } : null;
       })(),
     }),

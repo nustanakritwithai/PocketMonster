@@ -1,7 +1,7 @@
 import { LEGACY_FALLBACKS } from '../anchors.mjs';
 import { assertAssetHandle } from '../handle-contract.mjs';
 import { disposeHandle, registerOwned } from '../ownership.mjs';
-import { getStudioCharacterPackage } from '../studio-character-package.mjs';
+import { getStudioCharacterPackage, inspectStudioCharacterMotionPack } from '../studio-character-package.mjs';
 
 const ARRAY_TYPES = Object.freeze({
   Float32Array,
@@ -98,7 +98,7 @@ function buildMaterial(THREE, snapshot, resources) {
   return material;
 }
 
-function buildSceneNode(THREE, snapshot, resources) {
+function buildSceneNode(THREE, snapshot, resources, path = []) {
   const isMesh = snapshot?.nodeType === 'mesh';
   const node = isMesh
     ? new THREE.Mesh(
@@ -108,13 +108,15 @@ function buildSceneNode(THREE, snapshot, resources) {
     : new THREE.Group();
   node.name = snapshot?.name || '';
   node.visible = snapshot?.visible !== false;
-  node.userData = { ...(snapshot?.userData || {}) };
+  node.userData = { ...(snapshot?.userData || {}), studioScenePath: [...path] };
   applyTransform(node, snapshot?.transform);
   if (isMesh) {
     node.castShadow = !!snapshot.castShadow;
     node.receiveShadow = !!snapshot.receiveShadow;
   }
-  for (const child of snapshot?.children || []) node.add(buildSceneNode(THREE, child, resources));
+  for (const [index, child] of (snapshot?.children || []).entries()) {
+    node.add(buildSceneNode(THREE, child, resources, [...path, index]));
+  }
   return node;
 }
 
@@ -149,29 +151,115 @@ function normalizeAction(action) {
 }
 
 function clipState(clip) {
-  return clip?.runtime?.transition?.state || clip?.runtime?.state || normalizeAction(clip?.name || '');
+  return normalizeAction(clip?.runtime?.transition?.state || clip?.runtime?.state || clip?.name || '');
 }
 
-function findClip(pkg, action) {
+function clipMotionClass(clip) {
+  return normalizeAction(clip?.runtime?.motionClass || '');
+}
+
+const CLIP_STATE_ALIASES = Object.freeze({
+  attack_melee: ['attack', 'melee', 'slash', 'swing'],
+  attack_ranged: ['attack', 'ranged', 'shoot', 'gun'],
+  hurt: ['hurt', 'hit_react', 'hit'],
+  dead: ['dead', 'death', 'faint'],
+  skill: ['skill', 'cast', 'ability'],
+});
+
+function canonicalMotionAction(action) {
   const wanted = normalizeAction(action);
-  return (pkg.animations || []).find(clip => clipState(clip) === wanted)
-    || (pkg.animations || []).find(clip => normalizeAction(clip.name) === wanted)
-    || null;
+  if (wanted === 'attack_melee' || wanted === 'attack_ranged') return 'attack';
+  if (wanted === 'hit_react') return 'hurt';
+  if (wanted === 'death' || wanted === 'faint') return 'dead';
+  return wanted;
+}
+
+/**
+ * Studio names authored clips descriptively (for example walk_pose_library),
+ * while Pirate requests gameplay states (walk). Resolve those semantic forms
+ * without inventing a pose when the package did not author one.
+ */
+export function findStudioCharacterClip(pkg, action) {
+  const wanted = normalizeAction(action);
+  const clips = Array.isArray(pkg?.animations) ? pkg.animations : [];
+  const motion = inspectStudioCharacterMotionPack(pkg);
+  const canonical = canonicalMotionAction(wanted);
+  const canonicalId = motion.actionMap?.[canonical];
+  if (canonicalId) {
+    const mapped = clips.find(clip => clip?.id === canonicalId);
+    if (mapped) return mapped;
+  }
+  const exact = clips.find(clip => clipState(clip) === wanted)
+    || clips.find(clip => normalizeAction(clip?.name) === wanted);
+  if (exact) return exact;
+
+  // Templates use stable state prefixes even when their motion class predates
+  // the current Studio metadata migration.
+  const prefixed = clips.find(clip => clipState(clip).startsWith(`${wanted}_`))
+    || clips.find(clip => normalizeAction(clip?.name).startsWith(`${wanted}_`));
+  if (prefixed) return prefixed;
+
+  const aliases = CLIP_STATE_ALIASES[wanted] || [];
+  const aliased = clips.find(clip => aliases.some(alias => {
+    const state = clipState(clip);
+    const name = normalizeAction(clip?.name);
+    return state === alias || state.startsWith(`${alias}_`)
+      || name === alias || name.startsWith(`${alias}_`);
+  }));
+  if (aliased) return aliased;
+
+  if (wanted === 'idle' || wanted === 'walk' || wanted === 'run') {
+    return clips.find(clip => clipMotionClass(clip) === wanted) || null;
+  }
+  if (wanted.startsWith('attack_')) {
+    return clips.find(clip => clipMotionClass(clip) === 'action') || null;
+  }
+  return null;
 }
 
 function transformFromPose(value) {
-  if (!value || typeof value !== 'object') return { rotation: null, position: null };
+  if (!value || typeof value !== 'object') return {
+    rotation: null, quaternion: null, position: null, scale: null,
+  };
   const rotation = Array.isArray(value.rotation) ? value.rotation
     : Array.isArray(value.rot) ? value.rot
       : Array.isArray(value.r) ? value.r : null;
   const position = Array.isArray(value.position) ? value.position
     : Array.isArray(value.pos) ? value.pos
       : Array.isArray(value.p) ? value.p : null;
-  return { rotation, position };
+  const scale = Array.isArray(value.scale) ? value.scale
+    : Array.isArray(value.scl) ? value.scl
+      : Array.isArray(value.s) ? value.s : null;
+  const quaternion = Array.isArray(value.quaternion) ? value.quaternion
+    : Array.isArray(value.quat) ? value.quat
+      : Array.isArray(value.q) ? value.q : null;
+  return { rotation, quaternion, position, scale };
 }
 
 function lerp(a, b, t) {
   return (Number(a) || 0) + ((Number(b) || 0) - (Number(a) || 0)) * t;
+}
+
+function finiteVector(value, size) {
+  return Array.isArray(value) && value.length >= size && value.slice(0, size).every(Number.isFinite);
+}
+
+function slerpQuaternion(a, b, t) {
+  if (!finiteVector(a, 4) || !finiteVector(b, 4)) return null;
+  let [ax, ay, az, aw] = a;
+  let [bx, by, bz, bw] = b;
+  let dot = ax * bx + ay * by + az * bz + aw * bw;
+  if (dot < 0) { dot = -dot; bx = -bx; by = -by; bz = -bz; bw = -bw; }
+  if (dot > 0.9995) {
+    const q = [lerp(ax, bx, t), lerp(ay, by, t), lerp(az, bz, t), lerp(aw, bw, t)];
+    const length = Math.hypot(...q) || 1;
+    return q.map(value => value / length);
+  }
+  const theta = Math.acos(Math.min(1, Math.max(-1, dot)));
+  const sinTheta = Math.sin(theta) || 1;
+  const left = Math.sin((1 - t) * theta) / sinTheta;
+  const right = Math.sin(t * theta) / sinTheta;
+  return [ax * left + bx * right, ay * left + by * right, az * left + bz * right, aw * left + bw * right];
 }
 
 function sampleClip(clip, time, joints) {
@@ -198,7 +286,10 @@ function sampleClip(clip, time, joints) {
     if (!node) continue;
     const a = transformFromPose(left.joints?.[name] || right.joints?.[name]);
     const b = transformFromPose(right.joints?.[name] || left.joints?.[name]);
-    if (a.rotation && b.rotation) {
+    const quaternion = slerpQuaternion(a.quaternion, b.quaternion, alpha);
+    if (quaternion && node.quaternion?.set) {
+      node.quaternion.set(...quaternion);
+    } else if (finiteVector(a.rotation, 3) && finiteVector(b.rotation, 3)) {
       node.rotation?.set?.(
         lerp(a.rotation[0], b.rotation[0], alpha),
         lerp(a.rotation[1], b.rotation[1], alpha),
@@ -211,6 +302,13 @@ function sampleClip(clip, time, joints) {
         lerp(a.position[0], b.position[0], alpha),
         lerp(a.position[1], b.position[1], alpha),
         lerp(a.position[2], b.position[2], alpha),
+      );
+    }
+    if (finiteVector(a.scale, 3) && finiteVector(b.scale, 3)) {
+      node.scale?.set?.(
+        lerp(a.scale[0], b.scale[0], alpha),
+        lerp(a.scale[1], b.scale[1], alpha),
+        lerp(a.scale[2], b.scale[2], alpha),
       );
     }
   }
@@ -243,8 +341,16 @@ export function createStudioCharacterProvider({ THREE } = {}) {
     root.add(sceneRoot);
 
     const joints = buildJointMap(sceneRoot, pkg);
+    const motion = inspectStudioCharacterMotionPack(pkg);
     const height = Number(pkg.manifest?.metrics?.height) || 1.8;
-    const animation = { clip: findClip(pkg, 'idle'), time: 0, action: 'idle', finished: false };
+    const initialClip = findStudioCharacterClip(pkg, 'idle');
+    const animation = {
+      clip: initialClip,
+      time: 0,
+      action: 'idle',
+      finished: false,
+      lastResolveError: initialClip ? null : 'No authored Studio clip resolves idle',
+    };
     const rest = Object.freeze({
       headY: height * 0.80,
       throwY: height * 0.64,
@@ -265,14 +371,17 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         sceneRoot,
       }),
       play(action, options = {}) {
-        const next = findClip(pkg, action);
+        const next = findStudioCharacterClip(pkg, action);
+        animation.action = normalizeAction(action);
         if (next) {
           const changed = next !== animation.clip;
           animation.clip = next;
-          animation.action = normalizeAction(action);
           animation.finished = false;
+          animation.lastResolveError = null;
           if (changed || options.restart) animation.time = Math.max(0, Number(options.time) || 0);
           sampleClip(animation.clip, animation.time, joints);
+        } else {
+          animation.lastResolveError = `No authored Studio clip resolves ${animation.action}`;
         }
         return handle;
       },
@@ -333,8 +442,24 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         return handle;
       },
       get animationState() {
-        return Object.freeze({ action: animation.action, time: animation.time, finished: animation.finished });
+        return Object.freeze({
+          action: animation.action,
+          clipId: animation.clip?.id || null,
+          resolvedState: animation.clip ? clipState(animation.clip) : null,
+          hasClip: Boolean(animation.clip),
+          time: animation.time,
+          finished: animation.finished,
+          lastResolveError: animation.lastResolveError,
+          motion: {
+            mode: motion.mode,
+            defaultAction: motion.defaultAction,
+            available: motion.available,
+            missing: motion.missing,
+            invalid: motion.invalid,
+          },
+        });
       },
+      get renderProfile() { return pkg.renderProfile || null; },
     };
 
     for (const resource of resources) registerOwned(handle, resource);
