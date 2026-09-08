@@ -426,7 +426,9 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
     portrait.addEventListener('pointercancel', clearPress);
     portrait.addEventListener('click', () => {
       if (suppressClick) return;
-      partyAdapter()?.selectPartySlot?.(slot.slot);
+      const party = partyAdapter();
+      if (party?.activatePartySlot) party.activatePartySlot(slot.slot);
+      else party?.selectPartySlot?.(slot.slot);
     });
     portrait.addEventListener('contextmenu', event => {
       event?.preventDefault?.();
@@ -436,6 +438,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
   }
 
   function paintOverlayMonsterSlots(slots) {
+    const controlPanel = partyAdapter()?.snapshot?.()?.controlPanel || { mode: 'character', slot: null };
     for (const slot of slots) {
       const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
       if (!button) continue;
@@ -446,9 +449,10 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
       button.classList.toggle('selected', slot.selected === true);
       button.classList.toggle('active-monster', slot.active === true);
       button.classList.toggle('fainted-slot', slot.fainted === true);
+      button.classList.toggle('monster-control-open', controlPanel.mode === 'monster' && controlPanel.slot === slot.slot);
       button.dataset.partySlot = String(slot.slot);
       button.setAttribute('aria-label', slot.available === true
-        ? `${slot.name || 'Party'} slot ${slot.slot + 1}`
+        ? `${slot.name || 'Party'} ช่อง ${slot.slot + 1} • ${controlPanel.mode === 'monster' && controlPanel.slot === slot.slot ? 'กลับไปสกิลตัวละคร' : slot.active === true ? 'เปิดสกิลมอนสเตอร์' : 'ปามอนสเตอร์'}`
         : `Party ช่อง ${slot.slot + 1} ว่าง`);
       if (slot.available === true) {
         button.setAttribute('title', `${slot.name || 'Party'} • Lv.${slot.level || 0}`);
@@ -457,21 +461,13 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers } = {}
       }
       if (button.dataset.partyBound === '1') continue;
       button.dataset.partyBound = '1';
-      button.addEventListener('pointerdown', event => {
+      button.addEventListener('click', event => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
         const slotIndex = Number(button.dataset.partySlot);
         const party = partyAdapter();
-        if (party?.armSummon) party.armSummon(slotIndex);
+        if (party?.activatePartySlot) party.activatePartySlot(slotIndex);
         else party?.selectPartySlot?.(slotIndex);
-      });
-      button.addEventListener('pointerup', event => {
-        event?.preventDefault?.();
-        event?.stopPropagation?.();
-        partyAdapter()?.executeArmedSummon?.();
-      });
-      button.addEventListener('pointercancel', () => {
-        partyAdapter()?.cancelArmedSummon?.();
       });
       button.addEventListener('contextmenu', event => {
         event?.preventDefault?.();

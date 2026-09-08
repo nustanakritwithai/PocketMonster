@@ -2518,6 +2518,14 @@ function clearTransientEffects(){
 
 // ---------- State / save ----------
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
+let monsterControlPanel={mode:'character',slot:null,instanceId:null};
+function publishMonsterControlPanel(reason='state-change'){
+  const detail=Object.freeze({type:'pocketmonster:monster-control-panel-v1',mode:monsterControlPanel.mode,slot:monsterControlPanel.slot,instanceId:monsterControlPanel.instanceId,reason});
+  if(typeof document!=='undefined'&&document.body?.dataset) document.body.dataset.monsterControlPanel=monsterControlPanel.mode;
+  if(typeof window!=='undefined') window.dispatchEvent(new CustomEvent(detail.type,{detail}));
+  return detail;
+}
+function monsterControlPanelState(){return Object.freeze({...monsterControlPanel});}
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
 window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
@@ -2638,6 +2646,7 @@ function pocketPartyHudProjection(){
   return {
     selectedSlot:state.selectedSlot,
     activeInstanceId,
+    controlPanel:monsterControlPanelState(),
     canSwitch:characterUI?characterUI.canSwitchParty():false,
     slots:state.party.map(id=>{
       const inst=getInst(id);
@@ -2693,6 +2702,28 @@ function cancelArmedSummonCommand(){
   summonAimActive=false;
   return createHudCommandResult({ok:true,reason:'summon-aim-cancelled'});
 }
+function activatePartySlotCommand(slot){
+  const index=Number.isInteger(slot)?slot:-1;
+  if(index<0||index>=state.party.length)return createHudCommandResult({ok:false,reason:'invalid-slot'});
+  const inst=getInst(state.party[index]);
+  if(!inst)return createHudCommandResult({ok:false,reason:'empty-slot'});
+  const activeId=activeSummon?.inst?.instanceId||null;
+  if(activeId===inst.instanceId){
+    const mode=monsterControlPanel.mode==='monster'?'character':'monster';
+    monsterControlPanel={mode,slot:index,instanceId:inst.instanceId};
+    publishMonsterControlPanel('toggle');
+    renderHUD();
+    return createHudCommandResult({ok:true,reason:mode==='monster'?'monster-panel-opened':'character-panel-opened',mode,slot:index});
+  }
+  if(activeSummon||pendingSummon)return createHudCommandResult({ok:false,reason:'active-monster-recall-required'});
+  state.selectedSlot=index;
+  monsterControlPanel={mode:'character',slot:index,instanceId:inst.instanceId};
+  const result=summonThrow({ignorePanelPause:true});
+  if(result===false)return createHudCommandResult({ok:false,reason:'summon-failed'});
+  publishMonsterControlPanel('summon');
+  renderHUD();
+  return createHudCommandResult({ok:true,reason:'summon-thrown',mode:'character',slot:index});
+}
 function openCharacterCommand(slot){
   if(!characterUI)return createHudCommandResult({ok:false,reason:'unavailable'});
   const index=Number.isInteger(slot)?slot:state.selectedSlot;
@@ -2708,6 +2739,8 @@ window.POCKETMONSTER_PARTY_HUD=Object.freeze({
   armSummon:armSummonCommand,
   executeArmedSummon:executeArmedSummonCommand,
   cancelArmedSummon:cancelArmedSummonCommand,
+  activatePartySlot:activatePartySlotCommand,
+  monsterControlPanel:monsterControlPanelState,
   openCharacter:openCharacterCommand,
   reset:pocketPartyHud.reset,
 });
