@@ -38,6 +38,25 @@ function matchingBrace(source, openingBrace) {
   throw new Error(`unterminated block at byte ${openingBrace}`);
 }
 
+function matchingBracket(source, openingBracket) {
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let index = openingBracket; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') { quote = char; continue; }
+    if (char === '[') depth += 1;
+    if (char === ']') { depth -= 1; if (depth === 0) return index; }
+  }
+  throw new Error(`unterminated array at byte ${openingBracket}`);
+}
+
 function classBlocks(source) {
   const blocks = [];
   const pattern = /class\s+([A-Za-z_$][\w$]*)\{/g;
@@ -77,6 +96,7 @@ function compilePresenceRuntime(bundle, classes) {
     // The merged central-transport bundle starts the shared sanitizer prelude
     // at Oi; this keeps Cd and its real helper dependencies executable.
     bundle.lastIndexOf('const Oi=', messageIndex),
+    bundle.lastIndexOf('const Ln=', messageIndex),
   ].filter(index => index >= 0);
   const protocolHelperStart = protocolAnchors.length > 0 ? Math.min(...protocolAnchors) : -1;
   const declarationsStart = protocolHelperStart >= 0 ? protocolHelperStart : Math.max(
@@ -92,7 +112,48 @@ function compilePresenceRuntime(bundle, classes) {
     /constructor[\s\S]*?\{([A-Za-z_$][\w$]*)\(this,"remotePlayers"/,
     'presence class-field helper',
   )[1];
-  const executable = `${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
+  // New Pirate builds may place island placement helpers before the protocol
+  // prelude (c5dbb9c uses Pe/Cs). Extract this tiny dependency explicitly so
+  // the fixture does not depend on minifier names or evaluate the whole app.
+  const placementReturn = bundle.indexOf('return{x:e+o.x,z:t+o.z}');
+  const placementStart = bundle.lastIndexOf('function ', placementReturn);
+  const placement = placementReturn >= 0 && placementStart >= 0
+    ? bundle.slice(placementStart, bundle.indexOf('}', placementReturn) + 1).match(
+      /function ([A-Za-z_$][\w$]*)\(i,e,t\)\{const o=([A-Za-z_$][\w$]*)\[i\];/,
+    )
+    : null;
+  if (!placement) throw new Error('Pirate bundle fixture could not locate island placement helper');
+  const placementData = placement[2];
+  const placementDataStart = bundle.lastIndexOf(`${placementData}=`, placementStart);
+  const placementObjectStart = bundle.indexOf('{', placementDataStart);
+  const placementObjectEnd = placementObjectStart >= 0 ? matchingBrace(bundle, placementObjectStart) : -1;
+  const placementFunctionBrace = bundle.indexOf('{', placementStart);
+  const placementFunctionEnd = placementFunctionBrace >= 0 ? matchingBrace(bundle, placementFunctionBrace) : -1;
+  if (placementDataStart < 0 || placementObjectStart < 0 || placementObjectEnd < 0 || placementFunctionEnd < 0) {
+    throw new Error('Pirate bundle fixture could not locate island placement data');
+  }
+  const placementDeclaration = `const ${placementData}=${bundle.slice(placementObjectStart, placementObjectEnd + 1)};`;
+  const placementSource = `${placementDeclaration}\n${bundle.slice(placementStart, placementFunctionEnd + 1)}`;
+  // Presence cleanup references the bundle's save-key namespace (X in this
+  // artifact), which is declared before the protocol prelude. Extract its
+  // literal object as another real dependency rather than stubbing it.
+  const saveKeyMarker = bundle.indexOf('checkpoint:"pirate-fruit:save-v1"');
+  const saveKeyObjectStart = saveKeyMarker >= 0 ? bundle.lastIndexOf('{', saveKeyMarker) : -1;
+  const saveKeyObjectEnd = saveKeyObjectStart >= 0 ? matchingBrace(bundle, saveKeyObjectStart) : -1;
+  const saveKeyDeclarationStart = saveKeyObjectStart >= 0 ? bundle.lastIndexOf('const ', saveKeyObjectStart) : -1;
+  if (saveKeyDeclarationStart < 0 || saveKeyObjectEnd < 0) {
+    throw new Error('Pirate bundle fixture could not locate save-key namespace');
+  }
+  const saveKeySource = `${bundle.slice(saveKeyDeclarationStart, saveKeyObjectEnd + 1)};`;
+  const boatMarker = bundle.indexOf('id:"training-dinghy"');
+  const boatObjectStart = boatMarker >= 0 ? bundle.lastIndexOf('[', boatMarker) : -1;
+  const boatObjectEnd = boatObjectStart >= 0 ? matchingBracket(bundle, boatObjectStart) : -1;
+  const boatDeclarationStart = boatObjectStart >= 0 ? bundle.lastIndexOf('const ', boatObjectStart) : -1;
+  if (boatDeclarationStart < 0 || boatObjectEnd < 0) {
+    throw new Error('Pirate bundle fixture could not locate boat catalog namespace');
+  }
+  const boatSource = `${bundle.slice(boatDeclarationStart, boatObjectEnd + 1)};`;
+  const executable = `${placementSource}\n${saveKeySource}\n${boatSource}\n${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
   return new Function(fieldHelper, executable)(defineClassField);
 }
 
@@ -136,7 +197,7 @@ function compileRemotePlayerManager(bundle, classes, Effects) {
   const effectsType = requiredMatch(block.source, /this\.effects=new ([A-Za-z_$][\w$]*)\(e\)/, 'remote-player Effects dependency')[1];
   const mathUtils = requiredMatch(
     block.source,
-    /([A-Za-z_$][\w$]*)\.clamp\(r\*l/,
+    /([A-Za-z_$][\w$]*)\.clamp\(/,
     'remote-player MathUtils dependency',
   )[1];
   const runtimeConstants = requiredMatch(
