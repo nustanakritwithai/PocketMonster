@@ -17,7 +17,7 @@ import {
   pirateCentralAuthorityOwnsZone,
 } from './pirate-presence-bridge-v900.mjs?v=5';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=10';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=11';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,

@@ -61,6 +61,13 @@ export function createPirateIframeInputTransport({
     return post({ kind: 'reset', reason });
   };
 
+  const flushAudioUnlock = () => {
+    if (!pendingAudioUnlock || !ready()) return false;
+    const sent = post({ kind: 'audio-unlock' });
+    if (sent) pendingAudioUnlock = false;
+    return sent;
+  };
+
   const announceNativeControlMode = controlMode => {
     if (!['player', 'boat'].includes(controlMode) || controlMode === nativeControlMode) return false;
     nativeControlMode = controlMode;
@@ -131,10 +138,7 @@ export function createPirateIframeInputTransport({
       activeCameraGestureId = null;
       readyGeneration = frameGeneration;
       post({ kind: 'reset', reason: 'pirate-input-ready' });
-      if (pendingAudioUnlock) {
-        pendingAudioUnlock = false;
-        post({ kind: 'audio-unlock' });
-      }
+      flushAudioUnlock();
       return true;
     },
     move(payload) { return post({ kind: 'move', ...payload }); },
@@ -167,9 +171,7 @@ export function createPirateIframeInputTransport({
     reset,
     unlockAudio() {
       pendingAudioUnlock = true;
-      if (!ready()) return false;
-      pendingAudioUnlock = false;
-      return post({ kind: 'audio-unlock' });
+      return flushAudioUnlock();
     },
     diagnostics: () => Object.freeze({
       frameGeneration,

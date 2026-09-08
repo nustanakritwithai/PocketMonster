@@ -287,8 +287,8 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=9/, 'updated touch recovery dependency bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'world shell cache-busts the audio-enabled controls module');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=10/, 'Pirate boot bypasses cached controls that predate the iframe transport');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=11/, 'world shell cache-busts the audio-retry controls module');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=11/, 'Pirate boot bypasses cached controls that predate the iframe audio retry');
 assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=61/, 'online scene cache-busts the unified Pirate ship-control bridge');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');

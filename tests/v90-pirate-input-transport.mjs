@@ -40,6 +40,7 @@ assert.equal(sent.length, 0, 'input never reaches an iframe before a loaded gene
 assert.equal(transport.beginGeneration('frame-load'), true);
 assert.deepEqual(parentResets, ['pirate-input-frame-load']);
 assert.equal(transport.diagnostics().frameGeneration, 1);
+assert.equal(transport.unlockAudio(), false, 'a first touch before iframe readiness is retained for the child');
 assert.equal(transport.acceptReady(readyEvent({}, 'null')), false, 'a stale iframe window cannot claim readiness');
 assert.equal(transport.acceptReady(readyEvent(frame.contentWindow, 'https://game.example')), false, 'sandbox readiness requires the opaque child origin');
 
@@ -51,7 +52,14 @@ assert.deepEqual(sent.map(item => item.message), [{
   frameGeneration: 1,
   kind: 'reset',
   reason: 'pirate-input-ready',
+}, {
+  type: 'pocketmonster:unified-mobile-input-v1',
+  frameGeneration: 1,
+  kind: 'audio-unlock',
 }]);
+
+assert.equal(transport.unlockAudio(), true, 'a repeated real gesture retries audio after readiness');
+assert.equal(sent.at(-1).message.kind, 'audio-unlock');
 
 const modeEvent = (controlMode, { source = frame.contentWindow, origin = 'null', frameGeneration = 1 } = {}) => ({
   source,
@@ -82,13 +90,13 @@ assert.deepEqual(helmPromptEvents.at(-1), { helmPrompt: 'enter', frameGeneration
 
 assert.equal(transport.camera({ phase: 'move', gestureId: 2, x: 15, y: 20 }), false);
 assert.equal(transport.camera({ phase: 'end', gestureId: 2 }), false);
-assert.equal(sent.length, 1, 'a gesture begun before ready is not partially replayed after ready');
+assert.equal(sent.length, 3, 'a gesture begun before ready is not partially replayed after ready');
 
 assert.equal(transport.camera({ phase: 'start', gestureId: 3, x: 20, y: 30 }), true);
 assert.equal(transport.camera({ phase: 'start', gestureId: 4, x: 21, y: 30 }), false, 'an active gesture cannot be replaced by another start');
 assert.equal(transport.camera({ phase: 'move', gestureId: 3, x: 24, y: 32, dx: 4, dy: 2 }), true);
 assert.equal(transport.camera({ phase: 'end', gestureId: 3, reason: 'pointerup' }), true);
-const generationOneCamera = sent.slice(1).map(item => item.message);
+const generationOneCamera = sent.filter(item => item.message.kind === 'camera').map(item => item.message);
 assert.deepEqual(generationOneCamera.map(message => message.phase), ['start', 'move', 'end']);
 assert.ok(generationOneCamera.every(message => message.frameGeneration === 1 && message.gestureId === 3));
 assert.ok(sent.every(item => item.origin === '*'));

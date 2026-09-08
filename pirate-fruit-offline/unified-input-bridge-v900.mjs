@@ -59,6 +59,12 @@ let onboardingStateSignature = null;
 let onboardingObserver = null;
 let hudTelemetryPublisher = null;
 let pendingAudioUnlock = false;
+let audioUnlockRetryTimer = null;
+let audioUnlockInFlight = null;
+let audioUnlockAttempts = 0;
+
+const AUDIO_UNLOCK_RETRY_LIMIT = 40;
+const AUDIO_UNLOCK_RETRY_DELAY_MS = 125;
 
 function isPositiveSafeInteger(value) {
   return Number.isSafeInteger(value) && value > 0;
@@ -66,16 +72,49 @@ function isPositiveSafeInteger(value) {
 
 function requestAudioUnlock() {
   pendingAudioUnlock = true;
-  const audio = window.__audio;
-  if (typeof audio?.unlock !== 'function') return false;
-  pendingAudioUnlock = false;
-  Promise.resolve(audio.unlock()).catch(() => { pendingAudioUnlock = true; });
+  if (audioUnlockInFlight || audioUnlockRetryTimer) return true;
+  audioUnlockAttempts = 0;
+  retryAudioUnlock();
   return true;
 }
 
-function retryAudioUnlock(attempt = 0) {
-  if (!pendingAudioUnlock || requestAudioUnlock() || attempt >= 20) return;
-  setTimeout(() => retryAudioUnlock(attempt + 1), 100);
+function retryAudioUnlock() {
+  if (!pendingAudioUnlock || audioUnlockInFlight || audioUnlockRetryTimer) return;
+  if (audioUnlockAttempts >= AUDIO_UNLOCK_RETRY_LIMIT) {
+    pendingAudioUnlock = false;
+    return;
+  }
+  audioUnlockAttempts += 1;
+  const audio = window.__audio;
+  if (typeof audio?.unlock !== 'function') {
+    audioUnlockRetryTimer = setTimeout(() => {
+      audioUnlockRetryTimer = null;
+      retryAudioUnlock();
+    }, AUDIO_UNLOCK_RETRY_DELAY_MS);
+    return;
+  }
+  audioUnlockInFlight = Promise.resolve()
+    .then(() => audio.unlock())
+    .then(unlocked => {
+      if (unlocked === true) pendingAudioUnlock = false;
+      else if (pendingAudioUnlock) {
+        audioUnlockRetryTimer = setTimeout(() => {
+          audioUnlockRetryTimer = null;
+          retryAudioUnlock();
+        }, AUDIO_UNLOCK_RETRY_DELAY_MS);
+      }
+    })
+    .catch(() => {
+      if (pendingAudioUnlock) {
+        audioUnlockRetryTimer = setTimeout(() => {
+          audioUnlockRetryTimer = null;
+          retryAudioUnlock();
+        }, AUDIO_UNLOCK_RETRY_DELAY_MS);
+      }
+    })
+    .finally(() => {
+      audioUnlockInFlight = null;
+    });
 }
 
 function nativeControlMode() {
@@ -368,6 +407,11 @@ window.addEventListener('message', event => {
 window.addEventListener('blur', resetInputs);
 
 window.addEventListener('pagehide', () => {
+  pendingAudioUnlock = false;
+  if (audioUnlockRetryTimer !== null) {
+    clearTimeout(audioUnlockRetryTimer);
+    audioUnlockRetryTimer = null;
+  }
   resetInputs();
   inputReadyObserver?.disconnect();
   inputReadyObserver = null;

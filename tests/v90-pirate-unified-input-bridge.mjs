@@ -117,6 +117,8 @@ function send(data, options) {
   childWindow.dispatchEvent(messageEvent(data, options));
 }
 
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 function input(message) {
   return { type: INPUT_TYPE, ...message };
 }
@@ -203,7 +205,32 @@ assert.equal(eventLog.filter(({ type }) => type === 'pointerup').length, termina
 let audioUnlocks = 0;
 childWindow.__audio = { unlock: () => { audioUnlocks += 1; return Promise.resolve(true); } };
 send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+await Promise.resolve();
 assert.equal(audioUnlocks, 1, 'parent control gesture unlocks the Pirate iframe audio graph');
+await wait(10);
+
+delete childWindow.__audio;
+send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+await wait(150);
+assert.equal(audioUnlocks, 1, 'delayed audio runtime does not create an eager unlock call');
+let delayedAttempts = 0;
+childWindow.__audio = { unlock: () => { delayedAttempts += 1; audioUnlocks += 1; return Promise.resolve(true); } };
+await wait(300);
+assert.equal(delayedAttempts, 1, 'delayed runtime is picked up by the bounded readiness retry');
+
+const unlockResults = [false, () => Promise.reject(new Error('simulated resume failure')), true];
+childWindow.__audio = { unlock: () => {
+  audioUnlocks += 1;
+  const result = unlockResults.shift() ?? true;
+  return typeof result === 'function' ? result() : result;
+} };
+send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+await wait(180);
+await wait(180);
+await wait(180);
+assert.equal(unlockResults.length, 0, 'false/rejected unlocks retry and repeated gestures do not create parallel timers');
 const startsBeforeStaleReloadPackets = eventLog.filter(({ type }) => type === 'pointerdown').length;
 send(input({ kind: 'camera', phase: 'start', frameGeneration: 2, gestureId: 4, x: 130, y: 140 }));
 send(input({ kind: 'camera', phase: 'move', frameGeneration: 2, gestureId: 3, x: 135, y: 145 }));
