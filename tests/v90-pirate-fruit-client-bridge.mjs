@@ -211,7 +211,10 @@ assert.match(
   'the live update routes sampled edges through dead-safe playback',
 );
 assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*sample\.locomotion\s*\}\)/, 'adapter locomotion drives Pocket updates');
-assert.match(bridgeSrc, /rigRetargeter\.update\(\)/, 'source bones are applied after the generic Pocket update');
+// Studio deliberately removes the legacy retargeter. Keep update ordering,
+// but require the null-safe call that fixes the real post-attachment crash.
+assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*sample\.locomotion\s*\}\);\s*item\.rigRetargeter\?\.update\(\)/, 'source bones apply after generic updates only when a retargeter exists');
+assert.doesNotMatch(bridgeSrc, /item\.rigRetargeter\.update\(\)/, 'Studio replacement must not restore the unsafe null retargeter call');
 assert.match(bridgeSrc, /rigRetargeted:/, 'diagnostics report retargeted visuals');
 assert.match(bridgeSrc, /actionDriven:/, 'diagnostics report action-driven visuals');
 assert.doesNotMatch(boot, /buildPirateFruitWorld|pirate-fruit-world\.mjs/, 'pirate boot does not mount a Pocket-built island');
