@@ -532,6 +532,110 @@ export function worldSnapshotPayload(message) {
   return sanitizeOnlineWorldSnapshot(message.payload);
 }
 
+function percentile(values, percentileRank) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentileRank) - 1));
+  return sorted[index];
+}
+
+/**
+ * Local-only route measurements. These counters never enter the world wire
+ * contract; they make live two-client captures explain cadence and drops.
+ */
+export function createPresenceRouteDiagnostics({ now = () => Date.now(), maxSamples = 256 } = {}) {
+  const intervals = [];
+  const actorSequences = new Map();
+  let lastReceivedAt = null;
+  let receivedSnapshots = 0;
+  let acceptedSnapshots = 0;
+  let rejectedSnapshots = 0;
+  let staleSnapshots = 0;
+  let duplicateActors = 0;
+  let staleActors = 0;
+  let actorSequenceGaps = 0;
+  let actorsOmitted = 0;
+  let actorsEmpty = 0;
+  let actorsPresent = 0;
+
+  const observeSnapshot = (snapshot, { accepted = true, receivedAt = now() } = {}) => {
+    const at = Number(receivedAt);
+    receivedSnapshots += 1;
+    if (Number.isFinite(at)) {
+      if (lastReceivedAt !== null && at >= lastReceivedAt) {
+        intervals.push(at - lastReceivedAt);
+        while (intervals.length > maxSamples) intervals.shift();
+      }
+      lastReceivedAt = at;
+    }
+    if (!accepted) {
+      rejectedSnapshots += 1;
+      staleSnapshots += 1;
+      return;
+    }
+    acceptedSnapshots += 1;
+    if (!isRecord(snapshot)) return;
+    if (!Object.prototype.hasOwnProperty.call(snapshot, 'actors')) actorsOmitted += 1;
+    else if (!Array.isArray(snapshot.actors) || snapshot.actors.length === 0) actorsEmpty += 1;
+    else actorsPresent += 1;
+    const seen = new Set();
+    for (const actor of Array.isArray(snapshot.actors) ? snapshot.actors : []) {
+      const actorId = typeof actor?.actorId === 'string' ? actor.actorId : null;
+      const generation = Number.isSafeInteger(actor?.generation) ? actor.generation : 0;
+      const stateSequence = Number.isSafeInteger(actor?.stateSequence) ? actor.stateSequence : 0;
+      if (!actorId) continue;
+      const key = `${snapshot.zone || ''}:${generation}:${actorId}`;
+      if (seen.has(key)) { duplicateActors += 1; continue; }
+      seen.add(key);
+      const previous = actorSequences.get(key);
+      if (previous !== undefined) {
+        if (stateSequence <= previous) staleActors += 1;
+        else if (stateSequence > previous + 1) actorSequenceGaps += stateSequence - previous - 1;
+      }
+      actorSequences.set(key, Math.max(previous ?? 0, stateSequence));
+    }
+  };
+
+  const recordRejected = ({ receivedAt = now() } = {}) => {
+    observeSnapshot(null, { accepted: false, receivedAt });
+  };
+  const reset = () => {
+    intervals.length = 0;
+    actorSequences.clear();
+    lastReceivedAt = null;
+    receivedSnapshots = 0;
+    acceptedSnapshots = 0;
+    rejectedSnapshots = 0;
+    staleSnapshots = 0;
+    duplicateActors = 0;
+    staleActors = 0;
+    actorSequenceGaps = 0;
+    actorsOmitted = 0;
+    actorsEmpty = 0;
+    actorsPresent = 0;
+  };
+  const diagnostics = () => Object.freeze({
+    receivedSnapshots,
+    acceptedSnapshots,
+    rejectedSnapshots,
+    staleSnapshots,
+    duplicateActors,
+    staleActors,
+    actorSequenceGaps,
+    actorsOmitted,
+    actorsEmpty,
+    actorsPresent,
+    sampleCount: intervals.length,
+    intervalMs: Object.freeze({
+      min: intervals.length ? Math.min(...intervals) : null,
+      max: intervals.length ? Math.max(...intervals) : null,
+      p95: percentile(intervals, .95),
+      p99: percentile(intervals, .99),
+    }),
+  });
+  return Object.freeze({ observeSnapshot, recordRejected, reset, diagnostics });
+}
+
 export function isRemoteWorldPlayer(item, selfId) {
   if (!item?.id || !isFiniteNumber(item.x) || !isFiniteNumber(item.z)) return false;
   if (selfId != null && selfId !== '' && String(item.id).toLowerCase() === String(selfId).toLowerCase()) return false;
@@ -551,3 +655,4 @@ export function currentSelfPresenceId() {
   if (typeof window === 'undefined') return null;
   return selfPresenceId(window.POCKETMONSTER_AUTH_PROFILE_BRIDGE?.profile, window.POCKETMONSTER_SELF_PRESENCE_ID);
 }
+
