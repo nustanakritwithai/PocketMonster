@@ -200,6 +200,10 @@ send(input({ kind: 'camera', phase: 'start', frameGeneration: 2, gestureId: 3, x
 const terminalsBeforeReload = eventLog.filter(({ type }) => type === 'pointerup').length;
 send(input({ kind: 'reset', frameGeneration: 3 }));
 assert.equal(eventLog.filter(({ type }) => type === 'pointerup').length, terminalsBeforeReload + 1, 'a reload generation reset terminates the prior document gesture once');
+let audioUnlocks = 0;
+childWindow.__audio = { unlock: () => { audioUnlocks += 1; return Promise.resolve(true); } };
+send(input({ kind: 'audio-unlock', frameGeneration: 3 }));
+assert.equal(audioUnlocks, 1, 'parent control gesture unlocks the Pirate iframe audio graph');
 const startsBeforeStaleReloadPackets = eventLog.filter(({ type }) => type === 'pointerdown').length;
 send(input({ kind: 'camera', phase: 'start', frameGeneration: 2, gestureId: 4, x: 130, y: 140 }));
 send(input({ kind: 'camera', phase: 'move', frameGeneration: 2, gestureId: 3, x: 135, y: 145 }));

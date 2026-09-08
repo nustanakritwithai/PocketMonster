@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const src = readFileSync('audio-engine.mjs', 'utf8');
 const gameSrc = readFileSync('game-v800.js', 'utf8');
+const controlsSrc = readFileSync('unified-mobile-controls-v900.mjs', 'utf8');
 
 // ── Exports ──────────────────────────────────────────────────
 assert.match(src, /export function initAudio/, 'initAudio exported');
@@ -32,6 +33,14 @@ for (const id of sfxIds) {
 assert.match(gameSrc, /import.*audio-engine\.mjs/, 'game-v800.js imports audio-engine');
 assert.match(gameSrc, /addEventListener\('pointerdown'.*initAudio/, 'initAudio on first pointerdown');
 assert.match(gameSrc, /addEventListener\('keydown'.*initAudio/, 'initAudio on first keydown');
+assert.match(src, /pendingBgmZone/, 'BGM requested before unlock is retained');
+assert.match(src, /pendingAmbientZone/, 'ambient requested before unlock is retained');
+for (const zone of ['grass-meadow', 'ember-valley', 'misty-lake', 'storm-field', 'rocky-canyon', 'sky-ruins', 'poison-marsh', 'dream-shrine', 'haunted-woods', 'shadow-city', 'steel-factory', 'dragon-crater', 'fairy-garden', 'combat-colosseum', 'normal-wildlands', 'frozen-pass']) {
+  assert.match(src, new RegExp(`['"]?${zone.replaceAll('-', '\\-')}['"]?\\s*:`), `zone audio mapping exists: ${zone}`);
+}
+assert.match(controlsSrc, /import \{ initAudio \} from '\.\/audio-engine\.mjs'/, 'shared controls can unlock the Pocket audio graph');
+assert.match(controlsSrc, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'real control touch unlocks audio');
+assert.match(controlsSrc, /unlockAudio\(\)\s*\{/, 'iframe transport exposes audio unlock');
 assert.match(gameSrc, /playSFX\('sfx_hit_normal'\)/, 'damageWild plays sfx_hit_normal');
 assert.match(gameSrc, /playSFX\('sfx_hit_effective'\)/, 'damageWild plays sfx_hit_effective');
 assert.match(gameSrc, /playSFX\('sfx_faint'\)/, 'faintActive plays sfx_faint');

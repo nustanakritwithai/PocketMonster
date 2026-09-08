@@ -118,6 +118,7 @@ function bindPocketMonsterLink(frame) {
     camera: payload => inputTransport.camera(payload),
     action: payload => inputTransport.action(payload),
     reset: reason => inputTransport.reset(reason),
+    unlockAudio: () => inputTransport.unlockAudio(),
     activate: () => inputTransport.reset('pirate-activate'),
   }));
   frame.addEventListener('load', () => inputTransport.beginGeneration('frame-load'));

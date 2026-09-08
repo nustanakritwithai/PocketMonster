@@ -11,13 +11,15 @@ let masterGain = null;
 let sfxBus = null;
 let muted = false;
 let volume = 0.6;
+let pendingBgmZone = null;
+let pendingAmbientZone = null;
 
 const SFX_HANDLERS = {};
 
 // ── Init ──────────────────────────────────────────────────────
 export function initAudio() {
   if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     return;
   }
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -30,6 +32,23 @@ export function initAudio() {
   sfxBus.gain.value = 0.8;
   sfxBus.connect(masterGain);
   registerCombatSFX();
+  // Zone transitions can happen during boot before the first user gesture.
+  // Replay the latest requested tracks as soon as the graph exists.
+  const queuedBgm = pendingBgmZone;
+  const queuedAmbient = pendingAmbientZone;
+  pendingBgmZone = null;
+  pendingAmbientZone = null;
+  if (queuedBgm) playBGM(queuedBgm);
+  if (queuedAmbient) startAmbient(queuedAmbient);
+}
+
+// Mobile browsers can suspend an already unlocked context after app switching,
+// screen lock, or fullscreen changes. Resume only an existing graph here so a
+// lifecycle event never bypasses the browser's first-gesture autoplay policy.
+export function resumeAudio() {
+  if (!ctx) return Promise.resolve(false);
+  if (ctx.state === 'running') return Promise.resolve(true);
+  return Promise.resolve(ctx.resume()).then(() => ctx.state === 'running').catch(() => false);
 }
 
 export function setVolume(v) {
@@ -366,7 +385,17 @@ const PATTERN_STEPS = 16;
 
 // Map zone keys used by game-v800.js → BGM pattern ids.
 // game-v800 uses 'hub' for the ranch area; we treat 'hub' as 'ranch' BGM.
-const ZONE_TO_BGM = { hub: 'ranch', grassland: 'grassland', cave: 'cave', boss: 'boss' };
+const ZONE_TO_BGM = Object.freeze({
+  hub: 'ranch', ranch: 'ranch',
+  grassland: 'grassland', 'grass-meadow': 'grassland', 'normal-wildlands': 'grassland',
+  'ember-valley': 'grassland', 'misty-lake': 'grassland', 'storm-field': 'grassland',
+  'rocky-canyon': 'grassland', 'sky-ruins': 'grassland', 'fairy-garden': 'grassland',
+  cave: 'cave', 'poison-marsh': 'cave', 'dream-shrine': 'cave', 'haunted-woods': 'cave',
+  'frozen-pass': 'cave', 'steel-factory': 'cave', 'shadow-city': 'cave',
+  boss: 'boss', 'dragon-crater': 'boss', 'combat-colosseum': 'boss',
+});
+
+const resolveBgmZone = zone => ZONE_TO_BGM[zone] || 'grassland';
 
 // Pentatonic scale degrees → semitone offsets from root.
 const PENTATONIC = [0, 2, 4, 7, 9];
@@ -558,11 +587,13 @@ function bgmTick() {
 
 // ── Export: playBGM(zone) ─────────────────────────────────────
 export function playBGM(zone) {
+  const bgmKey = resolveBgmZone(zone);
+  pendingBgmZone = bgmKey;
   if (!ctx) return;
   ensureBgmBus();
-  const bgmKey = ZONE_TO_BGM[zone] || zone;
   const pattern = BGM_PATTERNS[bgmKey];
   if (!pattern) return;
+  pendingBgmZone = null;
   if (bgmActiveZone === bgmKey && bgmTimer) return; // same zone, no-op
 
   const t = ctx.currentTime;
@@ -610,15 +641,17 @@ let ambTimer = null;
 let ambActiveZone = null;
 
 export function startAmbient(zone) {
+  const ambientZone = resolveBgmZone(zone);
+  pendingAmbientZone = ambientZone;
   if (!ctx) return;
+  pendingAmbientZone = null;
   stopAmbient();
-  if (zone === 'hub') zone = 'ranch';
-  if (!['ranch', 'grassland', 'cave'].includes(zone)) return;
+  const ambientPattern = ['ranch', 'grassland', 'cave'].includes(ambientZone) ? ambientZone : 'grassland';
   ambBus = ctx.createGain();
   ambBus.gain.value = 0;
   ambBus.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.8);
   ambBus.connect(masterGain);
-  ambActiveZone = zone;
+  ambActiveZone = ambientPattern;
   const patterns = {
     ranch: () => {
       noiseBurstTo(ambBus, 0, 2, { gain: 0.02, filter: 'lowpass', freq: 500 });
@@ -654,7 +687,7 @@ export function startAmbient(zone) {
     },
   };
   const scheduleNext = (fn) => { if (ambActiveZone) fn(); };
-  patterns[zone]();
+  patterns[ambientPattern]();
 }
 
 export function stopAmbient() {
