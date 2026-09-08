@@ -649,7 +649,7 @@ function sanitizePlayerAuthorityResult(value) {
   const attackId = value.attackId.trim();
   if (!attackerId || attackerId.length > MAX_PLAYER_ID_LENGTH
     || !targetId || targetId.length > MAX_PLAYER_ID_LENGTH
-    || !attackId || attackId.length > MAX_ACTION_DURATION_MS) return null;
+    || !attackId || attackId.length > 96) return null;
   return Object.freeze({
     attackerId,
     targetId,
