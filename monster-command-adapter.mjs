@@ -44,6 +44,8 @@ export function createMonsterCommandAdapter({ send = null, getZone = null, timeo
   const pending = new Map();
   const resolved = new Map();
   let sceneEpoch = 0;
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(timeoutMs, 30000) : 10000;
+  const capacity = Number.isSafeInteger(maxPending) && maxPending > 0 ? Math.min(maxPending, 128) : 64;
   const currentZone = () => typeof getZone === 'function' ? getZone() : null;
   const dispatch = input => {
     const command = sanitizeMonsterCommand(input);
@@ -55,41 +57,53 @@ export function createMonsterCommandAdapter({ send = null, getZone = null, timeo
     const active = pending.get(command.commandId);
     if (active) return active.fingerprint === fingerprint ? active.promise : Object.freeze({ ok: false, code: 'COMMAND_ID_REUSE' });
     if (typeof send !== 'function') return Object.freeze({ ok: false, code: 'SERVER_INGRESS_UNAVAILABLE' });
-    if (!Number.isFinite(maxPending) || maxPending < 1 || pending.size >= Math.floor(maxPending)) return Object.freeze({ ok: false, code: 'PENDING_CAPACITY' });
+    if (pending.size >= capacity) return Object.freeze({ ok: false, code: 'PENDING_CAPACITY' });
     const requestEpoch = sceneEpoch;
-    const request = { fingerprint, epoch: requestEpoch, settled: false, resolve: null, timerId: null };
-    const cleanup = () => { if (pending.get(command.commandId) === request) pending.delete(command.commandId); };
-    const operation = Promise.resolve().then(() => {
-      if (request.settled) return { ok: false, code: 'STALE_SCENE', commandId: command.commandId };
-      if (request.epoch !== sceneEpoch || currentZone() !== null && currentZone() !== command.zone) return { ok: false, code: 'STALE_SCENE', commandId: command.commandId, skipSend: true };
+    const request = { fingerprint, settled: false, timerId: null, finish: null, promise: null };
+    const failure = code => Object.freeze({ ok: false, code, commandId: command.commandId });
+    const stale = () => requestEpoch !== sceneEpoch || (currentZone() !== null && currentZone() !== command.zone);
+    request.promise = new Promise(resolve => {
+      request.finish = (result, cache = false) => {
+        if (request.settled) return;
+        request.settled = true;
+        clearTimeout(request.timerId);
+        if (pending.get(command.commandId) === request) pending.delete(command.commandId);
+        if (cache) {
+          resolved.set(command.commandId, { fingerprint, result });
+          while (resolved.size > 128) resolved.delete(resolved.keys().next().value);
+        }
+        resolve(result);
+      };
+    });
+    pending.set(command.commandId, request);
+    request.timerId = setTimeout(() => request.finish(failure('TRANSPORT_TIMEOUT')), timeout);
+    void Promise.resolve().then(() => {
+      if (request.settled) return;
+      if (stale()) { request.finish(failure('STALE_SCENE')); return; }
       return send(command);
     }).then(result => {
-      if (request.settled || request.epoch !== sceneEpoch || currentZone() !== null && currentZone() !== command.zone) { cleanup(); return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command.commandId }); }
-      const normalized = record(result) && typeof result.ok === 'boolean' && result.commandId === command.commandId
-        ? Object.freeze({ ok: result.ok, ...(result.accepted === undefined ? {} : { accepted: result.accepted }), ...(result.code === undefined ? {} : { code: result.code }), commandId: command.commandId })
-        : Object.freeze({ ok: false, code: 'INVALID_SERVER_RESULT', commandId: command.commandId });
-      request.settled = true;
-      if (request.timerId) clearTimeout(request.timerId);
-      cleanup();
-      if (normalized.code !== 'STALE_SCENE') {
-        resolved.set(command.commandId, { fingerprint, result: normalized });
-        while (resolved.size > 128) resolved.delete(resolved.keys().next().value);
+      if (request.settled) return;
+      if (stale()) { request.finish(failure('STALE_SCENE')); return; }
+      if (!record(result) || typeof result.ok !== 'boolean' || result.commandId !== command.commandId
+        || (result.accepted !== undefined && typeof result.accepted !== 'boolean')
+        || (result.code !== undefined && (typeof result.code !== 'string' || !/^[A-Z0-9_]{1,80}$/.test(result.code)))) {
+        request.finish(failure('INVALID_SERVER_RESULT'));
+        return;
       }
-      return normalized;
-    }, () => { request.settled = true; if (request.timerId) clearTimeout(request.timerId); cleanup(); return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command.commandId }); });
-    const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? new Promise(resolve => {
-      request.resolve = resolve;
-      request.timerId = setTimeout(() => { if (request.settled) return; request.settled = true; cleanup(); resolve(Object.freeze({ ok: false, code: 'TRANSPORT_TIMEOUT', commandId: command.commandId })); }, timeoutMs);
-    }) : null;
-    const promise = timeout ? Promise.race([operation, timeout]) : operation;
-    request.promise = promise;
-    pending.set(command.commandId, request);
-    return promise;
+      request.finish(Object.freeze({ ok: result.ok,
+        ...(result.accepted === undefined ? {} : { accepted: result.accepted }),
+        ...(result.code === undefined ? {} : { code: result.code }), commandId: command.commandId }), true);
+    }).catch(() => request.finish(failure(stale() ? 'STALE_SCENE' : 'TRANSPORT_ERROR')));
+    return request.promise;
   };
   return Object.freeze({
     summon(input) { return dispatch({ ...input, kind: 'summon', contract: MONSTER_COMMAND_CONTRACT }); },
     skill(input) { return dispatch({ ...input, kind: 'skill', contract: MONSTER_COMMAND_CONTRACT }); },
     pendingCommandIds: () => Object.freeze([...pending.keys()]),
-    clearScene() { sceneEpoch += 1; for (const request of pending.values()) { request.settled = true; if (request.timerId) clearTimeout(request.timerId); request.resolve?.(Object.freeze({ ok: false, code: 'STALE_SCENE' })); } pending.clear(); resolved.clear(); },
+    clearScene() {
+      sceneEpoch += 1;
+      for (const [commandId, request] of pending) request.finish(Object.freeze({ ok: false, code: 'STALE_SCENE', commandId }));
+      resolved.clear();
+    },
   });
 }

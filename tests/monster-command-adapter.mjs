@@ -56,3 +56,18 @@ assert.equal((await immediatePending).code, 'STALE_SCENE', 'clearScene resolves 
 assert.equal(immediateResolve, undefined, 'immediate clear prevents send');
 assert.equal((await adapter.skill({ ...base, commandId: 'cmd-3', skillId: 'Flame-Bite', zone: 'other-zone' })).code, 'STALE_SCENE');
 console.log('Owned monster command adapter contract: PASS');
+
+for (const fields of [{ accepted: 'true' }, { code: { private: 'data' } }, { code: 'unbounded internal error' }]) {
+  const invalidAck = createMonsterCommandAdapter({ send: async command => ({ ok: true, commandId: command.commandId, ...fields }) });
+  assert.equal((await invalidAck.skill({ ...base, skillId: 'Flame-Bite' })).code, 'INVALID_SERVER_RESULT');
+}
+// Invalid timeout configuration must still allow immediate lifecycle cancellation.
+for (const timeoutMs of [0, NaN, Infinity]) {
+  const cancellable = createMonsterCommandAdapter({ timeoutMs, send: () => new Promise(() => {}) });
+  const result = cancellable.skill({ ...base, skillId: 'Flame-Bite' });
+  await Promise.resolve();
+  cancellable.clearScene();
+  assert.equal((await result).code, 'STALE_SCENE');
+  assert.deepEqual(cancellable.pendingCommandIds(), []);
+}
+console.log('Owned monster ACK validation and cancellation: PASS');

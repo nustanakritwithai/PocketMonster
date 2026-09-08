@@ -1,0 +1,37 @@
+name: Monster controls integration
+
+on:
+  pull_request:
+    paths:
+      - '*monster*control*.mjs'
+      - 'monster-command-adapter.mjs'
+      - 'unified-mmorpg-hud-v900.mjs'
+      - 'unified-mobile-controls-v900.mjs'
+      - 'online-world-shell-v900.mjs'
+      - 'tests/*monster*control*.mjs'
+      - 'tests/monster-command-adapter.mjs'
+      - '.github/workflows/monster-controls-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ตรวจคำสั่งมอนสเตอร์
+        run: node tests/monster-command-adapter.mjs
+      - name: ตรวจการเชื่อมแผงควบคุม
+        run: |
+          node tests/v90-unified-mmorpg-hud.mjs
+          node tests/v90-unified-mobile-controls.mjs
+          node tests/v90-unified-roster-stack.mjs
+          node tests/v90-unified-hud-world-lifecycle.mjs
+      - name: ตรวจระบบ Client ที่เกี่ยวข้อง
+        run: npm run check
