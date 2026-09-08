@@ -3,7 +3,7 @@ import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
   subscribePirateStudioCharacterStatus,
-} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=3';
+} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=4';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
   PIRATE_STUDIO_CHARACTER_FAILED,
