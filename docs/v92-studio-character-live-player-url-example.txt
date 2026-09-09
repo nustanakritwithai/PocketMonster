@@ -1,0 +1,1 @@
+https://nustanakritwithai.github.io/PocketMonster/game-v900.html?studioCharacter=/PocketMonster/assets/runtime-characters/custom.pocket-character.json
