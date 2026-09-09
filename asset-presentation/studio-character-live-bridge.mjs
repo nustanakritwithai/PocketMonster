@@ -6,16 +6,136 @@ export const STUDIO_CHARACTER_BRIDGE_RESPONSE = 'POCKET_STUDIO_CHARACTER_PACKAGE
 export const STUDIO_CHARACTER_BRIDGE_ERROR = 'POCKET_STUDIO_CHARACTER_ERROR';
 export const STUDIO_CHARACTER_BRIDGE_DEFAULT_TIMEOUT_MS = 30000;
 export const STUDIO_CHARACTER_BRIDGE_DEFAULT_RETRY_MS = 750;
+export const STUDIO_CHARACTER_PRIMARY_MODEL_ID = 'blue-explorer-primary-v1';
+export const STUDIO_CHARACTER_PRIMARY_NAME = 'Blue Explorer';
+export const STUDIO_CHARACTER_PIVOT_CONTRACT = 'studio-rigid-pivot-local-axes-v1';
+export const STUDIO_CHARACTER_REQUIRED_PIVOTS = Object.freeze([
+  'pelvis', 'chest', 'neck', 'head',
+  'shoulderL', 'elbowL', 'wristL', 'shoulderR', 'elbowR', 'wristR',
+  'hipL', 'kneeL', 'ankleL', 'hipR', 'kneeR', 'ankleR',
+]);
 
 function requestId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+function nodeAtPath(root, path) {
+  let node = root;
+  for (const index of Array.isArray(path) ? path : []) {
+    node = node?.children?.[index];
+    if (!node) return null;
+  }
+  return node || null;
+}
+function isFiniteVec(value, size) {
+  return Array.isArray(value) && value.length >= size && value.slice(0, size).every(Number.isFinite);
+}
+function validPivotTransform(transform) {
+  const rotation = transform?.rotation;
+  return isFiniteVec(transform?.position, 3) && isFiniteVec(rotation, 3)
+    && typeof rotation?.[3] === 'string' && rotation[3].length > 0
+    && isFiniteVec(transform?.scale, 3) && transform.scale.every(value => Math.abs(value) > 0.000001);
+}
+function pathStartsWith(path, ancestor) {
+  return Array.isArray(path) && Array.isArray(ancestor) && ancestor.length <= path.length
+    && ancestor.every((value, index) => path[index] === value);
+}
+function findBlueExplorerMarker(root) {
+  if (!root || typeof root !== 'object') return null;
+  if (root.userData?.primaryCharacter === STUDIO_CHARACTER_PRIMARY_MODEL_ID
+      && root.userData?.engineRole === 'primary-character') return root;
+  for (const child of root.children || []) {
+    const match = findBlueExplorerMarker(child);
+    if (match) return match;
+  }
+  return null;
+}
+function pivotFrame(pkg, joint) {
+  const binding = pkg?.rig?.jointBindings?.[joint];
+  const node = binding ? nodeAtPath(pkg?.sceneGraph?.root, binding.path) : null;
+  if (!binding || !node) return null;
+  const rotation = node.transform?.rotation || [0, 0, 0, 'XYZ'];
+  return Object.freeze({
+    joint,
+    path: [...binding.path],
+    nodeName: node.name || binding.nodeName || null,
+    position: [...(node.transform?.position || [0, 0, 0])],
+    rotation: rotation.slice(0, 3),
+    rotationOrder: rotation[3] || 'XYZ',
+    scale: [...(node.transform?.scale || [1, 1, 1])],
+  });
+}
+
+/**
+ * Strict presentation contract for the Engine's current primary model.
+ * A package can be generally valid but is not allowed to replace the game's
+ * player unless the Blue Explorer rigid-pivot hierarchy is actually present.
+ */
+export function inspectBlueExplorerPrimaryPackage(pkg) {
+  const errors = [];
+  const root = pkg?.sceneGraph?.root;
+  if (!root) errors.push('sceneGraph.root missing');
+  if (!findBlueExplorerMarker(root)) errors.push(`primary marker ${STUDIO_CHARACTER_PRIMARY_MODEL_ID} missing`);
+  const bindings = pkg?.rig?.jointBindings || {};
+  const frames = {};
+  for (const joint of STUDIO_CHARACTER_REQUIRED_PIVOTS) {
+    const binding = bindings[joint];
+    const node = binding ? nodeAtPath(root, binding.path) : null;
+    if (!binding || !node) { errors.push(`required pivot ${joint} missing`); continue; }
+    if (node.nodeType !== 'group') errors.push(`pivot ${joint} must resolve to a THREE.Group snapshot`);
+    if (node.userData?.engineJointKey && node.userData.engineJointKey !== joint) errors.push(`pivot ${joint} engineJointKey mismatch`);
+    if (!validPivotTransform(node.transform)) errors.push(`pivot ${joint} local transform/rotation order invalid`);
+    frames[joint] = pivotFrame(pkg, joint);
+  }
+  const relations = [
+    ['pelvis', 'chest'], ['chest', 'neck'], ['neck', 'head'],
+    ['chest', 'shoulderL'], ['shoulderL', 'elbowL'], ['elbowL', 'wristL'],
+    ['chest', 'shoulderR'], ['shoulderR', 'elbowR'], ['elbowR', 'wristR'],
+    ['pelvis', 'hipL'], ['hipL', 'kneeL'], ['kneeL', 'ankleL'],
+    ['pelvis', 'hipR'], ['hipR', 'kneeR'], ['kneeR', 'ankleR'],
+  ];
+  for (const [parent, child] of relations) {
+    const parentPath = bindings[parent]?.path, childPath = bindings[child]?.path;
+    if (parentPath && childPath && (!pathStartsWith(childPath, parentPath) || childPath.length <= parentPath.length)) {
+      errors.push(`pivot hierarchy ${parent} -> ${child} is not preserved`);
+    }
+  }
+  const sockets = pkg?.rig?.sockets || {};
+  if (sockets.rightHand?.joint !== 'wristR') errors.push('rightHand socket must bind wristR');
+  if (sockets.leftHand?.joint !== 'wristL') errors.push('leftHand socket must bind wristL');
+  if (sockets.throwOrigin?.joint !== 'wristR') errors.push('throwOrigin socket must bind wristR');
+  return Object.freeze({ valid: errors.length === 0, errors: Object.freeze(errors), frames: Object.freeze(frames) });
+}
+
+/** Add game-facing aliases without changing gameplay authority or authored clips. */
+export function promoteBlueExplorerGamePackage(pkg) {
+  const out = typeof structuredClone === 'function' ? structuredClone(pkg) : JSON.parse(JSON.stringify(pkg));
+  out.manifest = { ...(out.manifest || {}), name: STUDIO_CHARACTER_PRIMARY_NAME };
+  out.catalogEntry = { ...(out.catalogEntry || {}), name: STUDIO_CHARACTER_PRIMARY_NAME };
+  out.motionPack ??= {};
+  out.motionPack.actionMap = { ...(out.motionPack.actionMap || {}) };
+  const map = out.motionPack.actionMap;
+  const captureThrow = map.capture_throw || map.capture_throw_r;
+  const summonThrow = map.summon_monster_throw;
+  const command = map.monster_command;
+  if (captureThrow) map.throw = captureThrow; // current Pocket capture presentation call
+  if (summonThrow) { map.summon = summonThrow; map.summon_throw = summonThrow; }
+  if (command) { map.command = command; map.recall = command; }
+  const inspection = inspectBlueExplorerPrimaryPackage(out);
+  if (!inspection.valid) throw new Error(`Blue Explorer primary rig invalid: ${inspection.errors.join('; ')}`);
+  out.rig = {
+    ...(out.rig || {}),
+    primaryCharacter: STUDIO_CHARACTER_PRIMARY_MODEL_ID,
+    pivotContract: STUDIO_CHARACTER_PIVOT_CONTRACT,
+    pivotFrames: Object.fromEntries(Object.entries(inspection.frames).map(([key, value]) => [key, { ...value }])),
+  };
+  return out;
+}
 
 export function loadStudioCharacterFromEngine({
   sourceUrl = STUDIO_CHARACTER_BRIDGE_URL,
   characterId = 'character.human.pirate.studio-live',
-  displayName = 'Studio Player',
+  displayName = STUDIO_CHARACTER_PRIMARY_NAME,
   timeoutMs = STUDIO_CHARACTER_BRIDGE_DEFAULT_TIMEOUT_MS,
   retryMs = STUDIO_CHARACTER_BRIDGE_DEFAULT_RETRY_MS,
   documentRef = globalThis.document,
@@ -43,6 +163,8 @@ export function loadStudioCharacterFromEngine({
     sourceUrl: targetUrl.href,
     targetOrigin,
     requestId: id,
+    primaryCharacter: STUDIO_CHARACTER_PRIMARY_MODEL_ID,
+    pivotContract: STUDIO_CHARACTER_PIVOT_CONTRACT,
     attempts: 0,
     frameLoaded: false,
     frameError: false,
@@ -111,7 +233,16 @@ export function loadStudioCharacterFromEngine({
         finish(reject, error, 'invalid-package', error);
         return;
       }
-      finish(resolve, message.package, 'validated');
+      try {
+        const primary = promoteBlueExplorerGamePackage(message.package);
+        const promotedValidation = validateStudioCharacterPackage(primary);
+        if (!promotedValidation.valid) throw new Error(promotedValidation.errors.join('; '));
+        diagnostics.state = 'validated-blue-explorer';
+        finish(resolve, primary, 'validated-blue-explorer');
+      } catch (cause) {
+        const error = new Error(`Blue Explorer primary package rejected: ${cause?.message || cause}`);
+        finish(reject, error, 'invalid-primary-rig', error);
+      }
     };
     const timer = setTimeout(() => {
       const error = new Error(`Character Studio bridge timed out after ${Math.max(250, timeoutMs)}ms (${diagnostics.attempts} request attempt(s))`);
