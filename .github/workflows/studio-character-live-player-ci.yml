@@ -10,6 +10,7 @@ on:
       - 'asset-presentation/providers/studio-character.mjs'
       - 'tests/v91-studio-character-provider.mjs'
       - 'tests/v92-studio-character-live-player.mjs'
+      - 'tests/v92-studio-character-live-player-mutants.mjs'
       - '.github/workflows/studio-character-live-player-ci.yml'
   workflow_dispatch:
 
@@ -31,10 +32,13 @@ jobs:
           node --check asset-presentation/studio-character-package.mjs
           node --check asset-presentation/providers/studio-character.mjs
           node --check tests/v92-studio-character-live-player.mjs
+          node --check tests/v92-studio-character-live-player-mutants.mjs
       - name: Preserve Studio runtime provider gate
         run: node tests/v91-studio-character-provider.mjs
-      - name: Run Studio live-player gate
-        run: node tests/v92-studio-character-live-player.mjs
+      - name: Run Studio live-player gates
+        run: |
+          node tests/v92-studio-character-live-player.mjs
+          node tests/v92-studio-character-live-player-mutants.mjs
       - name: Preserve existing player/asset contracts
         run: |
           node tests/v80-ae0-contracts.mjs
