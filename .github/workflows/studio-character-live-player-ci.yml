@@ -1,0 +1,42 @@
+name: Studio character live player CI
+
+on:
+  pull_request:
+    branches: [main, feat/v91-studio-character-runtime-provider]
+    paths:
+      - 'game-v900.js'
+      - 'asset-presentation/studio-character-live-player.mjs'
+      - 'asset-presentation/studio-character-package.mjs'
+      - 'asset-presentation/providers/studio-character.mjs'
+      - 'tests/v91-studio-character-provider.mjs'
+      - 'tests/v92-studio-character-live-player.mjs'
+      - '.github/workflows/studio-character-live-player-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check live Studio player modules
+        run: |
+          node --check game-v900.js
+          node --check asset-presentation/studio-character-live-player.mjs
+          node --check asset-presentation/studio-character-package.mjs
+          node --check asset-presentation/providers/studio-character.mjs
+          node --check tests/v92-studio-character-live-player.mjs
+      - name: Preserve Studio runtime provider gate
+        run: node tests/v91-studio-character-provider.mjs
+      - name: Run Studio live-player gate
+        run: node tests/v92-studio-character-live-player.mjs
+      - name: Preserve existing player/asset contracts
+        run: |
+          node tests/v80-ae0-contracts.mjs
+          node tests/v80-ae1-adapter.mjs
+          node tests/v90-pirate-fruit-player.mjs
