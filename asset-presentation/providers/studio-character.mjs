@@ -194,6 +194,51 @@ function copyVector(target, source) {
   target.x = source.x; target.y = source.y; target.z = source.z;
   return target;
 }
+function socketAlias(name) {
+  return name === 'rightHand' ? 'rightHand' : name === 'throwOrigin' ? 'throwOrigin' : name === 'impact' ? 'attackOrigin' : name;
+}
+function buildSocketAnchors(THREE, joints, sockets = {}) {
+  const anchors = {};
+  for (const [name, socket] of Object.entries(sockets || {})) {
+    const joint = socket && typeof socket.joint === 'string' ? joints[socket.joint] : null;
+    if (!joint) continue;
+    const anchor = new THREE.Group();
+    anchor.name = `studio-socket:${name}`;
+    anchor.userData = { ...(anchor.userData || {}), studioSocket: name, joint: socket.joint, schema: socket.schema || 'legacy-position-only' };
+    setVec3(anchor.position, socket.offset, [0, 0, 0]);
+    const q = finiteVector(socket.quaternion, 4) ? socket.quaternion : [0, 0, 0, 1];
+    anchor.quaternion?.set?.(q[0], q[1], q[2], q[3]);
+    joint.add(anchor);
+    anchors[name] = anchor;
+  }
+  return anchors;
+}
+function rotateVecByQuaternion(vector, quaternion) {
+  const [x, y, z] = vector, [qx, qy, qz, qw] = quaternion;
+  const ix = qw * x + qy * z - qz * y;
+  const iy = qw * y + qz * x - qx * z;
+  const iz = qw * z + qx * y - qy * x;
+  const iw = -qx * x - qy * y - qz * z;
+  return [
+    ix * qw + iw * -qx + iy * -qz - iz * -qy,
+    iy * qw + iw * -qy + iz * -qx - ix * -qz,
+    iz * qw + iw * -qz + ix * -qy - iy * -qx,
+  ];
+}
+function inverseGrip(grip = {}) {
+  const position = finiteVector(grip.position, 3) ? grip.position : [0, 0, 0];
+  const q = finiteVector(grip.quaternion, 4) ? grip.quaternion : [0, 0, 0, 1];
+  const lengthSq = Math.max(1e-12, q.reduce((sum, value) => sum + value * value, 0));
+  const inverseQuaternion = [-q[0] / lengthSq, -q[1] / lengthSq, -q[2] / lengthSq, q[3] / lengthSq];
+  const inversePosition = rotateVecByQuaternion(position.map(value => -value), inverseQuaternion);
+  return { position: inversePosition, quaternion: inverseQuaternion };
+}
+function preferredAttachmentSocket(node) {
+  const id = String(node?.name || '').toLowerCase();
+  if (/(?:^|[-_:])(left|offhand)(?:$|[-_:])/.test(id)) return 'weaponGripL';
+  if (/(?:back|sheath|holster)/.test(id)) return 'back';
+  return 'weaponGripR';
+}
 export function createStudioCharacterProvider({ THREE } = {}) {
   if (!THREE?.Group || !THREE?.Mesh || !THREE?.BufferGeometry || !THREE?.BufferAttribute) throw new Error('studio-character provider needs THREE Group/Mesh/BufferGeometry/BufferAttribute');
   if (!THREE.MeshStandardMaterial && !THREE.MeshBasicMaterial) throw new Error('studio-character provider needs a Three.js material constructor');
@@ -206,16 +251,17 @@ export function createStudioCharacterProvider({ THREE } = {}) {
     sceneRoot.name ||= 'studio-character:visual';
     root.add(sceneRoot);
     const joints = buildJointMap(sceneRoot, pkg), motion = inspectStudioCharacterMotionPack(pkg);
+    const socketAnchors = buildSocketAnchors(THREE, joints, pkg.rig?.sockets || {});
     const height = Number(pkg.manifest?.metrics?.height) || 1.8;
     const initialClip = findStudioCharacterClip(pkg, 'idle');
     const animation = { clip: initialClip, time: 0, action: 'idle', finished: false,
       lastResolveError: initialClip ? null : 'No authored Studio clip resolves idle' };
     const rest = Object.freeze({ headY: height * 0.80, throwY: height * 0.64, hitTextY: height * 0.82, labelY: height * 1.08 });
-    let disposed = false;
+    let disposed = false, attachmentScanTime = 0;
     const restTransforms = Object.fromEntries(Object.entries(joints).map(([name, node]) => [name, {
       position: [node.position.x, node.position.y, node.position.z], rotation: [node.rotation.x, node.rotation.y, node.rotation.z], scale: [node.scale.x, node.scale.y, node.scale.z],
     }]));
-    const eventListeners = new Set(), pendingEvents = [];
+    const eventListeners = new Set(), pendingEvents = [], boundAttachments = new Map();
     let eventCount = 0, changedJoints = 0, previousPose = null;
     function emitEvents(from, to) {
       const clip = animation.clip;
@@ -239,9 +285,58 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       changedJoints = previousPose ? Object.keys(pose).filter(name => pose[name].some((v, i) => Math.abs(v - previousPose[name][i]) > 1e-7)).length : 0;
       previousPose = pose;
     }
+    function attachObjectToSocket(object, name = 'weaponGripR', grip = null, preserveWorld = false) {
+      const socketName = socketAlias(name), anchor = socketAnchors[socketName] || socketAnchors.rightHand;
+      if (!object || !anchor || object === root || object === anchor) return false;
+      const originalParent = object.parent || null;
+      root.updateMatrixWorld?.(true); originalParent?.updateMatrixWorld?.(true);
+      if (preserveWorld && typeof anchor.attach === 'function') anchor.attach(object);
+      else {
+        anchor.add(object);
+        const inverse = inverseGrip(grip || {});
+        object.position?.set?.(...inverse.position);
+        object.quaternion?.set?.(...inverse.quaternion);
+      }
+      object.userData ??= {};
+      object.userData.studioSocketBound = socketName;
+      if (!boundAttachments.has(object)) boundAttachments.set(object, originalParent);
+      return true;
+    }
+    function isInsideStudio(node) {
+      for (let current = node; current; current = current.parent) if (current === root) return true;
+      return false;
+    }
+    function bindHostAttachments() {
+      const host = root.parent;
+      if (!host?.traverse) return;
+      const candidates = [];
+      host.traverse(node => {
+        if (!node || node === host || isInsideStudio(node) || boundAttachments.has(node)) return;
+        if (/^(equipment:|attachment:)/.test(String(node.name || ''))) candidates.push(node);
+      });
+      const candidateSet = new Set(candidates);
+      for (const node of candidates) {
+        let nested = false;
+        for (let parent = node.parent; parent && parent !== host; parent = parent.parent) {
+          if (candidateSet.has(parent)) { nested = true; break; }
+        }
+        if (nested) continue;
+        const grip = node.userData?.studioWeaponGrip || node.userData?.weaponGrip || null;
+        attachObjectToSocket(node, preferredAttachmentSocket(node), grip, !grip);
+      }
+    }
+    function restoreHostAttachments() {
+      for (const [node, originalParent] of boundAttachments) {
+        const target = originalParent?.attach ? originalParent : root.parent;
+        try { target?.attach?.(node); } catch { target?.add?.(node); }
+        if (node?.userData) delete node.userData.studioSocketBound;
+      }
+      boundAttachments.clear();
+    }
     const handle = {
       id: def.id, role: request.role, root,
-      rig: Object.freeze({ schema: pkg.rig.schema, rest, pivots: Object.freeze({ ...joints }), sockets: Object.freeze({ ...(pkg.rig.sockets || {}) }), sceneRoot }),
+      rig: Object.freeze({ schema: pkg.rig.schema, rest, pivots: Object.freeze({ ...joints }), sockets: Object.freeze({ ...(pkg.rig.sockets || {}) }),
+        socketAnchors: Object.freeze({ ...socketAnchors }), attachmentContract: pkg.rig?.attachmentContract || null, sceneRoot }),
       play(action, options = {}) {
         if (disposed) return handle;
         const requested = normalizeAction(action), next = findStudioCharacterClip(pkg, requested);
@@ -265,10 +360,13 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       },
       update(dt) {
         if (!animation.clip || disposed) return handle;
+        const delta = Math.max(0, Number(dt) || 0);
         const duration = Math.max(.0001, Number(animation.clip.duration) || .0001), from = animation.time;
-        animation.time += Math.max(0, Number(dt) || 0) * (animation.rate || 1);
+        animation.time += delta * (animation.rate || 1);
         if (!animation.clip.loop && animation.time >= duration) { animation.time = duration; animation.finished = true; }
         emitEvents(from, animation.time); sampleClip(animation.clip, animation.time, joints); observePose();
+        attachmentScanTime += delta;
+        if (attachmentScanTime >= .25 || (!boundAttachments.size && root.parent)) { attachmentScanTime = 0; bindHostAttachments(); }
         return handle;
       },
       onAnimationEvent(listener) {
@@ -280,7 +378,13 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       get disposed() { return disposed; },
       anchor(name, target) {
         const out = target || (THREE.Vector3 ? new THREE.Vector3() : { x: 0, y: 0, z: 0 });
-        const socketName = name === 'rightHand' ? 'rightHand' : name === 'throwOrigin' ? 'throwOrigin' : name === 'impact' ? 'attackOrigin' : name;
+        const socketName = socketAlias(name), anchorNode = socketAnchors[socketName];
+        if (anchorNode && typeof anchorNode.getWorldPosition === 'function') {
+          root.updateMatrixWorld?.(true);
+          const world = THREE.Vector3 ? new THREE.Vector3() : { x: 0, y: 0, z: 0 };
+          anchorNode.getWorldPosition(world);
+          return copyVector(out, world);
+        }
         const socket = pkg.rig?.sockets?.[socketName], node = socket ? joints[socket.joint] : null;
         if (socket && node && THREE.Vector3 && typeof node.localToWorld === 'function') {
           root.updateMatrixWorld?.(true);
@@ -292,6 +396,21 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         if (THREE.Vector3 && typeof root.getWorldPosition === 'function') root.getWorldPosition(base);
         base.y += name === 'feet' ? 0 : name === 'label' || name === 'headTop' ? rest.labelY : name === 'hitText' ? rest.hitTextY : LEGACY_FALLBACKS.throwOriginY;
         return copyVector(out, base);
+      },
+      socketTransform(name) {
+        const socketName = socketAlias(name), anchorNode = socketAnchors[socketName];
+        if (!anchorNode) return null;
+        root.updateMatrixWorld?.(true);
+        const position = THREE.Vector3 ? new THREE.Vector3() : { x: 0, y: 0, z: 0 };
+        anchorNode.getWorldPosition?.(position);
+        let quaternion = anchorNode.quaternion?.clone?.() || null;
+        if (quaternion && typeof anchorNode.getWorldQuaternion === 'function') quaternion = anchorNode.getWorldQuaternion(quaternion);
+        return Object.freeze({ socket: socketName,
+          position: [Number(position.x) || 0, Number(position.y) || 0, Number(position.z) || 0],
+          quaternion: quaternion ? [quaternion.x, quaternion.y, quaternion.z, quaternion.w] : [0, 0, 0, 1] });
+      },
+      attachToSocket(object, name = 'weaponGripR', grip = null, options = {}) {
+        return attachObjectToSocket(object, name, grip, options.preserveWorld === true);
       },
       bounds(target) {
         const out = target || { minY: 0, maxY: 0 };
@@ -306,7 +425,8 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       setAppearance() { return handle; },
       dispose() {
         if (disposed) return handle;
-        disposed = true; eventListeners.clear(); pendingEvents.length = 0;
+        disposed = true; eventListeners.clear(); pendingEvents.length = 0; restoreHostAttachments();
+        for (const anchor of Object.values(socketAnchors)) anchor.removeFromParent?.();
         disposeHandle(handle); root.clear?.(); return handle;
       },
       get animationState() {
@@ -315,7 +435,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
           duration: Number(animation.clip?.duration) || 0, loop: !!animation.clip?.loop, playbackRate: animation.rate || 1,
           requestedAction: animation.requestedAction || animation.action, changedJoints,
           poseSample: previousPose ? Object.fromEntries(['chest', 'kneeL', 'kneeR', 'shoulderR', 'handR'].filter(key => previousPose[key]).map(key => [key, [...previousPose[key]]])) : {},
-          eventsEmitted: eventCount, finished: animation.finished, lastResolveError: animation.lastResolveError,
+          eventsEmitted: eventCount, socketAttachments: boundAttachments.size, finished: animation.finished, lastResolveError: animation.lastResolveError,
           motion: { mode: motion.mode, defaultAction: motion.defaultAction, available: motion.available, missing: motion.missing,
             invalid: motion.invalid, unsupportedActions: motion.unsupportedActions || {}, mappedActions: Object.keys(motion.actionMap || {}) },
         });

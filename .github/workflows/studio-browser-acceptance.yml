@@ -20,13 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
-      STUDIO_ENGINE_SHA: c7364503797bc8e751fbfc98a7671d7fe881b1a1
+      STUDIO_ENGINE_SHA: 0f6a229d2aa78ffa90041c41de5da8132c6d51aa
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: nustanakritwithai/3JS-player-block-asset-engine-
-          ref: c7364503797bc8e751fbfc98a7671d7fe881b1a1
+          ref: 0f6a229d2aa78ffa90041c41de5da8132c6d51aa
           path: .ci-studio-source
       - name: Capture exact tracked sources for reproducible paired diagnosis
         run: |
@@ -59,6 +59,7 @@ jobs:
           retention-days: 7
       - name: Build exact Studio producer
         run: |
+          test "$(git -C .ci-studio-source rev-parse HEAD)" = "$STUDIO_ENGINE_SHA"
           python .ci-studio-source/scripts/generate_textures.py --output .ci-studio-source/assets/textures --resolution 2048
           python .ci-studio-source/scripts/build_pages.py
           cd .ci-studio-source && node scripts/test_pocket_studio_texture_export.mjs
