@@ -4,6 +4,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { loadCatalog } from './asset-presentation/catalog.mjs';
 import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
+import { bootStudioCharacterLivePlayer } from './asset-presentation/studio-character-live-player.mjs';
 
 export const NEW_WORLD_VERSION = '9.0.0-new-world';
 export const NEW_WORLD_ID = 'pirate-fruit-new-world';
@@ -143,18 +144,30 @@ assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({
   torus: torusGeometry,
   material: mat,
 }));
-const playerVisual = assets.spawn('character.human.pirate-fruit.v1', {
+
+const studioLivePlayer = await bootStudioCharacterLivePlayer({
+  assets,
+  THREE,
+  locationLike: typeof window !== 'undefined' ? window.location : null,
+  onStatus: startupText,
+});
+const playerCharacterId = studioLivePlayer.characterId;
+const playerVisual = assets.spawn(playerCharacterId, {
   role: 'player',
-  appearanceId: 'appearance.human.player-orange.v1',
+  appearanceId: studioLivePlayer.enabled ? undefined : 'appearance.human.player-orange.v1',
   quality: qualityProfile.tier,
 });
 await playerVisual.ready;
+if (studioLivePlayer.enabled) playerVisual.play('idle', { restart: true });
 const player = playerVisual.root;
 player.position.set(0, 0, 1.2);
 scene.add(player);
 
 if (typeof window !== 'undefined') {
-  window.MLRPG_ASSETS = { diagnostics: () => assets.diagnostics() };
+  window.MLRPG_ASSETS = {
+    diagnostics: () => assets.diagnostics(),
+    livePlayer: studioLivePlayer,
+  };
 }
 
 let cameraYaw = 0.2;
@@ -208,6 +221,15 @@ function cameraRight() { const f = forward(); return new THREE.Vector3(-f.z, 0, 
 
 const BOUNDS = Object.freeze({ minX: -8, maxX: 8, minZ: -6, maxZ: 10 });
 const speed = 5.4;
+let livePlayerMotionAction = studioLivePlayer.enabled ? 'idle' : null;
+
+function updateStudioPlayerMotion(moving) {
+  if (!studioLivePlayer.enabled) return;
+  const next = moving ? 'walk' : 'idle';
+  if (next === livePlayerMotionAction) return;
+  livePlayerMotionAction = next;
+  playerVisual.play(next, { restart: false });
+}
 
 function updatePlayer(dt) {
   let side = 0, fwd = 0;
@@ -222,6 +244,7 @@ function updatePlayer(dt) {
     player.position.x = THREE.MathUtils.clamp(player.position.x, BOUNDS.minX, BOUNDS.maxX);
     player.position.z = THREE.MathUtils.clamp(player.position.z, BOUNDS.minZ, BOUNDS.maxZ);
   }
+  updateStudioPlayerMotion(moving);
   playerVisual.update(dt, { moving });
 }
 
@@ -241,11 +264,13 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-startupText('เข้าเกาะโจรสลัดแล้ว', 'ok');
+startupText(studioLivePlayer.enabled ? 'เข้าเกาะโจรสลัดแล้ว • Studio Character' : 'เข้าเกาะโจรสลัดแล้ว', 'ok');
 const zoneLabel = document.getElementById('zoneLabel');
 if (zoneLabel) zoneLabel.textContent = 'เกาะโจรสลัด • Pirate Fruit';
 const message = document.getElementById('message');
-if (message) message.textContent = 'โลก Pirate Fruit ใน V9.0 รวม 3 โลก • เกมเดิมอยู่ที่ปุ่มเกมเดิม';
+if (message) message.textContent = studioLivePlayer.enabled
+  ? `Studio Character: ${playerCharacterId}`
+  : 'โลก Pirate Fruit ใน V9.0 รวม 3 โลก • เกมเดิมอยู่ที่ปุ่มเกมเดิม';
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
