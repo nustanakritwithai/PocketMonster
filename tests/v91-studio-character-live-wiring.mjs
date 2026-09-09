@@ -4,6 +4,7 @@ import {
   STUDIO_CHARACTER_BRIDGE_DEFAULT_TIMEOUT_MS,
   STUDIO_CHARACTER_BRIDGE_REQUEST,
   STUDIO_CHARACTER_BRIDGE_RESPONSE,
+  STUDIO_CHARACTER_PRIMARY_MODEL_ID,
   loadStudioCharacterFromEngine,
 } from '../asset-presentation/studio-character-live-bridge.mjs';
 
@@ -27,6 +28,7 @@ assert.match(bridge, /validateStudioCharacterPackage\(message\.package\)/);
 assert.match(bridge, /event\.origin !== targetOrigin/);
 assert.match(bridge, /readiness-retry/);
 assert.match(bridge, /POCKETMONSTER_STUDIO_CHARACTER_BRIDGE_DIAGNOSTICS/);
+assert.match(bridge, /studio-rigid-pivot-local-axes-v1/);
 assert.equal(STUDIO_CHARACTER_BRIDGE_DEFAULT_TIMEOUT_MS, 30000, 'consumer timeout must cover Studio multi-source Three.js bootstrap');
 
 assert.match(packageLoader, /gameplayPolicy\?\.included !== false/);
@@ -39,9 +41,19 @@ assert.match(packageLoader, /pocket-motion-pack-v1/);
 assert.match(provider, /anchor\(name, target\)/);
 
 function validPackage() {
+  const transform = () => ({ position: [0, 0, 0], rotation: [0, 0, 0, 'XYZ'], scale: [1, 1, 1] });
+  const group = (name, joint = null, marker = false) => ({
+    name, nodeType: 'group', visible: true, transform: transform(),
+    userData: {
+      ...(joint ? { engineJointKey: joint } : {}),
+      ...(marker ? { primaryCharacter: STUDIO_CHARACTER_PRIMARY_MODEL_ID, engineRole: 'primary-character' } : {}),
+    },
+    children: [],
+  });
+  const add = (parent, child) => { parent.children.push(child); return child; };
   const mesh = {
     name: 'Body', nodeType: 'mesh', visible: true,
-    transform: { position: [0, 0, 0], rotation: [0, 0, 0, 'XYZ'], scale: [1, 1, 1] },
+    transform: transform(),
     geometry: {
       attributes: { position: { itemSize: 3, array: [0, 0, 0, 1, 0, 0, 0, 1, 0] } },
       index: { array: [0, 1, 2] },
@@ -49,15 +61,42 @@ function validPackage() {
     material: { color: '#ffffff', maps: {} },
     children: [],
   };
-  const root = {
-    name: 'characterRoot', nodeType: 'group', visible: true,
-    transform: { position: [0, 0, 0], rotation: [0, 0, 0, 'XYZ'], scale: [1, 1, 1] },
-    children: [mesh],
+  const root = group('characterRoot');
+  const blue = add(root, group('BlueExplorer', null, true));
+  const pelvis = add(blue, group('pelvis', 'pelvis'));
+  const chest = add(pelvis, group('torso', 'chest'));
+  const neck = add(chest, group('neck', 'neck'));
+  add(neck, group('head', 'head'));
+  const shoulderL = add(chest, group('shoulder_right', 'shoulderL'));
+  const elbowL = add(shoulderL, group('elbow_right', 'elbowL'));
+  add(elbowL, group('wrist_right', 'wristL'));
+  const shoulderR = add(chest, group('shoulder_left', 'shoulderR'));
+  const elbowR = add(shoulderR, group('elbow_left', 'elbowR'));
+  add(elbowR, group('wrist_left', 'wristR'));
+  const hipL = add(pelvis, group('hip_right', 'hipL'));
+  const kneeL = add(hipL, group('knee_right', 'kneeL'));
+  add(kneeL, group('ankle_right', 'ankleL'));
+  const hipR = add(pelvis, group('hip_left', 'hipR'));
+  const kneeR = add(hipR, group('knee_left', 'kneeR'));
+  add(kneeR, group('ankle_left', 'ankleR'));
+  chest.children.push(mesh);
+
+  const jointBindings = { rootJoint: { path: [], nodeName: 'characterRoot' } };
+  const visit = (node, path = []) => {
+    if (node.userData?.engineJointKey) jointBindings[node.userData.engineJointKey] = { path: [...path], nodeName: node.name };
+    node.children.forEach((child, index) => visit(child, [...path, index]));
   };
-  const sockets = Object.fromEntries(
-    ['rightHand', 'leftHand', 'head', 'back', 'waist', 'vfxOrigin', 'attackOrigin', 'throwOrigin']
-      .map(name => [name, { joint: 'rootJoint', offset: [0, 0, 0] }]),
-  );
+  visit(root);
+  const sockets = {
+    rightHand: { joint: 'wristR', offset: [0, 0, 0] },
+    leftHand: { joint: 'wristL', offset: [0, 0, 0] },
+    head: { joint: 'head', offset: [0, 0, 0] },
+    back: { joint: 'chest', offset: [0, 0, 0] },
+    waist: { joint: 'pelvis', offset: [0, 0, 0] },
+    vfxOrigin: { joint: 'chest', offset: [0, 0, 0] },
+    attackOrigin: { joint: 'wristR', offset: [0, 0, 0] },
+    throwOrigin: { joint: 'wristR', offset: [0, 0, 0] },
+  };
   const common = {
     id: 'character.human.pirate.studio-live',
     kind: 'character',
@@ -79,7 +118,7 @@ function validPackage() {
     rig: {
       architecture: 'THREE.Group',
       schema: 'studio-rig-v1',
-      jointBindings: { rootJoint: { path: [], nodeName: 'characterRoot' } },
+      jointBindings,
       sockets,
     },
     animations: ['idle', 'walk', 'run', 'attack', 'skill', 'hurt', 'dead'].map(action => ({
@@ -152,11 +191,13 @@ function validPackage() {
     windowRef,
   });
   assert.equal(pkg.manifest.id, 'character.human.pirate.studio-live');
+  assert.equal(pkg.manifest.name, 'Blue Explorer');
+  assert.equal(pkg.rig.primaryCharacter, STUDIO_CHARACTER_PRIMARY_MODEL_ID);
   assert.ok(attempts >= 2, 'readiness retry should recover when the first request is dropped');
   assert.equal(removed, true, 'hidden Studio iframe is removed after package delivery');
   assert.equal(windowListeners.has('message'), false, 'message listener is removed after package delivery');
   const diagnostics = windowRef.POCKETMONSTER_STUDIO_CHARACTER_BRIDGE_DIAGNOSTICS();
-  assert.equal(diagnostics.state, 'validated');
+  assert.equal(diagnostics.state, 'validated-blue-explorer');
   assert.ok(diagnostics.attempts >= 2);
 }
 
