@@ -20,13 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
-      STUDIO_ENGINE_SHA: a71e6a3ca9919785bc06891cc954168c17a9d6bd
+      STUDIO_ENGINE_SHA: c7364503797bc8e751fbfc98a7671d7fe881b1a1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: nustanakritwithai/3JS-player-block-asset-engine-
-          ref: a71e6a3ca9919785bc06891cc954168c17a9d6bd
+          ref: c7364503797bc8e751fbfc98a7671d7fe881b1a1
           path: .ci-studio-source
       - name: Capture exact tracked sources for reproducible paired diagnosis
         run: |
@@ -66,6 +66,7 @@ jobs:
         run: |
           node tests/v91-studio-motion-completion.mjs
           node tests/v91-studio-character-render-profile.mjs
+          node tests/v91-studio-blue-explorer-primary.mjs
       - name: Real Studio to sandboxed Pirate browser acceptance
         run: python tests/v91-studio-browser-acceptance.py
       - name: Actual exported package through native vendor regression
@@ -73,6 +74,7 @@ jobs:
         run: |
           node tests/v91-studio-real-vendor.mjs studio-browser-evidence/actual-studio-package.json
           node tests/v91-studio-motion-completion.mjs studio-browser-evidence/actual-studio-package.json studio-browser-evidence/motion-coverage.json
+          node tests/v91-studio-blue-explorer-primary.mjs studio-browser-evidence/actual-studio-package.json
       - name: Preserve actual screenshots, video, exported package and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
