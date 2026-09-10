@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { loadRuntimeConfig } from '../runtime-config.mjs';
+import { readWorldMapFrame } from '../world-simulator-map-adapter-v1.mjs';
 import {
   WORLD_GROUND_DEFAULT_ZONE,
   WORLD_GROUND_LIVE_SCHEMA,
+  WORLD_GROUND_PREVIEW_PATH,
   worldSimulatorGroundEnabled,
 } from '../world-simulator-ground-live-v1.mjs';
 
 assert.equal(WORLD_GROUND_LIVE_SCHEMA, 'pocketmonster.world-ground-live.v1');
 assert.equal(WORLD_GROUND_DEFAULT_ZONE, 'emerald-forest');
+assert.equal(WORLD_GROUND_PREVIEW_PATH, './assets/world-ground/worldsim-preview-frame-v2.json');
 assert.equal(worldSimulatorGroundEnabled({}), false);
 assert.equal(worldSimulatorGroundEnabled({ featureFlags: { vpsEnabled: true, vpsReads: true, worldSimGround: true }, apiBaseUrl: '' }), false);
 assert.equal(worldSimulatorGroundEnabled({ featureFlags: { vpsEnabled: true, vpsReads: false, worldSimGround: true }, apiBaseUrl: 'https://world.example' }), false);
@@ -39,22 +42,42 @@ assert.equal(enabled.canWritePlayerData, false, 'ground does not imply player-da
 const liveSource = fs.readFileSync(new URL('../world-simulator-ground-live-v1.mjs', import.meta.url), 'utf8');
 const sceneSource = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const configSource = fs.readFileSync(new URL('../runtime-config.mjs', import.meta.url), 'utf8');
+const deployConfig = JSON.parse(fs.readFileSync(new URL('../runtime-config.json', import.meta.url), 'utf8'));
 const packUrl = new URL('../assets/world-ground/material-pack-v1.json', import.meta.url);
 const pack = JSON.parse(fs.readFileSync(packUrl, 'utf8'));
+const previewUrl = new URL('../assets/world-ground/worldsim-preview-frame-v2.json', import.meta.url);
+const previewRaw = JSON.parse(fs.readFileSync(previewUrl, 'utf8'));
+const previewFrame = readWorldMapFrame(previewRaw);
 
 assert.match(liveSource, /fetchWorldMapFrame/, 'live bridge fetches through the validated WorldSim adapter');
-assert.match(liveSource, /fallbackMesh\.visible = !ground\.getFrame\(\)/, 'fallback remains until a valid frame exists');
-assert.match(liveSource, /state: ground\.getFrame\(\) \? 'stale' : 'fallback'/, 'failed refresh keeps the last valid frame or fallback');
-assert.doesNotMatch(liveSource, /setInterval\(|setTimeout\(/, 'P1 live bridge must not poll full snapshots');
+assert.match(liveSource, /readWorldMapFrame/, 'offline preview uses the same validated map-frame contract');
+assert.match(liveSource, /WORLD_GROUND_PREVIEW_PATH/, 'offline preview path is explicit');
+assert.match(liveSource, /sourceMode = 'preview'/, 'controller marks preview separately from live authority');
+assert.match(liveSource, /state: 'preview'/, 'failed live read can return visible preview state');
+assert.match(liveSource, /fallbackMesh\.visible = !ground\.getFrame\(\)/, 'old plaza disappears as soon as either valid live or preview frame exists');
+assert.doesNotMatch(liveSource, /setInterval\(|setTimeout\(/, 'ground bridge must not poll full snapshots');
 assert.doesNotMatch(liveSource, /method:\s*['"]POST|method:\s*['"]PUT|method:\s*['"]PATCH|method:\s*['"]DELETE/, 'ground live bridge is read-only');
 
-assert.match(configSource, /worldSimGround:\s*false/, 'checked-in ground feature flag defaults off');
+assert.match(configSource, /worldSimGround:\s*false/, 'build default remains safe-off');
+assert.equal(deployConfig.featureFlags.vpsEnabled, true);
+assert.equal(deployConfig.featureFlags.vpsReads, true);
+assert.equal(deployConfig.featureFlags.worldSimGround, true, 'deployed runtime manifest must actually enable ground rendering');
 assert.match(sceneSource, /createWorldSimulatorGroundLive/, 'Living World scene wires the WorldSim ground controller');
-assert.match(sceneSource, /fallbackMesh:\s*plaza/, 'existing plaza is the safe fallback');
+assert.match(sceneSource, /fallbackMesh:\s*plaza/, 'existing plaza remains last-resort fallback');
 assert.match(sceneSource, /zoneId:\s*'emerald-forest'/, 'first integration zone is explicit');
-assert.match(sceneSource, /if \(worldGroundLive\.enabled\) \{\s*void worldGroundLive\.refresh\(\)/s, 'snapshot load starts only when deployment enables it');
+assert.match(sceneSource, /if \(worldGroundLive\.enabled\) \{\s*void worldGroundLive\.refresh\(\)/s, 'snapshot load starts when deployment enables it');
 assert.match(sceneSource, /const BOUNDS = Object\.freeze\(\{ minX: -6\.4, maxX: 6\.4, minZ: -5\.4, maxZ: 5\.8 \}\)/,
   'presentation patch must not silently replace gameplay/navigation bounds');
+
+assert.equal(previewFrame.contract, 'pocketmonster.world-map-frame.v2');
+assert.equal(previewFrame.source.version, '20.9.4');
+assert.equal(previewFrame.grid.gridWidth, 16);
+assert.equal(previewFrame.grid.gridHeight, 16);
+assert.equal(previewFrame.grid.count, 256);
+assert.ok(new Set(previewFrame.channels.material).size >= 6, 'preview must visibly exercise multiple PBR ground materials');
+assert.ok(previewFrame.channels.waterDepth.some(value => value > 0), 'preview must contain visible authoritative-style water presentation');
+assert.ok(previewFrame.channels.wetness.some(value => value >= 0.9), 'preview must exercise wet surface response');
+assert.ok(previewFrame.channels.burn.some(value => value >= 0.7), 'preview must exercise burned surface response');
 
 assert.equal(pack.schema, 'pocketmonster.world-ground-material-pack.v1');
 assert.equal(pack.installed, true, 'high-quality local ground material pack must be vendored before merge');
