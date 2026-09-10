@@ -1,0 +1,76 @@
+{
+  "schema": "pocketmonster.world-ground-material-pack.v1",
+  "version": 1,
+  "installed": true,
+  "source": "Poly Haven",
+  "license": "CC0",
+  "runtimeApiDependency": false,
+  "resolution": "1k",
+  "format": "jpg",
+  "normalConvention": "opengl",
+  "materials": {
+    "grass": {
+      "sourceAsset": "grass_ground",
+      "albedo": "./polyhaven/grass_ground/albedo.jpg",
+      "normal": "./polyhaven/grass_ground/normal.jpg",
+      "roughness": "./polyhaven/grass_ground/roughness.jpg",
+      "ao": "./polyhaven/grass_ground/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "forest-floor": {
+      "sourceAsset": "forrest_ground_01",
+      "albedo": "./polyhaven/forrest_ground_01/albedo.jpg",
+      "normal": "./polyhaven/forrest_ground_01/normal.jpg",
+      "roughness": "./polyhaven/forrest_ground_01/roughness.jpg",
+      "ao": "./polyhaven/forrest_ground_01/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "mud": {
+      "sourceAsset": "mud_forest",
+      "albedo": "./polyhaven/mud_forest/albedo.jpg",
+      "normal": "./polyhaven/mud_forest/normal.jpg",
+      "roughness": "./polyhaven/mud_forest/roughness.jpg",
+      "ao": "./polyhaven/mud_forest/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "sand": {
+      "sourceAsset": "forrest_sand_01",
+      "albedo": "./polyhaven/forrest_sand_01/albedo.jpg",
+      "normal": "./polyhaven/forrest_sand_01/normal.jpg",
+      "roughness": "./polyhaven/forrest_sand_01/roughness.jpg",
+      "ao": "./polyhaven/forrest_sand_01/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "rock": {
+      "sourceAsset": "rock_ground",
+      "albedo": "./polyhaven/rock_ground/albedo.jpg",
+      "normal": "./polyhaven/rock_ground/normal.jpg",
+      "roughness": "./polyhaven/rock_ground/roughness.jpg",
+      "ao": "./polyhaven/rock_ground/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "dry-soil": {
+      "sourceAsset": "dirt",
+      "albedo": "./polyhaven/dirt/albedo.jpg",
+      "normal": "./polyhaven/dirt/normal.jpg",
+      "roughness": "./polyhaven/dirt/roughness.jpg",
+      "ao": "./polyhaven/dirt/ao.jpg",
+      "normalConvention": "opengl"
+    },
+    "burned": {
+      "sourceAsset": "dirt",
+      "albedo": "./polyhaven/dirt/albedo.jpg",
+      "normal": "./polyhaven/dirt/normal.jpg",
+      "roughness": "./polyhaven/dirt/roughness.jpg",
+      "ao": "./polyhaven/dirt/ao.jpg",
+      "normalConvention": "opengl"
+    }
+  },
+  "vendoredAt": "2026-09-10T16:33:30.200Z",
+  "vendor": {
+    "name": "Poly Haven",
+    "api": "https://api.polyhaven.com",
+    "policy": "development-time download only; game runtime uses vendored local files",
+    "userAgent": "PocketMonster-WorldGroundVendor/1.0 (nustanakritwithai/PocketMonster)"
+  }
+}

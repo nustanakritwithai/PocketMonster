@@ -23,6 +23,7 @@ export const BUILD_RUNTIME_CONFIG = Object.freeze({
     vpsReads: false,
     vpsWrites: false,
     playerDataWrites: false,
+    worldSimGround: false,
     accountMigration: false,
     saveMigration: false,
     economyMutation: false,
@@ -64,6 +65,7 @@ function normalizeManifest(manifest = {}) {
   if (!config.featureFlags.vpsEnabled || !config.featureFlags.vpsReads) {
     config.featureFlags.vpsWrites = false;
     config.featureFlags.playerDataWrites = false;
+    config.featureFlags.worldSimGround = false;
   }
   if (!config.featureFlags.vpsWrites) config.featureFlags.playerDataWrites = false;
   config.featureFlags.accountMigration = false;
