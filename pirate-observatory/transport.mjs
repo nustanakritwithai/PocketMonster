@@ -21,13 +21,13 @@ export class PirateObservatoryRestTransport {
 
   async getPartitionSnapshot(partition) {
     const target = encodeURIComponent(assertPartition(partition));
-    return this.#get(`api/observatory/regions/${target}/snapshot`);
+    return this.#get(`/api/observatory/regions/${target}/snapshot`);
   }
 
   async getChangesAfter(partition, afterSequence) {
     const target = encodeURIComponent(assertPartition(partition));
     assertSequence(afterSequence);
-    return this.#get(`api/observatory/regions/${target}/changes?afterSequence=${afterSequence}`);
+    return this.#get(`/api/observatory/regions/${target}/changes?afterSequence=${afterSequence}`);
   }
 
   async getInterest({ partition, viewport, zoom = 1, selectedId = null, watchedIds = [], includeTypes = [], maxEntities = 500 } = {}) {
@@ -46,7 +46,7 @@ export class PirateObservatoryRestTransport {
     if (selectedId) params.set('selectedId', selectedId);
     for (const id of watchedIds) params.append('watch', id);
     for (const type of includeTypes) params.append('type', type);
-    return this.#get(`api/observatory/regions/${target}/interest?${params}`);
+    return this.#get(`/api/observatory/regions/${target}/interest?${params}`);
   }
 
   async #get(path) {
