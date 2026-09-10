@@ -37,22 +37,30 @@ for (const profile of Object.values(PIRATE_FRUIT_TERRAIN_PBR)) {
 
 const pbrSrc = fs.readFileSync(new URL('../asset-presentation/pirate-fruit-pbr-ground.mjs', import.meta.url), 'utf8');
 const presentationSrc = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
+const groundEntrySrc = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-ground-presentation.mjs', import.meta.url), 'utf8');
 const offlineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const legacyBridgeSrc = fs.readFileSync(new URL('../asset-presentation/pirate-fruit-client-bridge.mjs', import.meta.url), 'utf8');
 
 for (const file of [
   'asset-presentation/pirate-fruit-pbr-ground.mjs',
   'pirate-fruit-offline/pocket-presentation.mjs',
+  'pirate-fruit-offline/pocket-ground-presentation.mjs',
 ]) {
   const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(`../${file}`, import.meta.url))], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
 
 assert.match(legacyBridgeSrc, /surfaceStyle = 'four-side-block-v1'/, 'test proves the old repaint path still exists and therefore needs a post-overlay');
-assert.match(presentationSrc, /hookPirateFruitRenderer\(pirateFruitThree\);[\s\S]*hookPirateFruitPbrGround\(\{ THREE: pirateFruitThreeKit \}\);/,
-  'PBR terrain hook runs after the existing Pirate presentation hook');
-assert.match(presentationSrc, /threeFromPirateFruitVendor/, 'PBR overlay shares the exact Pirate Fruit Three instance');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=30/, 'offline iframe cache-busts the PBR presentation entry');
+assert.match(presentationSrc, /hookPirateFruitRenderer\(pirateFruitThree\);/, 'existing Pirate/Studio presentation remains unchanged');
+assert.doesNotMatch(presentationSrc, /hookPirateFruitPbrGround/, 'ground is isolated from the Studio presentation entry');
+assert.match(groundEntrySrc, /threeFromPirateFruitVendor/, 'PBR overlay shares the exact Pirate Fruit Three instance');
+assert.match(groundEntrySrc, /hookPirateFruitPbrGround\(\{ THREE: pirateFruitThreeKit \}\)/, 'isolated ground entry installs the post-overlay');
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=29/, 'existing immediate attack presentation cache contract stays intact');
+assert.match(offlineHtml, /pocket-ground-presentation\.mjs\?v=1/, 'offline iframe loads the new isolated PBR ground entry');
+assert.ok(
+  offlineHtml.indexOf('pocket-presentation.mjs?v=29') < offlineHtml.indexOf('pocket-ground-presentation.mjs?v=1'),
+  'legacy Pirate presentation is installed before the PBR post-overlay',
+);
 
 assert.match(pbrSrc, /material-pack-v1\.json/, 'PBR overlay consumes the shared WorldSim material library');
 assert.match(pbrSrc, /normalMap/, 'PBR overlay assigns normal maps');
