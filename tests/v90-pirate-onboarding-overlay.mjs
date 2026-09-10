@@ -96,7 +96,7 @@ assert.match(pirateHud, /\.inv-open-button/,
 assert.match(pirateHud, /\.tc-root \{[\s\S]*display: none/,
   'old iframe punch/shield cluster is retired');
 assert.match(pirateHud, /\.dialogue-root \{[\s\S]*inset: auto/, 'talk window is not a fullscreen overlay');
-assert.match(pirateHud, /\.dialogue-card \{[\s\S]*max-height: 22vh/, 'talk card inner size fits a phone');
+assert.match(pirateHud, /\.dialogue-card \{[\s\S]*height: auto[\s\S]*max-height: 70vh/, 'talk card grows with text up to a phone max');
 assert.match(pirateHud, /\.quest-board,[\s\S]*max-height: 48vh/, 'quest board inner size fits a phone');
 assert.match(pirateHud, /\.boat-shop,[\s\S]*max-height: 48vh/, 'boat shop inner size fits a phone');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*max-height: 48vh/, 'potion shop inner size fits a phone');
