@@ -1,0 +1,33 @@
+name: Pirate Observatory Client P0
+
+on:
+  push:
+    branches:
+      - feat/pirate-world-observatory-p0
+    paths:
+      - 'pirate-observatory/**'
+      - 'tests/v90-pirate-observatory-p0.mjs'
+      - 'pirate-fruit-island-map-v900.mjs'
+      - '.github/workflows/pirate-observatory-p0.yml'
+  pull_request:
+    paths:
+      - 'pirate-observatory/**'
+      - 'tests/v90-pirate-observatory-p0.mjs'
+      - 'pirate-fruit-island-map-v900.mjs'
+      - '.github/workflows/pirate-observatory-p0.yml'
+
+jobs:
+  client-p0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: |
+          node --check pirate-observatory/protocol.mjs
+          node --check pirate-observatory/partition-sync.mjs
+          node --check pirate-observatory/dashboard.mjs
+      - name: Observatory client regression
+        run: node tests/v90-pirate-observatory-p0.mjs
