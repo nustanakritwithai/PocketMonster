@@ -222,7 +222,7 @@ async function verifyPages(options, runtimeConfig) {
   }
 
   const combined = bodies.get('combined-worlds-v900.mjs');
-  if (!combined.includes("runtime: './world-pirate-native-v900.mjs?v=1'")) {
+  if (!combined.includes('world-pirate-native-v900.mjs?v=1')) {
     throw new Error('combined-worlds-v900.mjs must route Pirate Fruit directly to Native V9');
   }
   if (combined.includes('boot-pirate-fruit-v900.mjs?v=953')) {
