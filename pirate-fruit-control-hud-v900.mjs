@@ -48,9 +48,9 @@ html[data-pirate-hud="pirate-primary-parent"] .interaction-prompt[data-unified-h
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-root {
   inset: auto !important;
-  left: 10% !important;
-  right: 10% !important;
-  bottom: 120px !important;
+  left: 4% !important;
+  right: 4% !important;
+  bottom: 108px !important;
   top: auto !important;
   padding: 0 !important;
   align-items: stretch !important;
@@ -59,31 +59,31 @@ html[data-pirate-hud="pirate-primary-parent"] .dialogue-root {
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-card {
   width: 100% !important;
   max-width: 100% !important;
-  max-height: 22vh !important;
+  max-height: 42vh !important;
   overflow: auto !important;
-  padding: 6px 8px 6px !important;
-  border-radius: 10px !important;
+  padding: 12px 14px 10px !important;
+  border-radius: 12px !important;
   box-sizing: border-box !important;
 }
-html[data-pirate-hud="pirate-primary-parent"] .dialogue-name { font-size: 13px !important; }
+html[data-pirate-hud="pirate-primary-parent"] .dialogue-name { font-size: 17px !important; }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-role,
-html[data-pirate-hud="pirate-primary-parent"] .dialogue-page { font-size: 9px !important; }
+html[data-pirate-hud="pirate-primary-parent"] .dialogue-page { font-size: 12px !important; }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-text {
-  font-size: 11px !important;
-  min-height: 20px !important;
-  margin: 4px 0 6px !important;
-  line-height: 1.35 !important;
+  font-size: 16px !important;
+  min-height: 48px !important;
+  margin: 8px 0 10px !important;
+  line-height: 1.45 !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-close {
-  font-size: 20px !important;
-  min-width: 40px;
-  min-height: 40px;
+  font-size: 22px !important;
+  min-width: 44px;
+  min-height: 44px;
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-next,
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-action {
-  min-height: 40px;
-  padding: 4px 8px !important;
-  font-size: 11px !important;
+  min-height: 44px;
+  padding: 8px 12px !important;
+  font-size: 15px !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .quest-board-root,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop-root,
