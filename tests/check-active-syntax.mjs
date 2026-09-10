@@ -5,10 +5,15 @@ import { activeEntryUrl, activeJsUrl } from './active-assets.mjs';
 const checkedModules = [
   activeEntryUrl,
   activeJsUrl,
+  new URL('../world-living-v900.mjs', import.meta.url),
+  new URL('../runtime-config.mjs', import.meta.url),
   new URL('../world-simulator-map-adapter-v1.mjs', import.meta.url),
   new URL('../world-simulator-ground-renderer-v1.mjs', import.meta.url),
+  new URL('../world-simulator-ground-live-v1.mjs', import.meta.url),
+  new URL('../scripts/vendor-world-ground-polyhaven.mjs', import.meta.url),
   new URL('./world-simulator-map-adapter-v1.mjs', import.meta.url),
   new URL('./world-simulator-ground-renderer-v1.mjs', import.meta.url),
+  new URL('./world-simulator-ground-live-v1.mjs', import.meta.url),
 ];
 
 for (const url of checkedModules) {
@@ -23,6 +28,7 @@ for (const url of checkedModules) {
 for (const testUrl of [
   new URL('./world-simulator-map-adapter-v1.mjs', import.meta.url),
   new URL('./world-simulator-ground-renderer-v1.mjs', import.meta.url),
+  new URL('./world-simulator-ground-live-v1.mjs', import.meta.url),
 ]) {
   const target = fileURLToPath(testUrl);
   const result = spawnSync(process.execPath, [target], { encoding: 'utf8' });
