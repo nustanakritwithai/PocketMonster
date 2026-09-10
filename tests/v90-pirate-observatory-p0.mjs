@@ -6,6 +6,7 @@ import {
   SYNC_STATES,
   PartitionSync,
   PirateObservatoryRestTransport,
+  classifyObservatoryConnectError,
   createStreamEnvelope,
   recoverPartition,
 } from '../pirate-observatory/index.mjs';
@@ -177,6 +178,24 @@ const delta = ({ partition = 'pirate-fruit', tick = 11, baseSequence = 1, sequen
   assert.equal(interestUrl.searchParams.get('type'), 'ship');
   assert.equal(calls.every(call => call.options.method === 'GET'), true);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer test-only');
+}
+
+// Reachable-but-not-ready is SYNCING, not falsely OFFLINE or LIVE.
+{
+  const notReady = classifyObservatoryConnectError({ code: 'OBSERVATORY_NOT_READY', status: 503 });
+  assert.deepEqual(notReady, {
+    reason: 'OBSERVATORY_NOT_READY',
+    state: SYNC_STATES.SYNCING,
+    serverReachable: true,
+    retryable: true,
+  });
+  const schema = classifyObservatoryConnectError({ code: 'SCHEMA_MISMATCH', status: 409 });
+  assert.equal(schema.state, SYNC_STATES.DESYNC);
+  assert.equal(schema.serverReachable, true);
+  assert.equal(schema.retryable, false);
+  const network = classifyObservatoryConnectError({ code: 'CONNECT_FAILED' });
+  assert.equal(network.state, SYNC_STATES.OFFLINE);
+  assert.equal(network.serverReachable, false);
 }
 
 console.log('v90 Pirate World Observatory client P0: PASS');
