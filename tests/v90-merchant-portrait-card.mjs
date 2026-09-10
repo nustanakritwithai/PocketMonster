@@ -5,10 +5,10 @@ const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 assert.match(css, /Merchant market: vertical portrait card/);
-assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*width:min\(340px,84vw\)/);
-assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*min-height:min\(520px,70dvh\)/);
-assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*max-height:min\(78dvh/);
+assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*width:min\(280px,72vw\)/);
+assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*min-height:0/);
+assert.match(css, /\.merchant-shop \.merchant-card[\s\S]*max-height:min\(64dvh/);
 assert.match(css, /place-items:center!important/);
-assert.match(html, /style-v900\.css\?v=970/);
+assert.match(html, /style-v900\.css\?v=971/);
 
 console.log('V9 merchant portrait card: PASS');
