@@ -105,19 +105,19 @@ html[data-pirate-hud="pirate-primary-parent"] .quest-board,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop,
 html[data-pirate-hud="pirate-primary-parent"] .potion-shop,
 html[data-pirate-hud="pirate-primary-parent"] .dealer-shop {
-  width: min(340px, 84vw) !important;
-  max-width: min(340px, 84vw) !important;
+  width: min(280px, 72vw) !important;
+  max-width: min(280px, 72vw) !important;
   height: auto !important;
-  min-height: min(520px, 70dvh) !important;
-  max-height: min(78vh, calc(100dvh - 96px)) !important;
+  min-height: 0 !important;
+  max-height: min(64vh, calc(100dvh - 96px)) !important;
   margin: 0 auto !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
-  padding: 14px 14px 12px !important;
-  border-radius: 18px !important;
+  padding: 10px 10px 8px !important;
+  border-radius: 16px !important;
   box-sizing: border-box !important;
-  box-shadow: 0 18px 48px #000a !important;
+  box-shadow: 0 14px 36px #000a !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .quest-board-cards,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop-cards,
