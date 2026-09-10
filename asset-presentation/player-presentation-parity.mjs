@@ -89,11 +89,23 @@ function normalizeAction(action) {
   return String(action || 'idle').trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
-function actionForHandoff({ lastAction, lastActionAt, lastMoving, now }) {
-  const action = normalizeAction(lastAction);
-  const locomotion = action === 'idle' || action === 'walk' || action === 'run';
-  if (!locomotion && now - lastActionAt <= PLAYER_PRESENTATION_TRANSIENT_MAX_AGE_MS) return action;
-  if (lastMoving) return action === 'run' ? 'run' : 'walk';
+function isLocomotionAction(action) {
+  const value = normalizeAction(action);
+  return value === 'idle' || value === 'walk' || value === 'run';
+}
+
+function transientWindowMs(action, options = {}) {
+  const normalized = normalizeAction(action);
+  if (normalized === 'dead' || normalized === 'death' || normalized === 'faint') return Infinity;
+  const explicit = Number(options?.duration) * 1000;
+  if (Number.isFinite(explicit) && explicit > 0) return Math.min(PLAYER_PRESENTATION_TRANSIENT_MAX_AGE_MS, explicit);
+  return PLAYER_PRESENTATION_TRANSIENT_MAX_AGE_MS;
+}
+
+export function resolvePlayerPresentationAction({ requestedAction = 'idle', requestedAt = -Infinity, requestedOptions = {}, moving = false, now = 0 } = {}) {
+  const action = normalizeAction(requestedAction);
+  if (!isLocomotionAction(action) && now - requestedAt <= transientWindowMs(action, requestedOptions)) return action;
+  if (moving) return action === 'run' ? 'run' : 'walk';
   return 'idle';
 }
 
@@ -113,11 +125,31 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
   const gameplayRoot = session.root;
   let disposed = false;
   let lastMoving = false;
-  let lastAction = 'idle';
-  let lastActionOptions = {};
-  let lastActionAt = -Infinity;
+  let requestedAction = 'idle';
+  let requestedOptions = {};
+  let requestedAt = -Infinity;
+  let lastAppliedAction = 'idle';
   let parityPromise = null;
   let parityReport = null;
+
+  function currentResolvedAction() {
+    return resolvePlayerPresentationAction({
+      requestedAction,
+      requestedAt,
+      requestedOptions,
+      moving: lastMoving,
+      now: nowMs(windowRef),
+    });
+  }
+
+  function ensureLocomotionParity() {
+    if (disposed || session.presentationSource !== 'studio-character') return;
+    const next = currentResolvedAction();
+    if (next === lastAppliedAction) return;
+    session.play?.(next, { restart: true });
+    lastAppliedAction = next;
+    if (gameplayRoot?.userData) gameplayRoot.userData.presentationReplayAction = next;
+  }
 
   function ensureParity() {
     if (disposed) return Promise.resolve(null);
@@ -165,13 +197,9 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
         }
       }
 
-      const replayAction = actionForHandoff({
-        lastAction,
-        lastActionAt,
-        lastMoving,
-        now: nowMs(windowRef),
-      });
-      studio.play?.(replayAction, { ...lastActionOptions, restart: true });
+      const replayAction = currentResolvedAction();
+      studio.play?.(replayAction, { ...requestedOptions, restart: true });
+      lastAppliedAction = replayAction;
 
       setVisible(fallbackChildren, false);
       if (studio.root) studio.root.visible = true;
@@ -213,9 +241,10 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
     get presentationSource() { return session.presentationSource; },
     get presentationParity() { return parityReport; },
     play(action, playOptions = {}) {
-      lastAction = String(action || 'idle');
-      lastActionOptions = { ...playOptions };
-      lastActionAt = nowMs(windowRef);
+      requestedAction = String(action || 'idle');
+      requestedOptions = { ...playOptions };
+      requestedAt = nowMs(windowRef);
+      lastAppliedAction = normalizeAction(requestedAction);
       session.play?.(action, playOptions);
       ensureParity();
       return wrapper;
@@ -224,6 +253,7 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
       if (context && typeof context.moving === 'boolean') lastMoving = context.moving;
       session.update?.(dt, context);
       ensureParity();
+      ensureLocomotionParity();
       return wrapper;
     },
     anchor(name, target) { ensureParity(); return session.anchor(name, target); },
