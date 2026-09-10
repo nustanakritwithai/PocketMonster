@@ -252,11 +252,18 @@ function isInsideNode(node, ancestor) {
   for (let current = node; current; current = current.parent) if (current === ancestor) return true;
   return false;
 }
+function legacyFightingStyleSearchRoot(host) {
+  let current = host || null;
+  while (current && current.name !== 'player:gameplay-root' && current.parent
+    && !current.parent.isScene && current.parent.type !== 'Scene') current = current.parent;
+  return current?.name === 'player:gameplay-root' ? current : host;
+}
 export function syncStudioLegacyFightingStyleWraps({ THREE, studioRoot, host, socketAnchors = {} } = {}) {
-  if (!THREE?.Vector3 || !studioRoot || !host?.traverse) return 0;
+  const searchRoot = legacyFightingStyleSearchRoot(host);
+  if (!THREE?.Vector3 || !studioRoot || !searchRoot?.traverse) return 0;
   studioRoot.updateMatrixWorld?.(true);
   let synced = 0;
-  host.traverse(node => {
+  searchRoot.traverse(node => {
     if (!node || isInsideNode(node, studioRoot)) return;
     const socketName = legacyFightingStyleSocket(node);
     if (!socketName) return;
@@ -378,8 +385,8 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       boundAttachments.clear();
     }
     function clearLegacyFightingStyleSync() {
-      const host = root.parent;
-      host?.traverse?.(node => {
+      const searchRoot = legacyFightingStyleSearchRoot(root.parent);
+      searchRoot?.traverse?.(node => {
         if (legacyFightingStyleSocket(node) && node?.userData) delete node.userData.studioSocketSynced;
       });
       legacyHandEquipmentSynced = 0;

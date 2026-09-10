@@ -14,6 +14,8 @@ class Node {
     this.parent = null;
     this.userData = {};
     this.quaternion = {};
+    this.isScene = false;
+    this.type = 'Group';
   }
   add(child) { child.parent = this; this.children.push(child); return this; }
   traverse(visitor) { visitor(this); for (const child of this.children) child.traverse(visitor); }
@@ -40,36 +42,41 @@ function near(a, b, label) {
 }
 
 const THREE = { Vector3: Vec3 };
-const host = new Node('player:pirate-v1', 10, 2, -3);
+const gameplayRoot = new Node('player:gameplay-root', 10, 2, -3);
+const visualHost = new Node('player:pirate-v1', 0, 0, 0);
 const studio = new Node('studio-character:test', 0.25, 0.1, -0.2);
-host.add(studio);
+gameplayRoot.add(visualHost);
+visualHost.add(studio);
 const leftAnchor = new Node('studio-socket:weaponGripL', -0.55, 1.15, 0.12);
 const rightAnchor = new Node('studio-socket:weaponGripR', 0.55, 1.15, 0.12);
 studio.add(leftAnchor).add(rightAnchor);
 
+// Pirate Fruit EquipmentVisuals is a sibling of player:pirate-v1 under
+// player:gameplay-root, not a descendant of the Studio visual host.
 const style = new Node('equipment:style', 0.2, 0.3, 0.4);
 const leftWrap = new Node('equipment:style:left-hand', -0.62, 0.76, 0.04);
 const rightWrap = new Node('equipment:style:right-hand', 0.62, 0.76, 0.04);
 const sword = new Node('equipment:sword', 4, 5, 6);
-host.add(style).add(sword);
+gameplayRoot.add(style).add(sword);
 style.add(leftWrap).add(rightWrap);
 const swordBefore = world(sword);
 
 const synced = syncStudioLegacyFightingStyleWraps({
   THREE,
   studioRoot: studio,
-  host,
+  host: visualHost,
   socketAnchors: { weaponGripL: leftAnchor, weaponGripR: rightAnchor },
 });
 
-assert.equal(synced, 2, 'both Fighting Style hand wraps must be corrected');
+assert.equal(synced, 2, 'both Fighting Style hand wraps must be found across the gameplay-root sibling hierarchy');
 near(world(leftWrap), world(leftAnchor), 'left wrap follows Studio left-hand socket');
 near(world(rightWrap), world(rightAnchor), 'right wrap follows Studio right-hand socket');
 assert.equal(leftWrap.parent, style, 'left wrap stays in legacy EquipmentVisuals hierarchy');
 assert.equal(rightWrap.parent, style, 'right wrap stays in legacy EquipmentVisuals hierarchy');
-assert.equal(style.parent, host, 'style parent is not reparented onto one hand');
+assert.equal(style.parent, gameplayRoot, 'style parent remains a gameplay-root sibling of the Studio visual host');
+assert.equal(visualHost.parent, gameplayRoot, 'Studio visual host remains under gameplay root');
 near(world(sword), swordBefore, 'unrelated equipment is untouched by wrap correction');
 assert.equal(leftWrap.userData.studioSocketSynced, 'weaponGripL');
 assert.equal(rightWrap.userData.studioSocketSynced, 'weaponGripR');
 
-console.log('V9.1 Studio Fighting Style wrap socket regression passed');
+console.log('V9.1 Studio Fighting Style gameplay-root socket regression passed');
