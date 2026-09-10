@@ -10,6 +10,7 @@ on:
       - 'tests/v90-pirate-observatory-stream-router.mjs'
       - 'tests/v90-pirate-observatory-rest-session.mjs'
       - 'tests/v90-pirate-observatory-runtime-context.mjs'
+      - 'tests/v90-pirate-observatory-readiness.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
@@ -19,6 +20,7 @@ on:
       - 'tests/v90-pirate-observatory-stream-router.mjs'
       - 'tests/v90-pirate-observatory-rest-session.mjs'
       - 'tests/v90-pirate-observatory-runtime-context.mjs'
+      - 'tests/v90-pirate-observatory-readiness.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -47,3 +49,4 @@ jobs:
           node tests/v90-pirate-observatory-stream-router.mjs
           node tests/v90-pirate-observatory-rest-session.mjs
           node tests/v90-pirate-observatory-runtime-context.mjs
+          node tests/v90-pirate-observatory-readiness.mjs
