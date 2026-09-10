@@ -14,10 +14,14 @@ on:
       - 'world-living-v900.mjs'
       - 'runtime-config.mjs'
       - 'runtime-config.json'
+      - 'asset-presentation/pirate-fruit-pbr-ground.mjs'
+      - 'pirate-fruit-offline/pocket-presentation.mjs'
+      - 'pirate-fruit-offline/index.html'
       - 'assets/world-ground/**'
       - 'scripts/vendor-world-ground-polyhaven.mjs'
       - 'scripts/write-deployment-runtime-config.mjs'
       - 'tests/world-simulator-*.mjs'
+      - 'tests/v90-pirate-fruit-pbr-ground.mjs'
       - 'tests/deployment-runtime-config.mjs'
       - 'tests/check-active-syntax.mjs'
       - 'tests/production-launch-workflows.mjs'
@@ -51,6 +55,9 @@ jobs:
 
       - name: Live read-only wiring and fallback
         run: node tests/world-simulator-ground-live-v1.mjs
+
+      - name: Pirate Fruit PBR ground overlay
+        run: node tests/v90-pirate-fruit-pbr-ground.mjs
 
       - name: Firebase deployment ground flag
         run: node tests/deployment-runtime-config.mjs
