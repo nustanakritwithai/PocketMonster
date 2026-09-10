@@ -71,9 +71,9 @@ assert.match(sceneSource, /const BOUNDS = Object\.freeze\(\{ minX: -6\.4, maxX: 
 
 assert.equal(previewFrame.contract, 'pocketmonster.world-map-frame.v2');
 assert.equal(previewFrame.source.version, '20.9.4');
-assert.equal(previewFrame.grid.gridWidth, 16);
-assert.equal(previewFrame.grid.gridHeight, 16);
-assert.equal(previewFrame.grid.count, 256);
+assert.equal(previewFrame.grid.gridWidth, 8);
+assert.equal(previewFrame.grid.gridHeight, 8);
+assert.equal(previewFrame.grid.count, 64);
 assert.ok(new Set(previewFrame.channels.material).size >= 6, 'preview must visibly exercise multiple PBR ground materials');
 assert.ok(previewFrame.channels.waterDepth.some(value => value > 0), 'preview must contain visible authoritative-style water presentation');
 assert.ok(previewFrame.channels.wetness.some(value => value >= 0.9), 'preview must exercise wet surface response');
