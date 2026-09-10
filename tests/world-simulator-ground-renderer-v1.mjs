@@ -73,8 +73,12 @@ assert.equal(vertexCount(geometry.water), 8, 'water mesh includes authoritative 
 assert.equal(indexCount(geometry.water), 12);
 
 const sand = materialBatch('sand');
-assert.deepEqual(sand.position.slice(0, 3), [-3, 0.1, -4], 'WorldSim map is centered without changing authoritative coordinates');
-assert.deepEqual(sand.position.slice(3, 6), [0, 0.15000000596046448, -4], 'shared border height blends adjacent cell elevations visually');
+assert.equal(sand.position[0], -3);
+assert.ok(Math.abs(sand.position[1] - 0.1) < 1e-6, 'WorldSim terrain height keeps authoritative value within Float32 precision');
+assert.equal(sand.position[2], -4);
+assert.equal(sand.position[3], 0);
+assert.ok(Math.abs(sand.position[4] - 0.15) < 1e-6, 'shared border height blends adjacent cell elevations visually');
+assert.equal(sand.position[5], -4);
 assert.ok(Math.abs(geometry.water.position[1] - 0.358) < 1e-6, 'water surface uses totalWaterHeight plus tiny presentation-only z-fighting offset');
 assert.equal(sand.uv[0], -3 / 2.5);
 assert.equal(sand.uv[1], -4 / 2.5);
