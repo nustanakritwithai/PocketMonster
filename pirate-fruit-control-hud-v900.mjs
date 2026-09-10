@@ -59,11 +59,11 @@ html[data-pirate-hud="pirate-primary-parent"] .dialogue-root {
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-card {
   width: 100% !important;
   max-width: 100% !important;
-  height: 48vh !important;
-  min-height: 48vh !important;
-  max-height: 48vh !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 70vh !important;
   overflow: auto !important;
-  padding: 12px 14px 10px !important;
+  padding: 14px 16px 12px !important;
   border-radius: 12px !important;
   box-sizing: border-box !important;
 }
@@ -72,9 +72,12 @@ html[data-pirate-hud="pirate-primary-parent"] .dialogue-role,
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-page { font-size: 12px !important; }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-text {
   font-size: 16px !important;
-  min-height: 22vh !important;
+  min-height: 0 !important;
+  height: auto !important;
   margin: 8px 0 10px !important;
   line-height: 1.45 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .dialogue-close {
   font-size: 22px !important;
