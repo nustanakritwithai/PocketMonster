@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Pirate World Observatory</title>
+  <link rel="stylesheet" href="./dashboard.css" />
+</head>
+<body>
+  <main class="observatory" id="observatory">
+    <header class="topbar">
+      <div class="brand"><span class="skull">☠</span><span>PIRATE WORLD</span></div>
+      <div class="status-group">
+        <span id="syncStatus" class="status status-offline">○ OFFLINE</span>
+        <span id="tickStatus" class="metric">Tick —</span>
+        <span id="tpsStatus" class="metric">TPS —</span>
+        <button id="issueButton" class="issue-button" type="button">✓ NO ISSUES</button>
+      </div>
+      <label class="search"><span>⌕</span><input id="searchInput" placeholder="Search island or entity…" autocomplete="off" /></label>
+    </header>
+
+    <nav class="rail" aria-label="Observatory workspace">
+      <button class="rail-button is-active" data-workspace="world" type="button"><span>◎</span><small>WORLD</small></button>
+      <button class="rail-button" data-workspace="debug" type="button"><span>◉</span><small>DEBUG</small></button>
+      <button class="rail-button" data-workspace="server" type="button"><span>▥</span><small>SERVER</small></button>
+      <div class="rail-spacer"></div>
+      <button id="layerButton" class="rail-button" type="button"><span>◫</span><small>LAYERS</small></button>
+      <button id="watchButton" class="rail-button" type="button"><span>★</span><small>WATCH</small></button>
+    </nav>
+
+    <section class="map-panel" data-panel="world">
+      <div class="map-toolbar">
+        <div class="layer-chips" id="layerChips">
+          <button class="chip is-on" data-layer="islands" type="button">🏝 Islands</button>
+          <button class="chip is-on" data-layer="entities" type="button">🚢 Entities</button>
+          <button class="chip" data-layer="performance" type="button">⚙ Performance</button>
+        </div>
+        <span class="map-note">Canonical Pirate Fruit geography</span>
+      </div>
+      <svg id="worldMap" class="world-map" viewBox="-110 -160 730 760" role="img" aria-label="Pirate world observatory map">
+        <defs>
+          <pattern id="waves" width="38" height="22" patternUnits="userSpaceOnUse">
+            <path d="M0 12 Q9 4 19 12 T38 12" fill="none" stroke="currentColor" stroke-width="1" opacity=".16" />
+          </pattern>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect x="-110" y="-160" width="730" height="760" class="ocean" />
+        <rect x="-110" y="-160" width="730" height="760" fill="url(#waves)" class="waves" />
+        <g id="islandLayer"></g>
+        <g id="entityLayer"></g>
+      </svg>
+      <div id="mapEmpty" class="map-empty">
+        <strong>Static geography ready</strong>
+        <span>Waiting for authoritative server snapshot stream.</span>
+      </div>
+    </section>
+
+    <section class="workspace-placeholder" data-panel="debug" hidden>
+      <div><span class="eyebrow">DEBUG WORKSPACE</span><h1>Investigation context will stay attached to the selected entity.</h1><p>Journal timeline, snapshot diff and replay controls activate when a server transport supplies history.</p></div>
+    </section>
+
+    <section class="workspace-placeholder" data-panel="server" hidden>
+      <div><span class="eyebrow">SERVER WORKSPACE</span><h1>System Health + World Health</h1><p>Tick budget, subsystem profiler and region profiler will consume canonical health channels rather than reading mutable WorldSim state.</p></div>
+    </section>
+
+    <aside class="inspector" id="inspector">
+      <span class="eyebrow">INSPECTOR</span>
+      <h2 id="inspectorTitle">No selection</h2>
+      <p id="inspectorSubtitle" class="muted">Select an island or stream entity.</p>
+      <div id="inspectorBody" class="inspector-body">
+        <div class="empty-card">Observatory is read-only. No world state is edited from this panel.</div>
+      </div>
+      <div class="inspector-actions">
+        <button id="watchSelected" type="button" disabled>★ WATCH</button>
+        <button id="debugSelected" type="button" disabled>◎ DEBUG</button>
+      </div>
+    </aside>
+
+    <footer class="timeline">
+      <div class="timeline-live"><span id="timelineMode">○ OFFLINE</span></div>
+      <div id="timelineEvents" class="timeline-events"><span>Awaiting world.event stream…</span></div>
+    </footer>
+  </main>
+  <script type="module" src="./dashboard.mjs"></script>
+</body>
+</html>
