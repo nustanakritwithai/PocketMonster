@@ -39,7 +39,8 @@ assert.equal(enabled.canWritePlayerData, false, 'ground does not imply player-da
 const liveSource = fs.readFileSync(new URL('../world-simulator-ground-live-v1.mjs', import.meta.url), 'utf8');
 const sceneSource = fs.readFileSync(new URL('../world-living-v900.mjs', import.meta.url), 'utf8');
 const configSource = fs.readFileSync(new URL('../runtime-config.mjs', import.meta.url), 'utf8');
-const pack = JSON.parse(fs.readFileSync(new URL('../assets/world-ground/material-pack-v1.json', import.meta.url), 'utf8'));
+const packUrl = new URL('../assets/world-ground/material-pack-v1.json', import.meta.url);
+const pack = JSON.parse(fs.readFileSync(packUrl, 'utf8'));
 
 assert.match(liveSource, /fetchWorldMapFrame/, 'live bridge fetches through the validated WorldSim adapter');
 assert.match(liveSource, /fallbackMesh\.visible = !ground\.getFrame\(\)/, 'fallback remains until a valid frame exists');
@@ -56,14 +57,25 @@ assert.match(sceneSource, /const BOUNDS = Object\.freeze\(\{ minX: -6\.4, maxX: 
   'presentation patch must not silently replace gameplay/navigation bounds');
 
 assert.equal(pack.schema, 'pocketmonster.world-ground-material-pack.v1');
-assert.equal(pack.installed, false, 'repository stays safe until texture binaries are actually vendored');
+assert.equal(pack.installed, true, 'high-quality local ground material pack must be vendored before merge');
 assert.equal(pack.runtimeApiDependency, false, 'deployed game must not depend on Poly Haven API');
 assert.equal(pack.license, 'CC0');
+assert.equal(pack.resolution, '1k');
+assert.equal(pack.normalConvention, 'opengl');
+
+const uniqueFiles = new Set();
 for (const material of ['grass', 'forest-floor', 'mud', 'sand', 'rock', 'dry-soil', 'burned']) {
   assert.ok(pack.materials[material], `material pack declares ${material}`);
   for (const slot of ['albedo', 'normal', 'roughness', 'ao']) {
-    assert.ok(pack.materials[material][slot], `${material} declares ${slot}`);
+    const relative = pack.materials[material][slot];
+    assert.ok(relative, `${material} declares ${slot}`);
+    const assetUrl = new URL(relative, packUrl);
+    const stat = fs.statSync(assetUrl);
+    assert.ok(stat.isFile(), `${material}.${slot} is a local file`);
+    assert.ok(stat.size > 1024, `${material}.${slot} is not an empty/placeholder asset`);
+    uniqueFiles.add(assetUrl.href);
   }
 }
+assert.equal(uniqueFiles.size, 24, 'material pack should vendor 24 unique local JPEG PBR maps');
 
 console.log('world-simulator-ground-live-v1: PASS');
