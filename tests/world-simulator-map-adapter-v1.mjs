@@ -88,7 +88,7 @@ assert.deepEqual(frame.channels.waterHeight, [0.35, 0.20, 0.36, 0.50], 'totalWat
 assert.deepEqual(frame.channels.waterDepth, [0.25, 0, 0.06, 0]);
 assert.equal(frame.channels.wetness[0], 0, 'inactive/no-soil water has no soil wetness');
 assert.equal(frame.channels.wetness[1], 0.5, 'wetness is waterContent/saturationCapacity');
-assert.equal(frame.channels.wetness[2], 0.9);
+assert.ok(Math.abs(frame.channels.wetness[2] - 0.9) < 1e-12);
 assert.equal(frame.channels.vegetation[2], 0.91);
 assert.equal(frame.channels.burn[3], 0.82);
 assert.equal(frame.channels.biome[0], WORLD_GROUND_BIOMES.indexOf('ocean'));
