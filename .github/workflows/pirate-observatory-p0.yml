@@ -29,6 +29,7 @@ jobs:
           node --check pirate-observatory/protocol.mjs
           node --check pirate-observatory/partition-sync.mjs
           node --check pirate-observatory/transport.mjs
+          node --check pirate-observatory/stream-router.mjs
           node --check pirate-observatory/dashboard.mjs
           node --check pirate-observatory/bootstrap.mjs
       - name: Observatory client regression
