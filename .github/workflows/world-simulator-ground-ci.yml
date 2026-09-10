@@ -16,6 +16,7 @@ on:
       - 'runtime-config.json'
       - 'asset-presentation/pirate-fruit-pbr-ground.mjs'
       - 'pirate-fruit-offline/pocket-presentation.mjs'
+      - 'pirate-fruit-offline/pocket-ground-presentation.mjs'
       - 'pirate-fruit-offline/index.html'
       - 'assets/world-ground/**'
       - 'scripts/vendor-world-ground-polyhaven.mjs'
