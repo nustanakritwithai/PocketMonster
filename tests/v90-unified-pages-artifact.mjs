@@ -13,16 +13,6 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.join(root, 'dist-pages');
 const manifest = JSON.parse(fs.readFileSync(path.join(output, 'patch-manifest.json'), 'utf8'));
 const closure = collectPublicDependencyClosure(root);
-const pirateBootstrap = fs.readFileSync(path.join(root, 'pirate-fruit-offline/pocket-bootstrap.mjs'), 'utf8');
-const pirateEntryMatch = pirateBootstrap.match(/import\('\.\/assets\/([^']+\.js)'\)/);
-assert.ok(pirateEntryMatch, 'Pirate bootstrap must declare its compiled entry asset');
-const pirateEntryAsset = `pirate-fruit-offline/assets/${pirateEntryMatch[1]}`;
-const activePirateAsset = (relative) => {
-  if (!relative.startsWith('pirate-fruit-offline/assets/')) return relative;
-  const filename = relative.slice('pirate-fruit-offline/assets/'.length);
-  const stem = filename.replace(/-[^-]+\.js$/, '');
-  return [...closure].find((candidate) => candidate.startsWith(`pirate-fruit-offline/assets/${stem}-`) && candidate.endsWith('.js')) ?? relative;
-};
 const required = new Set([
   ...REQUIRED_V9_ENTRY_FILES,
   'entry-preload-v900.mjs',
@@ -43,20 +33,35 @@ const required = new Set([
   'chat-runtime.mjs',
   'combined-worlds-v900.mjs',
   'game-v800.js',
-  'boot-pirate-fruit-v900.mjs',
+  'world-pirate-native-v900.mjs',
   'world-living-v900.mjs',
-  'pirate-fruit-offline/index.html',
-  pirateEntryAsset,
-  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
+  'asset-presentation/providers/procedural-bighead-monster.mjs',
   'assets/catalog/humanoid-core.json',
 ]);
 
 for (const relative of required) assert.ok(closure.has(relative), `${relative} must be reachable from a shipped V9 entry`);
 
+const rollbackOnly = [
+  'boot-pirate-fruit-v900.mjs',
+  'pirate-fruit-offline/index.html',
+  'pirate-fruit-offline/pocket-bootstrap.mjs',
+  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
+];
+for (const relative of rollbackOnly) {
+  assert.equal(closure.has(relative), false, `${relative} must stay outside the active V9 dependency closure`);
+  assert.equal(fs.existsSync(path.join(output, relative)), true, `${relative} remains published only as rollback compatibility`);
+}
+assert.equal([...closure].some(relative => relative.startsWith('pirate-fruit-offline/')), false,
+  'active Pages closure must not preload any vendored Pirate offline file');
+
 const manifestFiles = new Map(manifest.files.map(item => [item.path, item]));
-for (const relative of PAGES_LIVE_SMOKE_FILES.map(activePirateAsset)) {
+for (const relative of PAGES_LIVE_SMOKE_FILES) {
   assert.ok(manifestFiles.has(relative), `รายการตรวจ live ต้องอยู่ใน manifest ก่อนเผยแพร่: ${relative}`);
 }
+assert.equal(manifestFiles.has('boot-pirate-fruit-v900.mjs'), false,
+  'patch manifest must not force-download the rollback Pirate boot');
+assert.equal([...manifestFiles.keys()].some(relative => relative.startsWith('pirate-fruit-offline/')), false,
+  'patch manifest must not force-download any rollback offline Pirate file');
 assert.equal(manifestFiles.size, closure.size, 'patch manifest must not force-download public compatibility files outside the active V9 closure');
 assert.deepEqual([...manifestFiles.keys()].sort(), [...closure].sort(), 'patch manifest must equal the active V9 dependency closure exactly');
 for (const relative of closure) {
@@ -80,6 +85,15 @@ assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must 
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
+
+const combined = fs.readFileSync(path.join(output, 'combined-worlds-v900.mjs'), 'utf8');
+assert.match(combined, /world-pirate-native-v900\.mjs\?v=1/, 'built world catalog must route Pirate Fruit to Native V9');
+assert.doesNotMatch(combined, /boot-pirate-fruit-v900\.mjs\?v=953/, 'built world catalog must not route through rollback Pirate boot');
+const nativePirate = fs.readFileSync(path.join(output, 'world-pirate-native-v900.mjs'), 'utf8');
+assert.match(nativePirate, /studioFirst: true/, 'built Native Pirate runtime declares Studio-first startup');
+assert.match(nativePirate, /offlineClientLoaded: false/, 'built Native Pirate diagnostics prove no offline client is active');
+assert.doesNotMatch(nativePirate, /pirate-fruit-offline|pirateFruitFrame|mountPirateOffline/,
+  'built Native Pirate runtime must not reference the offline client');
 
 const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
 assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'public V9 artifact requires the one Monster Life launch session');
