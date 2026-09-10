@@ -1,9 +1,10 @@
-import { fetchWorldMapFrame } from './world-simulator-map-adapter-v1.mjs';
+import { fetchWorldMapFrame, readWorldMapFrame } from './world-simulator-map-adapter-v1.mjs';
 import { createWorldSimulatorGroundRenderer } from './world-simulator-ground-renderer-v1.mjs';
 
 export const WORLD_GROUND_LIVE_SCHEMA = 'pocketmonster.world-ground-live.v1';
 export const WORLD_GROUND_DEFAULT_ZONE = 'emerald-forest';
 export const WORLD_GROUND_PACK_PATH = './assets/world-ground/material-pack-v1.json';
+export const WORLD_GROUND_PREVIEW_PATH = './assets/world-ground/worldsim-preview-frame-v2.json';
 
 export function worldSimulatorGroundEnabled(runtimeConfig) {
   return Boolean(
@@ -30,6 +31,7 @@ export function createWorldSimulatorGroundLive({
   quality = 'medium',
   fetchImpl = globalThis.fetch,
   materialPackUrl = WORLD_GROUND_PACK_PATH,
+  previewFrameUrl = WORLD_GROUND_PREVIEW_PATH,
 } = {}) {
   if (!THREE || !scene || !renderer) throw new TypeError('THREE, scene and renderer are required');
   const enabled = worldSimulatorGroundEnabled(runtimeConfig);
@@ -48,6 +50,9 @@ export function createWorldSimulatorGroundLive({
   let lastAttemptAt = null;
   let lastError = null;
   let refreshCount = 0;
+  let sourceMode = 'none';
+  let previewLoadedAt = null;
+  let previewError = null;
   let packState = Object.freeze({ state: 'not-loaded', installed: false });
 
   function updateFallback() {
@@ -90,6 +95,29 @@ export function createWorldSimulatorGroundLive({
     return packPromise;
   }
 
+  async function loadPreviewFrame() {
+    if (!enabled || disposed || typeof fetchImpl !== 'function') return null;
+    try {
+      const response = await fetchImpl(new URL(previewFrameUrl, import.meta.url), {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (!response?.ok) throw new Error(`World ground preview request failed: ${response?.status ?? 'unknown'}`);
+      const frame = readWorldMapFrame(await response.json());
+      ground.setFrame(frame);
+      sourceMode = 'preview';
+      previewLoadedAt = nowMs();
+      previewError = null;
+      updateFallback();
+      void loadMaterialPack();
+      return Object.freeze({ state: 'preview', frame });
+    } catch (error) {
+      previewError = String(error?.message || error);
+      updateFallback();
+      return Object.freeze({ state: 'fallback', frame: ground.getFrame(), error: previewError });
+    }
+  }
+
   async function refresh() {
     if (disposed) throw new Error('World Simulator ground live controller has been disposed');
     if (!enabled) {
@@ -108,6 +136,7 @@ export function createWorldSimulatorGroundLive({
         });
         if (disposed) return Object.freeze({ state: 'disposed', frame: null });
         ground.setFrame(frame);
+        sourceMode = 'live';
         lastSuccessAt = nowMs();
         lastError = null;
         updateFallback();
@@ -115,7 +144,16 @@ export function createWorldSimulatorGroundLive({
         return Object.freeze({ state: 'ready', frame });
       } catch (error) {
         lastError = String(error?.message || error);
+        if (!ground.getFrame()) {
+          const preview = await loadPreviewFrame();
+          if (preview?.state === 'preview') {
+            return Object.freeze({ state: 'preview', frame: preview.frame, liveError: lastError });
+          }
+        }
         updateFallback();
+        if (sourceMode === 'preview' && ground.getFrame()) {
+          return Object.freeze({ state: 'preview', frame: ground.getFrame(), liveError: lastError });
+        }
         return Object.freeze({
           state: ground.getFrame() ? 'stale' : 'fallback',
           frame: ground.getFrame(),
@@ -134,18 +172,23 @@ export function createWorldSimulatorGroundLive({
       enabled,
       zoneId,
       apiBaseUrl: enabled ? runtimeConfig.apiBaseUrl : '',
+      sourceMode,
       state: disposed
         ? 'disposed'
         : !enabled
           ? 'disabled'
-          : ground.getFrame()
-            ? lastError ? 'stale' : 'ready'
-            : lastError ? 'fallback' : 'idle',
+          : sourceMode === 'preview' && ground.getFrame()
+            ? 'preview'
+            : ground.getFrame()
+              ? lastError ? 'stale' : 'ready'
+              : lastError ? 'fallback' : 'idle',
       refreshCount,
       inFlight: Boolean(inFlight),
       lastAttemptAt,
       lastSuccessAt,
       lastError,
+      previewLoadedAt,
+      previewError,
       fallbackVisible: Boolean(fallbackMesh?.visible),
       materialPack: packState,
       renderer: ground.diagnostics(),
@@ -158,6 +201,7 @@ export function createWorldSimulatorGroundLive({
     ground,
     refresh,
     loadMaterialPack,
+    loadPreviewFrame,
     diagnostics,
     dispose() {
       if (disposed) return false;

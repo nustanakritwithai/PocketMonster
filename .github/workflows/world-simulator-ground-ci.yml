@@ -13,10 +13,17 @@ on:
       - 'world-simulator-ground-live-v1.mjs'
       - 'world-living-v900.mjs'
       - 'runtime-config.mjs'
+      - 'runtime-config.json'
       - 'assets/world-ground/**'
       - 'scripts/vendor-world-ground-polyhaven.mjs'
+      - 'scripts/write-deployment-runtime-config.mjs'
       - 'tests/world-simulator-*.mjs'
+      - 'tests/deployment-runtime-config.mjs'
       - 'tests/check-active-syntax.mjs'
+      - 'tests/production-launch-workflows.mjs'
+      - 'tests/v90-deployment-gates.mjs'
+      - '.github/workflows/github-pages.yml'
+      - '.github/workflows/firebase-hosting-merge.yml'
       - '.github/workflows/world-simulator-ground-ci.yml'
   workflow_dispatch:
 
@@ -44,6 +51,15 @@ jobs:
 
       - name: Live read-only wiring and fallback
         run: node tests/world-simulator-ground-live-v1.mjs
+
+      - name: Firebase deployment ground flag
+        run: node tests/deployment-runtime-config.mjs
+
+      - name: Production launch workflow contract
+        run: node tests/production-launch-workflows.mjs
+
+      - name: V9 deployment gates
+        run: node tests/v90-deployment-gates.mjs
 
       - name: Active syntax gate
         run: node tests/check-active-syntax.mjs
