@@ -1,5 +1,7 @@
+import { COMBINED_RUNTIME_VERSION } from './version-manifest.mjs';
+
 /** V9 combined channel: 3 worlds. Control panels (human/throw) live in control-panels-v900.mjs. */
-export const COMBINED_VERSION = '9.0.1-unified-online-shell';
+export const COMBINED_VERSION = COMBINED_RUNTIME_VERSION;
 export const COMBINED_WORLD_COUNT = 3;
 export const DEFAULT_COMBINED_WORLD = 'pirate-fruit';
 
