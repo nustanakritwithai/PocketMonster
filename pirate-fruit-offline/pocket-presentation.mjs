@@ -3,7 +3,9 @@ import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
   subscribePirateStudioCharacterStatus,
+  threeFromPirateFruitVendor,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=5';
+import { hookPirateFruitPbrGround } from '../asset-presentation/pirate-fruit-pbr-ground.mjs?v=1';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
   PIRATE_STUDIO_CHARACTER_FAILED,
@@ -83,7 +85,9 @@ window.addEventListener('message', event => {
   document.documentElement.dataset.controlPanel = message.panel;
 });
 
+const pirateFruitThreeKit = threeFromPirateFruitVendor(pirateFruitThree);
 hookPirateFruitRenderer(pirateFruitThree);
+hookPirateFruitPbrGround({ THREE: pirateFruitThreeKit });
 if (studioCapability) {
   window.parent?.postMessage({ type: PIRATE_STUDIO_CHARACTER_READY, capability: studioCapability }, parentOrigin);
 }
@@ -93,7 +97,7 @@ const postDialogue = open => {
     window.parent?.postMessage({ type: PIRATE_FRUIT_DIALOGUE_MESSAGE, open: open === true }, parentOrigin || '*');
   } catch {}
 };
-const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.boat-shop-root', '.potion-shop-root', '.dealer-shop-root', '.inv-root'];
+const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.potion-shop-root', '.dealer-shop-root', '.inv-root', '.boat-shop-root'];
 let lastOverlayOpen = null;
 const syncDialogue = () => {
   const open = OVERLAY_ROOTS.some(selector => document.querySelector(selector)?.style?.display === 'flex');
