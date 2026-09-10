@@ -8,7 +8,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 // Keep the persistent owner in the explicit V9 dependency closure; the Server
 // wrapper below delegates installation to this same module instance.
 import './persistent-minimap-owner-v900.mjs?v=2';
-import { installPersistentMinimapOwnerFromServerPresence } from './server-minimap-presence-v900.mjs?v=1';
+import { installPersistentMinimapOwnerFromServerPresence } from './server-minimap-presence-v900.mjs?v=2';
 import {
   healthVersionGate,
   publishServerGateTelemetry,
