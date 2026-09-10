@@ -2,7 +2,7 @@ import { loadCatalog, getAssetDef, listBundle } from './catalog.mjs';
 import { assertAssetHandle } from './handle-contract.mjs';
 import { normalizeAssetRequest } from './requests.mjs';
 import { sharedSize } from './ownership.mjs';
-import { maybeWrapPlayerPresentationHandle } from './player-presentation-session.mjs';
+import { maybeWrapPlayerPresentationHandle } from './player-presentation-parity.mjs';
 
 export function createAssetEngine({ THREE = null, quality = 'medium' } = {}) {
   const providers = new Map();
