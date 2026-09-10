@@ -6,6 +6,16 @@ function cloneValue(value) {
   return value;
 }
 
+function validateChanges(packet) {
+  if (!Array.isArray(packet.changes) || packet.changes.length === 0) return false;
+  let previous = packet.baseSequence;
+  for (const change of packet.changes) {
+    if (!Number.isSafeInteger(change?.sequence) || change.sequence <= previous || change.sequence > packet.sequence) return false;
+    previous = change.sequence;
+  }
+  return previous === packet.sequence;
+}
+
 export class PartitionSync {
   constructor(partition) {
     this.partition = assertPartition(partition);
@@ -18,11 +28,9 @@ export class PartitionSync {
   }
 
   applySnapshot(snapshot) {
-    if (snapshot?.schemaVersion !== PIRATE_OBSERVATORY_SCHEMA_VERSION) {
-      return { ok: false, reason: 'SCHEMA_MISMATCH' };
-    }
+    if (snapshot?.schemaVersion !== PIRATE_OBSERVATORY_SCHEMA_VERSION) return { ok: false, reason: 'SCHEMA_MISMATCH' };
     if (snapshot.partition !== this.partition) return { ok: false, reason: 'PARTITION_MISMATCH' };
-    if (!Number.isSafeInteger(snapshot.sequence) || snapshot.sequence < 0) return { ok: false, reason: 'INVALID_SEQUENCE' };
+    if (!Number.isSafeInteger(snapshot.sequence) || snapshot.sequence < 0 || !Number.isSafeInteger(snapshot.tick) || snapshot.tick < 0) return { ok: false, reason: 'INVALID_SEQUENCE' };
 
     this.entities.clear();
     for (const entity of snapshot.entities ?? []) {
@@ -30,7 +38,7 @@ export class PartitionSync {
       this.entities.set(entity.id, cloneValue(entity));
     }
     this.sequence = snapshot.sequence;
-    this.tick = snapshot.tick ?? 0;
+    this.tick = snapshot.tick;
     this.lastSnapshotId = snapshot.snapshotId ?? null;
     this.state = SYNC_STATES.LIVE;
     this.staleChangeCount = 0;
@@ -40,18 +48,24 @@ export class PartitionSync {
   applyDelta(packet) {
     if (packet?.schemaVersion !== PIRATE_OBSERVATORY_SCHEMA_VERSION) return { ok: false, reason: 'SCHEMA_MISMATCH' };
     if (packet.partition !== this.partition) return { ok: false, reason: 'PARTITION_MISMATCH' };
-    if (!Number.isSafeInteger(packet.sequence) || !Number.isSafeInteger(packet.baseSequence)) return { ok: false, reason: 'INVALID_SEQUENCE' };
+    if (!Number.isSafeInteger(packet.sequence) || !Number.isSafeInteger(packet.baseSequence) || !Number.isSafeInteger(packet.tick)
+      || packet.sequence < 0 || packet.baseSequence < 0 || packet.tick < 0 || packet.sequence <= packet.baseSequence) {
+      return { ok: false, reason: 'INVALID_SEQUENCE' };
+    }
 
     if (packet.sequence <= this.sequence) return { ok: true, duplicate: true };
     if (packet.baseSequence !== this.sequence) {
       this.state = SYNC_STATES.DESYNC;
       return { ok: false, reason: 'SEQUENCE_GAP', expectedBase: this.sequence, receivedBase: packet.baseSequence, receivedSequence: packet.sequence };
     }
+    if (!validateChanges(packet)) {
+      this.state = SYNC_STATES.DESYNC;
+      return { ok: false, reason: 'INVALID_DELTA' };
+    }
 
-    const changes = [...(packet.changes ?? [])].sort((a, b) => a.sequence - b.sequence);
-    for (const change of changes) this.#applyChange(change);
+    for (const change of packet.changes) this.#applyChange(change);
     this.sequence = packet.sequence;
-    this.tick = Math.max(this.tick, packet.tick ?? 0);
+    this.tick = Math.max(this.tick, packet.tick);
     this.state = SYNC_STATES.LIVE;
     return { ok: true };
   }
