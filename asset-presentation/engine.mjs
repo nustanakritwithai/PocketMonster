@@ -2,6 +2,7 @@ import { loadCatalog, getAssetDef, listBundle } from './catalog.mjs';
 import { assertAssetHandle } from './handle-contract.mjs';
 import { normalizeAssetRequest } from './requests.mjs';
 import { sharedSize } from './ownership.mjs';
+import { maybeWrapPlayerPresentationHandle } from './player-presentation-session.mjs';
 
 export function createAssetEngine({ THREE = null, quality = 'medium' } = {}) {
   const providers = new Map();
@@ -28,7 +29,14 @@ export function createAssetEngine({ THREE = null, quality = 'medium' } = {}) {
     if (!def) throw new Error(`unknown asset ${req.assetId}`);
     const factory = providers.get(def.provider);
     if (!factory) throw new Error(`no provider registered for ${def.provider}`);
-    const handle = assertAssetHandle(factory({
+    const providerHandle = assertAssetHandle(factory({
+      def,
+      request: req,
+      THREE,
+      quality: req.quality || quality,
+    }));
+    const handle = assertAssetHandle(maybeWrapPlayerPresentationHandle({
+      handle: providerHandle,
       def,
       request: req,
       THREE,

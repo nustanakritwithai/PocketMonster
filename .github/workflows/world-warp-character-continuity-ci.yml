@@ -1,0 +1,50 @@
+name: World warp character continuity CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'asset-presentation/engine.mjs'
+      - 'asset-presentation/player-presentation-session.mjs'
+      - 'asset-presentation/studio-character-live-bridge.mjs'
+      - 'asset-presentation/studio-character-package.mjs'
+      - 'asset-presentation/providers/studio-character.mjs'
+      - 'asset-presentation/providers/pirate-fruit-player.mjs'
+      - 'boot-pirate-fruit-v900.mjs'
+      - 'game-v800.js'
+      - 'worlds-v900.mjs'
+      - 'pirate-player-server.mjs'
+      - 'tests/v92-world-warp-character-continuity.mjs'
+      - '.github/workflows/world-warp-character-continuity-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  continuity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check presentation continuity path
+        run: |
+          node --check asset-presentation/engine.mjs
+          node --check asset-presentation/player-presentation-session.mjs
+          node --check asset-presentation/studio-character-live-bridge.mjs
+          node --check asset-presentation/providers/studio-character.mjs
+          node --check boot-pirate-fruit-v900.mjs
+          node --check game-v800.js
+      - name: Run world-warp presentation continuity gate
+        run: node tests/v92-world-warp-character-continuity.mjs
+      - name: Preserve Studio provider and live bridge contracts
+        run: |
+          node tests/v91-studio-character-provider.mjs
+          node tests/v91-studio-character-live-wiring.mjs
+          node tests/v91-studio-blue-explorer-primary.mjs
+      - name: Preserve warp and Pirate player regressions
+        run: |
+          node tests/v90-warp-overlay-lifecycle.mjs
+          node tests/v90-pirate-fruit-player.mjs
