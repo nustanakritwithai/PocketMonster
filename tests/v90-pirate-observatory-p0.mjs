@@ -5,6 +5,7 @@ import {
   STREAM_CHANNELS,
   SYNC_STATES,
   PartitionSync,
+  PirateObservatoryRestTransport,
   createStreamEnvelope,
   recoverPartition,
 } from '../pirate-observatory/index.mjs';
@@ -69,6 +70,22 @@ const delta = ({ partition = 'pirate-fruit', tick = 11, baseSequence = 1, sequen
   assert.equal(sync.state, SYNC_STATES.DESYNC);
 }
 
+// A malformed batch cannot advance the partition cursor past unseen changes.
+{
+  const sync = new PartitionSync('pirate-fruit');
+  sync.applySnapshot(snapshot());
+  const result = sync.applyDelta(delta({
+    baseSequence: 1,
+    sequence: 3,
+    changes: [{ sequence: 2, type: CHANGE_TYPES.SPAWN, entity: 'ghost-gap', after: { id: 'ghost-gap', x: 0, z: 0 } }],
+  }));
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'INVALID_DELTA');
+  assert.equal(sync.sequence, 1);
+  assert.equal(sync.entities.has('ghost-gap'), false);
+  assert.equal(sync.state, SYNC_STATES.DESYNC);
+}
+
 // Wrong partition and schema never mutate the client cursor.
 {
   const sync = new PartitionSync('pirate-fruit');
@@ -127,6 +144,39 @@ const delta = ({ partition = 'pirate-fruit', tick = 11, baseSequence = 1, sequen
   assert.equal(envelope.schemaVersion, PIRATE_OBSERVATORY_SCHEMA_VERSION);
   assert.equal(envelope.partition, 'pirate-fruit');
   assert.equal(envelope.channel, 'world.delta');
+}
+
+// REST transport is read-only and anchors Observatory routes at the server API root.
+{
+  const calls = [];
+  const transport = new PirateObservatoryRestTransport({
+    baseUrl: 'https://server.example/game/',
+    headers: () => ({ Authorization: 'Bearer test-only' }),
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      return { ok: true, status: 200, async json() { return { ok: true }; } };
+    },
+  });
+  await transport.getPartitionSnapshot('pirate-fruit');
+  await transport.getChangesAfter('pirate-fruit', 12);
+  await transport.getInterest({
+    partition: 'pirate-fruit',
+    viewport: { minX: -1, maxX: 2, minZ: -3, maxZ: 4 },
+    zoom: 1.2,
+    selectedId: 'ship_1',
+    watchedIds: ['player_2'],
+    includeTypes: ['ship'],
+    maxEntities: 100,
+  });
+  assert.equal(new URL(calls[0].url).pathname, '/api/observatory/regions/pirate-fruit/snapshot');
+  assert.equal(new URL(calls[1].url).searchParams.get('afterSequence'), '12');
+  const interestUrl = new URL(calls[2].url);
+  assert.equal(interestUrl.pathname, '/api/observatory/regions/pirate-fruit/interest');
+  assert.equal(interestUrl.searchParams.get('selectedId'), 'ship_1');
+  assert.equal(interestUrl.searchParams.get('watch'), 'player_2');
+  assert.equal(interestUrl.searchParams.get('type'), 'ship');
+  assert.equal(calls.every(call => call.options.method === 'GET'), true);
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer test-only');
 }
 
 console.log('v90 Pirate World Observatory client P0: PASS');
