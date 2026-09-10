@@ -1,4 +1,6 @@
-const GAME_VERSION = '8.4.0';
+import { GAME_API_COMPAT_VERSION } from './version-manifest.mjs';
+
+const GAME_VERSION = GAME_API_COMPAT_VERSION;
 const APPLIED_KEY = 'monsterlife-applied-patch';
 const ASSET_BASE = new URL(globalThis.window?.__POCKETMONSTER_ASSET_BASE__ || '.', import.meta.url);
 const MAX_CONCURRENT_DOWNLOADS = 6;
