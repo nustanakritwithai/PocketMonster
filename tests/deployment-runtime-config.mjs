@@ -50,7 +50,9 @@ const ticketConfig = createReadOnlyRuntimeConfig('https://157.85.96.139', { laun
 assert.equal(ticketConfig.featureFlags.launchTicket, true);
 for (const flag of ['vpsWrites', 'playerDataWrites', 'saveMigration', 'economyMutation']) assert.equal(ticketConfig.featureFlags[flag], false);
 
-const workflowSource = fs.readFileSync('.github/workflows/firebase-hosting-merge.yml', 'utf8');
-assert.match(workflowSource, /MONSTERLIFE_WORLD_SIM_GROUND:\s*['"]true['"]/, 'Firebase live deployment must preserve WorldSim ground enablement');
+const firebaseWorkflowSource = fs.readFileSync('.github/workflows/firebase-hosting-merge.yml', 'utf8');
+const pagesWorkflowSource = fs.readFileSync('.github/workflows/github-pages.yml', 'utf8');
+assert.match(firebaseWorkflowSource, /MONSTERLIFE_WORLD_SIM_GROUND:\s*['"]true['"]/, 'Firebase live deployment must preserve WorldSim ground enablement');
+assert.match(pagesWorkflowSource, /MONSTERLIFE_WORLD_SIM_GROUND:\s*['"]true['"]/, 'GitHub Pages deployment must preserve WorldSim ground enablement');
 
 console.log('deployment runtime config contract passed');
