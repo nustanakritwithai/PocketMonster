@@ -19,9 +19,15 @@ import {
   normalizeMerchantPurchaseCommandIds,
   normalizeMerchantPurchaseHistory,
 } from './merchant-purchase.mjs';
+import {
+  LEGACY_ASSET_REVISION,
+  LEGACY_GAMEPLAY_RUNTIME_VERSION,
+} from './version-manifest.mjs';
 
-export const APP_VERSION = '8.4.0';
-export const ASSET_REVISION = '814';
+// Transitional aliases kept for existing save/test consumers. APP_VERSION is
+// the legacy gameplay compatibility identity, not the public V9 shell release.
+export const APP_VERSION = LEGACY_GAMEPLAY_RUNTIME_VERSION;
+export const ASSET_REVISION = LEGACY_ASSET_REVISION;
 export const SAVE_SCHEMA_VERSION = 15;
 export const SAVE_KEY = 'monster-life-rpg-proto-v6';
 export const SAVE_BACKUP_KEY = `${SAVE_KEY}:backup`;
