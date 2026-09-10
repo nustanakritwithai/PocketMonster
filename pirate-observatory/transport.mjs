@@ -19,6 +19,10 @@ export class PirateObservatoryRestTransport {
     this.headers = headers;
   }
 
+  async getStatus() {
+    return this.#get('/api/observatory/status');
+  }
+
   async getPartitionSnapshot(partition) {
     const target = encodeURIComponent(assertPartition(partition));
     return this.#get(`/api/observatory/regions/${target}/snapshot`);
