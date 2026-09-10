@@ -1,3 +1,5 @@
+import { GAME_API_COMPAT_VERSION } from './version-manifest.mjs';
+
 const SESSION_KEY = 'monsterlife.session.v1';
 const FIREBASE_LAUNCHER = 'https://pocketmonster-game.web.app/';
 const FIREBASE_LAUNCHER_ORIGIN = new URL(FIREBASE_LAUNCHER).origin;
@@ -95,7 +97,7 @@ export async function redeemLaunchTicket(config, launch, { fetchImpl = globalThi
       response = await fetchImpl(apiUrl(config, '/api/auth/launch-ticket/redeem'), {
         method: 'POST',
         cache: 'no-store',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion, 'X-Game-Version': '8.4.0', 'X-Request-Id': requestId },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion, 'X-Game-Version': GAME_API_COMPAT_VERSION, 'X-Request-Id': requestId },
         body: JSON.stringify({ ticket: launch.ticket, state: launch.state, codeVerifier: launch.verifier }),
       });
       if (response.ok || response.status < 500) break;
