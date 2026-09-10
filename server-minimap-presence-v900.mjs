@@ -1,10 +1,10 @@
 import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=2';
 
-export const SERVER_MINIMAP_PRESENCE_KIND = 'pocketmonster:server-minimap-presence-v1';
+export const SERVER_MINIMAP_PRESENCE_KIND = 'pocketmonster:server-minimap-presence-v2';
 export const SERVER_MINIMAP_PRESENCE_TTL_MS = 1500;
 
-const TAP_KEY = Symbol.for('pocketmonster.server-minimap-presence.tap.v1');
-const POSE_KEY = Symbol.for('pocketmonster.server-minimap-presence.pose.v1');
+const TAP_KEY = Symbol.for('pocketmonster.server-minimap-presence.tap.v2');
+const POSE_KEY = Symbol.for('pocketmonster.server-minimap-presence.pose.v2');
 const WINDOW_METHODS = new Set(['addEventListener', 'removeEventListener', 'dispatchEvent', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']);
 
 function finite(value) {
@@ -26,6 +26,16 @@ function sanitizeWorldPosFrame(frame, sentAt = Date.now()) {
   return Object.freeze(pose);
 }
 
+function readOfflineWorldPose(windowLike) {
+  try {
+    const pose = windowLike?.POCKETMONSTER_WORLD_STATE?.() || null;
+    if (!pose || typeof pose !== 'object' || !finite(pose.x) || !finite(pose.z)) return null;
+    return pose;
+  } catch {
+    return null;
+  }
+}
+
 export function recordServerPresencePose(windowLike, frame, sentAt = Date.now()) {
   if (!windowLike) return null;
   const pose = sanitizeWorldPosFrame(frame, sentAt);
@@ -45,6 +55,29 @@ export function readServerPresencePose({
   const pose = windowLike[POSE_KEY];
   if (!pose || !finite(pose.sentAt) || now - pose.sentAt > Math.max(100, Number(maxAgeMs) || SERVER_MINIMAP_PRESENCE_TTL_MS)) return null;
   return pose;
+}
+
+export function resolveMinimapPlayerPose({
+  windowLike = globalThis.window,
+  now = Date.now(),
+  maxAgeMs = SERVER_MINIMAP_PRESENCE_TTL_MS,
+} = {}) {
+  const offlinePose = readOfflineWorldPose(windowLike);
+  const serverPose = readServerPresencePose({ windowLike, now, maxAgeMs });
+  const offlineZone = typeof offlinePose?.zone === 'string' ? offlinePose.zone : '';
+  const serverZone = typeof serverPose?.zone === 'string' ? serverPose.zone : '';
+
+  // Server presence is primary only while it is fresh, connected and still
+  // describes the same active world as the original offline/local runtime.
+  if (serverPose && (!offlineZone || !serverZone || serverZone === offlineZone)) {
+    return Object.freeze({ pose: serverPose, source: 'server-presence-transport' });
+  }
+
+  // This is intentionally the exact original offline POCKETMONSTER_WORLD_STATE
+  // path. A missing/stale/disconnected/mismatched Server pose must never make
+  // the minimap player marker disappear while the local game still has a pose.
+  if (offlinePose) return Object.freeze({ pose: offlinePose, source: 'offline-world-state' });
+  return Object.freeze({ pose: null, source: 'none' });
 }
 
 function inspectOutboundWorldPos(windowLike, data) {
@@ -93,11 +126,7 @@ export function createServerBackedMinimapWindow(windowLike = globalThis.window) 
   return new Proxy(windowLike, {
     get(target, property) {
       if (property === 'POCKETMONSTER_WORLD_STATE') {
-        return () => {
-          const serverPose = readServerPresencePose({ windowLike: target });
-          if (serverPose) return serverPose;
-          try { return target.POCKETMONSTER_WORLD_STATE?.() || null; } catch { return null; }
-        };
+        return () => resolveMinimapPlayerPose({ windowLike: target }).pose;
       }
       const value = Reflect.get(target, property, target);
       if (typeof value === 'function' && WINDOW_METHODS.has(property)) return value.bind(target);
@@ -121,12 +150,17 @@ export function installPersistentMinimapOwnerFromServerPresence({
   const ownerWindow = createServerBackedMinimapWindow(windowLike);
   const owner = installPersistentMinimapOwner({ windowLike: ownerWindow, documentLike });
   try {
-    windowLike.POCKETMONSTER_SERVER_MINIMAP_DIAGNOSTICS = () => Object.freeze({
-      kind: SERVER_MINIMAP_PRESENCE_KIND,
-      connected: windowLike.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true,
-      serverPose: readServerPresencePose({ windowLike }),
-      minimap: owner?.api?.snapshot?.() || null,
-    });
+    windowLike.POCKETMONSTER_SERVER_MINIMAP_DIAGNOSTICS = () => {
+      const resolved = resolveMinimapPlayerPose({ windowLike });
+      return Object.freeze({
+        kind: SERVER_MINIMAP_PRESENCE_KIND,
+        connected: windowLike.POCKETMONSTER_WORLD_SOCKET_CONNECTED === true,
+        source: resolved.source,
+        serverPose: readServerPresencePose({ windowLike }),
+        playerPose: resolved.pose,
+        minimap: owner?.api?.snapshot?.() || null,
+      });
+    };
   } catch {}
   return owner;
 }
