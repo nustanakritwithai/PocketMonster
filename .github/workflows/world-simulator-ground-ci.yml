@@ -1,0 +1,49 @@
+name: World Simulator Ground CI
+
+on:
+  push:
+    branches:
+      - feat/world-simulator-map-adapter-v1
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'world-simulator-map-adapter-v1.mjs'
+      - 'world-simulator-ground-renderer-v1.mjs'
+      - 'world-simulator-ground-live-v1.mjs'
+      - 'world-living-v900.mjs'
+      - 'runtime-config.mjs'
+      - 'assets/world-ground/**'
+      - 'scripts/vendor-world-ground-polyhaven.mjs'
+      - 'tests/world-simulator-*.mjs'
+      - 'tests/check-active-syntax.mjs'
+      - '.github/workflows/world-simulator-ground-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-ground-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Adapter contract
+        run: node tests/world-simulator-map-adapter-v1.mjs
+
+      - name: Ground geometry and PBR presentation
+        run: node tests/world-simulator-ground-renderer-v1.mjs
+
+      - name: Live read-only wiring and fallback
+        run: node tests/world-simulator-ground-live-v1.mjs
+
+      - name: Active syntax gate
+        run: node tests/check-active-syntax.mjs
