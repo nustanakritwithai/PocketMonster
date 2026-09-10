@@ -12,6 +12,7 @@ export async function connectPirateObservatoryRest({
   headers = null,
   fetchImpl = globalThis.fetch,
   pollMs = 500,
+  notReadyPollMs = 3000,
   startPolling = true,
 } = {}) {
   activeSession?.stop?.();
@@ -20,6 +21,7 @@ export async function connectPirateObservatoryRest({
     transport,
     partition,
     pollMs,
+    notReadyPollMs,
     onSnapshot: snapshot => PirateObservatoryDashboard.acceptSnapshot(snapshot),
     onDelta: packet => PirateObservatoryDashboard.acceptDelta(packet),
     onState: (state, detail = {}) => {
@@ -28,6 +30,9 @@ export async function connectPirateObservatoryRest({
         connected,
         issues: state === SYNC_STATES.LIVE ? 0 : connected ? 1 : 0,
         tick: detail.tick,
+        reason: detail.reason ?? null,
+        waitingForAuthority: detail.waitingForAuthority === true,
+        nextAuthorityCheckAt: detail.nextAuthorityCheckAt ?? null,
       });
       PirateObservatoryDashboard.markPartition(partition, state);
     },
@@ -42,6 +47,7 @@ export async function connectPirateObservatoryRest({
 export async function connectPirateObservatoryFromRuntime({
   partition = 'pirate-fruit',
   pollMs = 500,
+  notReadyPollMs = 3000,
   startPolling = true,
   windowLike = globalThis.window,
   storage = globalThis.sessionStorage,
@@ -57,7 +63,7 @@ export async function connectPirateObservatoryFromRuntime({
     ...(Number.isFinite(now) ? { now } : {}),
   });
   if (!context.ok) {
-    PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0 });
+    PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0, reason: context.reason ?? null });
     PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.OFFLINE);
     return context;
   }
@@ -67,6 +73,7 @@ export async function connectPirateObservatoryFromRuntime({
     headers: context.headers,
     fetchImpl,
     pollMs,
+    notReadyPollMs,
     startPolling,
   });
 }
