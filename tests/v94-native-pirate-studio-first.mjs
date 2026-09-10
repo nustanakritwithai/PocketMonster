@@ -27,6 +27,15 @@ assert.match(nativePirate, /destination: 'pocket-monster'/);
 assert.match(nativePirate, /destination: 'living-world'/);
 assert.match(nativePirate, /offlineClientLoaded: false/);
 
+assert.match(nativePirate, /action: payload => handleNativeAction\(payload\)/,
+  'shared mobile Pirate controls must keep an action handler after removing the iframe');
+assert.match(nativePirate, /PIRATE_NATIVE_ACTION_EVENT/,
+  'native actions must be exposed to the gameplay/server integration layer');
+assert.match(nativePirate, /presentationActionUntil/,
+  'locomotion must not immediately cut short a native Studio action');
+assert.match(nativePirate, /presentationOnly: true,[\s\S]*combatAuthority: false/,
+  'native action handoff stays presentation-side and cannot become damage authority');
+
 assert.doesNotMatch(nativePirate, /pirate-fruit-offline|pirateFruitFrame|mountPirateOffline/,
   'native Pirate runtime must never touch the vendored offline client');
 assert.doesNotMatch(nativePirate,
