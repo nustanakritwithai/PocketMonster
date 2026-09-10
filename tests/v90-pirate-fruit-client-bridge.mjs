@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import {
   PIRATE_FRUIT_CLIENT_BRIDGE,
   PIRATE_FRUIT_MONSTER_VISUALS,
+  PIRATE_LOCAL_ATTACK_PRESENTATION_MS,
   applyPirateFruitActionTransition,
   applyPirateFruitLocomotionTransition,
   applyPirateFruitStudioPresentation,
   classifyPirateFruitNode,
+  createPirateLocalAttackPresentationState,
   hidePirateFruitOriginalMeshes,
   hookPirateFruitRenderer,
   orientPirateFruitVisual,
@@ -50,6 +52,7 @@ assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.visual, 'pocket-asset-engine');
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.presentationOnly, true);
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.combatAuthority, false);
 assert.equal(PIRATE_FRUIT_CLIENT_BRIDGE.createsStage, false);
+assert.equal(PIRATE_LOCAL_ATTACK_PRESENTATION_MS, 450, 'local attack presentation stays inside the authored attack window');
 
 const idleCombat = { combatState: 'idle', controller: { hp: 100 } };
 assert.equal(pirateFruitActionSignalFromCombat(idleCombat), null, 'idle combat has no presentation action');
@@ -80,6 +83,55 @@ assert.equal(
   pirateFruitActionSignalFromCombat({ combatState: 'attack-2', controller: { hp: 100 }, swing: null }).action,
   'attack-melee',
   'attack states default to melee without clearly ranged equipment',
+);
+
+const localAttack = createPirateLocalAttackPresentationState();
+assert.equal(localAttack.resolve(999, null, idleCombat), null, 'local presentation is inert before the first touch');
+assert.equal(localAttack.trigger(1000), 1, 'first touch creates a local presentation edge');
+const localMelee = localAttack.resolve(1000, null, {
+  ...idleCombat,
+  loadout: { state: { activeSet: 'sword', equippedWeaponKind: 'cutlass' } },
+});
+assert.deepEqual(localMelee, {
+  action: 'attack-melee',
+  token: 'local-attack:1',
+  duration: 0.45,
+  localPresentation: true,
+}, 'touch starts the melee visual immediately without waiting for combat state');
+assert.equal(
+  localAttack.resolve(1449, null, idleCombat)?.token,
+  'local-attack:1',
+  'local visual remains active for the authored presentation window',
+);
+const echoedServerSwing = { action: 'attack-melee', token: { comboIndex: 1 }, duration: 0.42 };
+assert.equal(
+  localAttack.resolve(1450, echoedServerSwing, meleeSwing),
+  null,
+  'the server attack confirmation is not replayed after local presentation already showed it',
+);
+assert.equal(localAttack.resolve(1451, null, idleCombat), null, 'a cleared combat signal releases server-echo suppression');
+assert.equal(
+  localAttack.resolve(1452, echoedServerSwing, meleeSwing),
+  echoedServerSwing,
+  'a later independent authoritative attack can still drive presentation after the old echo clears',
+);
+const rangedLocalAttack = createPirateLocalAttackPresentationState();
+rangedLocalAttack.trigger(2000);
+assert.equal(
+  rangedLocalAttack.resolve(2000, null, {
+    ...idleCombat,
+    loadout: { state: { activeSet: 'primary', equippedWeaponKind: 'flintlock-gun' } },
+  }).action,
+  'attack-ranged',
+  'local touch keeps the existing ranged-loadout visual mapping',
+);
+const priorityLocalAttack = createPirateLocalAttackPresentationState();
+priorityLocalAttack.trigger(3000);
+const deadSignal = { dead: true, action: 'dead', token: 'dead', duration: 1 };
+assert.equal(
+  priorityLocalAttack.resolve(3000, deadSignal, { combatState: 'dead' }),
+  deadSignal,
+  'local prediction never overrides a terminal combat presentation',
 );
 
 const pendingCast = { skillId: 'fireball', targetId: 'crab-1' };
@@ -269,6 +321,16 @@ assert.match(bridgeSrc, /userData:\s*\{\s*pocketActionSignal:\s*signal\s*\}/, 'a
 assert.doesNotMatch(bridgeSrc, /host\.userData\.pocketActionSignal\s*=/, 'bridge never writes action signals onto the real host');
 assert.match(
   bridgeSrc,
+  /document\.addEventListener\('pointerdown',[\s\S]*?closest\?\.\('\.tc-attack'\)[\s\S]*?localAttackPresentation\.trigger/,
+  'native or proxied attack pointerdown feeds the presentation-only local attack path',
+);
+assert.match(
+  bridgeSrc,
+  /const combatSignal = pirateFruitActionSignalFromCombat\(combat\);[\s\S]*?localAttackPresentation\.resolve\(now, combatSignal, combat\)/,
+  'local presentation is resolved before the action adapter sees authoritative combat',
+);
+assert.match(
+  bridgeSrc,
   /applyPirateFruitActionTransition\(item\.handle,\s*item\.lastAction,\s*sample\)/,
   'the live update routes sampled edges through dead-safe playback',
 );
@@ -284,6 +346,7 @@ assert.match(bridgeSrc, /handle\.update\?\.\(dt,\s*\{\s*moving,\s*locomotion:\s*
 assert.doesNotMatch(bridgeSrc, /item\.rigRetargeter\.update\(\)/, 'Studio replacement must not restore the unsafe null retargeter call');
 assert.match(bridgeSrc, /rigRetargeted:/, 'diagnostics report retargeted visuals');
 assert.match(bridgeSrc, /actionDriven:/, 'diagnostics report action-driven visuals');
+assert.match(bridgeSrc, /localAttackPresentation:/, 'diagnostics expose the local attack presentation state');
 assert.doesNotMatch(boot, /buildPirateFruitWorld|pirate-fruit-world\.mjs/, 'pirate boot does not mount a Pocket-built island');
 assert.match(boot, /id = 'pirateFruitFrame'/, 'real Pirate Fruit client stays in the iframe');
 assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not add a Pocket pirate stage runtime');
@@ -291,7 +354,7 @@ assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-wo
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
 assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=28"/, 'offline HTML cache-busts and loads the Pocket hook');
-assert.match(hookSrc, /pirate-fruit-client-bridge\.mjs\?v=4/, 'offline hook cache-busts the active Studio animation bridge');
+assert.match(hookSrc, /pirate-fruit-client-bridge\.mjs\?v=5/, 'offline hook cache-busts the immediate local attack presentation bridge');
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline save bootstrap still boots the real Vite client');
 assert.ok(
