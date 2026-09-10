@@ -1,0 +1,45 @@
+name: Version architecture guard
+
+on:
+  pull_request:
+    paths:
+      - '**/*.js'
+      - '**/*.mjs'
+      - '**/*.css'
+      - '**/*.html'
+      - 'version-manifest.mjs'
+      - 'package.json'
+      - '.github/workflows/version-architecture-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  version-architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate version domains
+        run: |
+          node tests/version-manifest.mjs
+          node tests/active-entry.mjs
+
+      - name: Reject new generation-labelled production runtime files
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          added="$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD")"
+          production_added="$(printf '%s\n' "$added" | grep -Ev '^(tests/|docs/|\.hermes/|assets/|pirate-fruit-offline/assets/)' || true)"
+          blocked="$(printf '%s\n' "$production_added" | grep -E '(^|/)(v[0-9]+\.html|[^/]+-v[0-9]+\.(js|mjs|css))$' || true)"
+          if [ -n "$blocked" ]; then
+            echo 'New generation-labelled production files are not allowed.'
+            echo 'Name new runtime modules by responsibility and keep version in metadata/contracts.'
+            echo "$blocked"
+            exit 1
+          fi
