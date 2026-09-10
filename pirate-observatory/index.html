@@ -49,9 +49,9 @@
         <g id="islandLayer"></g>
         <g id="entityLayer"></g>
       </svg>
-      <div id="mapEmpty" class="map-empty">
+      <div id="mapEmpty" class="map-empty" role="status" aria-live="polite">
         <strong>Static geography ready</strong>
-        <span>Waiting for authoritative server snapshot stream.</span>
+        <span>Waiting for an authenticated Observatory server connection.</span>
       </div>
     </section>
 
@@ -78,7 +78,7 @@
 
     <footer class="timeline">
       <div class="timeline-live"><span id="timelineMode">○ OFFLINE</span></div>
-      <div id="timelineEvents" class="timeline-events"><span>Awaiting world.event stream…</span></div>
+      <div id="timelineEvents" class="timeline-events"><span>Awaiting canonical world events…</span></div>
     </footer>
   </main>
   <script type="module" src="./bootstrap.mjs"></script>
