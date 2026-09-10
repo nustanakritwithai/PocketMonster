@@ -1,39 +1,66 @@
-# Monster Life RPG V8.1.0 — Progression Core live loop
+# Monster Life RPG / PocketMonster
 
-เวอร์ชันเล่นได้จริงของแผน V7.1–V8.0: สูตรสเตท, การเลี้ยง, ต่อสู้, อาหาร 6 หมวด, สกิล candidate/mutation, อุปกรณ์คลัง, วิวัฒนาการหลายสาขา, อีเวนต์, ผสมพันธุ์ และ CR Debug Panel
+PocketMonster is currently in a **version-consolidation transition**.
 
-GitHub Pages: https://nustanakritwithai.github.io/PocketMonster/  
-เปิดโดยตรง: `http://127.0.0.1:8081/v800.html`  
-GitHub Pages ใช้ `index.html` ซึ่งต้องเหมือน `v800.html` ทุกไบต์
+## Current production identity
 
-## สิ่งที่ต่อเข้า live loop ใน V8.1.0
+- Public/live shell release: **9.0.1** (UI label: V9.0)
+- Active page: `index.html`
+- Current authenticated shell entry: `entry-preload-v900.mjs` *(known migration debt)*
+- Pocket Monster gameplay runtime: `game-v800.js` / compatibility identity **8.4.0** *(known migration debt)*
+- Save schema: **15**
+- Asset compatibility revision: **814**
 
-- `content-catalog.mjs` — ข้อมูลอาหาร / ของ / personality / skill / สาขาอีโวล แยกจาก runtime
-- `live-progression.mjs` — อะแดปเตอร์สูตรที่เทสได้ (สเตท, ดาเมจ+crit, จับมอน, EXP, เทรนที่ Ranch)
-- `refreshStats` ใช้ Combat Rating + training / nutrition / equipment / gene / evo / condition
-- ดาเมจใช้ `defenseMitigation` + mastery + derived crit
-- จับมอนใช้สูตร capture ของ V7.1 — Boss / `capturePolicy: disabled` = 0
-- อาหารครบ 6 หมวด: Daily / Favorite / Training / Nutrition / Skill / Evolution
-- Skill candidate (Flame Bite) และ Mutation เมื่อ Master
-- คลังอุปกรณ์ + preview CR/DPS/EHP ก่อนใส่
-- Flare Slime: Form Lv.2 แล้วเลือก Flame Wolf หรือ Magma Bear จาก Raising Profile
-- Raising Event โผล่ตอนเลี้ยงที่ Ranch; personality มีผลต่อเทรน
-- CR Debug Panel แยก Base / Level / Training / Gene / Evolution / Equipment / Condition
-- Save ผ่าน `normalizeSavedState` + `migrateState`
+The V9 shell currently hosts the older Pocket Monster gameplay runtime. This is intentional only as a migration state; it is not the target architecture.
 
-## ไฟล์เวอร์ชัน
+See `version-manifest.mjs` for the canonical release/compatibility metadata and `docs/version-consolidation.md` for the retirement policy.
 
-- Active entry: `index.html` = `v800.html`
-- Runtime: `game-v800.js?v=810`
-- Styles: `style-v800.css?v=810`
-- `ASSET_REVISION = '810'` • `APP_VERSION = '8.1.0'` • save schema 8
+## Important version rule
 
-## เทสต์
+Do **not** solve new bugs by creating another generation wrapper such as `game-v920.js`, `world-v930.mjs`, or a new versioned copy of an existing runtime.
+
+New canonical code should be named by responsibility, for example:
+
+```text
+runtime/pocket-monster-runtime.mjs
+runtime/world-runtime-manager.mjs
+combat/protocol.mjs
+hud/runtime.mjs
+```
+
+Version numbers belong in metadata/contracts. Save, database, and protocol schema versions may remain versioned when compatibility requires them.
+
+## Current world composition
+
+```text
+V9 online shell
+  ├─ Pocket Monster -> legacy game-v800.js runtime
+  ├─ Pirate Fruit   -> Pirate Fruit embedded build + V9 integration bridges
+  └─ Living World   -> V9 world presentation runtime
+```
+
+The consolidation work removes these generation-labelled dependencies incrementally without changing gameplay behavior.
+
+## Development safety
+
+Before retiring an old runtime path, verify:
+
+1. no production/static caller remains;
+2. no dynamic import caller remains;
+3. deployment/patch manifests no longer require the asset;
+4. browser/gameplay regression passes;
+5. save migration passes;
+6. realtime/multiplayer regression passes.
+
+Legacy save keys and save migrations are compatibility mechanisms and must not be deleted merely because they contain old version numbers.
+
+## Test commands
 
 ```bash
 npm test
+npm run check
 npm run ci
 npm run sim
 ```
 
-ชุด `v80-live-wiring.mjs` และ `v80-master-plan.mjs` ตรวจว่าเกมเรียกโมดูล V7.x จริงและคอนเทนต์ตามแผนแม่บทครบแกน Vertical Slice
+The existing regression suite intentionally contains historical test names (`v80-*`, `v81-*`, `v90-*`, etc.). Test filenames are historical evidence and are not production runtime ownership boundaries.
