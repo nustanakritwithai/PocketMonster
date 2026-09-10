@@ -353,7 +353,7 @@ assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene file is gone');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=28"/, 'offline HTML cache-busts and loads the Pocket hook');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=29"/, 'offline HTML cache-busts and loads the immediate attack presentation hook');
 assert.match(hookSrc, /pirate-fruit-client-bridge\.mjs\?v=5/, 'offline hook cache-busts the immediate local attack presentation bridge');
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline save bootstrap still boots the real Vite client');
