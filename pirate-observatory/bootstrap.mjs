@@ -1,42 +1,37 @@
 import { PirateObservatoryDashboard } from './dashboard.mjs';
 import { PirateObservatoryRestTransport } from './transport.mjs';
+import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { SYNC_STATES } from './protocol.mjs';
-import { classifyObservatoryConnectError } from './connection-state.mjs';
 
 export async function connectPirateObservatoryRest({
   baseUrl,
   partition = 'pirate-fruit',
   headers = null,
   fetchImpl = globalThis.fetch,
+  pollMs = 500,
+  startPolling = true,
 } = {}) {
   const transport = new PirateObservatoryRestTransport({ baseUrl, headers, fetchImpl });
-  PirateObservatoryDashboard.setServerStatus({ connected: true });
-  PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.SYNCING);
-  try {
-    const snapshot = await transport.getPartitionSnapshot(partition);
-    const result = PirateObservatoryDashboard.acceptSnapshot(snapshot);
-    if (!result.ok) {
-      PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.DESYNC);
-      return { ok: false, reason: result.reason, retryable: false, transport };
-    }
-    PirateObservatoryDashboard.setServerStatus({ connected: true, issues: 0 });
-    return { ok: true, transport, snapshot };
-  } catch (error) {
-    const classified = classifyObservatoryConnectError(error);
-    PirateObservatoryDashboard.setServerStatus({
-      connected: classified.serverReachable,
-      issues: classified.serverReachable ? 1 : 0,
-    });
-    PirateObservatoryDashboard.markPartition(partition, classified.state);
-    return {
-      ok: false,
-      reason: classified.reason,
-      retryable: classified.retryable,
-      serverReachable: classified.serverReachable,
-      error,
-      transport,
-    };
-  }
+  const session = new PirateObservatoryRestSession({
+    transport,
+    partition,
+    pollMs,
+    onSnapshot: snapshot => PirateObservatoryDashboard.acceptSnapshot(snapshot),
+    onDelta: packet => PirateObservatoryDashboard.acceptDelta(packet),
+    onState: (state, detail = {}) => {
+      const connected = detail.serverReachable ?? state !== SYNC_STATES.OFFLINE;
+      PirateObservatoryDashboard.setServerStatus({
+        connected,
+        issues: state === SYNC_STATES.LIVE ? 0 : connected ? 1 : 0,
+        tick: detail.tick,
+      });
+      PirateObservatoryDashboard.markPartition(partition, state);
+    },
+  });
+
+  const result = await session.bootstrap();
+  if (startPolling && (result.ok || result.serverReachable)) session.start();
+  return { ...result, transport, session };
 }
 
 if (typeof window !== 'undefined') {
