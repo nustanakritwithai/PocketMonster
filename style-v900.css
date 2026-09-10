@@ -269,3 +269,53 @@ body.unified-hud-active #party{display:none!important;pointer-events:none!import
 body.unified-hud-active #message{display:none!important;pointer-events:none!important}
 body.unified-hud-active .game-chat{display:none!important;pointer-events:none!important}
 body.unified-hud-active .chat-toggle{display:none!important;pointer-events:none!important}
+
+/* Merchant market: vertical portrait card (not fullscreen sheet) */
+.merchant-shop,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop.merchant-shop{
+  display:grid!important;
+  place-items:center!important;
+  align-content:center!important;
+  justify-items:center!important;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+.merchant-shop .merchant-card,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-card{
+  width:min(340px,84vw)!important;
+  max-width:min(340px,84vw)!important;
+  height:auto!important;
+  min-height:min(520px,70dvh)!important;
+  max-height:min(78dvh,calc(100dvh - 40px))!important;
+  margin:0 auto!important;
+  padding:14px 14px 12px!important;
+  border-radius:18px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  box-sizing:border-box!important;
+  box-shadow:0 18px 48px #000a!important;
+}
+.merchant-shop .merchant-head small,
+.merchant-shop .merchant-dialog,
+.merchant-shop .merchant-foot,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-head small,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-dialog,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-foot{
+  display:block!important;
+}
+.merchant-shop .merchant-products,
+body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-products{
+  grid-template-columns:1fr!important;
+  gap:8px!important;
+}
+@media (pointer:coarse) and (orientation:landscape){
+  .merchant-shop .merchant-card,
+  body.unified-hud-active[data-combined-world="pocket-monster"] #merchantShop .merchant-card{
+    width:min(320px,54vw)!important;
+    max-width:min(320px,54vw)!important;
+    min-height:0!important;
+    max-height:min(86dvh,calc(100dvh - 24px))!important;
+  }
+}
