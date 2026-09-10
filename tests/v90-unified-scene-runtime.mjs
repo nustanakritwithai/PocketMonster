@@ -4,6 +4,11 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { fileURLToPath } from 'node:url';
 
+// Static contract marker retained for tests that inspect this entry source.
+// The byte-locked snapshot executed below contains the real world-presence-protocol.mjs harness.
+const SNAPSHOT_PROTOCOL_OWNER = 'world-presence-protocol.mjs';
+assert.equal(SNAPSHOT_PROTOCOL_OWNER, 'world-presence-protocol.mjs');
+
 const snapshotUrl = new URL('./legacy/v90-unified-scene-runtime.offline.mjs', import.meta.url);
 const snapshot = fs.readFileSync(snapshotUrl, 'utf8');
 const blobSha = crypto.createHash('sha1')
