@@ -8,6 +8,7 @@ on:
       - 'boot-pirate-fruit-v900.mjs'
       - 'tests/v91-studio-*.mjs'
       - 'tests/v91-studio-browser-acceptance.py'
+      - 'tests/v91-studio-fighting-wrap-browser-report.py'
       - '.github/workflows/studio-browser-acceptance.yml'
   workflow_dispatch:
 permissions:
@@ -70,6 +71,8 @@ jobs:
           node tests/v91-studio-blue-explorer-primary.mjs
       - name: Real Studio to sandboxed Pirate browser acceptance
         run: python tests/v91-studio-browser-acceptance.py
+      - name: Verify Fighting Style wraps follow Studio hand sockets
+        run: python tests/v91-studio-fighting-wrap-browser-report.py
       - name: Actual exported package through native vendor regression
         if: always()
         run: |

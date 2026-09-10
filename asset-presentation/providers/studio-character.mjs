@@ -239,6 +239,51 @@ function preferredAttachmentSocket(node) {
   if (/(?:back|sheath|holster)/.test(id)) return 'back';
   return 'weaponGripR';
 }
+function legacyFightingStyleSocket(node) {
+  const id = String(node?.name || '').toLowerCase();
+  if (id === 'equipment:style:left-hand') return 'weaponGripL';
+  if (id === 'equipment:style:right-hand') return 'weaponGripR';
+  return null;
+}
+function isLegacyFightingStyleNode(node) {
+  return /^equipment:style(?:$|:)/i.test(String(node?.name || ''));
+}
+function isInsideNode(node, ancestor) {
+  for (let current = node; current; current = current.parent) if (current === ancestor) return true;
+  return false;
+}
+export function syncStudioLegacyFightingStyleWraps({ THREE, studioRoot, host, socketAnchors = {} } = {}) {
+  if (!THREE?.Vector3 || !studioRoot || !host?.traverse) return 0;
+  studioRoot.updateMatrixWorld?.(true);
+  let synced = 0;
+  host.traverse(node => {
+    if (!node || isInsideNode(node, studioRoot)) return;
+    const socketName = legacyFightingStyleSocket(node);
+    if (!socketName) return;
+    const anchor = socketAnchors[socketName]
+      || socketAnchors[socketName === 'weaponGripL' ? 'leftHand' : 'rightHand'];
+    const parent = node.parent;
+    if (!anchor || !parent || typeof anchor.getWorldPosition !== 'function' || typeof parent.worldToLocal !== 'function') return;
+    anchor.updateMatrixWorld?.(true); parent.updateMatrixWorld?.(true);
+    const worldPosition = new THREE.Vector3();
+    anchor.getWorldPosition(worldPosition);
+    parent.worldToLocal(worldPosition);
+    if (typeof node.position?.copy === 'function') node.position.copy(worldPosition);
+    else node.position?.set?.(worldPosition.x, worldPosition.y, worldPosition.z);
+    if (node.quaternion?.clone && node.quaternion?.copy
+      && typeof anchor.getWorldQuaternion === 'function' && typeof parent.getWorldQuaternion === 'function') {
+      const socketWorldQuaternion = node.quaternion.clone();
+      const parentWorldQuaternion = node.quaternion.clone();
+      anchor.getWorldQuaternion(socketWorldQuaternion);
+      parent.getWorldQuaternion(parentWorldQuaternion).invert();
+      node.quaternion.copy(parentWorldQuaternion.multiply(socketWorldQuaternion));
+    }
+    node.userData ??= {};
+    node.userData.studioSocketSynced = socketName;
+    synced += 1;
+  });
+  return synced;
+}
 export function createStudioCharacterProvider({ THREE } = {}) {
   if (!THREE?.Group || !THREE?.Mesh || !THREE?.BufferGeometry || !THREE?.BufferAttribute) throw new Error('studio-character provider needs THREE Group/Mesh/BufferGeometry/BufferAttribute');
   if (!THREE.MeshStandardMaterial && !THREE.MeshBasicMaterial) throw new Error('studio-character provider needs a Three.js material constructor');
@@ -257,7 +302,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
     const animation = { clip: initialClip, time: 0, action: 'idle', finished: false,
       lastResolveError: initialClip ? null : 'No authored Studio clip resolves idle' };
     const rest = Object.freeze({ headY: height * 0.80, throwY: height * 0.64, hitTextY: height * 0.82, labelY: height * 1.08 });
-    let disposed = false, attachmentScanTime = 0;
+    let disposed = false, attachmentScanTime = 0, legacyHandEquipmentSynced = 0;
     const restTransforms = Object.fromEntries(Object.entries(joints).map(([name, node]) => [name, {
       position: [node.position.x, node.position.y, node.position.z], rotation: [node.rotation.x, node.rotation.y, node.rotation.z], scale: [node.scale.x, node.scale.y, node.scale.z],
     }]));
@@ -303,8 +348,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       return true;
     }
     function isInsideStudio(node) {
-      for (let current = node; current; current = current.parent) if (current === root) return true;
-      return false;
+      return isInsideNode(node, root);
     }
     function bindHostAttachments() {
       const host = root.parent;
@@ -312,7 +356,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       const candidates = [];
       host.traverse(node => {
         if (!node || node === host || isInsideStudio(node) || boundAttachments.has(node)) return;
-        if (/^(equipment:|attachment:)/.test(String(node.name || ''))) candidates.push(node);
+        if (/^(equipment:|attachment:)/.test(String(node.name || '')) && !isLegacyFightingStyleNode(node)) candidates.push(node);
       });
       const candidateSet = new Set(candidates);
       for (const node of candidates) {
@@ -332,6 +376,13 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         if (node?.userData) delete node.userData.studioSocketBound;
       }
       boundAttachments.clear();
+    }
+    function clearLegacyFightingStyleSync() {
+      const host = root.parent;
+      host?.traverse?.(node => {
+        if (legacyFightingStyleSocket(node) && node?.userData) delete node.userData.studioSocketSynced;
+      });
+      legacyHandEquipmentSynced = 0;
     }
     const handle = {
       id: def.id, role: request.role, root,
@@ -367,6 +418,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
         emitEvents(from, animation.time); sampleClip(animation.clip, animation.time, joints); observePose();
         attachmentScanTime += delta;
         if (attachmentScanTime >= .25 || (!boundAttachments.size && root.parent)) { attachmentScanTime = 0; bindHostAttachments(); }
+        legacyHandEquipmentSynced = syncStudioLegacyFightingStyleWraps({ THREE, studioRoot: root, host: root.parent, socketAnchors });
         return handle;
       },
       onAnimationEvent(listener) {
@@ -425,7 +477,7 @@ export function createStudioCharacterProvider({ THREE } = {}) {
       setAppearance() { return handle; },
       dispose() {
         if (disposed) return handle;
-        disposed = true; eventListeners.clear(); pendingEvents.length = 0; restoreHostAttachments();
+        disposed = true; eventListeners.clear(); pendingEvents.length = 0; clearLegacyFightingStyleSync(); restoreHostAttachments();
         for (const anchor of Object.values(socketAnchors)) anchor.removeFromParent?.();
         disposeHandle(handle); root.clear?.(); return handle;
       },
@@ -435,7 +487,8 @@ export function createStudioCharacterProvider({ THREE } = {}) {
           duration: Number(animation.clip?.duration) || 0, loop: !!animation.clip?.loop, playbackRate: animation.rate || 1,
           requestedAction: animation.requestedAction || animation.action, changedJoints,
           poseSample: previousPose ? Object.fromEntries(['chest', 'kneeL', 'kneeR', 'shoulderR', 'handR'].filter(key => previousPose[key]).map(key => [key, [...previousPose[key]]])) : {},
-          eventsEmitted: eventCount, socketAttachments: boundAttachments.size, finished: animation.finished, lastResolveError: animation.lastResolveError,
+          eventsEmitted: eventCount, socketAttachments: boundAttachments.size, legacyHandEquipmentSynced,
+          finished: animation.finished, lastResolveError: animation.lastResolveError,
           motion: { mode: motion.mode, defaultAction: motion.defaultAction, available: motion.available, missing: motion.missing,
             invalid: motion.invalid, unsupportedActions: motion.unsupportedActions || {}, mappedActions: Object.keys(motion.actionMap || {}) },
         });
