@@ -1,7 +1,7 @@
 {
   "schema": "pocketmonster.world-ground-material-pack.v1",
   "version": 1,
-  "installed": false,
+  "installed": true,
   "source": "Poly Haven",
   "license": "CC0",
   "runtimeApiDependency": false,
@@ -65,5 +65,12 @@
       "ao": "./polyhaven/dirt/ao.jpg",
       "normalConvention": "opengl"
     }
+  },
+  "vendoredAt": "2026-09-10T16:33:30.200Z",
+  "vendor": {
+    "name": "Poly Haven",
+    "api": "https://api.polyhaven.com",
+    "policy": "development-time download only; game runtime uses vendored local files",
+    "userAgent": "PocketMonster-WorldGroundVendor/1.0 (nustanakritwithai/PocketMonster)"
   }
 }
