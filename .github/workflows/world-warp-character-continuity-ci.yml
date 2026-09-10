@@ -6,8 +6,10 @@ on:
     paths:
       - 'asset-presentation/engine.mjs'
       - 'asset-presentation/player-presentation-session.mjs'
+      - 'asset-presentation/player-presentation-parity.mjs'
       - 'asset-presentation/studio-character-live-bridge.mjs'
       - 'asset-presentation/studio-character-package.mjs'
+      - 'asset-presentation/studio-character-render-profile.mjs'
       - 'asset-presentation/providers/studio-character.mjs'
       - 'asset-presentation/providers/pirate-fruit-player.mjs'
       - 'boot-pirate-fruit-v900.mjs'
@@ -15,6 +17,7 @@ on:
       - 'worlds-v900.mjs'
       - 'pirate-player-server.mjs'
       - 'tests/v92-world-warp-character-continuity.mjs'
+      - 'tests/v93-monster-studio-presentation-parity.mjs'
       - '.github/workflows/world-warp-character-continuity-ci.yml'
   workflow_dispatch:
 
@@ -33,17 +36,22 @@ jobs:
         run: |
           node --check asset-presentation/engine.mjs
           node --check asset-presentation/player-presentation-session.mjs
+          node --check asset-presentation/player-presentation-parity.mjs
           node --check asset-presentation/studio-character-live-bridge.mjs
+          node --check asset-presentation/studio-character-render-profile.mjs
           node --check asset-presentation/providers/studio-character.mjs
           node --check boot-pirate-fruit-v900.mjs
           node --check game-v800.js
-      - name: Run world-warp presentation continuity gate
-        run: node tests/v92-world-warp-character-continuity.mjs
+      - name: Run world-warp presentation continuity gates
+        run: |
+          node tests/v92-world-warp-character-continuity.mjs
+          node tests/v93-monster-studio-presentation-parity.mjs
       - name: Preserve Studio provider and live bridge contracts
         run: |
           node tests/v91-studio-character-provider.mjs
           node tests/v91-studio-character-live-wiring.mjs
           node tests/v91-studio-blue-explorer-primary.mjs
+          node tests/v91-studio-character-render-profile.mjs
       - name: Preserve warp and Pirate player regressions
         run: |
           node tests/v90-warp-overlay-lifecycle.mjs
