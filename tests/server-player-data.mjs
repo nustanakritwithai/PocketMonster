@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, logoutServerSession, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from '../server-player-data.mjs';
+import { GAME_API_COMPAT_VERSION } from '../version-manifest.mjs';
 
-const config = { apiBaseUrl: 'https://server.example/', apiVersion: '1.1', featureFlags: { vpsWrites: true, playerDataWrites: true }, deployedRelease: { version: '8.4.0' } };
+const config = { apiBaseUrl: 'https://server.example/', apiVersion: '1.1', featureFlags: { vpsWrites: true, playerDataWrites: true }, deployedRelease: { version: GAME_API_COMPAT_VERSION } };
 const calls = [];
 const reply = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), { status, headers });
 const fetchImpl = async (url, init) => {
@@ -22,7 +23,7 @@ assert.equal(write.revision, 5);
 const saveCall = calls.find(call => call.url.endsWith('/api/save') && call.init.method === 'POST');
 assert.equal(saveCall.init.headers.Authorization, 'Bearer session');
 assert.equal(saveCall.init.headers['X-Save-Revision'], '4');
-assert.equal(saveCall.init.headers['X-Game-Version'], '8.4.0');
+assert.equal(saveCall.init.headers['X-Game-Version'], GAME_API_COMPAT_VERSION);
 
 await syncPlayerData(config, 'session', { actionLog: 'test' }, { fetchImpl });
 await saveCharacterProfile(config, 'session', { name: 'Hero' }, { fetchImpl });
