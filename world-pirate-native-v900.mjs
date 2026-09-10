@@ -12,6 +12,7 @@ import { installWorldPresence, publishWorldState } from './world-presence-v800.m
 export const PIRATE_NATIVE_WORLD_VERSION = '9.4.0-studio-first';
 export const PIRATE_NATIVE_WORLD_ID = 'pirate-fruit';
 export const PIRATE_NATIVE_WORLD_LABEL = 'Pirate Fruit • Native V9';
+export const PIRATE_NATIVE_ACTION_EVENT = 'pocketmonster:pirate-native-action-v1';
 
 const startup = document.getElementById('startupStatus');
 let sceneRuntimeActive = true;
@@ -271,10 +272,60 @@ installWorldPresence({
 
 let cameraYaw = .08;
 let cameraPitch = .38;
+let cameraDistance = 7.1;
 const keys = {};
 addEventListener('keydown', event => { keys[event.code] = true; });
 addEventListener('keyup', event => { keys[event.code] = false; });
 const joy = { x: 0, y: 0 };
+let locomotionState = 'idle';
+let presentationActionUntil = 0;
+let dashUntil = 0;
+let nativeActionSequence = 0;
+
+function actionPresentation(action) {
+  if (action === 'capture') return { clip: 'attack', duration: .45 };
+  if (/^skill[1-4]$/.test(action)) return { clip: 'skill', duration: .6 };
+  if (action === 'recall') return { clip: 'jump', duration: .65 };
+  if (action === 'summon') return { clip: 'run', duration: .28, dash: true };
+  if (action === 'block') return { clip: 'idle', duration: .3 };
+  return null;
+}
+
+function publishNativeAction(payload) {
+  nativeActionSequence += 1;
+  window.dispatchEvent(new CustomEvent(PIRATE_NATIVE_ACTION_EVENT, {
+    detail: Object.freeze({
+      ...payload,
+      sequence: nativeActionSequence,
+      world: PIRATE_NATIVE_WORLD_ID,
+      presentationOnly: true,
+      combatAuthority: false,
+    }),
+  }));
+}
+
+function handleNativeAction({ action, phase = 'start', pointerId = null } = {}) {
+  const normalized = String(action || '');
+  publishNativeAction({ action: normalized, phase, pointerId });
+  if (phase !== 'start') return true;
+  if (normalized === 'zoomIn') {
+    cameraDistance = Math.max(4.6, cameraDistance - .55);
+    return true;
+  }
+  if (normalized === 'zoomOut') {
+    cameraDistance = Math.min(10.5, cameraDistance + .55);
+    return true;
+  }
+  const presentation = actionPresentation(normalized);
+  if (!presentation) return true;
+  const now = performance.now();
+  presentationActionUntil = now + presentation.duration * 1000;
+  if (presentation.dash) dashUntil = presentationActionUntil;
+  locomotionState = null;
+  playerVisual.play?.(presentation.clip, { restart: true, duration: presentation.duration });
+  return true;
+}
+
 const unifiedMobileControls = window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
 if (unifiedMobileControls) {
   unifiedMobileControls.registerAdapter(PIRATE_NATIVE_WORLD_ID, Object.freeze({
@@ -288,6 +339,7 @@ if (unifiedMobileControls) {
       cameraYaw -= dx * .006;
       cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * .004, .20, .84);
     },
+    action: payload => handleNativeAction(payload),
     reset: () => { joy.x = 0; joy.y = 0; },
     activate: () => { joy.x = 0; joy.y = 0; },
   }));
@@ -323,7 +375,6 @@ function cameraRight() {
 
 const BOUNDS = Object.freeze({ minX: -9.8, maxX: 9.8, minZ: -5.5, maxZ: 14.2 });
 const speed = 5.2;
-let locomotionState = 'idle';
 
 function updatePlayer(dt) {
   let side = 0, fwd = 0;
@@ -334,14 +385,16 @@ function updatePlayer(dt) {
   side += joy.x;
   fwd += -joy.y;
   const moving = Math.hypot(side, fwd) > .05;
+  const now = performance.now();
   if (moving) {
     const dir = cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize();
-    player.position.addScaledVector(dir, speed * dt);
+    const currentSpeed = now < dashUntil ? speed * 1.75 : speed;
+    player.position.addScaledVector(dir, currentSpeed * dt);
     player.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI;
     player.position.x = THREE.MathUtils.clamp(player.position.x, BOUNDS.minX, BOUNDS.maxX);
     player.position.z = THREE.MathUtils.clamp(player.position.z, BOUNDS.minZ, BOUNDS.maxZ);
   }
-  if (playerVisualSource === 'studio-character') {
+  if (playerVisualSource === 'studio-character' && now >= presentationActionUntil) {
     const next = moving ? 'walk' : 'idle';
     if (next !== locomotionState) {
       playerVisual.play(next);
@@ -376,9 +429,8 @@ function updatePortals(dt) {
 
 function updateCamera(dt) {
   const f = forward();
-  const distance = 7.1;
-  const horizontal = Math.cos(cameraPitch) * distance;
-  const height = Math.sin(cameraPitch) * distance + 1.2;
+  const horizontal = Math.cos(cameraPitch) * cameraDistance;
+  const height = Math.sin(cameraPitch) * cameraDistance + 1.2;
   const desired = player.position.clone()
     .add(new THREE.Vector3(0, height, 0))
     .add(f.clone().multiplyScalar(-horizontal));
@@ -408,12 +460,15 @@ if (typeof window !== 'undefined') {
     source: 'native-v9',
     studioFirst: true,
     offlineClientLoaded: false,
+    playAction: action => handleNativeAction({ action, phase: 'start', pointerId: null }),
     diagnostics: () => Object.freeze({
       active: sceneRuntimeActive,
       playerVisualSource,
       playerScale,
       renderProfileState: renderProfileReport?.state || (playerVisualSource === 'studio-character' ? 'none' : 'fallback'),
       portals: portals.map(portal => portal.destination),
+      cameraDistance,
+      actionSequence: nativeActionSequence,
     }),
   });
   window.MLRPG_ASSETS = { diagnostics: () => ({ ...assets.diagnostics(), playerVisualSource }) };
@@ -447,6 +502,8 @@ window.POCKETMONSTER_SCENE_LIFECYCLE = Object.freeze({
   unmount: () => {
     sceneRuntimeActive = false;
     joy.x = 0; joy.y = 0;
+    presentationActionUntil = 0;
+    dashUntil = 0;
     return true;
   },
   diagnostics: () => Object.freeze({
