@@ -6,7 +6,7 @@ const syncs = new Map();
 const watched = new Set();
 const eventTimeline = [];
 let selected = null;
-let serverStatus = { connected: false, tps: null, tick: null, issues: 0 };
+let serverStatus = { connected: false, tps: null, tick: null, issues: 0, reason: null, waitingForAuthority: false };
 
 const els = {
   syncStatus: document.getElementById('syncStatus'),
@@ -61,6 +61,27 @@ function overallSyncState() {
   return SYNC_STATES.OFFLINE;
 }
 
+function emptyMapCopy(state) {
+  if (serverStatus.waitingForAuthority || serverStatus.reason === 'OBSERVATORY_NOT_READY') {
+    return ['Server reachable', 'Waiting for authoritative WorldTickSnapshot; combat/HP is not fabricated.'];
+  }
+  if (state === SYNC_STATES.DESYNC) {
+    return ['Partition desynchronized', 'Canonical state is paused while a clean snapshot resync is requested.'];
+  }
+  if (state === SYNC_STATES.SYNCING) {
+    return ['Synchronizing canonical state', 'Server is reachable; validating snapshot and sequence cursors.'];
+  }
+  if (state === SYNC_STATES.DELAYED) {
+    return ['Live data delayed', 'Showing the last verified canonical state while transport catches up.'];
+  }
+  if (state === SYNC_STATES.OFFLINE) {
+    return ['Static geography ready', serverStatus.reason === 'SERVER_SESSION_UNAVAILABLE'
+      ? 'An active Monster Life server session is required.'
+      : 'Waiting for an authenticated Observatory server connection.'];
+  }
+  return ['Canonical world connected', 'No streamed entities are currently visible in this partition.'];
+}
+
 function renderStatus() {
   const state = overallSyncState();
   const icon = state === SYNC_STATES.LIVE ? '●' : state === SYNC_STATES.OFFLINE ? '○' : '↻';
@@ -74,6 +95,13 @@ function renderStatus() {
   els.issueButton.textContent = issues ? `⚠ ${issues} ISSUE${issues === 1 ? '' : 'S'}` : '✓ NO ISSUES';
   els.issueButton.style.color = issues ? 'var(--amber)' : 'var(--green)';
   els.mapEmpty.hidden = state === SYNC_STATES.LIVE && entityValues().length > 0;
+  if (!els.mapEmpty.hidden) {
+    const [heading, detail] = emptyMapCopy(state);
+    const strong = els.mapEmpty.querySelector('strong');
+    const span = els.mapEmpty.querySelector('span');
+    if (strong) strong.textContent = heading;
+    if (span) span.textContent = detail;
+  }
 }
 
 function selectIsland(id) {
@@ -208,6 +236,8 @@ export const PirateObservatoryDashboard = Object.freeze({
     const result = getSync(snapshot.partition).applySnapshot(snapshot);
     if (result.ok) {
       serverStatus.connected = true;
+      serverStatus.reason = null;
+      serverStatus.waitingForAuthority = false;
       renderEntities();
       renderSelection();
       renderStatus();
