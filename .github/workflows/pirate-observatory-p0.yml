@@ -7,12 +7,14 @@ on:
     paths:
       - 'pirate-observatory/**'
       - 'tests/v90-pirate-observatory-p0.mjs'
+      - 'tests/v90-pirate-observatory-stream-router.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
     paths:
       - 'pirate-observatory/**'
       - 'tests/v90-pirate-observatory-p0.mjs'
+      - 'tests/v90-pirate-observatory-stream-router.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -33,4 +35,6 @@ jobs:
           node --check pirate-observatory/dashboard.mjs
           node --check pirate-observatory/bootstrap.mjs
       - name: Observatory client regression
-        run: node tests/v90-pirate-observatory-p0.mjs
+        run: |
+          node tests/v90-pirate-observatory-p0.mjs
+          node tests/v90-pirate-observatory-stream-router.mjs
