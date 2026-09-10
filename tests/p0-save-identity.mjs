@@ -9,6 +9,10 @@ import {
   readStoredSave,
   writeStoredSave,
 } from '../save-schema.mjs';
+import {
+  GAME_API_COMPAT_VERSION,
+  LEGACY_ASSET_REVISION,
+} from '../version-manifest.mjs';
 
 class MemoryStorage {
   #values = new Map();
@@ -16,8 +20,8 @@ class MemoryStorage {
   setItem(key, value) { this.#values.set(key, String(value)); }
 }
 
-assert.equal(APP_VERSION, '8.4.0');
-assert.equal(ASSET_REVISION, '813');
+assert.equal(APP_VERSION, GAME_API_COMPAT_VERSION);
+assert.equal(ASSET_REVISION, LEGACY_ASSET_REVISION);
 assert.equal(SAVE_SCHEMA_VERSION, 15);
 assert.equal(SAVE_KEY, 'monster-life-rpg-proto-v6', 'release must preserve the established save key');
 
