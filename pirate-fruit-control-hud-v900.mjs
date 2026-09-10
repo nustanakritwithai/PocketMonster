@@ -95,16 +95,32 @@ html[data-pirate-hud="pirate-primary-parent"] .boat-shop-root,
 html[data-pirate-hud="pirate-primary-parent"] .potion-shop-root,
 html[data-pirate-hud="pirate-primary-parent"] .dealer-shop-root {
   align-items: flex-end !important;
-  padding: 6px 8px 64px !important;
+  justify-content: flex-end !important;
+  inset: 0 !important;
+  padding: 8px 8px max(72px, env(safe-area-inset-bottom, 0px) + 56px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .quest-board,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop,
 html[data-pirate-hud="pirate-primary-parent"] .potion-shop,
 html[data-pirate-hud="pirate-primary-parent"] .dealer-shop {
-  width: min(380px, 100%) !important;
-  max-height: 48vh !important;
-  padding: 8px 10px !important;
-  border-radius: 10px !important;
+  width: min(420px, 100%) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(78vh, calc(100dvh - 96px)) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  padding: 12px 12px 10px !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .quest-board-cards,
+html[data-pirate-hud="pirate-primary-parent"] .boat-shop-cards,
+html[data-pirate-hud="pirate-primary-parent"] .potion-shop-cards,
+html[data-pirate-hud="pirate-primary-parent"] .dealer-cards {
+  max-height: none !important;
 }
 html[data-pirate-hud="pirate-primary-parent"] .quest-board h2,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop-head h2,
