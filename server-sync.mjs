@@ -1,4 +1,5 @@
 import { runtimeWritePolicy } from './runtime-config.mjs';
+import { GAME_API_COMPAT_VERSION } from './version-manifest.mjs';
 
 export const SERVER_GATE_STATES = Object.freeze(['disabled', 'healthy', 'maintenance', 'offline', 'incompatible', 'invalid']);
 
@@ -201,7 +202,7 @@ export async function requestServerContract(config, { fetchImpl = globalThis.fet
   const callerAbort = () => abortRequest('request aborted');
   if (signal?.aborted) callerAbort();
   else signal?.addEventListener?.('abort', callerAbort, { once: true });
-  const headers = { Accept: 'application/json', 'X-Request-Id': correlationId, 'X-Game-Version': '8.4.0' };
+  const headers = { Accept: 'application/json', 'X-Request-Id': correlationId, 'X-Game-Version': GAME_API_COMPAT_VERSION };
   try {
     const guardedFetch = url => Promise.resolve().then(() => {
       if (controller.signal.aborted) throw createAbortError('request aborted');
