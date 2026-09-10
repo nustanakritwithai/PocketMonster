@@ -22,6 +22,7 @@ on:
       - 'tests/check-active-syntax.mjs'
       - 'tests/production-launch-workflows.mjs'
       - 'tests/v90-deployment-gates.mjs'
+      - '.github/workflows/github-pages.yml'
       - '.github/workflows/firebase-hosting-merge.yml'
       - '.github/workflows/world-simulator-ground-ci.yml'
   workflow_dispatch:
