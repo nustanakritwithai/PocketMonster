@@ -179,6 +179,63 @@ function isClearlyRangedLoadout(loadout) {
   return values.some(value => /(?:^|[-_\s])(gun|ranged|pistol|rifle|musket|flintlock|bow|crossbow)(?:$|[-_\s])/i.test(String(value || '')));
 }
 
+export const PIRATE_LOCAL_ATTACK_PRESENTATION_MS = 450;
+
+function isAttackPresentationSignal(signal) {
+  return signal?.action === 'attack-melee' || signal?.action === 'attack-ranged';
+}
+
+function isPriorityCombatPresentation(signal) {
+  return signal?.action === 'dead' || signal?.action === 'hurt' || signal?.action === 'skill';
+}
+
+function presentationNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
+
+/**
+ * Presentation-only attack prediction. A local pointerdown owns the visible
+ * attack immediately; authoritative combat still owns hits, damage and cooldowns.
+ */
+export function createPirateLocalAttackPresentationState({ durationMs = PIRATE_LOCAL_ATTACK_PRESENTATION_MS } = {}) {
+  let serial = 0;
+  let startedAt = -Infinity;
+  let suppressServerAttack = false;
+
+  return {
+    trigger(now = presentationNow()) {
+      serial += 1;
+      startedAt = Number.isFinite(now) ? now : presentationNow();
+      suppressServerAttack = true;
+      return serial;
+    },
+    resolve(now, combatSignal, combat) {
+      // Never let speculative presentation override terminal/reaction/cast poses.
+      if (isPriorityCombatPresentation(combatSignal)) return combatSignal;
+
+      const sampleNow = Number.isFinite(now) ? now : presentationNow();
+      const elapsed = sampleNow - startedAt;
+      if (serial > 0 && elapsed >= 0 && elapsed < durationMs) {
+        return {
+          action: isClearlyRangedLoadout(combat?.loadout) ? 'attack-ranged' : 'attack-melee',
+          token: `local-attack:${serial}`,
+          duration: durationMs / 1000,
+          localPresentation: true,
+        };
+      }
+
+      // The authoritative swing that arrives after this touch is confirmation
+      // of an animation we already showed. Suppress that echo until it clears.
+      if (suppressServerAttack && isAttackPresentationSignal(combatSignal)) return null;
+      if (!isAttackPresentationSignal(combatSignal)) suppressServerAttack = false;
+      return combatSignal;
+    },
+    diagnostics() {
+      return Object.freeze({ serial, startedAt, suppressServerAttack, durationMs });
+    },
+  };
+}
+
 export function pirateFruitActionSignalFromCombat(combat) {
   if (!combat || typeof combat !== 'object') return null;
   const combatState = String(combat.combatState || '');
@@ -355,6 +412,12 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
   assets.registerProvider('procedural', ctx => ctx.def?.kind === 'monster' ? monsterProvider(ctx) : humanoidProvider(ctx));
   assets.registerProvider('studio-character', createStudioCharacterProvider({ THREE: engineThree }));
   const attached = new WeakSet(), visuals = [];
+  const localAttackPresentation = createPirateLocalAttackPresentationState();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', event => {
+      if (event?.target?.closest?.('.tc-attack')) localAttackPresentation.trigger(presentationNow());
+    }, { capture: true });
+  }
 
   function attachVisual(host, handle, kind) {
     handle.root.userData.pocketVisual = true;
@@ -557,7 +620,8 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       const combat = globalThis.__combat;
       const liveSpeed = combat?.controller?.moveState?.speed;
       const speed = Number.isFinite(liveSpeed) && liveSpeed >= 0 ? liveSpeed : (dt > 0 ? Math.sqrt(distanceSq) / dt : 0);
-      const signal = pirateFruitActionSignalFromCombat(combat);
+      const combatSignal = pirateFruitActionSignalFromCombat(combat);
+      const signal = localAttackPresentation.resolve(now, combatSignal, combat);
       const sample = item.actionTracker.sample({ userData: { pocketActionSignal: signal } }, now, { distanceSq, speed });
       if (item.source === 'studio-character') {
         item.lastStudioPresentation = applyPirateFruitStudioPresentation(item.handle, item.lastStudioPresentation, item.sampleController(sample, combat?.controller));
@@ -578,6 +642,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       attached: visuals.length,
       rigRetargeted: visuals.filter(item => item.rigRetargeter).length,
       actionDriven: visuals.filter(item => item.actionTracker).length,
+      localAttackPresentation: localAttackPresentation.diagnostics(),
       providers: assets.diagnostics().providers,
       studioPlayers: visuals.filter(item => item.source === 'studio-character').length,
       playerVisualSource: visuals.find(item => item.kind === 'player')?.source || 'pending',
