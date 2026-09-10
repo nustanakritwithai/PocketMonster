@@ -1,353 +1,282 @@
-export const WORLD_SIMULATOR_MAP_ADAPTER_VERSION = '1.0.0';
-export const WORLD_MAP_FRAME_CONTRACT = 'pocketmonster.world-map-frame.v1';
+/**
+ * Read-only projection of Living World Physics Simulator 20.9.4 snapshots.
+ *
+ * The PocketMonster client is presentation-only here. It consumes canonical
+ * world/soil/vegetation/biome/fire values and never recreates hydrology,
+ * ecology, weather, biome classification or simulation clocks.
+ */
+export const WORLD_SIMULATOR_MAP_ADAPTER_VERSION = '2.0.0-worldsim-20.9.4';
+export const WORLD_MAP_FRAME_CONTRACT = 'pocketmonster.world-map-frame.v2';
+export const WORLD_SIMULATOR_SOURCE_VERSION = '20.9.4';
 
-const TERRAIN_ALIASES = Object.freeze({
-  deepwater: 'water',
-  shallowwater: 'water',
-  ocean: 'water',
-  sea: 'water',
-  lake: 'water',
-  river: 'water',
-  stream: 'water',
-  water: 'water',
-  marsh: 'wetland',
-  swamp: 'wetland',
-  wetland: 'wetland',
-  beach: 'sand',
-  coast: 'sand',
-  coastal: 'sand',
-  sand: 'sand',
-  dune: 'sand',
-  cliff: 'rock',
-  mountain: 'rock',
-  rocky: 'rock',
-  rock: 'rock',
-  stone: 'rock',
-  ice: 'snow',
-  frozen: 'snow',
-  snow: 'snow',
-  tundra: 'snow',
-  grassland: 'grass',
-  meadow: 'grass',
-  forest: 'forest',
-  jungle: 'forest',
-  soil: 'soil',
-  dirt: 'soil',
-  ground: 'soil',
+export const WORLD_GROUND_BIOMES = Object.freeze([
+  'forest', 'grassland', 'wetland', 'beach', 'rock', 'mountain',
+  'lake', 'river', 'dryland', 'burned', 'ocean',
+]);
+
+export const WORLD_GROUND_MATERIALS = Object.freeze([
+  'grass', 'forest-floor', 'mud', 'sand', 'rock', 'dry-soil', 'burned',
+]);
+
+export const WORLD_GROUND_CHANNELS = Object.freeze([
+  'elevation', 'waterHeight', 'waterDepth', 'wetness', 'vegetation',
+  'burn', 'biome', 'material', 'ocean', 'flooded',
+]);
+
+const TERRAIN_TYPES = Object.freeze([
+  'deepWater', 'shallowWater', 'sand', 'grass', 'forest', 'rock',
+]);
+const SOIL_TYPES = Object.freeze([
+  'none', 'sand', 'loam', 'clay', 'peat', 'rocky', 'wetland', 'coastal',
+]);
+const MATERIAL_BY_SURFACE = Object.freeze({
+  forest: 1,
+  grassland: 0,
+  wetland: 2,
+  beach: 3,
+  rock: 4,
+  mountain: 4,
+  lake: 2,
+  river: 2,
+  dryland: 5,
+  burned: 6,
+  ocean: 3,
 });
 
-function finite(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
+const clamp01 = value => Math.max(0, Math.min(1, value));
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clamp01(value) {
-  return clamp(finite(value), 0, 1);
-}
-
-function normalizedScalar(value) {
-  const number = Math.max(0, finite(value));
-  return number <= 1 ? number : number / (1 + number);
-}
-
-function normalizedLabel(value, fallback = 'unknown') {
-  const text = String(value ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
-  return text || fallback;
-}
-
-function normalizeTerrain(value) {
-  const key = normalizedLabel(value);
-  return TERRAIN_ALIASES[key] || key;
-}
-
-function arrayLike(value) {
-  return Array.isArray(value) || ArrayBuffer.isView(value);
-}
-
-function readArrayValue(container, names, index) {
-  if (!container || typeof container !== 'object') return undefined;
-  for (const name of names) {
-    const channel = container[name];
-    if (arrayLike(channel) && index < channel.length) return channel[index];
+function finite(value, name, minimum = -Infinity) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum) {
+    throw new TypeError(`Invalid ${name}`);
   }
-  return undefined;
+  return value;
 }
 
-function readNestedValue(snapshot, groups, names, index) {
-  for (const groupName of groups) {
-    const value = readArrayValue(snapshot?.[groupName], names, index);
-    if (value !== undefined) return value;
+function integer(value, name, minimum = 0) {
+  finite(value, name, minimum);
+  if (!Number.isSafeInteger(value)) throw new TypeError(`Invalid ${name}`);
+  return value;
+}
+
+function boolean(value, name) {
+  if (typeof value !== 'boolean') throw new TypeError(`Invalid ${name}`);
+  return value;
+}
+
+function enumValue(value, values, name) {
+  if (!values.includes(value)) throw new TypeError(`Unsupported ${name}: ${String(value)}`);
+  return value;
+}
+
+function dimensions(world) {
+  const gridWidth = integer(world.gridWidth, 'gridWidth', 1);
+  const gridHeight = integer(world.gridHeight, 'gridHeight', 1);
+  const count = gridWidth * gridHeight;
+  if (count > 65536) throw new RangeError('World ground renderer is limited to 65536 cells');
+
+  const cellWidth = finite(world.cellWidth, 'cellWidth', Number.MIN_VALUE);
+  const cellHeight = finite(world.cellHeight, 'cellHeight', Number.MIN_VALUE);
+  const worldWidth = finite(world.worldWidth, 'worldWidth', Number.MIN_VALUE);
+  const worldHeight = finite(world.worldHeight, 'worldHeight', Number.MIN_VALUE);
+
+  const widthError = Math.abs(gridWidth * cellWidth - worldWidth);
+  const heightError = Math.abs(gridHeight * cellHeight - worldHeight);
+  if (widthError > Math.max(1, worldWidth) * 1e-8 || heightError > Math.max(1, worldHeight) * 1e-8) {
+    throw new TypeError('Inconsistent World Simulator dimensions');
   }
-  return readArrayValue(snapshot, names, index);
+
+  return Object.freeze({
+    gridWidth,
+    gridHeight,
+    count,
+    cellWidth,
+    cellHeight,
+    worldWidth,
+    worldHeight,
+  });
 }
 
-function readCellValue(cell, paths, fallback) {
-  for (const path of paths) {
-    let value = cell;
-    for (const part of path.split('.')) {
-      value = value?.[part];
-      if (value === undefined || value === null) break;
+function canonicalCells(section, count, label) {
+  const cells = section?.cells;
+  if (!Array.isArray(cells) || cells.length !== count) {
+    throw new TypeError(`Missing or incomplete ${label}.cells; a full World Simulator snapshot is required`);
+  }
+  for (let i = 0; i < count; i += 1) {
+    if (!cells[i] || cells[i].index !== i) {
+      throw new TypeError(`${label}.cells must use canonical row-major indices (at ${i})`);
     }
-    if (value !== undefined && value !== null) return value;
   }
-  return fallback;
+  return cells;
 }
 
-function sourceCells(snapshot) {
-  if (Array.isArray(snapshot?.cells)) return snapshot.cells;
-  if (Array.isArray(snapshot?.grid?.cells)) return snapshot.grid.cells;
-  if (Array.isArray(snapshot?.world?.cells)) return snapshot.world.cells;
-  return null;
+function freezeFrame(frame) {
+  for (const name of WORLD_GROUND_CHANNELS) Object.freeze(frame.channels[name]);
+  Object.freeze(frame.channels);
+  Object.freeze(frame.source.versions);
+  Object.freeze(frame.source);
+  Object.freeze(frame.grid);
+  return Object.freeze(frame);
 }
 
-function resolveDimensions(snapshot) {
-  const width = Math.trunc(finite(
-    snapshot?.grid?.width ?? snapshot?.world?.width ?? snapshot?.width ?? snapshot?.columns,
-  ));
-  const height = Math.trunc(finite(
-    snapshot?.grid?.height ?? snapshot?.world?.height ?? snapshot?.height ?? snapshot?.rows,
-  ));
-  if (width <= 0 || height <= 0) {
-    throw new TypeError('World snapshot must expose positive grid width and height.');
+/**
+ * Project a RenderSnapshot / RenderWorldSnapshot from WorldSim 20.9.4.
+ *
+ * Optional surfaceBiome must be WorldSim's existing producer-side
+ * worldSurfaceBiome selector. PocketMonster is never allowed to invent a
+ * replacement biome classifier.
+ */
+export function adaptWorldSnapshotToMapFrame(input, {
+  sourceVersion = WORLD_SIMULATOR_SOURCE_VERSION,
+  surfaceBiome,
+} = {}) {
+  if (sourceVersion !== WORLD_SIMULATOR_SOURCE_VERSION) {
+    throw new TypeError('Unverified World Simulator producer version; add an audited adapter before enabling it');
   }
-  return { width, height };
-}
-
-function readWorldChannel(snapshot, cell, index, cellPaths, groupNames, channelNames, fallback = 0) {
-  const direct = readCellValue(cell, cellPaths, undefined);
-  if (direct !== undefined) return direct;
-  const channel = readNestedValue(snapshot, groupNames, channelNames, index);
-  return channel === undefined ? fallback : channel;
-}
-
-function classifySurface({ terrain, soilType, surfaceWater, soilMoisture, vegetationDensity, fireSeverity }) {
-  if (terrain === 'water' || surfaceWater >= 0.35) return 'water';
-  if (terrain === 'snow') return 'snow';
-  if (terrain === 'wetland' || (surfaceWater >= 0.06 && soilMoisture >= 0.68)) return 'wetland';
-  if (terrain === 'sand' || soilType === 'sand' || soilType === 'coastal') return 'sand';
-  if (terrain === 'rock' || soilType === 'rocky') return 'rock';
-  if (fireSeverity >= 0.45) return 'burned';
-  if (terrain === 'forest' || vegetationDensity >= 0.55) return 'vegetated';
-  if (terrain === 'grass') return 'grass';
-  return 'soil';
-}
-
-function materialProfile(surfaceClass, state) {
-  const wetness = clamp01(
-    state.surfaceWater * 1.9 + state.soilMoisture * 0.58 + state.humidity * 0.12,
-  );
-  const moss = clamp01(state.vegetationDensity * state.soilMoisture * (0.55 + state.soilHealth * 0.45));
-  const puddle = clamp01(state.surfaceWater * 3.2);
-  const char = clamp01(state.fireSeverity);
-  const erosion = clamp01(state.erosion);
-  const deposition = clamp01(state.deposition);
-
-  const base = {
-    water:      { roughness: 0.16, normalStrength: 0.36, displacement: 0.02 },
-    wetland:    { roughness: 0.48, normalStrength: 0.72, displacement: 0.08 },
-    sand:       { roughness: 0.82, normalStrength: 0.54, displacement: 0.10 },
-    rock:       { roughness: 0.76, normalStrength: 1.00, displacement: 0.22 },
-    snow:       { roughness: 0.58, normalStrength: 0.42, displacement: 0.12 },
-    burned:     { roughness: 0.88, normalStrength: 0.90, displacement: 0.11 },
-    vegetated:  { roughness: 0.86, normalStrength: 0.86, displacement: 0.14 },
-    grass:      { roughness: 0.84, normalStrength: 0.80, displacement: 0.12 },
-    soil:       { roughness: 0.90, normalStrength: 0.74, displacement: 0.10 },
-  }[surfaceClass] || { roughness: 0.86, normalStrength: 0.70, displacement: 0.10 };
-
-  return Object.freeze({
-    family: surfaceClass,
-    wetness,
-    puddle,
-    moss,
-    char,
-    erosion,
-    deposition,
-    roughness: clamp(base.roughness - wetness * 0.34 + char * 0.08, 0.08, 1),
-    normalStrength: clamp(base.normalStrength + erosion * 0.18, 0, 1.35),
-    displacement: clamp(base.displacement + erosion * 0.06 + deposition * 0.04, 0, 0.35),
-  });
-}
-
-function adaptCell(snapshot, cell, index, width, options) {
-  const x = Number.isInteger(cell?.x) ? cell.x : index % width;
-  const z = Number.isInteger(cell?.z) ? cell.z : Math.floor(index / width);
-
-  const terrain = normalizeTerrain(readWorldChannel(
-    snapshot, cell, index,
-    ['terrainType', 'terrain.type', 'terrain'],
-    ['world', 'terrain', 'channels'],
-    ['terrainType', 'terrainTypes', 'terrain'],
-    'soil',
-  ));
-  const soilType = normalizedLabel(readWorldChannel(
-    snapshot, cell, index,
-    ['soilType', 'soil.type'],
-    ['soil', 'channels'],
-    ['soilType', 'soilTypes', 'type'],
-    'unknown',
-  ));
-  const biome = normalizedLabel(readWorldChannel(
-    snapshot, cell, index,
-    ['biome', 'biomeType', 'biome.type'],
-    ['world', 'biome', 'channels'],
-    ['biome', 'biomeType', 'biomes'],
-    'unknown',
-  ));
-
-  const elevation = finite(readWorldChannel(
-    snapshot, cell, index,
-    ['elevation', 'height', 'terrain.elevation'],
-    ['world', 'terrain', 'channels'],
-    ['elevation', 'height', 'heights'],
-  ));
-  const surfaceWater = normalizedScalar(readWorldChannel(
-    snapshot, cell, index,
-    ['surfaceWater', 'water.surface', 'hydrology.surfaceWater'],
-    ['hydrology', 'water', 'channels'],
-    ['surfaceWater', 'surfaceWaterDepth', 'waterDepth'],
-  ));
-  const soilMoisture = clamp01(readWorldChannel(
-    snapshot, cell, index,
-    ['soilMoisture', 'soil.waterContent', 'waterContent'],
-    ['soil', 'hydrology', 'channels'],
-    ['soilMoisture', 'waterContent'],
-  ));
-  const humidity = clamp01(readWorldChannel(
-    snapshot, cell, index,
-    ['humidity', 'climate.humidity'],
-    ['climate', 'channels'],
-    ['humidity', 'relativeHumidity'],
-  ));
-  const temperature = finite(readWorldChannel(
-    snapshot, cell, index,
-    ['temperature', 'soil.temperature', 'climate.temperature'],
-    ['climate', 'soil', 'channels'],
-    ['temperature', 'airTemperature', 'soilTemperature'],
-    options.defaultTemperature,
-  ), options.defaultTemperature);
-  const vegetationDensity = normalizedScalar(readWorldChannel(
-    snapshot, cell, index,
-    ['vegetationDensity', 'vegetation.cover', 'vegetation.biomass'],
-    ['vegetation', 'channels'],
-    ['vegetationDensity', 'cover', 'biomass', 'livingBiomass'],
-  ));
-  const soilHealth = clamp01(readWorldChannel(
-    snapshot, cell, index,
-    ['soilHealth', 'soil.health'],
-    ['soil', 'channels'],
-    ['soilHealth', 'health'],
-    0.5,
-  ));
-  const fireSeverity = clamp01(readWorldChannel(
-    snapshot, cell, index,
-    ['fireSeverity', 'fire.severity', 'burnSeverity'],
-    ['fire', 'channels'],
-    ['severity', 'fireSeverity', 'burnSeverity'],
-  ));
-  const erosion = normalizedScalar(readWorldChannel(
-    snapshot, cell, index,
-    ['erosion', 'erosion.amount'],
-    ['erosion', 'channels'],
-    ['erosion', 'erosionAmount', 'soilLoss'],
-  ));
-  const deposition = normalizedScalar(readWorldChannel(
-    snapshot, cell, index,
-    ['deposition', 'erosion.deposition'],
-    ['erosion', 'channels'],
-    ['deposition', 'depositionAmount', 'sedimentDeposit'],
-  ));
-
-  const state = Object.freeze({
-    terrain,
-    biome,
-    soilType,
-    elevation,
-    surfaceWater,
-    soilMoisture,
-    humidity,
-    temperature,
-    vegetationDensity,
-    soilHealth,
-    fireSeverity,
-    erosion,
-    deposition,
-  });
-  const surfaceClass = classifySurface(state);
-
-  return Object.freeze({
-    index,
-    x,
-    z,
-    worldX: options.originX + x * options.cellSize,
-    worldZ: options.originZ + z * options.cellSize,
-    worldY: elevation * options.elevationScale,
-    state,
-    surfaceClass,
-    material: materialProfile(surfaceClass, state),
-  });
-}
-
-export function adaptWorldSnapshotToMapFrame(snapshot, options = {}) {
-  if (!snapshot || typeof snapshot !== 'object') {
-    throw new TypeError('World snapshot must be an object.');
+  if (surfaceBiome !== undefined && typeof surfaceBiome !== 'function') {
+    throw new TypeError('surfaceBiome must be a producer-owned function');
   }
 
-  const { width, height } = resolveDimensions(snapshot);
-  const count = width * height;
-  const cells = sourceCells(snapshot);
-  if (cells && cells.length !== count) {
-    throw new RangeError(`World snapshot cell count mismatch: expected ${count}, received ${cells.length}.`);
+  const world = input?.world ?? input;
+  if (!world || typeof world !== 'object') throw new TypeError('World Simulator snapshot required');
+
+  const grid = dimensions(world);
+  const count = grid.count;
+  const terrain = canonicalCells(world, count, 'world');
+  const soil = canonicalCells(world.soil, count, 'soil');
+  const vegetation = canonicalCells(world.vegetation, count, 'vegetation');
+  const biomes = canonicalCells(world.biomes, count, 'biomes');
+  const fire = canonicalCells(world.fire, count, 'fire');
+  const channels = Object.fromEntries(WORLD_GROUND_CHANNELS.map(key => [key, new Array(count)]));
+  const versions = {};
+
+  for (const key of ['hydrology', 'soil', 'vegetation', 'biomes', 'fire']) {
+    versions[key] = integer(world[key]?.version, `${key}.version`);
   }
 
-  const normalizedOptions = Object.freeze({
-    cellSize: Math.max(0.001, finite(options.cellSize, 1)),
-    elevationScale: finite(options.elevationScale, 1),
-    originX: finite(options.originX, 0),
-    originZ: finite(options.originZ, 0),
-    defaultTemperature: finite(options.defaultTemperature, 24),
-  });
+  for (let i = 0; i < count; i += 1) {
+    const cell = terrain[i];
+    const soilCell = soil[i];
+    const vegetationCell = vegetation[i];
+    const biomeCell = biomes[i];
+    const fireCell = fire[i];
 
-  const mapped = new Array(count);
-  for (let index = 0; index < count; index++) {
-    mapped[index] = adaptCell(snapshot, cells?.[index] || null, index, width, normalizedOptions);
+    if (cell.column !== i % grid.gridWidth || cell.row !== Math.floor(i / grid.gridWidth)) {
+      throw new TypeError(`World cell coordinate/index mismatch at ${i}`);
+    }
+
+    enumValue(cell.terrainType, TERRAIN_TYPES, 'terrainType');
+    enumValue(soilCell.soilType, SOIL_TYPES, 'soilType');
+    const primaryBiome = enumValue(biomeCell.primaryBiome, WORLD_GROUND_BIOMES, 'primaryBiome');
+    const surface = surfaceBiome
+      ? enumValue(surfaceBiome(world, i), WORLD_GROUND_BIOMES, 'producer surfaceBiome')
+      : primaryBiome;
+
+    const waterContent = finite(soilCell.waterContent, `soil[${i}].waterContent`, 0);
+    const saturationCapacity = finite(soilCell.saturationCapacity, `soil[${i}].saturationCapacity`, 0);
+    const soilActive = boolean(soilCell.active, `soil[${i}].active`);
+    const coverage = finite(vegetationCell.coverage, `vegetation[${i}].coverage`, 0);
+
+    channels.elevation[i] = finite(cell.elevation, `cells[${i}].elevation`);
+    // totalWaterHeight already uses the same elevation datum. Never add elevation twice.
+    channels.waterHeight[i] = finite(cell.totalWaterHeight, `cells[${i}].totalWaterHeight`);
+    channels.waterDepth[i] = finite(cell.surfaceWater, `cells[${i}].surfaceWater`, 0);
+    channels.wetness[i] = soilActive && saturationCapacity > 0
+      ? clamp01(waterContent / saturationCapacity)
+      : 0;
+    channels.vegetation[i] = boolean(vegetationCell.active, `vegetation[${i}].active`)
+      ? clamp01(coverage)
+      : 0;
+    channels.burn[i] = clamp01(finite(fireCell.burnSeverity, `fire[${i}].burnSeverity`, 0));
+    channels.biome[i] = WORLD_GROUND_BIOMES.indexOf(primaryBiome);
+    channels.material[i] = MATERIAL_BY_SURFACE[surface];
+    channels.ocean[i] = Number(boolean(cell.isOceanCell, `cells[${i}].isOceanCell`));
+    channels.flooded[i] = Number(boolean(cell.isFlooded, `cells[${i}].isFlooded`));
   }
 
-  const tick = Math.trunc(finite(
-    snapshot.worldTick ?? snapshot.tick ?? snapshot.simulationTick ?? snapshot.time?.tick,
-    0,
-  ));
-  const sourceVersion = String(
-    snapshot.sourceStateVersion ?? snapshot.version ?? snapshot.buildInfo?.version ?? 'unknown',
-  );
-
-  return Object.freeze({
+  return freezeFrame({
     contract: WORLD_MAP_FRAME_CONTRACT,
     adapterVersion: WORLD_SIMULATOR_MAP_ADAPTER_VERSION,
-    source: 'living-world-physics',
-    sourceVersion,
-    tick,
-    grid: Object.freeze({
-      width,
-      height,
-      count,
-      cellSize: normalizedOptions.cellSize,
-      elevationScale: normalizedOptions.elevationScale,
-      originX: normalizedOptions.originX,
-      originZ: normalizedOptions.originZ,
-    }),
-    cells: Object.freeze(mapped),
+    presentationOnly: true,
+    source: {
+      simulator: 'living-world-physics',
+      version: WORLD_SIMULATOR_SOURCE_VERSION,
+      seed: integer(world.seed, 'seed', -Number.MAX_SAFE_INTEGER),
+      tick: input?.world ? integer(input.tick, 'tick') : null,
+      surfacePolicy: surfaceBiome ? 'producer-worldSurfaceBiome' : 'primaryBiome',
+      versions,
+    },
+    grid,
+    channels,
+  });
+}
+
+/** Validate imported presentation packets and detach their arrays from callers. */
+export function readWorldMapFrame(value) {
+  if (
+    value?.contract !== WORLD_MAP_FRAME_CONTRACT
+    || value.presentationOnly !== true
+    || value.source?.version !== WORLD_SIMULATOR_SOURCE_VERSION
+  ) {
+    throw new TypeError('Unsupported World Simulator map frame');
+  }
+
+  const grid = dimensions(value.grid);
+  const count = grid.count;
+  const channels = {};
+  for (const key of WORLD_GROUND_CHANNELS) {
+    const source = value.channels?.[key];
+    if (!Array.isArray(source) || source.length !== count) throw new TypeError(`Invalid world ground channel ${key}`);
+    channels[key] = source.map((entry, index) => finite(entry, `${key}[${index}]`));
+
+    if (['wetness', 'vegetation', 'burn', 'ocean', 'flooded'].includes(key)
+      && source.some(entry => entry < 0 || entry > 1)) {
+      throw new RangeError(`Invalid normalized world ground channel ${key}`);
+    }
+    if (['ocean', 'flooded'].includes(key) && source.some(entry => entry !== 0 && entry !== 1)) {
+      throw new RangeError(`Invalid world ground flag ${key}`);
+    }
+    if (key === 'waterDepth' && source.some(entry => entry < 0)) throw new RangeError('Negative water depth');
+
+    const enumCount = key === 'biome'
+      ? WORLD_GROUND_BIOMES.length
+      : key === 'material'
+        ? WORLD_GROUND_MATERIALS.length
+        : null;
+    if (enumCount !== null && source.some(entry => !Number.isInteger(entry) || entry < 0 || entry >= enumCount)) {
+      throw new RangeError(`Invalid enum world ground channel ${key}`);
+    }
+  }
+
+  const versions = {};
+  for (const key of ['hydrology', 'soil', 'vegetation', 'biomes', 'fire']) {
+    versions[key] = integer(value.source?.versions?.[key], `${key}.version`);
+  }
+  if (!['primaryBiome', 'producer-worldSurfaceBiome'].includes(value.source?.surfacePolicy)) {
+    throw new TypeError('Unknown World Simulator surface policy');
+  }
+
+  return freezeFrame({
+    contract: WORLD_MAP_FRAME_CONTRACT,
+    adapterVersion: WORLD_SIMULATOR_MAP_ADAPTER_VERSION,
+    presentationOnly: true,
+    source: {
+      simulator: 'living-world-physics',
+      version: WORLD_SIMULATOR_SOURCE_VERSION,
+      seed: integer(value.source.seed, 'seed', -Number.MAX_SAFE_INTEGER),
+      tick: value.source.tick === null ? null : integer(value.source.tick, 'tick'),
+      surfacePolicy: value.source.surfacePolicy,
+      versions,
+    },
+    grid,
+    channels,
   });
 }
 
 export function buildWorldSnapshotEndpoint(baseUrl, zoneId) {
   const base = String(baseUrl ?? '').trim().replace(/\/+$/, '');
   const zone = String(zoneId ?? '').trim();
-  if (!base) throw new TypeError('World Simulator baseUrl is required.');
-  if (!zone) throw new TypeError('World Simulator zoneId is required.');
+  if (!base) throw new TypeError('World Simulator baseUrl is required');
+  if (!zone) throw new TypeError('World Simulator zoneId is required');
   return `${base}/world/zones/${encodeURIComponent(zone)}/snapshot`;
 }
 
@@ -358,15 +287,14 @@ export async function fetchWorldMapFrame({
   signal,
   adapterOptions,
 } = {}) {
-  if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl must be a function.');
+  if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl must be a function');
   const endpoint = buildWorldSnapshotEndpoint(baseUrl, zoneId);
   const response = await fetchImpl(endpoint, {
     method: 'GET',
     headers: { Accept: 'application/json' },
+    cache: 'no-store',
     signal,
   });
-  if (!response?.ok) {
-    throw new Error(`World Simulator snapshot request failed: ${response?.status ?? 'unknown'}`);
-  }
+  if (!response?.ok) throw new Error(`World Simulator snapshot request failed: ${response?.status ?? 'unknown'}`);
   return adaptWorldSnapshotToMapFrame(await response.json(), adapterOptions);
 }
