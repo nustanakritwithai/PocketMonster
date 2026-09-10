@@ -12,6 +12,7 @@ on:
       - 'tests/v91-studio-character-provider.mjs'
       - 'tests/v91-studio-character-live-wiring.mjs'
       - 'tests/v91-studio-blue-explorer-primary.mjs'
+      - 'tests/v91-studio-fighting-wrap-sockets.mjs'
       - '.github/workflows/studio-character-provider-ci.yml'
   workflow_dispatch:
 
@@ -35,12 +36,15 @@ jobs:
           node --check tests/v91-studio-character-provider.mjs
           node --check tests/v91-studio-character-live-wiring.mjs
           node --check tests/v91-studio-blue-explorer-primary.mjs
+          node --check tests/v91-studio-fighting-wrap-sockets.mjs
       - name: Run Studio character provider gate
         run: node tests/v91-studio-character-provider.mjs
       - name: Run Studio live wiring gate
         run: node tests/v91-studio-character-live-wiring.mjs
       - name: Run Blue Explorer primary rig and pivot gate
         run: node tests/v91-studio-blue-explorer-primary.mjs
+      - name: Keep Pirate Fighting Style wraps on Studio hand sockets
+        run: node tests/v91-studio-fighting-wrap-sockets.mjs
       - name: Preserve Asset Engine contracts
         run: |
           node tests/v80-ae0-contracts.mjs
