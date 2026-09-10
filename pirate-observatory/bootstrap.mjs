@@ -63,7 +63,7 @@ export async function connectPirateObservatoryFromRuntime({
     ...(Number.isFinite(now) ? { now } : {}),
   });
   if (!context.ok) {
-    PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0, reason: context.reason ?? null });
+    PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0, reason: context.reason ?? null, waitingForAuthority: false });
     PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.OFFLINE);
     return context;
   }
