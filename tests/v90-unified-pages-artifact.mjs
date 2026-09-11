@@ -72,11 +72,13 @@ for (const relative of closure) {
   const built = fs.readFileSync(path.join(output, relative));
   assert.equal(crypto.createHash('sha256').update(built).digest('hex'), manifestEntry.sha256, `${relative} built hash must match manifest`);
   if (relative === 'index.html' || relative === 'v900.html') {
-    const normalizedBuilt = built.toString('utf8').replace(
-      /entry-preload-v900\.mjs\?release=[^'"\s>]+/,
-      'entry-preload-v900.mjs?v=972',
-    );
-    assert.equal(normalizedBuilt, source.toString('utf8'), `${relative} may differ from source only by the release-bound entry cache key`);
+    const normalizedBuilt = built.toString('utf8')
+      .replace(/\s+hidden\s+data-release-boot="waiting"/i, '')
+      .replace(
+        /entry-preload-v900\.mjs\?release=[^'"\s>]+/,
+        'entry-preload-v900.mjs?v=972',
+      );
+    assert.equal(normalizedBuilt, source.toString('utf8'), `${relative} may differ from source only by release binding and the pre-shell hidden first-paint gate`);
   } else {
     assert.equal(Buffer.compare(source, built), 0, `${relative} built bytes must match source`);
   }
@@ -88,10 +90,14 @@ assert.match(index, new RegExp(`entry-preload-v900\\.mjs\\?release=${encodedRele
   'published entry must bind the preload module to deployedRelease');
 assert.doesNotMatch(index, /entry-preload-v900\.mjs\?v=972/,
   'published entry must not reuse the source-level cache key across releases');
+assert.match(index, /<html\b[^>]*\bhidden\b[^>]*data-release-boot="waiting"/i,
+  'published Pages entry must suppress legacy top-level DOM until the online shell is ready');
 assert.match(index, /style-v900\.css\?v=969/);
 const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 assert.match(entry, /installReleaseBoundSceneFrames/, 'V9 entry installs release binding before online shell boot');
+assert.match(entry, /await import\('\.\/online-world-shell-v900\.mjs\?v=65'\)[\s\S]*document\.documentElement\.hidden = false/,
+  'published root stays hidden until online shell import has replaced the legacy DOM');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=969/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
