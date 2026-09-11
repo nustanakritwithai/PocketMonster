@@ -14,6 +14,8 @@ for (const entry of ['index.html', 'v900.html']) {
     `${entry} must bind entry-preload to the exact deployed release`);
   assert.doesNotMatch(html, /entry-preload-v900\.mjs\?v=972/,
     `${entry} must not publish the stale shared entry-preload cache key`);
+  assert.match(html, /<html\b[^>]*\bhidden\b[^>]*data-release-boot="waiting"/i,
+    `${entry} must suppress the legacy top-level DOM before the online shell replaces it`);
 }
 
 const preload = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
@@ -23,8 +25,13 @@ assert.match(preload, /release:\s*config\.deployedRelease/,
   'scene release hook must use runtime-config deployedRelease');
 const hookIndex = preload.indexOf('installReleaseBoundSceneFrames');
 const shellIndex = preload.indexOf("await import('./online-world-shell-v900.mjs?v=65')");
+const revealIndex = preload.indexOf('document.documentElement.hidden = false');
 assert.ok(hookIndex >= 0 && shellIndex > hookIndex,
   'scene release binding must be active before the cached shell can assign scene iframe src');
+assert.ok(revealIndex > shellIndex,
+  'top-level Pages entry may only become visible after online-world-shell import completes');
+assert.match(preload, /document\.body\.replaceChildren\(status\)[\s\S]*document\.documentElement\.hidden = false/,
+  'boot failure must replace the hidden legacy DOM with a neutral error before revealing');
 
 const sceneCache = fs.readFileSync(path.join(output, 'scene-release-cache-v1.mjs'), 'utf8');
 assert.match(sceneCache, /url\.pathname\.endsWith\('\/scene-v900\.html'\)/,
@@ -36,4 +43,4 @@ const launcher = fs.readFileSync('firebase-launcher-entry.mjs', 'utf8');
 assert.match(launcher, /releaseBoundLaunchUrl\(launch\.launchUrl, config\.deployedRelease\)/,
   'Firebase launcher must enter Pages through the same deployed release token');
 
-console.log(`Release-bound Pages cache chain passed: ${release}`);
+console.log(`Release-bound Pages cache and first-paint chain passed: ${release}`);
