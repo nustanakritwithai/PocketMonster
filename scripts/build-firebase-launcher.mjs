@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function launcherHtml({ apiOrigin, release }) {
+function launcherHtml({ apiOrigin, assetBase, release }) {
   return `<!doctype html>
 <html lang="th">
 <head>
@@ -11,6 +11,7 @@ function launcherHtml({ apiOrigin, release }) {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; connect-src 'self' ${apiOrigin} https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data:; style-src 'self'; font-src 'self'; frame-src 'self' https://accounts.google.com https://pocketmonster-game.firebaseapp.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
+  <meta name="pocketmonster-asset-base" content="${assetBase}" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -67,7 +68,7 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   if (!assetBase || new URL(assetBase).protocol !== 'https:') throw new Error('runtime-config.json requires an HTTPS assetBaseUrl');
   if (new URL(apiOrigin).protocol !== 'https:') throw new Error('runtime-config.json requires an HTTPS apiBaseUrl');
   const release = encodeURIComponent(config.deployedRelease || Date.now());
-  const html = launcherHtml({ apiOrigin, release });
+  const html = launcherHtml({ apiOrigin, assetBase, release });
 
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });
