@@ -1,5 +1,6 @@
 import { PirateObservatoryHistorySession } from './history-session.mjs';
 import { PirateObservatoryEvidencePlayback } from './evidence-playback.mjs';
+import { PirateObservatoryHistoryMap } from './history-map.mjs';
 
 const els = {
   status: document.getElementById('debugHistoryStatus'),
@@ -115,6 +116,9 @@ function renderSnapshot(snapshot) {
   if (els.sequence && Number.isSafeInteger(snapshot?.sequence)) els.sequence.value = String(snapshot.sequence);
   if (els.entities) els.entities.textContent = Array.isArray(snapshot?.entities) ? snapshot.entities.length.toLocaleString() : '—';
   renderEntities(snapshot);
+  PirateObservatoryHistoryMap.render(snapshot, {
+    selectedId: dashboard?.selected?.()?.kind === 'entity' ? dashboard.selected().id : null,
+  });
 }
 
 function clearSnapshot() {
@@ -124,6 +128,7 @@ function clearSnapshot() {
   if (els.body) {
     els.body.innerHTML = '<div class="debug-empty">Load a committed historical sequence to inspect detached evidence.</div>';
   }
+  PirateObservatoryHistoryMap.clear();
 }
 
 function bindControls() {
