@@ -37,12 +37,20 @@ const hybrid = new PirateObservatoryHybridSession({
   partition: 'pirate-fruit',
   WebSocketImpl: AutoOpenWebSocket,
   fetchImpl: async (url, options) => {
-    requests.push({ url: String(url), options });
+    const href = String(url);
+    requests.push({ url: href, options });
+    const pathname = new URL(href).pathname;
     return {
       ok: true,
       status: 200,
       async json() {
-        return { schemaVersion: 1, snapshotId: 'pirate-fruit:12:7', partition: 'pirate-fruit', tick: 12, sequence: 7, entities: [] };
+        if (pathname === '/api/observatory/status') {
+          return { schemaVersion: 1, ready: true, code: 'OK', lastObservedTick: 12, mode: 'canonical-read-model' };
+        }
+        if (pathname === '/api/observatory/regions/pirate-fruit/snapshot') {
+          return { schemaVersion: 1, snapshotId: 'pirate-fruit:12:7', partition: 'pirate-fruit', tick: 12, sequence: 7, entities: [] };
+        }
+        throw new Error(`unexpected request: ${pathname}`);
       },
     };
   },
@@ -54,8 +62,9 @@ const result = await hybrid.start();
 assert.equal(result.ok, true);
 assert.equal(result.mode, 'websocket');
 assert.equal(snapshots.length, 1);
-assert.equal(requests.length, 1, 'hybrid bootstrap should use one canonical REST snapshot');
-assert.equal(new URL(requests[0].url).pathname, '/api/observatory/regions/pirate-fruit/snapshot');
+assert.equal(requests.length, 2, 'hybrid bootstrap should verify readiness then load one canonical REST snapshot');
+assert.equal(new URL(requests[0].url).pathname, '/api/observatory/status');
+assert.equal(new URL(requests[1].url).pathname, '/api/observatory/regions/pirate-fruit/snapshot');
 assert.equal(AutoOpenWebSocket.instances.length, 1);
 const socket = AutoOpenWebSocket.instances[0];
 assert.equal(socket.url, 'wss://server.example/ws/observatory');
