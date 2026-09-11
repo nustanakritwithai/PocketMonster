@@ -1,4 +1,5 @@
 import { PirateObservatoryHistorySession } from './history-session.mjs';
+import { PirateObservatoryEvidencePlayback } from './evidence-playback.mjs';
 
 const els = {
   status: document.getElementById('debugHistoryStatus'),
@@ -6,6 +7,12 @@ const els = {
   sequence: document.getElementById('debugHistorySequence'),
   refresh: document.getElementById('debugHistoryRefresh'),
   load: document.getElementById('debugHistoryLoad'),
+  prev: document.getElementById('debugPlaybackPrev'),
+  play: document.getElementById('debugPlaybackPlay'),
+  pause: document.getElementById('debugPlaybackPause'),
+  next: document.getElementById('debugPlaybackNext'),
+  playbackState: document.getElementById('debugPlaybackState'),
+  playbackRange: document.getElementById('debugPlaybackRange'),
   tick: document.getElementById('debugHistoryTick'),
   loadedSequence: document.getElementById('debugHistoryLoadedSequence'),
   entities: document.getElementById('debugHistoryEntityCount'),
@@ -13,6 +20,7 @@ const els = {
 };
 
 let session = null;
+let playback = null;
 let dashboard = null;
 let configured = false;
 let checkpointsLoaded = false;
@@ -23,19 +31,40 @@ function setStatus(text, tone = 'muted') {
   els.status.dataset.tone = tone;
 }
 
-function renderCheckpoints(sequences) {
-  if (!els.checkpoint) return;
-  els.checkpoint.replaceChildren();
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = sequences.length ? 'Select checkpoint…' : 'No checkpoints';
-  els.checkpoint.append(placeholder);
-  for (const sequence of sequences) {
-    const option = document.createElement('option');
-    option.value = String(sequence);
-    option.textContent = `#${sequence.toLocaleString()}`;
-    els.checkpoint.append(option);
+function renderPlaybackState(state = null) {
+  const value = state ?? playback?.status?.() ?? null;
+  if (els.playbackState) {
+    const label = value?.state ? value.state.toUpperCase() : 'IDLE';
+    els.playbackState.textContent = label;
+    els.playbackState.dataset.state = value?.state ?? 'idle';
   }
+  if (els.playbackRange) {
+    els.playbackRange.textContent = Number.isSafeInteger(value?.minSequence) && Number.isSafeInteger(value?.maxSequence)
+      ? `#${value.minSequence.toLocaleString()} → #${value.maxSequence.toLocaleString()}`
+      : 'NO RETAINED RANGE';
+  }
+  if (els.play) els.play.disabled = !value || value.minSequence === null || value.state === 'playing';
+  if (els.pause) els.pause.disabled = !value || value.state !== 'playing';
+  if (els.prev) els.prev.disabled = !value || value.minSequence === null || (value.currentSequence !== null && value.currentSequence <= value.minSequence);
+  if (els.next) els.next.disabled = !value || value.maxSequence === null || (value.currentSequence !== null && value.currentSequence >= value.maxSequence);
+}
+
+function renderCheckpoints(sequences) {
+  if (els.checkpoint) {
+    els.checkpoint.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = sequences.length ? 'Select checkpoint…' : 'No checkpoints';
+    els.checkpoint.append(placeholder);
+    for (const sequence of sequences) {
+      const option = document.createElement('option');
+      option.value = String(sequence);
+      option.textContent = `#${sequence.toLocaleString()}`;
+      els.checkpoint.append(option);
+    }
+  }
+  playback?.configureBounds(sequences);
+  renderPlaybackState();
 }
 
 function renderEntities(snapshot) {
@@ -83,6 +112,7 @@ function renderEntities(snapshot) {
 function renderSnapshot(snapshot) {
   if (els.tick) els.tick.textContent = Number.isSafeInteger(snapshot?.tick) ? snapshot.tick.toLocaleString() : '—';
   if (els.loadedSequence) els.loadedSequence.textContent = Number.isSafeInteger(snapshot?.sequence) ? snapshot.sequence.toLocaleString() : '—';
+  if (els.sequence && Number.isSafeInteger(snapshot?.sequence)) els.sequence.value = String(snapshot.sequence);
   if (els.entities) els.entities.textContent = Array.isArray(snapshot?.entities) ? snapshot.entities.length.toLocaleString() : '—';
   renderEntities(snapshot);
 }
@@ -102,6 +132,10 @@ function bindControls() {
   });
   els.refresh?.addEventListener('click', () => { void refresh(); });
   els.load?.addEventListener('click', () => { void load(); });
+  els.prev?.addEventListener('click', () => { void playback?.step(-1); });
+  els.next?.addEventListener('click', () => { void playback?.step(1); });
+  els.play?.addEventListener('click', () => { void playback?.play(); });
+  els.pause?.addEventListener('click', () => playback?.pause());
   document.querySelector('[data-workspace="debug"]')?.addEventListener('click', () => {
     if (configured && !checkpointsLoaded) void refresh();
   });
@@ -112,13 +146,14 @@ async function refresh() {
     setStatus('HISTORY UNAVAILABLE', 'warn');
     return { ok: false, reason: 'HISTORY_UNAVAILABLE' };
   }
+  playback?.pause();
   const result = await session.refreshCheckpoints();
   if (result.ok) checkpointsLoaded = true;
   return result;
 }
 
 async function load() {
-  if (!session) {
+  if (!session || !playback) {
     setStatus('HISTORY UNAVAILABLE', 'warn');
     return { ok: false, reason: 'HISTORY_UNAVAILABLE' };
   }
@@ -128,17 +163,22 @@ async function load() {
     setStatus('ENTER A VALID SEQUENCE', 'warn');
     return { ok: false, reason: 'INVALID_HISTORY_SEQUENCE' };
   }
-  return session.loadSequence(sequence);
+  const result = await playback.jump(sequence);
+  if (!result.ok && result.reason === 'HISTORY_OUT_OF_RANGE') setStatus('SEQUENCE OUTSIDE RETAINED RANGE', 'warn');
+  return result;
 }
 
 function configure({ transport, partition = 'pirate-fruit', dashboard: dashboardValue = null } = {}) {
   dashboard = dashboardValue ?? dashboard;
   checkpointsLoaded = false;
+  playback?.clear();
+  playback = null;
   clearSnapshot();
   if (!transport?.getHistoryCheckpoints || !transport?.getHistoricalSnapshot) {
     session = null;
     configured = false;
     renderCheckpoints([]);
+    renderPlaybackState();
     setStatus('HISTORY UNAVAILABLE', 'muted');
     return;
   }
@@ -158,23 +198,38 @@ function configure({ transport, partition = 'pirate-fruit', dashboard: dashboard
       setStatus('HISTORY IDLE', 'muted');
     },
   });
+  playback = new PirateObservatoryEvidencePlayback({
+    historySession: session,
+    stepMs: 500,
+    onState: state => {
+      renderPlaybackState(state);
+      if (Number.isSafeInteger(state.currentSequence) && els.sequence) els.sequence.value = String(state.currentSequence);
+      if (state.state === 'error') setStatus(state.reason ?? 'PLAYBACK ERROR', 'warn');
+      if (state.state === 'ended') setStatus(`EVIDENCE END #${state.currentSequence ?? '—'}`, 'history');
+    },
+  });
   configured = true;
+  renderPlaybackState(playback.status());
   setStatus('HISTORY READY TO QUERY', 'muted');
 }
 
 function clear() {
+  playback?.clear();
+  playback = null;
   session?.clear();
   session = null;
   configured = false;
   checkpointsLoaded = false;
   renderCheckpoints([]);
   clearSnapshot();
+  renderPlaybackState();
   setStatus('HISTORY UNAVAILABLE', 'muted');
 }
 
 bindControls();
 renderCheckpoints([]);
 clearSnapshot();
+renderPlaybackState();
 setStatus('HISTORY UNAVAILABLE', 'muted');
 
 export const PirateObservatoryHistoryPanel = Object.freeze({
@@ -182,5 +237,7 @@ export const PirateObservatoryHistoryPanel = Object.freeze({
   clear,
   refresh,
   load,
+  pause: () => playback?.pause(),
   current: () => session?.snapshot ?? null,
+  playbackStatus: () => playback?.status() ?? null,
 });
