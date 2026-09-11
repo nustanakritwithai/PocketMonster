@@ -1,5 +1,6 @@
 import { PirateObservatoryDashboard } from './dashboard.mjs';
 import { PirateObservatoryServerPanel } from './server-panel.mjs';
+import { PirateObservatoryDebugPanel } from './debug-panel.mjs';
 import { PirateObservatoryRestTransport } from './transport.mjs';
 import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { PirateObservatoryHybridSession } from './hybrid-session.mjs';
@@ -17,6 +18,20 @@ let activeInterestPollMs = 750;
 let activeHealthSession = null;
 let activeHealthPartition = null;
 let activeHealthPollMs = 3000;
+
+PirateObservatoryDebugPanel.attachDashboard(PirateObservatoryDashboard);
+
+function acceptCanonicalSnapshot(snapshot) {
+  const result = PirateObservatoryDashboard.acceptSnapshot(snapshot);
+  if (result?.ok) PirateObservatoryDebugPanel.acceptSnapshot(snapshot);
+  return result;
+}
+
+function acceptCanonicalDelta(packet) {
+  const result = PirateObservatoryDashboard.acceptDelta(packet);
+  if (result?.ok && result.duplicate !== true) PirateObservatoryDebugPanel.acceptDelta(packet);
+  return result;
+}
 
 function stopInterestSession() {
   activeViewportUnsubscribe?.();
@@ -115,6 +130,7 @@ function stopActiveSession() {
   activeSession?.stop?.();
   activeSession = null;
   activeTransport = null;
+  PirateObservatoryDebugPanel.clear();
   PirateObservatoryDashboard.setServerStatus({ issues: 0 });
 }
 
@@ -140,8 +156,8 @@ export async function connectPirateObservatoryRest({
     partition,
     pollMs,
     notReadyPollMs,
-    onSnapshot: snapshot => PirateObservatoryDashboard.acceptSnapshot(snapshot),
-    onDelta: packet => PirateObservatoryDashboard.acceptDelta(packet),
+    onSnapshot: acceptCanonicalSnapshot,
+    onDelta: acceptCanonicalDelta,
     onState: (state, detail = {}) => applyDashboardState(partition, state, { ...detail, transport: 'rest' }),
   });
 
@@ -175,8 +191,8 @@ export async function connectPirateObservatoryHybrid({
     WebSocketImpl,
     pollMs,
     notReadyPollMs,
-    onSnapshot: snapshot => PirateObservatoryDashboard.acceptSnapshot(snapshot),
-    onDelta: packet => PirateObservatoryDashboard.acceptDelta(packet),
+    onSnapshot: acceptCanonicalSnapshot,
+    onDelta: acceptCanonicalDelta,
     onEvent: (event, envelope) => PirateObservatoryDashboard.acceptEvent({ ...event, at: envelope?.serverTime ?? Date.now() }),
     onServerHealth: (payload, envelope) => {
       PirateObservatoryServerPanel.acceptHealth(payload, { source: 'websocket' });
