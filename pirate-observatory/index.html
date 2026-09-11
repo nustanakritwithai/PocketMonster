@@ -6,6 +6,7 @@
   <title>Pirate World Observatory</title>
   <link rel="stylesheet" href="./dashboard.css" />
   <link rel="stylesheet" href="./dashboard-map-p1.css" />
+  <link rel="stylesheet" href="./dashboard-debug-p2.css" />
   <link rel="stylesheet" href="./dashboard-server-p2.css" />
 </head>
 <body>
@@ -57,8 +58,39 @@
       </div>
     </section>
 
-    <section class="workspace-placeholder" data-panel="debug" hidden>
-      <div><span class="eyebrow">DEBUG WORKSPACE</span><h1>Investigation context will stay attached to the selected entity.</h1><p>Journal timeline, snapshot diff and replay controls activate when a server transport supplies history.</p></div>
+    <section class="debug-workspace" data-panel="debug" hidden>
+      <div class="debug-shell">
+        <div class="debug-heading">
+          <div>
+            <span class="eyebrow">DEBUG WORKSPACE</span>
+            <h1>Canonical Investigation Context</h1>
+            <p>Inspect the latest accepted snapshot cursor and post-snapshot deltas already received by this browser. This view never mutates world state.</p>
+          </div>
+          <span class="debug-badge">REPLAY NOT ENABLED</span>
+        </div>
+
+        <div class="debug-summary">
+          <article class="debug-card"><span>Partition</span><strong id="debugPartition">—</strong></article>
+          <article class="debug-card"><span>Tick</span><strong id="debugTick">—</strong></article>
+          <article class="debug-card"><span>Sequence</span><strong id="debugSequence">—</strong></article>
+          <article class="debug-card"><span>Snapshot ID</span><strong id="debugSnapshotId">—</strong></article>
+          <article class="debug-card"><span>Selected entity</span><strong id="debugSelectedEntity">—</strong></article>
+          <article class="debug-card"><span>Watch count</span><strong id="debugWatchCount">0</strong></article>
+        </div>
+
+        <div id="debugNote" class="debug-note">Waiting for canonical snapshot/delta evidence.</div>
+        <div class="debug-columns">
+          <section class="debug-panel-card">
+            <header class="debug-panel-head"><span>RECENT CHANGES</span><strong>Browser-session evidence</strong></header>
+            <div id="debugRecentChanges" class="debug-list"><div class="debug-empty">No canonical journal changes received yet.</div></div>
+          </section>
+          <section class="debug-panel-card">
+            <header class="debug-panel-head"><span>SELECTED ENTITY DIFF</span><strong id="debugDiffTitle">No entity selected</strong></header>
+            <div id="debugDiffBody" class="debug-diff"><div class="debug-empty">Select a canonical entity in WORLD to inspect its latest accepted delta.</div></div>
+          </section>
+        </div>
+        <div class="debug-guardrail"><strong>Replay guardrail:</strong> time travel/replay remains disabled until P3 adds persisted checkpoint + journal history. The rows above are only current-session debug evidence.</div>
+      </div>
     </section>
 
     <section class="server-workspace" data-panel="server" hidden>
