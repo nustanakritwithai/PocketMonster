@@ -8,6 +8,7 @@ on:
       - 'pirate-observatory/**'
       - 'pirate-fruit-island-map-v900.mjs'
       - 'runtime-config.mjs'
+      - 'runtime-config.json'
       - 'launch-bootstrap.mjs'
       - 'scripts/build-pirate-observatory-preview.mjs'
       - '.github/workflows/pirate-observatory-preview.yml'
@@ -19,7 +20,6 @@ permissions:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    environment: auth-profile-staging
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,18 +35,13 @@ jobs:
           node tests/v90-pirate-observatory-evidence-playback.mjs
           node tests/v90-pirate-observatory-history-map.mjs
 
-      - name: Generate protected test-project runtime config
+      - name: Generate read-only preview runtime config
         env:
-          MONSTERLIFE_AUTH_PROFILE_PREVIEW: 'true'
-          MONSTERLIFE_READONLY_ORIGIN: '${{ vars.MONSTERLIFE_AUTH_STAGING_ORIGIN }}'
-          FIREBASE_TEST_API_KEY: '${{ vars.FIREBASE_TEST_API_KEY }}'
-          FIREBASE_TEST_AUTH_DOMAIN: '${{ vars.FIREBASE_TEST_AUTH_DOMAIN }}'
-          FIREBASE_TEST_PROJECT_ID: '${{ vars.FIREBASE_TEST_PROJECT_ID }}'
-          FIREBASE_TEST_STORAGE_BUCKET: '${{ vars.FIREBASE_TEST_STORAGE_BUCKET }}'
-          FIREBASE_TEST_MESSAGING_SENDER_ID: '${{ vars.FIREBASE_TEST_MESSAGING_SENDER_ID }}'
-          FIREBASE_TEST_APP_ID: '${{ vars.FIREBASE_TEST_APP_ID }}'
+          MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
           MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
           MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
+          MONSTERLIFE_LAUNCH_TICKET: 'true'
+          MONSTERLIFE_WORLD_SIM_GROUND: 'true'
           MONSTERLIFE_RELEASE_VERSION: '8.4.0-observatory.${{ github.sha }}'
         run: |
           node scripts/write-deployment-runtime-config.mjs
@@ -68,7 +63,7 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MONSTERLIFE_TEST }}'
-          projectId: '${{ vars.FIREBASE_TEST_PROJECT_ID }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_POCKETMONSTER_GAME }}'
+          projectId: pocketmonster-game
           channelId: pirate-observatory-test
           expires: 7d
