@@ -21,6 +21,7 @@ on:
       - 'tests/v90-pirate-observatory-history-transport.mjs'
       - 'tests/v90-pirate-observatory-evidence-playback.mjs'
       - 'tests/v90-pirate-observatory-history-map.mjs'
+      - 'tests/v90-pirate-observatory-mobile-layout.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
@@ -41,6 +42,7 @@ on:
       - 'tests/v90-pirate-observatory-history-transport.mjs'
       - 'tests/v90-pirate-observatory-evidence-playback.mjs'
       - 'tests/v90-pirate-observatory-history-map.mjs'
+      - 'tests/v90-pirate-observatory-mobile-layout.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -76,6 +78,7 @@ jobs:
           node --check pirate-observatory/server-panel.mjs
           node --check pirate-observatory/dashboard.mjs
           node --check pirate-observatory/bootstrap.mjs
+          node --check tests/v90-pirate-observatory-mobile-layout.mjs
       - name: Observatory client regression
         run: |
           node tests/v90-pirate-observatory-p0.mjs
@@ -93,3 +96,4 @@ jobs:
           node tests/v90-pirate-observatory-history-transport.mjs
           node tests/v90-pirate-observatory-evidence-playback.mjs
           node tests/v90-pirate-observatory-history-map.mjs
+          node tests/v90-pirate-observatory-mobile-layout.mjs
