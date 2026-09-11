@@ -33,6 +33,7 @@ export class PirateObservatoryWebSocketSession {
     onAlert = () => {},
     onState = () => {},
     onResyncRequired = () => {},
+    onClose = () => {},
   } = {}) {
     if (typeof WebSocketImpl !== 'function') throw new TypeError('WebSocket implementation is required');
     if (typeof token !== 'string' || !token) throw new TypeError('session token is required');
@@ -52,6 +53,7 @@ export class PirateObservatoryWebSocketSession {
     this.onAlert = onAlert;
     this.onState = onState;
     this.onResyncRequired = onResyncRequired;
+    this.onClose = onClose;
     this.socket = null;
     this.closedByClient = false;
   }
@@ -93,14 +95,14 @@ export class PirateObservatoryWebSocketSession {
       });
       socket.addEventListener('close', event => {
         this.socket = null;
-        if (!this.closedByClient) {
-          this.onState(SYNC_STATES.OFFLINE, {
-            transport: 'websocket',
-            reason: 'SOCKET_CLOSED',
-            code: event.code,
-          });
-        }
-        finish({ ok: false, reason: 'SOCKET_CLOSED', code: event.code });
+        const detail = {
+          transport: 'websocket',
+          reason: this.closedByClient ? 'CLIENT_CLOSED' : 'SOCKET_CLOSED',
+          code: event.code,
+        };
+        if (!this.closedByClient) this.onState(SYNC_STATES.OFFLINE, detail);
+        this.onClose(detail);
+        finish({ ok: false, reason: detail.reason, code: event.code });
       });
     });
   }
