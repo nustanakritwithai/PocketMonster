@@ -63,6 +63,17 @@ export class PirateObservatoryRestTransport {
     return this.#get(`/api/observatory/regions/${target}/interest?${params}`);
   }
 
+  async getHistoryCheckpoints(partition = 'pirate-fruit') {
+    const target = encodeURIComponent(assertPartition(partition));
+    return this.#get(`/api/observatory/history/${target}/checkpoints`);
+  }
+
+  async getHistoricalSnapshot(partition, sequence) {
+    const target = encodeURIComponent(assertPartition(partition));
+    assertSequence(sequence);
+    return this.#get(`/api/observatory/history/${target}/snapshot?sequence=${sequence}`);
+  }
+
   async #get(path) {
     const url = new URL(path, this.baseUrl);
     const dynamicHeaders = typeof this.headers === 'function' ? await this.headers() : this.headers;
@@ -78,6 +89,7 @@ export class PirateObservatoryRestTransport {
       const error = new Error(body?.message ?? body?.code ?? `Observatory request failed (${response.status})`);
       error.status = response.status;
       error.code = body?.code ?? 'HTTP_ERROR';
+      error.body = body;
       throw error;
     }
     return body;
