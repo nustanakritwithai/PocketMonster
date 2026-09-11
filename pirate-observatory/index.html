@@ -73,16 +73,17 @@
         </div>
 
         <div class="health-grid">
+          <article class="health-card"><span>World Health</span><strong id="serverWorldHealthStatus" data-tone="muted">NO DATA</strong><small>Server-owned integrity evaluation</small></article>
           <article class="health-card"><span>Mode</span><strong id="serverHealthMode">—</strong><small>Authority/read-model mode</small></article>
           <article class="health-card"><span>Transport</span><strong id="serverHealthSource">—</strong><small>Last health payload source</small></article>
           <article class="health-card"><span>Partition</span><strong id="serverHealthPartition">—</strong><small>Canonical partition</small></article>
-          <article class="health-card"><span>Observed tick</span><strong id="serverHealthTick">—</strong><small>Latest authoritative tick seen</small></article>
 
+          <article class="health-card"><span>Observed tick</span><strong id="serverHealthTick">—</strong><small>Latest authoritative tick seen</small></article>
           <article class="health-card"><span>Latest sequence</span><strong id="serverHealthLatest">—</strong><small>Current journal cursor</small></article>
           <article class="health-card"><span>Oldest retained</span><strong id="serverHealthOldest">—</strong><small>Catch-up retention boundary</small></article>
           <article class="health-card"><span>Retained events</span><strong id="serverHealthRetained">—</strong><small>Events retained for this partition</small></article>
-          <article class="health-card"><span>Entities</span><strong id="serverHealthEntities">—</strong><small>Canonical read-model entity count</small></article>
 
+          <article class="health-card"><span>Entities</span><strong id="serverHealthEntities">—</strong><small>Canonical read-model entity count</small></article>
           <article class="health-card health-wide">
             <span>Journal utilization</span>
             <strong id="serverHealthUtilization">—</strong>
@@ -93,7 +94,10 @@
           <article class="health-card"><span>Generated</span><strong id="serverHealthGenerated">—</strong><small>Server health sample time</small></article>
         </div>
 
-        <div id="serverHealthNotice" class="health-notice" data-tone="muted">Awaiting authenticated Observatory health data.</div>
+        <div id="serverHealthNotice" class="health-notice" data-tone="muted">Awaiting authenticated World Health data.</div>
+        <div id="serverWorldHealthIssues" class="health-issues" aria-live="polite">
+          <div class="health-issue health-issue-empty">Awaiting server-owned World Health evaluation.</div>
+        </div>
         <p class="server-footnote"><strong>Guardrail:</strong> this panel observes evidence only. It never edits WorldSim state, and actor-only Pirate presentation is not treated as combat truth.</p>
       </div>
     </section>
