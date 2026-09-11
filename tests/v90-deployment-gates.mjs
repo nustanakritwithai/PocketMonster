@@ -40,13 +40,8 @@ assert.ok(
   'live verifier hashes the active procedural monster provider',
 );
 assert.ok(
-  PAGES_LIVE_SMOKE_FILES.includes('world-pirate-native-v900.mjs'),
-  'live verifier hashes the active Native Pirate runtime',
-);
-assert.ok(
-  !PAGES_LIVE_SMOKE_FILES.includes('boot-pirate-fruit-v900.mjs')
-    && !PAGES_LIVE_SMOKE_FILES.some(relative => relative.startsWith('pirate-fruit-offline/')),
-  'live active smoke path excludes rollback Pirate files',
+  !PAGES_LIVE_SMOKE_FILES.includes('pirate-fruit-offline/assets/OnboardingDirector-BUBFdiaO.js'),
+  'live verifier does not require the disabled onboarding chunk',
 );
 
 function runtimeConfig(overrides = {}, configOverrides = {}) {
@@ -126,8 +121,8 @@ pagesFiles.set('index.html', '<link href="./style-v900.css"><link href="./combat
 pagesFiles.set('v900.html', pagesFiles.get('index.html'));
 pagesFiles.set('scene-v900.html', '<script type="module" src="./scene-entry-v900.mjs"></script>');
 pagesFiles.set('online-world-shell-v900.mjs', "import { createCombatV91Shell } from './combat-v91-entry.mjs?v=1';\nvoid createCombatV91Shell;");
-pagesFiles.set('combined-worlds-v900.mjs', "export const COMBINED_WORLDS=[{id:'pirate-fruit',runtime:'./world-pirate-native-v900.mjs?v=1'}];");
-pagesFiles.set('world-pirate-native-v900.mjs', "export const nativePirate={studioFirst: true, offlineClientLoaded: false};");
+pagesFiles.set('pirate-fruit-offline/index.html', '<script type="module" src="./pocket-bootstrap.mjs?v=4"></script>');
+pagesFiles.set('pirate-fruit-offline/pocket-bootstrap.mjs', "import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=1';\nawait installPirateSaveSandbox();\nawait import('./assets/index-B4TDjvel.js');\n");
 const manifest = {
   files: [...pagesFiles].map(([relative, body]) => ({
     path: relative,
@@ -187,26 +182,6 @@ await assert.rejects(
     retryDelayMs: 0,
   }),
   /must not publish server-only Combat module combat-v91-server-authority\.mjs/,
-);
-
-const leakedRollbackPages = new Map(pagesFiles);
-const leakedRollbackManifest = JSON.parse(leakedRollbackPages.get('patch-manifest.json'));
-leakedRollbackManifest.files.push({
-  path: 'pirate-fruit-offline/index.html',
-  sha256: crypto.createHash('sha256').update('rollback').digest('hex'),
-});
-leakedRollbackPages.set('patch-manifest.json', JSON.stringify(leakedRollbackManifest));
-await assert.rejects(
-  verifyLiveV9Deployment({
-    target: 'pages',
-    baseUrl: PAGES_BASE,
-    expectedSha: SHA,
-    expectedApiBaseUrl: API_BASE,
-    fetchImpl: mappedFetch(PAGES_BASE, leakedRollbackPages),
-    attempts: 1,
-    retryDelayMs: 0,
-  }),
-  /must not force-download rollback Pirate file pirate-fruit-offline\/index\.html/,
 );
 
 const backendCliFetch = mappedFetch(PAGES_BASE, new Map());
