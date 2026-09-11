@@ -8,12 +8,7 @@ function secureBaseUrl(value, label = 'URL') {
   return url.href.replace(/\/$/, '');
 }
 
-export function createReadOnlyRuntimeConfig(apiBaseUrl, {
-  assetBaseUrl = '',
-  deployedRelease = '',
-  launchTicket = false,
-  worldSimGround = false,
-} = {}) {
+export function createReadOnlyRuntimeConfig(apiBaseUrl, { assetBaseUrl = '', deployedRelease = '', launchTicket = false } = {}) {
   const base = secureBaseUrl(apiBaseUrl, 'API URL');
   const assetBase = assetBaseUrl ? `${secureBaseUrl(assetBaseUrl, 'asset URL')}/` : '';
   const host = new URL(base).host;
@@ -31,7 +26,6 @@ export function createReadOnlyRuntimeConfig(apiBaseUrl, {
     deployedRelease,
     featureFlags: {
       vpsEnabled: true, vpsReads: true, vpsWrites: false, playerDataWrites: false,
-      worldSimGround: worldSimGround === true,
       accountMigration: false, saveMigration: false, economyMutation: false,
       firebaseFallback: false, firebaseAuthBridge: false, accountLinking: false, profileReads: false,
       launchTicket: launchTicket === true,
@@ -77,8 +71,7 @@ export function writeDeploymentRuntimeConfig({ root = process.cwd(), env = proce
   const deployedRelease = env.MONSTERLIFE_RELEASE_VERSION || (env.GITHUB_SHA ? `8.4.0-github.${env.GITHUB_SHA.slice(0, 7)}` : '8.4.0-local');
   const enableAuthBridge = env.MONSTERLIFE_FIREBASE_AUTH_BRIDGE !== 'false';
   const launchTicket = env.MONSTERLIFE_LAUNCH_TICKET === 'true';
-  const worldSimGround = env.MONSTERLIFE_WORLD_SIM_GROUND === 'true';
-  const options = { assetBaseUrl, deployedRelease, launchTicket, worldSimGround };
+  const options = { assetBaseUrl, deployedRelease, launchTicket };
   const config = enableAuthBridge
     ? createAuthProfilePreviewConfig(apiBaseUrl, loadFirebaseConfig(root, env), options)
     : createReadOnlyRuntimeConfig(apiBaseUrl, options);

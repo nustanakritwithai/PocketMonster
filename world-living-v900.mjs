@@ -6,7 +6,6 @@ import { createAssetEngine } from './asset-presentation/engine.mjs';
 import { createPirateFruitPlayerProvider } from './asset-presentation/providers/pirate-fruit-player.mjs';
 import { createBigheadMonsterProvider } from './asset-presentation/providers/procedural-bighead-monster.mjs';
 import { installWorldPresence, publishWorldState } from './world-presence-v800.mjs?v=5';
-import { createWorldSimulatorGroundLive } from './world-simulator-ground-live-v1.mjs';
 
 export const LIVING_WORLD_VERSION = '9.0.1-living-world-portal';
 export const LIVING_WORLD_ID = 'living-world';
@@ -116,29 +115,11 @@ const lanternLight = new THREE.PointLight(0xffcc66, 1.4, 18);
 lanternLight.position.set(0, 2.4, -2.2);
 scene.add(lanternLight);
 
-// Stable fallback remains visible until the first audited WorldSim 20.9.4 frame is accepted.
 const plaza = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.6, 0.28, 12), mat(0x6b6570, .92, .08));
 plaza.name = 'living-world:plaza';
 plaza.position.y = -0.14;
 plaza.receiveShadow = true;
 scene.add(plaza);
-
-const worldGroundLive = createWorldSimulatorGroundLive({
-  THREE,
-  scene,
-  renderer,
-  runtimeConfig,
-  fallbackMesh: plaza,
-  zoneId: 'emerald-forest',
-  quality: qualityProfile.tier,
-});
-if (typeof window !== 'undefined') {
-  window.POCKETMONSTER_WORLD_GROUND = Object.freeze({
-    enabled: worldGroundLive.enabled,
-    refresh: () => worldGroundLive.refresh(),
-    diagnostics: () => worldGroundLive.diagnostics(),
-  });
-}
 
 const ring = new THREE.Mesh(new THREE.TorusGeometry(5.1, 0.12, 8, 24), mat(0xc4b49a, .55, .22));
 ring.rotation.x = Math.PI / 2;
@@ -401,8 +382,6 @@ unifiedMobileControls.registerAdapter(LIVING_WORLD_ID, Object.freeze({
 function forward() { return new THREE.Vector3(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw)).normalize(); }
 function cameraRight() { const f = forward(); return new THREE.Vector3(-f.z, 0, f.x).normalize(); }
 
-// Gameplay/nav bounds stay on the established Living World prototype until the
-// authoritative WorldSim spatial/collision contract is connected in a later gate.
 const BOUNDS = Object.freeze({ minX: -6.4, maxX: 6.4, minZ: -5.4, maxZ: 5.8 });
 const speed = 5.0;
 
@@ -442,23 +421,7 @@ startupText('เข้าโลกกลางแล้ว', 'ok');
 const zoneLabel = document.getElementById('zoneLabel');
 if (zoneLabel) zoneLabel.textContent = 'โลกกลาง • World Layer';
 const message = document.getElementById('message');
-if (message) {
-  message.textContent = worldGroundLive.enabled
-    ? 'กำลังโหลดพื้นจาก World Simulator • World เป็น authority, Three.js แสดงภาพเท่านั้น'
-    : 'ชั้นโลกกลางใน V9.0 • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP';
-}
-
-if (worldGroundLive.enabled) {
-  void worldGroundLive.refresh().then(result => {
-    if (!message) return;
-    if (result.state === 'ready') {
-      message.textContent = `WorldSim Ground พร้อม • tick ${result.frame.source.tick ?? '-'} • พื้น/น้ำ/ดิน/พืช/ไฟมาจาก World 20.9.4`;
-    } else if (result.state === 'fallback') {
-      message.textContent = 'WorldSim Ground ยังโหลดไม่ได้ • ใช้พื้นเดิมสำรองโดยไม่หยุดเกม';
-    }
-  });
-}
-
+if (message) message.textContent = 'ชั้นโลกกลางใน V9.0 • พรีเซนต์เท่านั้น ยังไม่เป็น authority ของดาเมจ/HP';
 let last = performance.now();
 function frame(now) {
   if (!sceneRuntimeActive) { requestAnimationFrame(frame); return; }
@@ -474,11 +437,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
-  mount:()=>{
-    sceneRuntimeActive=true;
-    if (worldGroundLive.enabled) void worldGroundLive.refresh();
-    return true;
-  },
+  mount:()=>{sceneRuntimeActive=true;return true;},
   unmount:()=>{sceneRuntimeActive=false;return true;},
-  diagnostics:()=>Object.freeze({active:sceneRuntimeActive,worldGround:worldGroundLive.diagnostics()}),
+  diagnostics:()=>Object.freeze({active:sceneRuntimeActive}),
 });

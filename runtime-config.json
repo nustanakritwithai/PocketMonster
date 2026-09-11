@@ -15,7 +15,6 @@
     "vpsReads": true,
     "vpsWrites": false,
     "playerDataWrites": false,
-    "worldSimGround": true,
     "accountMigration": false,
     "saveMigration": false,
     "economyMutation": false,

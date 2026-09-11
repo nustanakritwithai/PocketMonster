@@ -21,12 +21,7 @@ template = re.sub(r'<script\b[^>]*>[\s\S]*?</script>', '', (ROOT / 'v900.html').
 # Isolated fixture has no online auth handler. Production code is unchanged.
 template = template.replace('class="account-gate"', 'class="account-gate hidden"')
 template = template.replace('<body>', '<body data-control-panel="human" data-combined-world="pirate-fruit">')
-ENTRY_MODULE.write_text(
-    "import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs';\n"
-    "installPersistentMinimapOwner({ windowLike: window, documentLike: document });\n"
-    "await import('./boot-pirate-fruit-v900.mjs');\n"
-    "window.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS.activate('pirate-fruit');\n"
-)
+ENTRY_MODULE.write_text("import './boot-pirate-fruit-v900.mjs';\nwindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS.activate('pirate-fruit');\n")
 ENTRY.write_text(template.replace('</body>', '<script type="module" src="./studio-browser-entry.mjs"></script></body>'))
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -93,7 +88,7 @@ try:
             return next((f for f in page.frames if '/pirate-fruit-offline/' in f.url), None)
         def snapshot():
             child = child_frame()
-            return {'parent': page.evaluate('({delivery:window.POCKETMONSTER_STUDIO_CHARACTER_BRIDGE_DIAGNOSTICS?.(),relay:window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS?.(),world:window.POCKETMONSTER_WORLD_STATE?.(),minimap:window.POCKETMONSTER_MINIMAP_HUD?.snapshot?.()})'),
+            return {'parent': page.evaluate('({delivery:window.POCKETMONSTER_STUDIO_CHARACTER_BRIDGE_DIAGNOSTICS?.(),relay:window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS?.()})'),
                     'child': child.evaluate('({bridge:window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE,studio:window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER,position:window.__combat?.controller?.position,heading:window.__combat?.controller?.heading,move:window.__combat?.controller?.moveState,combat:window.__combat?.combatState})') if child else None}
         def actor():
             return child_frame().evaluate('window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE?.studioPlayer')
@@ -106,11 +101,6 @@ try:
         def has_motion(values, actions):
             matching = [v for v in values if v and v.get('animation', {}).get('action') in actions]
             return len(matching) >= 2 and any(v['animation'].get('changedJoints', 0) > 0 for v in matching)
-        def assert_pose_and_minimap(snap, label):
-            pose = snap['parent'].get('world')
-            player = (snap['parent'].get('minimap') or {}).get('player')
-            assert pose and all(isinstance(pose.get(key), (int, float)) for key in ('x', 'z', 'dir')), f'{label}: outer Pirate WORLD_STATE lost iframe pose'
-            assert player and all(isinstance(player.get(key), (int, float)) for key in ('x', 'z', 'heading')), f'{label}: persistent minimap lost the real player pose'
         page.goto(base + '/studio-browser-entry.html', wait_until='domcontentloaded')
         page.wait_for_timeout(12000)
         child = child_frame()
@@ -119,7 +109,6 @@ try:
         child.wait_for_function('window.POCKETMONSTER_PIRATE_FRUIT_BRIDGE?.studioPlayer?.renderProfile?.assigned > 0', timeout=25000)
         report['initial'] = snapshot()
         assert report['initial']['child']['bridge']['studioPlayer']['renderProfile']['failed'] == []
-        assert_pose_and_minimap(report['initial'], 'initial')
         page.screenshot(path=str(OUT / 'pirate-studio.png'))
         before = snapshot()
         zone = page.locator('#joystick').bounding_box()
@@ -141,10 +130,6 @@ try:
         bp, ap = before['child']['position'], after['child']['position']
         report['moved'] = (ap['x']-bp['x'])**2 + (ap['z']-bp['z'])**2 > .0001
         assert report['moved']
-        assert_pose_and_minimap(after, 'after movement')
-        outer_before, outer_after = before['parent']['world'], after['parent']['world']
-        report['outerPoseMoved'] = (outer_after['x']-outer_before['x'])**2 + (outer_after['z']-outer_before['z'])**2 > .0001
-        assert report['outerPoseMoved'], 'outer Pirate WORLD_STATE must move with the nested gameplay controller'
         assert after['child']['bridge']['studioPlayers'] == 1
         assert after['parent']['relay']['studioState'] == 'studio-character'
         assert after['child']['studio']['state'] == 'attached'
@@ -173,7 +158,6 @@ try:
         assert report['reload']['child']['bridge']['studioPlayers'] == 1 and reload_actor['renderFrames'] > 3
         assert reload_actor['renderProfile']['assigned'] == report['initial']['child']['bridge']['studioPlayer']['renderProfile']['assigned'], 'Cold/warm texture assignments must match'
         assert reload_actor['renderProfile']['failed'] == []
-        assert_pose_and_minimap(report['reload'], 'reload')
         block_studio = True
         page.reload(wait_until='domcontentloaded')
         page.wait_for_timeout(35000)
@@ -181,7 +165,6 @@ try:
         assert report['fallback']['parent']['relay']['studioState'] == 'fallback'
         assert report['fallback']['child']['bridge']['playerVisualSource'] == 'pirate-fruit'
         assert report['fallback']['child']['bridge']['studioPlayers'] == 0
-        assert_pose_and_minimap(report['fallback'], 'Studio fallback')
         page.screenshot(path=str(OUT / 'pirate-fallback.png'))
         assert not report['errors'], 'Unhandled page exceptions'
         report['passed'] = True

@@ -21,7 +21,6 @@ jobs:
       RELEASE_SHA: ${{ inputs.release_sha }}
       MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
       MONSTERLIFE_EXPECTED_API_BASE_URL: 'https://157.85.96.139'
-      MONSTERLIFE_WORLD_SIM_GROUND: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

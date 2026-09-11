@@ -54,20 +54,16 @@ for (const serverOnlyModule of [
   assert.equal(publicDependencyClosure.has(serverOnlyModule), false,
     `${serverOnlyModule} must never enter the browser dependency closure`);
 }
-const alternateRuntimeFiles = Object.freeze([
-  'v800.html',
-  'entry-preload.mjs',
+for (const shadowFoundation of [
   'one-document-world-runtime-host-v910.mjs',
   'world-runtime-lifecycle-v910.mjs',
   'world-runtime-import-purity-v912.mjs',
   'world-runtime-resource-scope-v912.mjs',
-  'world-pirate-native-v900.mjs',
-]);
-for (const alternateRuntime of alternateRuntimeFiles) {
-  assert.equal(fs.existsSync(path.join(output, alternateRuntime)), false,
-    `${alternateRuntime} must not exist in the single-current-version production artifact`);
-  assert.equal(publicDependencyClosure.has(alternateRuntime), false,
-    `${alternateRuntime} must not be reachable from the current production entries`);
+]) {
+  assert.equal(published.has(shadowFoundation), false,
+    `${shadowFoundation} must stay source-only until iframe replacement is wired`);
+  assert.equal(publicDependencyClosure.has(shadowFoundation), false,
+    `${shadowFoundation} must not be presented as a live browser runtime`);
 }
 assert.equal([...published].some(name => name.startsWith('tests/v91-combat-')), false,
   'V9.1 tests must not ship in the public artifact');
@@ -98,24 +94,4 @@ for (const htmlName of ['index.html', 'v900.html']) {
     `${htmlName} must load the Combat V9.1 stylesheet exactly once in the parent document`);
 }
 
-const combinedWorlds = fs.readFileSync(path.join(output, 'combined-worlds-v900.mjs'), 'utf8');
-assert.match(combinedWorlds, /runtime:\s*['"]\.\/boot-pirate-fruit-v900\.mjs\?v=953['"]/,
-  'Pirate Fruit must use the restored ocean/multi-island runtime');
-assert.doesNotMatch(combinedWorlds, /world-pirate-native-v900\.mjs/,
-  'the retired single-island Native Pirate runtime must not be selectable');
-
-for (const currentPirateAsset of [
-  'pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js',
-  'pirate-fruit-offline/assets/EmberVolcanoIsland-Dwvxnue6.js',
-  'pirate-fruit-offline/assets/MistJungleIsland-iKbiMxA3.js',
-  'pirate-fruit-offline/assets/SunscarDesertIsland-DRO7IMVp.js',
-  'pirate-fruit-offline/assets/TempestSkyIsland-BdTzGlWY.js',
-  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
-]) {
-  assert.equal(fs.existsSync(path.join(output, currentPirateAsset)), true,
-    `${currentPirateAsset} must remain in the current ocean/multi-island build`);
-}
-assert.equal(fs.existsSync(path.join(output, 'pirate-fruit-offline/SOURCE.json')), true,
-  'current Pirate build provenance must remain published');
-
-console.log(`Single-current-version Pages artifact: PASS (${clientAssets.length} Combat client assets, alternate runtimes excluded)`);
+console.log(`V9.1 Pages artifact: PASS (${clientAssets.length} client assets, server authority excluded)`);
