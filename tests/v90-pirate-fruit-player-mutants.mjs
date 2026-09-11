@@ -32,19 +32,19 @@ assert.equal(DEFAULT_COMBINED_WORLD, 'pirate-fruit', 'mutant 0c2: V9 starts in t
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'mutant 0c2b: Pocket-block pirate island stage is deleted');
 assert.equal(resolveCombinedWorld({ href: 'https://example.test/v900.html' }), 'pirate-fruit', 'mutant 0c3: missing ?world= resolves to pirate-fruit');
 assert.match(worldsJs, /await bootWorld\(resolveCombinedWorld\(\)\)/, 'mutant 0c4: orchestrator boots the default pirate world');
-assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: legacy rollback boot still validates portal destinations');
+assert.match(boot, /assignCombinedWorld\(message\.world\)/, 'mutant 0c5: validated pirate portals route into their declared world');
 assert.doesNotMatch(html, /id="huntBtn"|id="warpPrompt"/, 'mutant 0d: V9 exposes no clickable hunt or warp confirmation tab');
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=829', 'mutant 0e: original game runtime is game-v800.js');
-assert.equal(worldById('pirate-fruit').runtime, './world-pirate-native-v900.mjs?v=1', 'mutant 0e2: active Pirate world boots the native Studio-first runtime');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=953', 'mutant 0e2: pirate world still boots through the cache-busted pirate boot module');
 assert.equal(COMBINED_WORLDS.length, 3, 'mutant 0f: V9 is the 3-world combined channel');
 assert.match(worldsJs, /import\(world\.runtime\)/, 'mutant 0g: orchestrator imports the selected world');
 assert.doesNotMatch(liveJs, /^import \{ createPirateFruitPlayerProvider \} from '\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs';/m, 'mutant 1: V8.4 must not statically import the pirate provider');
 assert.match(liveJs, /const \{ createPirateFruitPlayerProvider \} = await import\('\.\/asset-presentation\/providers\/pirate-fruit-player\.mjs'\);/, 'mutant 1b: pirate provider always loads dynamically for the live player');
 assert.match(liveJs, /distance=5\.15/, 'mutant 1c: live follow distance is the pirate camera, not the old 7.4 overhead cam');
 assert.match(schema, /'pirate-fruit'/, 'mutant 2: schema must allow the pirate-fruit provider');
-assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: rollback boot retains the vendored Pirate Fruit client');
-assert.match(boot, /remote: false/, 'mutant 4: rollback Pirate world remains local, not a remote host');
-assert.doesNotMatch(boot, /from ['"]three['"]/, 'mutant 5: rollback Pocket boot must not import the three package');
+assert.match(boot, /pirate-fruit-offline\/index\.html/, 'mutant 3: pirate world must load the real Pirate Fruit client');
+assert.match(boot, /remote: false/, 'mutant 4: pirate world must be local, not a remote host');
+assert.doesNotMatch(boot, /from ['"]three['"]/, 'mutant 5: Pocket boot must not import the three package');
 assert.match(liveJs, /assets\.spawn\('character\.human\.pirate-fruit\.v1',\{role:'player'/, 'mutant 6: live player is pirate-fruit');
 assert.doesNotMatch(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'player'/, 'mutant 6b: Pocket Monster player model is removed');
 assert.match(liveJs, /assets\.spawn\('character\.human\.blocky-bighead\.v1',\{role:'keeper'/, 'mutant 7: current version keeper stays bighead');
@@ -66,8 +66,8 @@ for (const field of PIRATE_PRESENTATION_FORBIDDEN) {
 }
 
 assert.match(provider, /setFromMatrixPosition/, 'mutant 13: worldPos scratch must implement Three.js Vector3.setFromMatrixPosition');
-assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open VPS write flags for rollback pirate boot');
-assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must remain the offline rollback build');
+assert.doesNotMatch(boot, /vpsWrites|playerDataWrites/, 'mutant 14: do not open VPS write flags for this pirate boot');
+assert.equal(pirateSource.remote, false, 'mutant 15: vendored Pirate Fruit must be the offline build');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.transport, 'existing-parent-chat-websocket', 'mutant 15b: Pirate presence shares the authenticated parent socket');
 assert.equal(pirateSource.integrations.pocketMonsterPresence.persistentWrites, false, 'mutant 15c: Pirate presence never enables persistent writes');
 assert.doesNotMatch(html, /id="controlPanelSwitcher"/, 'mutant 16: V9 does not ship the control-panel switcher');
@@ -84,21 +84,21 @@ assert.match(cssV900, /data-control-panel="human".*#huntBtn/s, 'mutant 22: human
 assert.match(cssV900, /#monsterThrowStage\{position:fixed;inset:0;z-index:0/, 'mutant 23: pirate throw stage stays under the Pocket HUD');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #joystick/, 'mutant 23b: pirate throw does not hide Pocket movement pads');
 assert.doesNotMatch(cssV900, /pirate-fruit"\]\[data-control-panel="throw"\] #huntBtn/, 'mutant 23c: pirate throw keeps hunt for wild animal control');
-assert.match(boot, /game-v800\.js\?v=829&animalControl=pirate-fruit/, 'mutant 23d: rollback boot retains a dedicated animal-control instance');
+assert.match(boot, /game-v800\.js\?v=829&animalControl=pirate-fruit/, 'mutant 23d: throw boots a dedicated animal-control instance');
 assert.match(liveJs, /POCKETMONSTER_ANIMAL_CONTROL/, 'mutant 23e: Pocket loop publishes animal-control functions');
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'mutant 23f: Pocket character server APIs host on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'mutant 23g: live imports the pirate-hosted character server adapter');
-assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: rollback boot still identifies the vendored offline client');
-assert.match(boot, /visual: 'pocket-asset-engine'/, 'mutant 24b: rollback boot overlays Pocket visuals on the real client');
-assert.match(boot, /ui: 'pirate-fruit-parent-primary'/, 'mutant 24b2: rollback boot uses the Pirate-primary parent V9 HUD');
+assert.match(boot, /source: 'pirate-fruit-offline'/, 'mutant 24: pirate human panel is the real offline Pirate Fruit client');
+assert.match(boot, /visual: 'pocket-asset-engine'/, 'mutant 24b: pirate boot overlays Pocket visuals on the real client');
+assert.match(boot, /ui: 'pirate-fruit-parent-primary'/, 'mutant 24b2: pirate boot uses the Pirate-primary parent V9 HUD');
 assert.match(fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8'), /pointer-events: none !important/, 'mutant 24b3: iframe controls cannot steal touch input');
 assert.equal(pirateSource.pocketPresentation?.createsStage, false, 'mutant 24c: Pocket presentation does not create a new hunt stage');
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'mutant 24d: Pocket-built pirate island scene stays deleted');
-assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: rollback boot does not keep the Pocket-block island stage');
-assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: rollback boot does not rebuild a Pocket island silhouette');
+assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'mutant 25: pirate boot does not keep the Pocket-block island stage');
+assert.doesNotMatch(boot, /CapsuleGeometry|CylinderGeometry/, 'mutant 26: pirate boot does not rebuild a Pocket island silhouette');
 assert.match(shellJs, /chat-runtime\.mjs\?v=8\.4\.0-smooth-presence-1/, 'mutant 27: persistent V9 shell loads one presence-aware Pocket chat transport');
 assert.doesNotMatch(worldsJs, /if \(world\.id === 'pocket-monster'\) await import\('\.\/chat-runtime/, 'mutant 27b: chat is not gated to Pocket Monster only');
-assert.match(boot, /publishWorldState\(/, 'mutant 28: rollback pirate world still publishes shared-zone world state');
+assert.match(boot, /publishWorldState\(/, 'mutant 28: real pirate world publishes shared-zone world state');
 assert.match(pirateBundle, /pocketmonster:pirate-presence-v1/, 'mutant 28a: vendored Pirate reports the real local pose');
 assert.match(pirateBundle, /pocketmonster:pirate-presence-snapshot-v1/, 'mutant 28aa: vendored Pirate renders remote snapshots');
 {

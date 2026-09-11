@@ -7,8 +7,6 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
-// Legacy Pirate provenance remains verified as rollback compatibility, but it is
-// intentionally outside the active patch manifest after Native Pirate V9.4.
 export const EXPECTED_PIRATE_SOURCE_COMMIT = 'c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708';
 export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'e0ddda08106ed834728ec9d163069eb96828ab5deabf3e5c5c428901f9b5806a';
 const SAFE_FALSE_FLAGS = Object.freeze([
@@ -40,13 +38,19 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'chat-runtime.mjs',
   'style-v900.css',
   'game-v800.js',
-  'world-pirate-native-v900.mjs',
+  'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'asset-presentation/providers/procedural-bighead-monster.mjs',
-  'asset-presentation/providers/studio-character.mjs',
-  'asset-presentation/studio-character-live-bridge.mjs',
-  'asset-presentation/studio-character-render-profile.mjs',
-  'assets/catalog/humanoid-core.json',
+  'pirate-fruit-offline/index.html',
+  'pirate-fruit-offline/pocket-bootstrap.mjs',
+  'pirate-save-bridge-v900.mjs',
+  'pirate-fruit-offline/assets/index-B4TDjvel.js',
+  'pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js',
+  'pirate-fruit-offline/assets/EmberVolcanoIsland-Dwvxnue6.js',
+  'pirate-fruit-offline/assets/MistJungleIsland-iKbiMxA3.js',
+  'pirate-fruit-offline/assets/SunscarDesertIsland-DRO7IMVp.js',
+  'pirate-fruit-offline/assets/TempestSkyIsland-BdTzGlWY.js',
+  'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
 ]);
 
 function secureBaseUrl(value, label) {
@@ -141,9 +145,17 @@ function sha256(body) {
   return crypto.createHash('sha256').update(body).digest('hex');
 }
 
+function resolveActivePirateAsset(relative, entries) {
+  if (!relative.startsWith('pirate-fruit-offline/assets/')) return relative;
+  const filename = relative.slice('pirate-fruit-offline/assets/'.length);
+  const stem = filename.replace(/-[^-]+\.js$/, '');
+  return [...entries.keys()].find((candidate) => candidate.startsWith(`pirate-fruit-offline/assets/${stem}-`)
+    && candidate.endsWith('.js')) || relative;
+}
+
 function parsePirateBootstrapEntry(bootstrap) {
   const match = bootstrap.match(/await import\('\.\/(assets\/[^']+\.js)'\)/);
-  if (!match) throw new Error('Pirate Fruit rollback bootstrap must declare its compiled entry asset');
+  if (!match) throw new Error('Pirate Fruit bootstrap must declare its compiled entry asset');
   return `pirate-fruit-offline/${match[1]}`;
 }
 
@@ -188,15 +200,28 @@ async function verifyPages(options, runtimeConfig) {
     if (relative.startsWith('combat-v91-server-')) {
       throw new Error(`patch-manifest.json must not publish server-only Combat module ${relative}`);
     }
-    if (relative === 'boot-pirate-fruit-v900.mjs' || relative.startsWith('pirate-fruit-offline/')) {
-      throw new Error(`patch-manifest.json must not force-download rollback Pirate file ${relative}`);
-    }
   }
 
   const bodies = new Map();
-  for (const relative of PAGES_LIVE_SMOKE_FILES) {
+  const bootstrapRelative = 'pirate-fruit-offline/pocket-bootstrap.mjs';
+  const bootstrapEntry = entries.get(bootstrapRelative);
+  if (!bootstrapEntry) throw new Error(`patch-manifest.json is missing ${bootstrapRelative}`);
+  const bootstrapBody = await fetchLiveText(bootstrapRelative, {
+    ...options,
+    validate(value) {
+      const actual = sha256(value);
+      if (actual !== bootstrapEntry.sha256.toLowerCase()) throw new Error(`manifest hash mismatch for ${bootstrapRelative}`);
+    },
+  });
+  bodies.set(bootstrapRelative, bootstrapBody);
+  const activePirateEntry = parsePirateBootstrapEntry(bootstrapBody);
+  const activePirateManifestEntry = entries.get(activePirateEntry);
+  if (!activePirateManifestEntry) throw new Error(`patch-manifest.json is missing active Pirate entry ${activePirateEntry}`);
+  const smokeFiles = [...new Set(PAGES_LIVE_SMOKE_FILES.map(relative => resolveActivePirateAsset(relative, entries)))];
+  for (const relative of smokeFiles) {
+    if (bodies.has(relative)) continue;
     const entry = entries.get(relative);
-    if (!entry) throw new Error(`patch-manifest.json is missing active smoke file ${relative}`);
+    if (!entry) throw new Error(`patch-manifest.json is missing ${relative}`);
     const body = await fetchLiveText(relative, {
       ...options,
       validate(value) {
@@ -220,42 +245,31 @@ async function verifyPages(options, runtimeConfig) {
     || !/\bcreateCombatV91Shell\b/.test(parentShell)) {
     throw new Error('online-world-shell-v900.mjs must import and install combat-v91-entry.mjs in the parent shell');
   }
-
-  const combined = bodies.get('combined-worlds-v900.mjs');
-  if (!combined.includes('world-pirate-native-v900.mjs?v=1')) {
-    throw new Error('combined-worlds-v900.mjs must route Pirate Fruit directly to Native V9');
+  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=4')) {
+    throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
   }
-  if (combined.includes('boot-pirate-fruit-v900.mjs?v=953')) {
-    throw new Error('combined-worlds-v900.mjs must not route Pirate Fruit through the rollback boot');
+  const pirateBootstrap = bodies.get(bootstrapRelative);
+  if (!pirateBootstrap.includes('await installPirateSaveSandbox();')
+    || !/await import\('\.\/assets\/[^']+\.js'\)/.test(pirateBootstrap)) {
+    throw new Error('Pirate Fruit bootstrap must install its save sandbox before the vendored scene bundle');
   }
-  const nativePirate = bodies.get('world-pirate-native-v900.mjs');
-  if (!nativePirate.includes('studioFirst: true') || !nativePirate.includes('offlineClientLoaded: false')) {
-    throw new Error('Native Pirate runtime must declare Studio-first startup with offline client disabled');
-  }
-  if (/pirate-fruit-offline|pirateFruitFrame|mountPirateOffline/.test(nativePirate)) {
-    throw new Error('Native Pirate runtime must not reference the rollback offline client');
-  }
-
-  // Preserve deploy-time provenance for the dormant rollback package without
-  // putting any of those files into the active patch manifest or game startup.
   if (options.expectedPirateSourceCommit || options.expectedPirateArtifactSha256) {
-    const bootstrapRelative = 'pirate-fruit-offline/pocket-bootstrap.mjs';
-    const bootstrapBody = await fetchLiveText(bootstrapRelative, options);
-    if (!bootstrapBody.includes('await installPirateSaveSandbox();')
-      || !/await import\('\.\/assets\/[^']+\.js'\)/.test(bootstrapBody)) {
-      throw new Error('Pirate rollback bootstrap must install its save sandbox before the vendored scene bundle');
-    }
-    const rollbackEntry = parsePirateBootstrapEntry(bootstrapBody);
-    const rollbackBody = await fetchLiveText(rollbackEntry, options);
     const sourceRelative = 'pirate-fruit-offline/SOURCE.json';
-    const sourceBody = await fetchLiveText(sourceRelative, options);
+    const sourceEntry = entries.get(sourceRelative);
+    const sourceBody = await fetchLiveText(sourceRelative, {
+      ...options,
+      ...(sourceEntry ? { validate(value) {
+        const actual = sha256(value);
+        if (actual !== sourceEntry.sha256.toLowerCase()) throw new Error(`manifest hash mismatch for ${sourceRelative}`);
+      } } : {}),
+    });
     const source = parseJson(sourceBody, sourceRelative);
     if (options.expectedPirateSourceCommit && source.commit !== options.expectedPirateSourceCommit) {
-      throw new Error(`Pirate rollback source provenance mismatch: expected ${options.expectedPirateSourceCommit}, received ${source.commit || 'missing'}`);
+      throw new Error(`Pirate source provenance mismatch: expected ${options.expectedPirateSourceCommit}, received ${source.commit || 'missing'}`);
     }
     if (options.expectedPirateArtifactSha256
-      && sha256(rollbackBody).toLowerCase() !== options.expectedPirateArtifactSha256.toLowerCase()) {
-      throw new Error(`Pirate rollback artifact hash mismatch: expected ${options.expectedPirateArtifactSha256}, received ${sha256(rollbackBody)}`);
+      && activePirateManifestEntry.sha256.toLowerCase() !== options.expectedPirateArtifactSha256.toLowerCase()) {
+      throw new Error(`Pirate artifact hash mismatch: expected ${options.expectedPirateArtifactSha256}, received ${activePirateManifestEntry.sha256}`);
     }
   }
   return { runtimeConfig, manifest };
