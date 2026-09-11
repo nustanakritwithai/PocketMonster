@@ -64,7 +64,7 @@
           <div>
             <span class="eyebrow">DEBUG WORKSPACE</span>
             <h1>Canonical Investigation Context</h1>
-            <p>Inspect the latest accepted snapshot cursor and post-snapshot deltas already received by this browser. This view never mutates world state.</p>
+            <p>Inspect accepted live evidence and query detached persisted history. Historical snapshots never replace the live cursor or mutate world state.</p>
           </div>
           <span class="debug-badge">REPLAY NOT ENABLED</span>
         </div>
@@ -89,7 +89,32 @@
             <div id="debugDiffBody" class="debug-diff"><div class="debug-empty">Select a canonical entity in WORLD to inspect its latest accepted delta.</div></div>
           </section>
         </div>
-        <div class="debug-guardrail"><strong>Replay guardrail:</strong> time travel/replay remains disabled until P3 adds persisted checkpoint + journal history. The rows above are only current-session debug evidence.</div>
+
+        <section class="debug-history">
+          <header class="debug-history-head">
+            <div>
+              <span>HISTORY · DETACHED</span>
+              <strong>Persisted checkpoint + journal reconstruction</strong>
+            </div>
+            <span id="debugHistoryStatus" class="history-status" data-tone="muted">HISTORY UNAVAILABLE</span>
+          </header>
+          <div class="history-controls">
+            <select id="debugHistoryCheckpoint" aria-label="History checkpoint"><option value="">No checkpoints</option></select>
+            <input id="debugHistorySequence" inputmode="numeric" placeholder="Target sequence" aria-label="Historical target sequence" />
+            <button id="debugHistoryRefresh" type="button">REFRESH</button>
+            <button id="debugHistoryLoad" type="button">LOAD SEQUENCE</button>
+          </div>
+          <div class="history-summary">
+            <article><span>Historical tick</span><strong id="debugHistoryTick">—</strong></article>
+            <article><span>Loaded sequence</span><strong id="debugHistoryLoadedSequence">—</strong></article>
+            <article><span>Entities</span><strong id="debugHistoryEntityCount">—</strong></article>
+          </div>
+          <div id="debugHistoryEntities" class="history-entities">
+            <div class="debug-empty">Load a committed historical sequence to inspect detached evidence.</div>
+          </div>
+        </section>
+
+        <div class="debug-guardrail"><strong>History guardrail:</strong> persisted snapshots are detached evidence only. They never enter LIVE PartitionSync or replace the world map cursor. Replay remains disabled until the deterministic replay engine is implemented and verified.</div>
       </div>
     </section>
 
