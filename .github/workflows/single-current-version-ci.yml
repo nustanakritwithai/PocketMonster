@@ -6,8 +6,12 @@ on:
     paths:
       - 'scripts/build-github-pages.mjs'
       - 'tests/v91-combat-artifact.mjs'
+      - 'tests/v90-pirate-fruit-blocky-ground.mjs'
       - 'combined-worlds-v900.mjs'
       - 'boot-pirate-fruit-v900.mjs'
+      - 'asset-presentation/blocky-ground.mjs'
+      - 'asset-presentation/pirate-fruit-client-bridge.mjs'
+      - 'asset-presentation/pirate-fruit-pbr-ground.mjs'
       - 'pirate-fruit-offline/**'
       - '.github/workflows/single-current-version-ci.yml'
   workflow_dispatch:
@@ -30,6 +34,8 @@ jobs:
       - name: Verify current Pirate route
         run: |
           node -e "import('./combined-worlds-v900.mjs').then(({worldById})=>{const w=worldById('pirate-fruit'); if(w?.runtime!=='./boot-pirate-fruit-v900.mjs?v=953') throw new Error('Pirate Fruit current route changed: '+w?.runtime);})"
+      - name: Verify current Pirate blocky ground
+        run: node tests/v90-pirate-fruit-blocky-ground.mjs
       - name: Reject alternate deployed entries
         run: |
           test ! -e dist-pages/v800.html
@@ -39,3 +45,5 @@ jobs:
           test ! -e dist-pages/world-runtime-import-purity-v912.mjs
           test ! -e dist-pages/world-runtime-resource-scope-v912.mjs
           test ! -e dist-pages/world-pirate-native-v900.mjs
+          test ! -e dist-pages/pirate-fruit-offline/pocket-ground-presentation.mjs
+          test ! -e dist-pages/asset-presentation/pirate-fruit-pbr-ground.mjs
