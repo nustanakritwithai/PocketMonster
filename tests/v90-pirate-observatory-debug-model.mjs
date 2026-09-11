@@ -29,8 +29,8 @@ const packet = {
 assert.equal(model.acceptDelta(packet).ok, true);
 assert.equal(model.latestSnapshot().tick, 11);
 assert.equal(model.latestSnapshot().sequence, 6);
-assert.deepEqual(model.recentChanges().map(change => change.sequence), [5, 6]);
-assert.equal(model.latestChangeForEntity('ship:a').sequence, 5, 'recent changes should preserve packet journal order');
+assert.deepEqual(model.recentChanges().map(change => change.sequence), [6, 5]);
+assert.equal(model.latestChangeForEntity('ship:a').sequence, 6, 'entity diff should use the newest accepted journal change');
 
 const moveFields = changedFieldsForObservatoryChange(packet.changes[0]);
 assert.deepEqual(moveFields.map(field => field.key), ['x']);
@@ -43,7 +43,7 @@ assert.equal(model.acceptDelta({
   sequence: 7,
   changes: [{ partition: 'pirate-fruit', tick: 12, sequence: 7, type: 'STATE_CHANGE', entity: 'ship:b', before: { state: 'idle' }, after: { state: 'moving' } }],
 }).ok, true);
-assert.equal(model.recentChanges().length, 3);
+assert.deepEqual(model.recentChanges().map(change => change.sequence), [7, 6, 5]);
 
 // A fresh canonical snapshot/resync invalidates post-snapshot deltas from that partition.
 assert.equal(model.acceptSnapshot({
