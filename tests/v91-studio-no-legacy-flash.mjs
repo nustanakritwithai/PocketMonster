@@ -48,7 +48,7 @@ assert.ok(readyPost > bridgeInstall,
   'child must not advertise readiness before both the visibility guard and renderer bridge are armed');
 assert.match(childHtml, /pocket-presentation\.mjs\?v=29/,
   'source keeps the audited presentation baseline cache key');
-assert.match(releaseBinder, /pocket-presentation\.mjs\(?:\\\?\[\^'\"\]\*\)\?/,
+assert.match(releaseBinder, /Pirate child presentation entry could not be bound to the deployed release/,
   'production release binder owns the child presentation cache key');
 assert.match(releaseBinder, /pocket-presentation\.mjs\?release=\$\{encoded\}/,
   'published Pirate child loads presentation through deployedRelease rather than a shared cache key');
