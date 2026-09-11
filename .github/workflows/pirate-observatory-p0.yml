@@ -16,6 +16,7 @@ on:
       - 'tests/v90-pirate-observatory-hybrid-session.mjs'
       - 'tests/v90-pirate-observatory-map-interest.mjs'
       - 'tests/v90-pirate-observatory-health-session.mjs'
+      - 'tests/v90-pirate-observatory-debug-model.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
@@ -31,6 +32,7 @@ on:
       - 'tests/v90-pirate-observatory-hybrid-session.mjs'
       - 'tests/v90-pirate-observatory-map-interest.mjs'
       - 'tests/v90-pirate-observatory-health-session.mjs'
+      - 'tests/v90-pirate-observatory-debug-model.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -56,6 +58,8 @@ jobs:
           node --check pirate-observatory/map-interest.mjs
           node --check pirate-observatory/interest-session.mjs
           node --check pirate-observatory/health-session.mjs
+          node --check pirate-observatory/debug-model.mjs
+          node --check pirate-observatory/debug-panel.mjs
           node --check pirate-observatory/server-panel.mjs
           node --check pirate-observatory/dashboard.mjs
           node --check pirate-observatory/bootstrap.mjs
@@ -71,3 +75,4 @@ jobs:
           node tests/v90-pirate-observatory-hybrid-session.mjs
           node tests/v90-pirate-observatory-map-interest.mjs
           node tests/v90-pirate-observatory-health-session.mjs
+          node tests/v90-pirate-observatory-debug-model.mjs
