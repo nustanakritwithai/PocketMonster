@@ -19,6 +19,7 @@ on:
       - 'tests/v90-pirate-observatory-debug-model.mjs'
       - 'tests/v90-pirate-observatory-history-session.mjs'
       - 'tests/v90-pirate-observatory-history-transport.mjs'
+      - 'tests/v90-pirate-observatory-evidence-playback.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
@@ -37,6 +38,7 @@ on:
       - 'tests/v90-pirate-observatory-debug-model.mjs'
       - 'tests/v90-pirate-observatory-history-session.mjs'
       - 'tests/v90-pirate-observatory-history-transport.mjs'
+      - 'tests/v90-pirate-observatory-evidence-playback.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -65,6 +67,7 @@ jobs:
           node --check pirate-observatory/debug-model.mjs
           node --check pirate-observatory/debug-panel.mjs
           node --check pirate-observatory/history-session.mjs
+          node --check pirate-observatory/evidence-playback.mjs
           node --check pirate-observatory/history-panel.mjs
           node --check pirate-observatory/server-panel.mjs
           node --check pirate-observatory/dashboard.mjs
@@ -84,3 +87,4 @@ jobs:
           node tests/v90-pirate-observatory-debug-model.mjs
           node tests/v90-pirate-observatory-history-session.mjs
           node tests/v90-pirate-observatory-history-transport.mjs
+          node tests/v90-pirate-observatory-evidence-playback.mjs
