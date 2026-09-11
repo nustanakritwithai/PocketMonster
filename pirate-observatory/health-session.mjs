@@ -1,20 +1,50 @@
 import { PIRATE_OBSERVATORY_SCHEMA_VERSION, assertPartition } from './protocol.mjs';
 
+function assertPollMs(value) {
+  if (!Number.isFinite(value) || value < 1000) throw new TypeError('health poll interval must be at least 1000ms');
+  return value;
+}
+
+export function validateObservatoryHealth(payload, partition = null) {
+  const expectedPartition = partition ? assertPartition(partition) : null;
+  if (!payload || payload.schemaVersion !== PIRATE_OBSERVATORY_SCHEMA_VERSION) return { ok: false, reason: 'SCHEMA_MISMATCH' };
+  if (typeof payload.ready !== 'boolean') return { ok: false, reason: 'READY_REQUIRED' };
+  if (typeof payload.partition !== 'string' || !payload.partition) return { ok: false, reason: 'PARTITION_REQUIRED' };
+  if (expectedPartition && payload.partition !== expectedPartition) return { ok: false, reason: 'PARTITION_MISMATCH' };
+  if (!Number.isSafeInteger(payload.lastObservedTick) || payload.lastObservedTick < -1) return { ok: false, reason: 'INVALID_TICK' };
+  if (!Number.isSafeInteger(payload.latestSequence) || payload.latestSequence < 0
+    || !Number.isSafeInteger(payload.oldestRetainedSequence) || payload.oldestRetainedSequence < 0) {
+    return { ok: false, reason: 'INVALID_SEQUENCE' };
+  }
+  if (!Number.isSafeInteger(payload.retainedEvents) || payload.retainedEvents < 0
+    || !Number.isSafeInteger(payload.retentionCapacity) || payload.retentionCapacity < 1
+    || payload.retainedEvents > payload.retentionCapacity) {
+    return { ok: false, reason: 'INVALID_RETENTION' };
+  }
+  if (!Number.isFinite(payload.journalUtilization) || payload.journalUtilization < 0 || payload.journalUtilization > 1) {
+    return { ok: false, reason: 'INVALID_UTILIZATION' };
+  }
+  if (!Number.isSafeInteger(payload.entityCount) || payload.entityCount < 0) return { ok: false, reason: 'INVALID_ENTITY_COUNT' };
+  if (typeof payload.code !== 'string' || !payload.code || typeof payload.mode !== 'string' || !payload.mode) {
+    return { ok: false, reason: 'HEALTH_MODE_REQUIRED' };
+  }
+  return { ok: true, health: payload };
+}
+
 export class PirateObservatoryHealthSession {
   constructor({
     transport,
     partition = 'pirate-fruit',
-    pollMs = 2000,
+    pollMs = 3000,
     onHealth = () => {},
     onError = () => {},
     setIntervalImpl = globalThis.setInterval,
     clearIntervalImpl = globalThis.clearInterval,
   } = {}) {
     if (!transport?.getHealth) throw new TypeError('transport.getHealth is required');
-    if (!Number.isFinite(pollMs) || pollMs < 500) throw new TypeError('pollMs must be at least 500ms');
     this.transport = transport;
     this.partition = assertPartition(partition);
-    this.pollMs = pollMs;
+    this.pollMs = assertPollMs(pollMs);
     this.onHealth = onHealth;
     this.onError = onError;
     this.setIntervalImpl = setIntervalImpl;
@@ -22,6 +52,7 @@ export class PirateObservatoryHealthSession {
     this.timer = null;
     this.inFlight = null;
     this.stopped = true;
+    this.last = null;
   }
 
   start({ immediate = true } = {}) {
@@ -50,27 +81,18 @@ export class PirateObservatoryHealthSession {
     try {
       const health = await this.transport.getHealth(this.partition);
       if (this.stopped) return { ok: false, reason: 'SESSION_STOPPED' };
-      const valid = health?.schemaVersion === PIRATE_OBSERVATORY_SCHEMA_VERSION
-        && health.partition === this.partition
-        && typeof health.ready === 'boolean'
-        && typeof health.code === 'string'
-        && Number.isSafeInteger(health.lastObservedTick)
-        && Number.isSafeInteger(health.latestSequence) && health.latestSequence >= 0
-        && Number.isSafeInteger(health.oldestRetainedSequence) && health.oldestRetainedSequence >= 0
-        && Number.isInteger(health.retainedEvents) && health.retainedEvents >= 0
-        && Number.isInteger(health.retentionCapacity) && health.retentionCapacity > 0
-        && Number.isFinite(health.journalUtilization) && health.journalUtilization >= 0 && health.journalUtilization <= 1
-        && Number.isInteger(health.entityCount) && health.entityCount >= 0;
-      if (!valid) {
-        const error = Object.assign(new Error('Invalid Observatory health response'), { code: 'INVALID_HEALTH_RESPONSE' });
-        this.onError(error);
-        return { ok: false, reason: error.code };
+      const validation = validateObservatoryHealth(health, this.partition);
+      if (!validation.ok) {
+        this.onError(validation);
+        return validation;
       }
+      this.last = health;
       await this.onHealth(health);
       return { ok: true, health };
     } catch (error) {
+      const result = { ok: false, reason: error?.code ?? 'HEALTH_REQUEST_FAILED', error };
       this.onError(error);
-      return { ok: false, reason: error?.code ?? 'HEALTH_REQUEST_FAILED', error };
+      return result;
     }
   }
 }
