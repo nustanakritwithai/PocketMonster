@@ -2,6 +2,7 @@ import { PIRATE_OBSERVATORY_SCHEMA_VERSION } from './protocol.mjs';
 
 const els = {
   state: document.getElementById('serverHealthState'),
+  worldState: document.getElementById('serverWorldHealthStatus'),
   mode: document.getElementById('serverHealthMode'),
   source: document.getElementById('serverHealthSource'),
   partition: document.getElementById('serverHealthPartition'),
@@ -15,9 +16,11 @@ const els = {
   entities: document.getElementById('serverHealthEntities'),
   generated: document.getElementById('serverHealthGenerated'),
   notice: document.getElementById('serverHealthNotice'),
+  issues: document.getElementById('serverWorldHealthIssues'),
 };
 
 let lastHealth = null;
+let lastWorldHealth = null;
 let lastSource = '—';
 
 function safeInt(value, fallback = '—') {
@@ -30,24 +33,52 @@ function formatTime(value) {
   return new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function healthNotice(health) {
-  if (!health) return { tone: 'muted', text: 'Awaiting authenticated Observatory health data.' };
-  if (!health.ready) return {
-    tone: 'warn',
-    text: 'Server is reachable, but no authoritative Pirate WorldTickSnapshot is available yet. Combat/HP remains intentionally unavailable.',
-  };
-  if (health.journalUtilization >= .9) return {
-    tone: 'danger',
-    text: 'Journal retention is above 90%. Slow clients may soon require a full snapshot resync instead of journal catch-up.',
-  };
-  if (health.journalUtilization >= .75) return {
-    tone: 'warn',
-    text: 'Journal retention is above 75%. Watch retention headroom while debugging long-running sessions.',
-  };
-  return {
-    tone: 'ok',
-    text: 'Canonical Observatory read model is ready and journal retention has healthy headroom.',
-  };
+function renderIssues() {
+  if (els.worldState) {
+    const status = lastWorldHealth?.status ?? null;
+    els.worldState.textContent = status ? status.toUpperCase() : 'NO DATA';
+    els.worldState.dataset.tone = status === 'ok' ? 'ok' : status === 'critical' ? 'danger' : status === 'warning' ? 'warn' : 'muted';
+  }
+
+  if (els.issues) {
+    els.issues.replaceChildren();
+    if (!lastWorldHealth) {
+      const empty = document.createElement('div');
+      empty.className = 'health-issue health-issue-empty';
+      empty.textContent = 'Awaiting server-owned World Health evaluation.';
+      els.issues.append(empty);
+    } else if (lastWorldHealth.issueCount === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'health-issue health-issue-ok';
+      empty.textContent = 'No evidence-based Observatory issues.';
+      els.issues.append(empty);
+    } else {
+      for (const issue of lastWorldHealth.issues ?? []) {
+        const item = document.createElement('div');
+        item.className = 'health-issue';
+        item.dataset.tone = issue.severity === 'critical' ? 'danger' : 'warn';
+        const code = document.createElement('strong');
+        code.textContent = issue.code;
+        const message = document.createElement('span');
+        message.textContent = issue.message;
+        item.append(code, message);
+        els.issues.append(item);
+      }
+    }
+  }
+
+  if (els.notice) {
+    if (!lastWorldHealth) {
+      els.notice.textContent = 'Awaiting authenticated World Health data.';
+      els.notice.dataset.tone = 'muted';
+    } else if (lastWorldHealth.issueCount === 0) {
+      els.notice.textContent = 'Canonical Observatory health evaluator reports no current issues.';
+      els.notice.dataset.tone = 'ok';
+    } else {
+      els.notice.textContent = `${lastWorldHealth.issueCount} evidence-based issue${lastWorldHealth.issueCount === 1 ? '' : 's'} reported by the server evaluator.`;
+      els.notice.dataset.tone = lastWorldHealth.status === 'critical' ? 'danger' : 'warn';
+    }
+  }
 }
 
 function render() {
@@ -74,14 +105,11 @@ function render() {
   if (els.utilization) els.utilization.textContent = health ? `${(utilization * 100).toFixed(1)}%` : '—';
   if (els.utilizationBar) {
     els.utilizationBar.style.width = `${utilization * 100}%`;
-    els.utilizationBar.dataset.tone = utilization >= .9 ? 'danger' : utilization >= .75 ? 'warn' : 'ok';
+    els.utilizationBar.dataset.tone = lastWorldHealth?.status === 'critical'
+      ? 'danger'
+      : lastWorldHealth?.status === 'warning' ? 'warn' : 'ok';
   }
-
-  const notice = healthNotice(health);
-  if (els.notice) {
-    els.notice.textContent = notice.text;
-    els.notice.dataset.tone = notice.tone;
-  }
+  renderIssues();
 }
 
 function acceptHealth(health, { source = 'rest' } = {}) {
@@ -102,8 +130,24 @@ function acceptHealth(health, { source = 'rest' } = {}) {
   return { ok: true };
 }
 
+function acceptWorldHealth(worldHealth, { source = 'server' } = {}) {
+  const valid = worldHealth?.schemaVersion === PIRATE_OBSERVATORY_SCHEMA_VERSION
+    && typeof worldHealth.partition === 'string' && worldHealth.partition.length > 0
+    && Number.isSafeInteger(worldHealth.tick) && worldHealth.tick >= 0
+    && Number.isSafeInteger(worldHealth.sequence) && worldHealth.sequence >= 0
+    && ['ok', 'warning', 'critical'].includes(worldHealth.status)
+    && Number.isInteger(worldHealth.issueCount) && worldHealth.issueCount >= 0
+    && Array.isArray(worldHealth.issues) && worldHealth.issues.length === worldHealth.issueCount;
+  if (!valid) return { ok: false, reason: 'INVALID_WORLD_HEALTH_RESPONSE' };
+  lastWorldHealth = Object.freeze({ ...worldHealth, issues: Object.freeze([...worldHealth.issues]) });
+  if (source === 'websocket') lastSource = 'websocket';
+  render();
+  return { ok: true };
+}
+
 function clear(reason = null) {
   lastHealth = null;
+  lastWorldHealth = null;
   lastSource = reason ?? '—';
   render();
 }
@@ -112,6 +156,8 @@ render();
 
 export const PirateObservatoryServerPanel = Object.freeze({
   acceptHealth,
+  acceptWorldHealth,
   clear,
   current: () => lastHealth,
+  currentWorldHealth: () => lastWorldHealth,
 });
