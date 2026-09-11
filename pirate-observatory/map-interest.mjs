@@ -29,6 +29,11 @@ export function lodForSemanticZoom(zoom) {
   return 3;
 }
 
+export function wireZoomForSemanticZoom(zoom) {
+  if (!Number.isFinite(zoom) || zoom <= 0) return 0.3;
+  return zoom * 0.3;
+}
+
 export function entityBudgetForLod(lod) {
   if (lod <= 0) return 80;
   if (lod === 1) return 160;
@@ -44,8 +49,8 @@ export function viewportRequestFromViewBox(viewBox, {
   base = PIRATE_WORLD_VIEWBOX,
 } = {}) {
   const view = normalizeViewBox(viewBox, base);
-  const zoom = zoomForViewBox(view, base);
-  const lod = lodForSemanticZoom(zoom);
+  const semanticZoom = zoomForViewBox(view, base);
+  const lod = lodForSemanticZoom(semanticZoom);
   return Object.freeze({
     partition,
     viewport: Object.freeze({
@@ -54,7 +59,8 @@ export function viewportRequestFromViewBox(viewBox, {
       minZ: view.y,
       maxZ: view.y + view.height,
     }),
-    zoom,
+    zoom: wireZoomForSemanticZoom(semanticZoom),
+    semanticZoom,
     lod,
     selectedId,
     watchedIds: Object.freeze([...new Set(watchedIds.filter(Boolean))]),
