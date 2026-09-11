@@ -132,6 +132,11 @@ function acceptDelta(packet) {
   return result;
 }
 
+function clear() {
+  model.clear();
+  render();
+}
+
 function attachDashboard(value) {
   dashboard = value;
   document.querySelector('[data-workspace="debug"]')?.addEventListener('click', render);
@@ -143,6 +148,7 @@ export const PirateObservatoryDebugPanel = Object.freeze({
   attachDashboard,
   acceptSnapshot,
   acceptDelta,
+  clear,
   render,
   recentChanges: () => model.recentChanges(),
 });
