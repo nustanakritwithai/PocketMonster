@@ -9,3 +9,4 @@ export * from './websocket-session.mjs';
 export * from './hybrid-session.mjs';
 export * from './map-interest.mjs';
 export * from './interest-session.mjs';
+export * from './health-session.mjs';
