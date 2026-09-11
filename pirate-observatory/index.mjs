@@ -12,3 +12,4 @@ export * from './interest-session.mjs';
 export * from './health-session.mjs';
 export * from './debug-model.mjs';
 export * from './history-session.mjs';
+export * from './evidence-playback.mjs';
