@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Pirate World Observatory</title>
   <link rel="stylesheet" href="./dashboard.css" />
+  <link rel="stylesheet" href="./dashboard-map-p1.css" />
 </head>
 <body>
   <main class="observatory" id="observatory">
@@ -35,7 +36,7 @@
           <button class="chip is-on" data-layer="entities" type="button">🚢 Entities</button>
           <button class="chip" data-layer="performance" type="button">⚙ Performance</button>
         </div>
-        <span class="map-note">Canonical Pirate Fruit geography</span>
+        <span class="map-note">LOD 0 • 1.0× • 0 visible</span>
       </div>
       <svg id="worldMap" class="world-map" viewBox="-110 -160 730 760" role="img" aria-label="Pirate world observatory map">
         <defs>
@@ -66,7 +67,7 @@
     <aside class="inspector" id="inspector">
       <span class="eyebrow">INSPECTOR</span>
       <h2 id="inspectorTitle">No selection</h2>
-      <p id="inspectorSubtitle" class="muted">Select an island or stream entity.</p>
+      <p id="inspectorSubtitle" class="muted">Select an island or visible canonical entity.</p>
       <div id="inspectorBody" class="inspector-body">
         <div class="empty-card">Observatory is read-only. No world state is edited from this panel.</div>
       </div>
