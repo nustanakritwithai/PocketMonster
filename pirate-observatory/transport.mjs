@@ -28,6 +28,11 @@ export class PirateObservatoryRestTransport {
     return this.#get(`/api/observatory/regions/${target}/health`);
   }
 
+  async getWorldHealth(partition = 'pirate-fruit') {
+    const target = encodeURIComponent(assertPartition(partition));
+    return this.#get(`/api/observatory/regions/${target}/world-health`);
+  }
+
   async getPartitionSnapshot(partition) {
     const target = encodeURIComponent(assertPartition(partition));
     return this.#get(`/api/observatory/regions/${target}/snapshot`);
