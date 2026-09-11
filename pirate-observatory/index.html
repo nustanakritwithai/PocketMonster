@@ -6,6 +6,7 @@
   <title>Pirate World Observatory</title>
   <link rel="stylesheet" href="./dashboard.css" />
   <link rel="stylesheet" href="./dashboard-map-p1.css" />
+  <link rel="stylesheet" href="./dashboard-server-p2.css" />
 </head>
 <body>
   <main class="observatory" id="observatory">
@@ -60,8 +61,41 @@
       <div><span class="eyebrow">DEBUG WORKSPACE</span><h1>Investigation context will stay attached to the selected entity.</h1><p>Journal timeline, snapshot diff and replay controls activate when a server transport supplies history.</p></div>
     </section>
 
-    <section class="workspace-placeholder" data-panel="server" hidden>
-      <div><span class="eyebrow">SERVER WORKSPACE</span><h1>System Health + World Health</h1><p>Tick budget, subsystem profiler and region profiler will consume canonical health channels rather than reading mutable WorldSim state.</p></div>
+    <section class="server-workspace" data-panel="server" hidden>
+      <div class="server-shell">
+        <div class="server-heading">
+          <div>
+            <span class="eyebrow">SERVER WORKSPACE</span>
+            <h1>Observatory Health</h1>
+            <p>Only metrics measured by the read-only Observatory are shown here. CPU, RAM and TPS stay absent until they have canonical instrumentation.</p>
+          </div>
+          <span id="serverHealthState" class="health-state" data-tone="muted">○ NO DATA</span>
+        </div>
+
+        <div class="health-grid">
+          <article class="health-card"><span>Mode</span><strong id="serverHealthMode">—</strong><small>Authority/read-model mode</small></article>
+          <article class="health-card"><span>Transport</span><strong id="serverHealthSource">—</strong><small>Last health payload source</small></article>
+          <article class="health-card"><span>Partition</span><strong id="serverHealthPartition">—</strong><small>Canonical partition</small></article>
+          <article class="health-card"><span>Observed tick</span><strong id="serverHealthTick">—</strong><small>Latest authoritative tick seen</small></article>
+
+          <article class="health-card"><span>Latest sequence</span><strong id="serverHealthLatest">—</strong><small>Current journal cursor</small></article>
+          <article class="health-card"><span>Oldest retained</span><strong id="serverHealthOldest">—</strong><small>Catch-up retention boundary</small></article>
+          <article class="health-card"><span>Retained events</span><strong id="serverHealthRetained">—</strong><small>Events retained for this partition</small></article>
+          <article class="health-card"><span>Entities</span><strong id="serverHealthEntities">—</strong><small>Canonical read-model entity count</small></article>
+
+          <article class="health-card health-wide">
+            <span>Journal utilization</span>
+            <strong id="serverHealthUtilization">—</strong>
+            <div class="health-meter" aria-hidden="true"><i id="serverHealthUtilizationBar" data-tone="ok"></i></div>
+            <small>Retained events / configured retention capacity</small>
+          </article>
+          <article class="health-card"><span>Capacity</span><strong id="serverHealthCapacity">—</strong><small>Configured journal retention</small></article>
+          <article class="health-card"><span>Generated</span><strong id="serverHealthGenerated">—</strong><small>Server health sample time</small></article>
+        </div>
+
+        <div id="serverHealthNotice" class="health-notice" data-tone="muted">Awaiting authenticated Observatory health data.</div>
+        <p class="server-footnote"><strong>Guardrail:</strong> this panel observes evidence only. It never edits WorldSim state, and actor-only Pirate presentation is not treated as combat truth.</p>
+      </div>
     </section>
 
     <aside class="inspector" id="inspector">
