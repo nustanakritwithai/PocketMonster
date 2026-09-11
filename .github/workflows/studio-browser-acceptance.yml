@@ -9,9 +9,16 @@ on:
       - 'scene-v900.html'
       - 'pirate-studio-reveal-gate-v1.css'
       - 'pirate-studio-reveal-gate-v1.mjs'
+      - 'scene-release-cache-v1.mjs'
+      - 'entry-preload-v900.mjs'
+      - 'firebase-launcher-entry.mjs'
+      - 'scripts/bind-pages-release.mjs'
+      - 'scripts/build-github-pages.mjs'
+      - 'tests/v90-release-bound-pages.mjs'
       - 'tests/v91-studio-*.mjs'
       - 'tests/v91-studio-browser-acceptance.py'
       - 'tests/v91-studio-fighting-wrap-browser-report.py'
+      - '.github/workflows/github-pages.yml'
       - '.github/workflows/studio-browser-acceptance.yml'
   workflow_dispatch:
 permissions:
@@ -50,6 +57,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Release-bound cache chain regression
+        run: |
+          npm run build:pages
+          node scripts/bind-pages-release.mjs
+          node tests/v90-release-bound-pages.mjs
       - name: Install isolated browser dependencies
         run: |
           pip install playwright==1.62.0 numpy pillow
