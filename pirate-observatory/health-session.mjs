@@ -31,12 +31,33 @@ export function validateObservatoryHealth(payload, partition = null) {
   return { ok: true, health: payload };
 }
 
+export function validateObservatoryWorldHealth(payload, partition = null) {
+  const expectedPartition = partition ? assertPartition(partition) : null;
+  if (!payload || payload.schemaVersion !== PIRATE_OBSERVATORY_SCHEMA_VERSION) return { ok: false, reason: 'SCHEMA_MISMATCH' };
+  if (typeof payload.partition !== 'string' || !payload.partition) return { ok: false, reason: 'PARTITION_REQUIRED' };
+  if (expectedPartition && payload.partition !== expectedPartition) return { ok: false, reason: 'PARTITION_MISMATCH' };
+  if (!Number.isSafeInteger(payload.tick) || payload.tick < 0
+    || !Number.isSafeInteger(payload.sequence) || payload.sequence < 0) return { ok: false, reason: 'INVALID_CURSOR' };
+  if (!['ok', 'warning', 'critical'].includes(payload.status)) return { ok: false, reason: 'INVALID_WORLD_HEALTH_STATUS' };
+  if (!Number.isSafeInteger(payload.issueCount) || payload.issueCount < 0 || !Array.isArray(payload.issues)
+    || payload.issues.length !== payload.issueCount) return { ok: false, reason: 'INVALID_WORLD_HEALTH_ISSUES' };
+  for (const issue of payload.issues) {
+    if (!issue || typeof issue.code !== 'string' || !issue.code
+      || !['warning', 'critical'].includes(issue.severity)
+      || typeof issue.message !== 'string' || !issue.message) {
+      return { ok: false, reason: 'INVALID_WORLD_HEALTH_ISSUE' };
+    }
+  }
+  return { ok: true, worldHealth: payload };
+}
+
 export class PirateObservatoryHealthSession {
   constructor({
     transport,
     partition = 'pirate-fruit',
     pollMs = 3000,
     onHealth = () => {},
+    onWorldHealth = () => {},
     onError = () => {},
     setIntervalImpl = globalThis.setInterval,
     clearIntervalImpl = globalThis.clearInterval,
@@ -46,6 +67,7 @@ export class PirateObservatoryHealthSession {
     this.partition = assertPartition(partition);
     this.pollMs = assertPollMs(pollMs);
     this.onHealth = onHealth;
+    this.onWorldHealth = onWorldHealth;
     this.onError = onError;
     this.setIntervalImpl = setIntervalImpl;
     this.clearIntervalImpl = clearIntervalImpl;
@@ -53,6 +75,7 @@ export class PirateObservatoryHealthSession {
     this.inFlight = null;
     this.stopped = true;
     this.last = null;
+    this.lastWorldHealth = null;
   }
 
   start({ immediate = true } = {}) {
@@ -88,7 +111,29 @@ export class PirateObservatoryHealthSession {
       }
       this.last = health;
       await this.onHealth(health);
-      return { ok: true, health };
+
+      let worldHealth = null;
+      let worldHealthError = null;
+      if (typeof this.transport.getWorldHealth === 'function') {
+        try {
+          const candidate = await this.transport.getWorldHealth(this.partition);
+          if (!this.stopped) {
+            const worldValidation = validateObservatoryWorldHealth(candidate, this.partition);
+            if (worldValidation.ok) {
+              worldHealth = candidate;
+              this.lastWorldHealth = candidate;
+              await this.onWorldHealth(candidate);
+            } else {
+              worldHealthError = worldValidation;
+              this.onError(worldValidation);
+            }
+          }
+        } catch (error) {
+          worldHealthError = { ok: false, reason: error?.code ?? 'WORLD_HEALTH_REQUEST_FAILED', error };
+          this.onError(error);
+        }
+      }
+      return { ok: true, health, worldHealth, worldHealthError };
     } catch (error) {
       const result = { ok: false, reason: error?.code ?? 'HEALTH_REQUEST_FAILED', error };
       this.onError(error);
