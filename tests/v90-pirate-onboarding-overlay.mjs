@@ -47,7 +47,8 @@ const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-pre
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=11/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=953/);
+assert.match(worldCatalog, /world-pirate-native-v900\.mjs\?v=1/, 'active Pirate route uses Native V9');
+assert.doesNotMatch(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=953/, 'rollback boot is not an active world route');
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -59,13 +60,13 @@ assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
 assert.match(parentBoot, /event\.source !== frame\.contentWindow/);
 assert.match(parentBoot, /event\.origin !== 'null'/);
-assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'integrated shell consumes onboarding state without creating tutorial action buttons');
-assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated onboarding proxy layer is kept empty');
-assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell creates no invisible tutorial action buttons');
+assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'rollback shell consumes onboarding state without creating tutorial action buttons');
+assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'rollback onboarding proxy layer is kept empty');
+assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'rollback shell creates no invisible tutorial action buttons');
 assert.match(
   pirateHud,
   /\.onboarding-root\s*\{[\s\S]*display:\s*none\s*!important/,
-  'integrated Pirate HUD still removes the bottom tutorial bar',
+  'rollback Pirate HUD still removes the bottom tutorial bar',
 );
 assert.doesNotMatch(
   pirateHud,
@@ -100,17 +101,17 @@ assert.match(pirateHud, /\.dialogue-card \{[\s\S]*height: auto[\s\S]*max-height:
 assert.match(pirateHud, /\.quest-board,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'quest board grows with content up to a phone max');
 assert.match(pirateHud, /\.boat-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'boat shop grows with content up to a phone max');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'potion shop grows with content up to a phone max');
-assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
-assert.match(childEntry, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'Pirate child HTML cache-busts presentation with a positive revision');
+assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested rollback Pirate Fruit stays in an opaque iframe sandbox');
+assert.match(childEntry, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'rollback Pirate child HTML cache-busts presentation with a positive revision');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
 assert.doesNotMatch(presentation, /stopImmediatePropagation/, 'talk taps must reach the original Pirate prompt handler');
 assert.match(presentation, /OVERLAY_ROOTS/, 'quest/boat/potion shops hide the parent control surface');
 assert.match(presentation, /setInterval\(syncDialogue, 200\)/, 'child keeps publishing overlay open on phones that miss MutationObserver');
-assert.match(parentBoot, /window\.parent\?\.postMessage/, 'scene forwards overlay open to the parent shell');
+assert.match(parentBoot, /window\.parent\?\.postMessage/, 'rollback scene forwards overlay open to the parent shell');
 assert.match(shell, /pirate-dialogue-v1/, 'parent shell raises the scene over HUD while a Pirate window is open');
 assert.match(presentation, /PIRATE_FRUIT_DIALOGUE_MESSAGE/, 'child publishes dialogue open so parent HUD can stand down');
-assert.match(parentBoot, /pocketmonster:pirate-dialogue-v1/, 'parent lets the talk window sit in front of HUD buttons');
+assert.match(parentBoot, /pocketmonster:pirate-dialogue-v1/, 'rollback parent lets the talk window sit in front of HUD buttons');
 
 assert.doesNotMatch(parentBoot, /createPirateNpcNameParentProxy|npcNameProxy|pirate-npc-name-interaction/, 'failed parent คุย chip is gone');
 assert.doesNotMatch(presentation, /installPirateNpcNameChild|pirate-npc-name-interaction/, 'failed child NPC-name publisher is gone');
@@ -123,7 +124,7 @@ assert.equal(
 
 const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
 const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
-assert.ok(pirateEntryMatch, 'Pirate bootstrap declares its compiled entry');
+assert.ok(pirateEntryMatch, 'rollback Pirate bootstrap declares its compiled entry');
 const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/assets/${pirateEntryMatch[1]}`, import.meta.url), 'utf8');
 assert.match(
   pirateBundle,
@@ -136,4 +137,4 @@ assert.match(
   'original NPC dialogue opens from consumeInteract or consumeRequested',
 );
 
-console.log('V9 Pirate onboarding overlay and original talk path: PASS');
+console.log('V9 Pirate onboarding rollback coverage + Native active route: PASS');

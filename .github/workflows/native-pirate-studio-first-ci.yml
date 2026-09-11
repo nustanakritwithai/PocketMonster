@@ -1,0 +1,60 @@
+name: Native Pirate Studio-first CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'world-pirate-native-v900.mjs'
+      - 'combined-worlds-v900.mjs'
+      - 'asset-presentation/**'
+      - 'tests/v90-pirate-fruit-player.mjs'
+      - 'tests/v90-unified-scene-runtime.mjs'
+      - 'tests/legacy/**'
+      - 'tests/v94-native-pirate-studio-first.mjs'
+      - 'scripts/build-github-pages.mjs'
+      - '.github/workflows/native-pirate-studio-first-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-pirate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax
+        run: |
+          node --check world-pirate-native-v900.mjs
+          node --check combined-worlds-v900.mjs
+          node --check tests/v90-pirate-fruit-player.mjs
+          node --check tests/v90-unified-scene-runtime.mjs
+          node --check tests/v94-native-pirate-studio-first.mjs
+      - name: Native Pirate active-path gate
+        run: node tests/v94-native-pirate-studio-first.mjs
+      - name: Preserve Studio character contracts
+        run: |
+          node tests/v91-studio-character-provider.mjs
+          node tests/v91-studio-blue-explorer-primary.mjs
+          node tests/v91-studio-character-render-profile.mjs
+      - name: Preserve shared world presence contracts
+        run: |
+          node tests/world-presence-protocol.mjs
+          node tests/v90-world-presence-avatars.mjs
+      - name: Pages pre-deploy release gates
+        run: |
+          node tests/check-active-syntax.mjs
+          node tests/deployment-runtime-config.mjs
+          node tests/production-launch-workflows.mjs
+          node tests/hosting-architecture.mjs
+          node tests/v90-deployment-gates.mjs
+          npm run test:remote-animation
+          npm run test:v90:pirate-player
+          npm run test:v91:combat
+      - name: Build public Pages closure
+        run: npm run build:pages
+      - name: Verify unified-world artifact
+        run: node tests/v90-unified-pages-artifact.mjs
