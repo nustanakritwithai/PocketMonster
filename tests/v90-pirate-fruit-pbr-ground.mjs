@@ -91,13 +91,20 @@ assert.match(pbrSrc, /shader\.uniforms\.uRockNormal\.value = textures\.rock\.nor
 assert.match(pbrSrc, /uSandRoughness/);
 assert.match(pbrSrc, /uGrassRoughness/);
 assert.match(pbrSrc, /uRockRoughness/);
+assert.match(pbrSrc, /roughnessDeclaration/,
+  'roughness injection is guarded by the native shader declaration');
 assert.match(pbrSrc, /preservesNativeSplat: true/);
 assert.match(pbrSrc, /preservesWetShore: true/);
 assert.match(pbrSrc, /waterChanged: false/);
+assert.match(pbrSrc, /dockChanged: false/);
 assert.match(pbrSrc, /geometryChanged: false/);
 assert.match(pbrSrc, /collisionChanged: false/);
-assert.match(pbrSrc, /presentation\.scan\(this\)[\s\S]*return current\.call\(this, force\)/,
+assert.match(pbrSrc, /presentation\.scan\(this\)[\s\S]*return currentUpdate\.call\(this, force\)/,
   'terrain is claimed before the legacy bridge update is invoked');
+assert.match(pbrSrc, /proto\.add = add/,
+  'streamed terrain is claimed immediately when it is added to the real scene');
+assert.match(pbrSrc, /presentation\.upgrade\(object\)/,
+  'new PF_TERRAIN meshes are upgraded before later scene scans');
 
 // Regression for the bug reported by the user: never replace the whole terrain
 // with a new flat/one-family material, and never install a flat fallback.
