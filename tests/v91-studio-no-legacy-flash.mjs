@@ -7,6 +7,7 @@ const gate = fs.readFileSync(new URL('../pirate-studio-reveal-gate-v1.mjs', impo
 const child = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const childHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const visibility = fs.readFileSync(new URL('../asset-presentation/pirate-local-player-visibility-v1.mjs', import.meta.url), 'utf8');
+const releaseBinder = fs.readFileSync(new URL('../scripts/bind-pages-release.mjs', import.meta.url), 'utf8');
 
 const cssIndex = scene.indexOf('pirate-studio-reveal-gate-v1.css?v=2');
 const gateIndex = scene.indexOf('pirate-studio-reveal-gate-v1.mjs?v=2');
@@ -45,8 +46,12 @@ assert.ok(guardInstall >= 0 && bridgeInstall > guardInstall,
   'legacy-player guard must arm before the Pirate renderer bridge');
 assert.ok(readyPost > bridgeInstall,
   'child must not advertise readiness before both the visibility guard and renderer bridge are armed');
-assert.match(childHtml, /pocket-presentation\.mjs\?v=30/,
-  'Pirate child cache-busts the nonblocking presentation bootstrap');
+assert.match(childHtml, /pocket-presentation\.mjs\?v=29/,
+  'source keeps the audited presentation baseline cache key');
+assert.match(releaseBinder, /pocket-presentation\.mjs\(?:\\\?\[\^'\"\]\*\)\?/,
+  'production release binder owns the child presentation cache key');
+assert.match(releaseBinder, /pocket-presentation\.mjs\?release=\$\{encoded\}/,
+  'published Pirate child loads presentation through deployedRelease rather than a shared cache key');
 
 assert.match(visibility, /hideLegacyLocalPlayer/,
   'visibility guard marks the local Pirate host as legacy-hidden');
