@@ -47,6 +47,8 @@ const required = new Set([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
+  'pirate-fruit-offline/pocket-presentation.mjs',
+  'asset-presentation/pirate-local-player-visibility-v1.mjs',
   pirateEntryAsset,
   'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
   'assets/catalog/humanoid-core.json',
@@ -79,6 +81,13 @@ for (const relative of closure) {
         'entry-preload-v900.mjs?v=972',
       );
     assert.equal(normalizedBuilt, source.toString('utf8'), `${relative} may differ from source only by release binding and the pre-shell hidden first-paint gate`);
+  } else if (relative === 'pirate-fruit-offline/index.html') {
+    const normalizedBuilt = built.toString('utf8').replace(
+      /pocket-presentation\.mjs\?release=[^'"\s>]+/,
+      'pocket-presentation.mjs?v=29',
+    );
+    assert.equal(normalizedBuilt, source.toString('utf8'),
+      'Pirate child HTML may differ from source only by release-bound presentation bootstrap');
   } else {
     assert.equal(Buffer.compare(source, built), 0, `${relative} built bytes must match source`);
   }
@@ -102,6 +111,11 @@ const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=969/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
+const pirateChild = fs.readFileSync(path.join(output, 'pirate-fruit-offline/index.html'), 'utf8');
+assert.match(pirateChild, new RegExp(`pocket-presentation\\.mjs\\?release=${encodedRelease.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+  'published Pirate child must load the guarded presentation module through deployedRelease');
+assert.doesNotMatch(pirateChild, /pocket-presentation\.mjs\?v=29/,
+  'published Pirate child must not reuse the old presentation cache key');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
 
