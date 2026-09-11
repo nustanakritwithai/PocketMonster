@@ -5,10 +5,7 @@ import {
 } from './launch-bootstrap.mjs?v=912';
 import { applyPendingPatch } from './patch-updater.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
-// Keep the persistent owner in the explicit V9 dependency closure; the Server
-// wrapper below delegates installation to this same module instance.
-import './persistent-minimap-owner-v900.mjs?v=2';
-import { installPersistentMinimapOwnerFromServerPresence } from './server-minimap-presence-v900.mjs?v=2';
+import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=2';
 import {
   healthVersionGate,
   publishServerGateTelemetry,
@@ -47,5 +44,5 @@ await applyPendingPatch();
 document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
-installPersistentMinimapOwnerFromServerPresence({ windowLike: window, documentLike: document });
+installPersistentMinimapOwner({ windowLike: window, documentLike: document });
 await import('./online-world-shell-v900.mjs?v=65');

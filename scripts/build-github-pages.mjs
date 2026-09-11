@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_FILE_EXTENSIONS = new Set(['.css', '.html', '.ico', '.js', '.json', '.mjs', '.png', '.svg', '.webmanifest', '.woff', '.woff2']);
@@ -18,6 +19,8 @@ const SERVER_ONLY_ROOT_PREFIXES = Object.freeze([
   'combat-v91-server-',
 ]);
 const SOURCE_ONLY_ROOT_FILES = new Set([
+  // Shadow foundation: publish only after runtime factories replace the
+  // iframe realms and these modules enter the verified browser closure.
   'one-document-world-runtime-host-v910.mjs',
   'world-runtime-lifecycle-v910.mjs',
   'world-runtime-import-purity-v912.mjs',
@@ -29,13 +32,10 @@ const DEPENDENCY_EXTENSIONS = new Set([
   '.mjs', '.mp3', '.ogg', '.png', '.svg', '.wasm', '.wav', '.webmanifest', '.webp', '.woff', '.woff2',
 ]);
 const TEXT_DEPENDENCY_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.mjs']);
-
-// These are the only browser entry points for the current production release.
-// v900.html remains because scene-entry-v900.mjs consumes it as the scene template;
-// it is not an alternate selectable game version.
 export const REQUIRED_V9_ENTRY_FILES = Object.freeze(['index.html', 'v900.html', 'scene-v900.html']);
 const REQUIRED_BOOTSTRAP_FILES = [
   ...REQUIRED_V9_ENTRY_FILES,
+  'entry-preload.mjs',
   'entry-preload-v900.mjs',
   'launch-bootstrap.mjs',
   'runtime-config.mjs',
@@ -49,9 +49,6 @@ const REQUIRED_BOOTSTRAP_FILES = [
   'scene-entry-v900.mjs',
   'worlds-v900.mjs',
 ];
-const REQUIRED_PROVENANCE_FILES = Object.freeze([
-  'pirate-fruit-offline/SOURCE.json',
-]);
 
 function normalize(relative) {
   return relative.replaceAll('\\', '/');
@@ -66,6 +63,11 @@ export function isPublicGameFile(relative) {
   if (name.includes('/')) return false;
   if (SOURCE_ONLY_ROOT_FILES.has(name)) return false;
   return !ROOT_EXCLUDES.has(name) && ROOT_FILE_EXTENSIONS.has(path.extname(name).toLowerCase());
+}
+
+function trackedFiles(root) {
+  return execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0').filter(Boolean).map(normalize);
 }
 
 function sha256(file) {
@@ -183,20 +185,14 @@ export function buildGitHubPages({ root = process.cwd(), output = path.join(root
   const dependencyClosure = collectPublicDependencyClosure(root);
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });
-
-  for (const relative of [...REQUIRED_BOOTSTRAP_FILES, ...REQUIRED_PROVENANCE_FILES]) {
-    if (!fs.existsSync(path.join(root, relative))) throw new Error(`Required current-release file is missing: ${relative}`);
+  for (const relative of REQUIRED_BOOTSTRAP_FILES) {
+    if (!fs.existsSync(path.join(root, relative))) throw new Error(`Required bootstrap file is missing: ${relative}`);
   }
-
-  // Single-current-version policy: deploy only files reachable from the current
-  // production entries plus explicit bootstrap/provenance contracts. Do not copy
-  // every tracked legacy HTML/runtime/build artifact into production.
   const files = [...new Set([
+    ...trackedFiles(root).filter(isPublicGameFile),
     ...REQUIRED_BOOTSTRAP_FILES,
-    ...REQUIRED_PROVENANCE_FILES,
     ...dependencyClosure,
   ])].sort();
-
   for (const relative of files) {
     const source = path.join(root, relative);
     const destination = path.join(output, relative);
@@ -204,8 +200,9 @@ export function buildGitHubPages({ root = process.cwd(), output = path.join(root
     fs.copyFileSync(source, destination);
   }
   fs.writeFileSync(path.join(output, '.nojekyll'), '', 'utf8');
-
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  // Keep compatibility files published, but only force clients to prefetch the
+  // dependency closure that the active V9 entries can actually reach.
   const patchFiles = [...dependencyClosure].sort();
   const entries = patchFiles.map(relative => {
     const file = path.join(output, relative);
@@ -231,6 +228,6 @@ if (isDirect) {
   const root = process.cwd();
   const writeRootManifest = process.argv.includes('--write-root-manifest');
   const { output, manifest, publicFileCount } = buildGitHubPages({ root, writeRootManifest });
-  console.log(`Built ${publicFileCount} current-release files in ${output}`);
+  console.log(`Built ${publicFileCount} public files in ${output}`);
   console.log(`Patch ${manifest.buildId} (${manifest.files.length} active files)${writeRootManifest ? ' (root manifest updated)' : ''}`);
 }

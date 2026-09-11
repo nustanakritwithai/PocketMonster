@@ -25,7 +25,6 @@ jobs:
     env:
       MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
       MONSTERLIFE_EXPECTED_API_BASE_URL: 'https://157.85.96.139'
-      MONSTERLIFE_WORLD_SIM_GROUND: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

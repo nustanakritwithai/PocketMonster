@@ -22,10 +22,6 @@ function worldId(windowRef = globalThis.window) {
   return windowRef?.POCKETMONSTER_COMBINED_BOOT?.worldId || null;
 }
 
-export function shouldDeferPlayerPresentationParity(windowRef = globalThis.window) {
-  return windowRef?.POCKETMONSTER_SCENE_PREWARM === true;
-}
-
 function retargetYawForWorld(id) {
   return id === 'pocket-monster' || id === 'living-world' ? PLAYER_PRESENTATION_FORWARD_YAW : 0;
 }
@@ -157,12 +153,6 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
 
   function ensureParity() {
     if (disposed) return Promise.resolve(null);
-    // worlds-v900 prewarms the Pocket runtime while Pirate Fruit is still the
-    // active route. Do not cache a resolved-null parity promise here: the
-    // underlying Studio session intentionally defers its upgrade during prewarm.
-    // The first real mounted update must be allowed to retry scale/yaw/PBR/action
-    // parity once POCKETMONSTER_SCENE_PREWARM has been cleared.
-    if (shouldDeferPlayerPresentationParity(windowRef)) return Promise.resolve(null);
     if (parityPromise) return parityPromise;
 
     // Force the underlying session to begin its async Studio upgrade now, then
@@ -170,11 +160,7 @@ export function maybeWrapPlayerPresentationHandle(options = {}) {
     session.update?.(0, { moving: lastMoving });
     const pending = session.presentationReady;
     parityPromise = Promise.resolve(pending).then(async studio => {
-      if (!studio || disposed) {
-        // A transient null must never poison future mounted retries.
-        if (!disposed) parityPromise = null;
-        return studio || null;
-      }
+      if (!studio || disposed) return studio || null;
 
       // The session has just swapped to Studio. Keep the known-good fallback on
       // screen while scale/orientation and verified textures are being applied.
