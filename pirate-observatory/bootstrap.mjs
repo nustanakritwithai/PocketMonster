@@ -2,10 +2,52 @@ import { PirateObservatoryDashboard } from './dashboard.mjs';
 import { PirateObservatoryRestTransport } from './transport.mjs';
 import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { PirateObservatoryHybridSession } from './hybrid-session.mjs';
+import { PirateObservatoryInterestSession } from './interest-session.mjs';
 import { resolvePirateObservatoryRuntimeContext } from './runtime-context.mjs';
 import { SYNC_STATES } from './protocol.mjs';
 
 let activeSession = null;
+let activeTransport = null;
+let activeInterestSession = null;
+let activeViewportUnsubscribe = null;
+let activeInterestPartition = null;
+let activeInterestPollMs = 750;
+
+function stopInterestSession() {
+  activeViewportUnsubscribe?.();
+  activeViewportUnsubscribe = null;
+  activeInterestSession?.stop?.();
+  activeInterestSession = null;
+  activeInterestPartition = null;
+}
+
+function ensureInterestSession(transport, partition) {
+  if (!transport?.getInterest) return;
+  if (activeInterestSession?.transport === transport && activeInterestPartition === partition) {
+    void activeInterestSession.refresh();
+    return;
+  }
+
+  stopInterestSession();
+  const session = new PirateObservatoryInterestSession({
+    transport,
+    pollMs: activeInterestPollMs,
+    getRequest: () => PirateObservatoryDashboard.currentInterestRequest(partition),
+    onInterest: response => PirateObservatoryDashboard.acceptInterest(response),
+    onError: error => {
+      if (error?.status === 401 || error?.status === 403) {
+        PirateObservatoryDashboard.acceptEvent({
+          type: 'interest.auth',
+          label: 'Viewport interest authorization expired',
+        });
+      }
+    },
+  });
+  activeInterestSession = session;
+  activeInterestPartition = partition;
+  activeViewportUnsubscribe = PirateObservatoryDashboard.subscribeViewport(() => { void session.refresh(); });
+  session.start();
+}
 
 function applyDashboardState(partition, state, detail = {}) {
   const connected = detail.serverReachable ?? state !== SYNC_STATES.OFFLINE;
@@ -19,6 +61,15 @@ function applyDashboardState(partition, state, detail = {}) {
     transport: detail.transport ?? null,
   });
   PirateObservatoryDashboard.markPartition(partition, state);
+  if (state === SYNC_STATES.LIVE && activeTransport) ensureInterestSession(activeTransport, partition);
+  else if (state === SYNC_STATES.OFFLINE || state === SYNC_STATES.DESYNC || state === SYNC_STATES.SYNCING || state === SYNC_STATES.CATCHING_UP) stopInterestSession();
+}
+
+function stopActiveSession() {
+  stopInterestSession();
+  activeSession?.stop?.();
+  activeSession = null;
+  activeTransport = null;
 }
 
 export async function connectPirateObservatoryRest({
@@ -28,10 +79,13 @@ export async function connectPirateObservatoryRest({
   fetchImpl = globalThis.fetch,
   pollMs = 500,
   notReadyPollMs = 3000,
+  interestPollMs = 750,
   startPolling = true,
 } = {}) {
-  activeSession?.stop?.();
+  stopActiveSession();
+  activeInterestPollMs = interestPollMs;
   const transport = new PirateObservatoryRestTransport({ baseUrl, headers, fetchImpl });
+  activeTransport = transport;
   const session = new PirateObservatoryRestSession({
     transport,
     partition,
@@ -57,8 +111,10 @@ export async function connectPirateObservatoryHybrid({
   WebSocketImpl = globalThis.WebSocket,
   pollMs = 500,
   notReadyPollMs = 3000,
+  interestPollMs = 750,
 } = {}) {
-  activeSession?.stop?.();
+  stopActiveSession();
+  activeInterestPollMs = interestPollMs;
   const session = new PirateObservatoryHybridSession({
     baseUrl,
     token,
@@ -91,6 +147,7 @@ export async function connectPirateObservatoryHybrid({
     onTransport: mode => PirateObservatoryDashboard.setServerStatus({ transport: mode }),
   });
   activeSession = session;
+  activeTransport = session.transport;
   const result = await session.start();
   return { ...result, session };
 }
@@ -99,6 +156,7 @@ export async function connectPirateObservatoryFromRuntime({
   partition = 'pirate-fruit',
   pollMs = 500,
   notReadyPollMs = 3000,
+  interestPollMs = 750,
   preferWebSocket = true,
   startPolling = true,
   windowLike = globalThis.window,
@@ -116,6 +174,7 @@ export async function connectPirateObservatoryFromRuntime({
     ...(Number.isFinite(now) ? { now } : {}),
   });
   if (!context.ok) {
+    stopActiveSession();
     PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0, reason: context.reason ?? null, waitingForAuthority: false });
     PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.OFFLINE);
     return context;
@@ -131,6 +190,7 @@ export async function connectPirateObservatoryFromRuntime({
       WebSocketImpl,
       pollMs,
       notReadyPollMs,
+      interestPollMs,
     });
   }
 
@@ -141,13 +201,13 @@ export async function connectPirateObservatoryFromRuntime({
     fetchImpl,
     pollMs,
     notReadyPollMs,
+    interestPollMs,
     startPolling,
   });
 }
 
 export function disconnectPirateObservatory() {
-  activeSession?.stop?.();
-  activeSession = null;
+  stopActiveSession();
 }
 
 if (typeof window !== 'undefined') {
