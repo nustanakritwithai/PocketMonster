@@ -23,6 +23,11 @@ export class PirateObservatoryRestTransport {
     return this.#get('/api/observatory/status');
   }
 
+  async getHealth(partition = 'pirate-fruit') {
+    const target = encodeURIComponent(assertPartition(partition));
+    return this.#get(`/api/observatory/regions/${target}/health`);
+  }
+
   async getPartitionSnapshot(partition) {
     const target = encodeURIComponent(assertPartition(partition));
     return this.#get(`/api/observatory/regions/${target}/snapshot`);
