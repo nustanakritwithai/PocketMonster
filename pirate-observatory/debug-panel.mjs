@@ -1,6 +1,6 @@
-const snapshots = new Map();
-const recentChanges = [];
-const MAX_CHANGES = 80;
+import { PirateObservatoryDebugModel, changedFieldsForObservatoryChange } from './debug-model.mjs';
+
+const model = new PirateObservatoryDebugModel({ maxChanges: 80 });
 let dashboard = null;
 
 const els = {
@@ -16,10 +16,6 @@ const els = {
   note: document.getElementById('debugNote'),
 };
 
-function latestSnapshot() {
-  return [...snapshots.values()].sort((a, b) => b.tick - a.tick || b.sequence - a.sequence)[0] ?? null;
-}
-
 function valueText(value) {
   if (value === undefined) return '—';
   if (value === null) return 'null';
@@ -27,29 +23,19 @@ function valueText(value) {
   return String(value);
 }
 
-function changedFields(change) {
-  const before = change?.before && typeof change.before === 'object' ? change.before : {};
-  const after = change?.after && typeof change.after === 'object' ? change.after : {};
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])]
-    .filter(key => !['fingerprint'].includes(key));
-  return keys
-    .filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
-    .slice(0, 12)
-    .map(key => ({ key, before: before[key], after: after[key] }));
-}
-
 function renderChanges() {
   if (!els.changes) return;
   els.changes.replaceChildren();
-  if (recentChanges.length === 0) {
+  const changes = model.recentChanges(40);
+  if (changes.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'debug-empty';
-    empty.textContent = 'No canonical journal changes received yet.';
+    empty.textContent = 'No canonical journal changes received since the latest snapshot/resync.';
     els.changes.append(empty);
     return;
   }
 
-  for (const change of recentChanges.slice(0, 40)) {
+  for (const change of changes) {
     const row = document.createElement('div');
     row.className = 'debug-change';
     const cursor = document.createElement('span');
@@ -78,11 +64,11 @@ function renderDiff() {
   }
 
   els.diffTitle.textContent = selected.id;
-  const change = recentChanges.find(item => item.entity === selected.id);
+  const change = model.latestChangeForEntity(selected.id);
   if (!change) {
     const empty = document.createElement('div');
     empty.className = 'debug-empty';
-    empty.textContent = 'No retained client-side delta for this selected entity yet.';
+    empty.textContent = 'No post-snapshot delta for this selected entity is retained in this browser session.';
     els.diffBody.append(empty);
     return;
   }
@@ -91,7 +77,7 @@ function renderDiff() {
   meta.className = 'debug-diff-meta';
   meta.textContent = `${change.type} · tick ${change.tick} · sequence ${change.sequence}`;
   els.diffBody.append(meta);
-  const fields = changedFields(change);
+  const fields = changedFieldsForObservatoryChange(change);
   if (fields.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'debug-empty';
@@ -117,7 +103,7 @@ function renderDiff() {
 }
 
 function render() {
-  const snapshot = latestSnapshot();
+  const snapshot = model.latestSnapshot();
   const selected = dashboard?.selected?.();
   const watched = dashboard?.watched?.() ?? [];
   if (els.partition) els.partition.textContent = snapshot?.partition ?? '—';
@@ -126,41 +112,24 @@ function render() {
   if (els.snapshot) els.snapshot.textContent = snapshot?.snapshotId ?? '—';
   if (els.selected) els.selected.textContent = selected?.kind === 'entity' ? selected.id : '—';
   if (els.watches) els.watches.textContent = watched.length.toLocaleString();
-  if (els.note) els.note.textContent = recentChanges.length
-    ? `${recentChanges.length} recent canonical change${recentChanges.length === 1 ? '' : 's'} kept in this browser session.`
+  const retained = model.recentChanges().length;
+  if (els.note) els.note.textContent = retained
+    ? `${retained} post-snapshot canonical change${retained === 1 ? '' : 's'} kept in this browser session.`
     : 'Waiting for canonical snapshot/delta evidence.';
   renderChanges();
   renderDiff();
 }
 
 function acceptSnapshot(snapshot) {
-  if (!snapshot?.partition || !Number.isSafeInteger(snapshot.tick) || !Number.isSafeInteger(snapshot.sequence)) {
-    return { ok: false, reason: 'INVALID_SNAPSHOT' };
-  }
-  snapshots.set(snapshot.partition, Object.freeze({
-    partition: snapshot.partition,
-    tick: snapshot.tick,
-    sequence: snapshot.sequence,
-    snapshotId: snapshot.snapshotId ?? null,
-    entityCount: Array.isArray(snapshot.entities) ? snapshot.entities.length : 0,
-  }));
-  render();
-  return { ok: true };
+  const result = model.acceptSnapshot(snapshot);
+  if (result.ok) render();
+  return result;
 }
 
 function acceptDelta(packet) {
-  if (!packet?.partition || !Array.isArray(packet.changes)) return { ok: false, reason: 'INVALID_DELTA' };
-  snapshots.set(packet.partition, Object.freeze({
-    partition: packet.partition,
-    tick: packet.tick,
-    sequence: packet.sequence,
-    snapshotId: snapshots.get(packet.partition)?.snapshotId ?? null,
-    entityCount: snapshots.get(packet.partition)?.entityCount ?? null,
-  }));
-  for (const change of [...packet.changes].reverse()) recentChanges.unshift(Object.freeze({ ...change }));
-  if (recentChanges.length > MAX_CHANGES) recentChanges.length = MAX_CHANGES;
-  render();
-  return { ok: true };
+  const result = model.acceptDelta(packet);
+  if (result.ok) render();
+  return result;
 }
 
 function attachDashboard(value) {
@@ -175,5 +144,5 @@ export const PirateObservatoryDebugPanel = Object.freeze({
   acceptSnapshot,
   acceptDelta,
   render,
-  recentChanges: () => [...recentChanges],
+  recentChanges: () => model.recentChanges(),
 });
