@@ -40,11 +40,11 @@ assert.match(gate, /message\.capability !== frame\.dataset\.studioCapability/,
 
 const guardInstall = child.indexOf('installPirateLocalPlayerVisibilityGuard(pirateFruitThree)');
 const bridgeInstall = child.indexOf('hookPirateFruitRenderer(pirateFruitThree)');
-const readyPost = child.indexOf('PIRATE_STUDIO_CHARACTER_READY');
+const readyPost = child.indexOf('postMessage({ type: PIRATE_STUDIO_CHARACTER_READY');
 assert.ok(guardInstall >= 0 && bridgeInstall > guardInstall,
   'legacy-player guard must arm before the Pirate renderer bridge');
-assert.ok(readyPost >= 0 && guardInstall < readyPost,
-  'child must not advertise readiness before the legacy-player guard is armed');
+assert.ok(readyPost > bridgeInstall,
+  'child must not advertise readiness before both the visibility guard and renderer bridge are armed');
 assert.match(childHtml, /pocket-presentation\.mjs\?v=30/,
   'Pirate child cache-busts the nonblocking presentation bootstrap');
 
