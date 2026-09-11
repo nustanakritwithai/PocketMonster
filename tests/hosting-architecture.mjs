@@ -36,22 +36,29 @@ const output = fs.mkdtempSync(path.join(os.tmpdir(), 'pocketmonster-launcher-'))
 try {
   buildFirebaseLauncher({ root: path.resolve('.'), output });
   const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
-  assert.match(html, /firebase-launcher-entry\.mjs/, 'Firebase remains the V8.4 login and launch-ticket entry');
-  assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v800\.css/);
-  assert.match(html, /https:\/\/nustanakritwithai\.github\.io\/PocketMonster\/style-v900\.css/);
-  assert.doesNotMatch(html, /entry-preload-v900\.mjs/, 'Firebase launcher must redirect into the GitHub V9 entry instead of booting V9 locally');
-  assert.doesNotMatch(html, /combat-v91\.css/,
-    'Firebase login/redirect launcher must not request the Pages-only Combat stylesheet');
+  const css = fs.readFileSync(path.join(output, 'firebase-launcher.css'), 'utf8');
+  assert.match(html, /firebase-launcher-entry\.mjs/, 'Firebase remains the login and launch-ticket entry');
+  assert.match(html, /firebase-launcher\.css/, 'Firebase launcher uses its own neutral boot stylesheet');
+  assert.match(html, /id="accountGate" class="account-gate hidden"/,
+    'auth gate starts hidden so returning users never see an intermediate screen before redirect');
+  assert.match(css, /\.hidden\{display:none!important\}/, 'launcher CSS must hide the auth gate until Firebase reports no session');
+  assert.doesNotMatch(html, /entry-preload-v900\.mjs/, 'Firebase launcher must redirect into the game entry instead of booting the game locally');
+  assert.doesNotMatch(html, /style-v800\.css|style-v900\.css|combat-v91\.css/,
+    'Firebase launcher must not render any old or game-version presentation styles');
+  assert.doesNotMatch(html, /id="game"|id="versionBadge"|V9\.0|3 โลก/,
+    'Firebase launcher must not expose the old game/version shell before the target release');
   assert.equal(fs.existsSync(path.join(output, 'combat-v91.css')), false,
     'Firebase launcher must not copy a dormant Combat client asset');
+  assert.equal(fs.existsSync(path.join(output, 'entry-preload-v900.mjs')), false,
+    'Firebase launcher must not copy the game runtime entry');
+  assert.equal(fs.existsSync(path.join(output, 'firebase-launcher.css')), true);
   assert.equal(fs.existsSync(path.join(output, 'firebase-launcher-entry.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'firebase-auth-ui.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'server-auth.mjs')), true);
   assert.equal(fs.existsSync(path.join(output, 'runtime-config.json')), true);
   const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
-  assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'Firebase live launcher cannot boot a legacy local game');
+  assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'Firebase live launcher must issue a launch ticket before redirect');
   for (const flag of ['vpsWrites', 'playerDataWrites', 'firebaseFallback']) assert.equal(runtimeConfig.featureFlags[flag], false);
-  assert.equal(fs.existsSync(path.join(output, 'entry-preload-v900.mjs')), false);
   assert.match(html, /form-action 'self'/, 'launcher forms must be handled on the same origin');
   assert.match(html, new RegExp(`connect-src[^;]*${new URL(runtimeConfig.apiBaseUrl).origin.replaceAll('.', '\\.')}`), 'launcher CSP must allow its configured API origin');
 } finally {
