@@ -1,1 +1,0 @@
-Temporary hotfix note: restore exact tree from merge 66cee04846b5869dbc299dcd3fc44aeb13a9b4a5, the last user-confirmed working Blue Explorer pre-ground snapshot. Loader/first-paint experiments from PRs #575-#579 are intentionally removed. Remove this note after the hotfix is merged if desired.
