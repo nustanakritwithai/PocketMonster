@@ -53,7 +53,7 @@ export class PirateObservatoryDebugModel {
       snapshotId: previous?.snapshotId ?? null,
       entityCount: previous?.entityCount ?? null,
     }));
-    for (const change of [...packet.changes].reverse()) {
+    for (const change of packet.changes) {
       if (!change || !validCursor(change.tick) || !validCursor(change.sequence)) continue;
       this.changes.unshift(Object.freeze({ partition: packet.partition, ...change }));
     }
