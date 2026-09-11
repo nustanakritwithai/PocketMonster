@@ -6,7 +6,6 @@ import {
 import { applyPendingPatch } from './patch-updater.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
 import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=2';
-import { installReleaseBoundSceneFrames } from './scene-release-cache-v1.mjs?v=1';
 import {
   healthVersionGate,
   publishServerGateTelemetry,
@@ -46,18 +45,4 @@ document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
 installPersistentMinimapOwner({ windowLike: window, documentLike: document });
-installReleaseBoundSceneFrames({ release: config.deployedRelease, windowLike: window });
-try {
-  await import('./online-world-shell-v900.mjs?v=65');
-  document.documentElement.dataset.releaseBoot = 'ready';
-  document.documentElement.hidden = false;
-} catch (error) {
-  const status = document.createElement('div');
-  status.id = 'startupStatus';
-  status.className = 'startup-status error';
-  status.textContent = `เปิดเกมไม่สำเร็จ: ${error?.message || error}`;
-  document.body.replaceChildren(status);
-  document.documentElement.dataset.releaseBoot = 'error';
-  document.documentElement.hidden = false;
-  throw error;
-}
+await import('./online-world-shell-v900.mjs?v=65');

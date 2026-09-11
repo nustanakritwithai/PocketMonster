@@ -11,15 +11,9 @@ on:
       - 'unified-mobile-controls-v900.mjs'
       - 'online-world-shell-v900.mjs'
       - 'pirate-fruit-offline/**'
-      - 'asset-presentation/**'
-      - 'pirate-studio-reveal-gate-v1.css'
-      - 'pirate-studio-reveal-gate-v1.mjs'
-      - 'scene-v900.html'
-      - 'scripts/bind-pages-release.mjs'
       - 'patch-manifest.json'
       - 'tests/*monster*control*.mjs'
       - 'tests/monster-command-adapter.mjs'
-      - 'tests/v90-unified-pages-artifact.mjs'
       - '.github/workflows/monster-controls-ci.yml'
   workflow_dispatch:
 
@@ -38,7 +32,6 @@ jobs:
       - name: สร้างแพตช์รวมบน runner
         run: |
           node scripts/build-github-pages.mjs --write-root-manifest
-          node scripts/bind-pages-release.mjs
           node tests/v91-combat-artifact.mjs
       - name: ตรวจคำสั่งมอนสเตอร์
         run: node tests/monster-command-adapter.mjs
@@ -56,9 +49,7 @@ jobs:
       - name: ตรวจระบบ Client ที่เกี่ยวข้อง
         run: npm run check
       - name: ตรวจ artifact ทุกโลก
-        run: |
-          node tests/v90-unified-pages-artifact.mjs
-          node tests/v90-release-bound-pages.mjs
+        run: node tests/v90-unified-pages-artifact.mjs
       - name: เก็บแพตช์สำหรับตรวจและติดตั้ง
         uses: actions/upload-artifact@v4
         with:
