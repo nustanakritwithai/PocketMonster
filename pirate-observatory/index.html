@@ -66,7 +66,7 @@
             <h1>Canonical Investigation Context</h1>
             <p>Inspect accepted live evidence and query detached persisted history. Historical snapshots never replace the live cursor or mutate world state.</p>
           </div>
-          <span class="debug-badge">REPLAY NOT ENABLED</span>
+          <span class="debug-badge">SIMULATION REPLAY NOT ENABLED</span>
         </div>
 
         <div class="debug-summary">
@@ -104,6 +104,21 @@
             <button id="debugHistoryRefresh" type="button">REFRESH</button>
             <button id="debugHistoryLoad" type="button">LOAD SEQUENCE</button>
           </div>
+
+          <div class="playback-bar" aria-label="Evidence Playback controls">
+            <div class="playback-label">
+              <span>EVIDENCE PLAYBACK</span>
+              <strong id="debugPlaybackState" data-state="idle">IDLE</strong>
+              <small id="debugPlaybackRange">NO RETAINED RANGE</small>
+            </div>
+            <div class="playback-controls">
+              <button id="debugPlaybackPrev" type="button" disabled>◀ PREV</button>
+              <button id="debugPlaybackPlay" type="button" disabled>▶ PLAY</button>
+              <button id="debugPlaybackPause" type="button" disabled>Ⅱ PAUSE</button>
+              <button id="debugPlaybackNext" type="button" disabled>NEXT ▶</button>
+            </div>
+          </div>
+
           <div class="history-summary">
             <article><span>Historical tick</span><strong id="debugHistoryTick">—</strong></article>
             <article><span>Loaded sequence</span><strong id="debugHistoryLoadedSequence">—</strong></article>
@@ -114,7 +129,7 @@
           </div>
         </section>
 
-        <div class="debug-guardrail"><strong>History guardrail:</strong> persisted snapshots are detached evidence only. They never enter LIVE PartitionSync or replace the world map cursor. Replay remains disabled until the deterministic replay engine is implemented and verified.</div>
+        <div class="debug-guardrail"><strong>Playback guardrail:</strong> Evidence Playback only steps through reconstructed historical sequence snapshots. It does not re-run WorldSim, commands, RNG, AI decisions or physics; historical snapshots never enter LIVE PartitionSync or replace the world map cursor.</div>
       </div>
     </section>
 
