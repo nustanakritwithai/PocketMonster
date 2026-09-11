@@ -1,8 +1,10 @@
 import { PirateObservatoryDashboard } from './dashboard.mjs';
+import { PirateObservatoryServerPanel } from './server-panel.mjs';
 import { PirateObservatoryRestTransport } from './transport.mjs';
 import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { PirateObservatoryHybridSession } from './hybrid-session.mjs';
 import { PirateObservatoryInterestSession } from './interest-session.mjs';
+import { PirateObservatoryHealthSession } from './health-session.mjs';
 import { resolvePirateObservatoryRuntimeContext } from './runtime-context.mjs';
 import { SYNC_STATES } from './protocol.mjs';
 
@@ -12,6 +14,9 @@ let activeInterestSession = null;
 let activeViewportUnsubscribe = null;
 let activeInterestPartition = null;
 let activeInterestPollMs = 750;
+let activeHealthSession = null;
+let activeHealthPartition = null;
+let activeHealthPollMs = 3000;
 
 function stopInterestSession() {
   activeViewportUnsubscribe?.();
@@ -19,6 +24,41 @@ function stopInterestSession() {
   activeInterestSession?.stop?.();
   activeInterestSession = null;
   activeInterestPartition = null;
+}
+
+function stopHealthSession() {
+  activeHealthSession?.stop?.();
+  activeHealthSession = null;
+  activeHealthPartition = null;
+}
+
+function ensureHealthSession(transport, partition) {
+  if (!transport?.getHealth) return;
+  if (activeHealthSession?.transport === transport && activeHealthPartition === partition) return;
+
+  stopHealthSession();
+  const session = new PirateObservatoryHealthSession({
+    transport,
+    partition,
+    pollMs: activeHealthPollMs,
+    onHealth: health => {
+      PirateObservatoryServerPanel.acceptHealth(health, { source: 'rest-health' });
+      PirateObservatoryDashboard.setServerStatus({
+        connected: true,
+        tick: health.lastObservedTick >= 0 ? health.lastObservedTick : null,
+        reason: health.code ?? null,
+        waitingForAuthority: health.ready === false,
+      });
+    },
+    onError: error => {
+      if (error?.status === 401 || error?.status === 403) {
+        PirateObservatoryServerPanel.clear('AUTH EXPIRED');
+      }
+    },
+  });
+  activeHealthSession = session;
+  activeHealthPartition = partition;
+  session.start({ immediate: true });
 }
 
 function ensureInterestSession(transport, partition) {
@@ -67,6 +107,7 @@ function applyDashboardState(partition, state, detail = {}) {
 
 function stopActiveSession() {
   stopInterestSession();
+  stopHealthSession();
   activeSession?.stop?.();
   activeSession = null;
   activeTransport = null;
@@ -80,12 +121,15 @@ export async function connectPirateObservatoryRest({
   pollMs = 500,
   notReadyPollMs = 3000,
   interestPollMs = 750,
+  healthPollMs = 3000,
   startPolling = true,
 } = {}) {
   stopActiveSession();
   activeInterestPollMs = interestPollMs;
+  activeHealthPollMs = healthPollMs;
   const transport = new PirateObservatoryRestTransport({ baseUrl, headers, fetchImpl });
   activeTransport = transport;
+  ensureHealthSession(transport, partition);
   const session = new PirateObservatoryRestSession({
     transport,
     partition,
@@ -99,7 +143,7 @@ export async function connectPirateObservatoryRest({
   activeSession = session;
   const result = await session.bootstrap();
   if (startPolling && (result.ok || result.serverReachable)) session.start();
-  return { ...result, transport, session };
+  return { ...result, transport, session, healthSession: activeHealthSession };
 }
 
 export async function connectPirateObservatoryHybrid({
@@ -112,9 +156,11 @@ export async function connectPirateObservatoryHybrid({
   pollMs = 500,
   notReadyPollMs = 3000,
   interestPollMs = 750,
+  healthPollMs = 3000,
 } = {}) {
   stopActiveSession();
   activeInterestPollMs = interestPollMs;
+  activeHealthPollMs = healthPollMs;
   const session = new PirateObservatoryHybridSession({
     baseUrl,
     token,
@@ -127,13 +173,16 @@ export async function connectPirateObservatoryHybrid({
     onSnapshot: snapshot => PirateObservatoryDashboard.acceptSnapshot(snapshot),
     onDelta: packet => PirateObservatoryDashboard.acceptDelta(packet),
     onEvent: (event, envelope) => PirateObservatoryDashboard.acceptEvent({ ...event, at: envelope?.serverTime ?? Date.now() }),
-    onServerHealth: (payload, envelope) => PirateObservatoryDashboard.setServerStatus({
-      connected: true,
-      tick: envelope?.tick,
-      reason: payload?.code ?? null,
-      waitingForAuthority: payload?.ready === false,
-      transport: 'websocket',
-    }),
+    onServerHealth: (payload, envelope) => {
+      PirateObservatoryServerPanel.acceptHealth(payload, { source: 'websocket' });
+      PirateObservatoryDashboard.setServerStatus({
+        connected: true,
+        tick: envelope?.tick,
+        reason: payload?.code ?? null,
+        waitingForAuthority: payload?.ready === false,
+        transport: 'websocket',
+      });
+    },
     onWorldHealth: payload => {
       if (Number.isFinite(payload?.issueCount)) PirateObservatoryDashboard.setServerStatus({ issues: payload.issueCount });
     },
@@ -148,8 +197,9 @@ export async function connectPirateObservatoryHybrid({
   });
   activeSession = session;
   activeTransport = session.transport;
+  ensureHealthSession(activeTransport, partition);
   const result = await session.start();
-  return { ...result, session };
+  return { ...result, session, healthSession: activeHealthSession };
 }
 
 export async function connectPirateObservatoryFromRuntime({
@@ -157,6 +207,7 @@ export async function connectPirateObservatoryFromRuntime({
   pollMs = 500,
   notReadyPollMs = 3000,
   interestPollMs = 750,
+  healthPollMs = 3000,
   preferWebSocket = true,
   startPolling = true,
   windowLike = globalThis.window,
@@ -175,6 +226,7 @@ export async function connectPirateObservatoryFromRuntime({
   });
   if (!context.ok) {
     stopActiveSession();
+    PirateObservatoryServerPanel.clear(context.reason ?? 'OFFLINE');
     PirateObservatoryDashboard.setServerStatus({ connected: false, issues: 0, reason: context.reason ?? null, waitingForAuthority: false });
     PirateObservatoryDashboard.markPartition(partition, SYNC_STATES.OFFLINE);
     return context;
@@ -191,6 +243,7 @@ export async function connectPirateObservatoryFromRuntime({
       pollMs,
       notReadyPollMs,
       interestPollMs,
+      healthPollMs,
     });
   }
 
@@ -202,12 +255,14 @@ export async function connectPirateObservatoryFromRuntime({
     pollMs,
     notReadyPollMs,
     interestPollMs,
+    healthPollMs,
     startPolling,
   });
 }
 
 export function disconnectPirateObservatory() {
   stopActiveSession();
+  PirateObservatoryServerPanel.clear('STOPPED');
 }
 
 if (typeof window !== 'undefined') {
