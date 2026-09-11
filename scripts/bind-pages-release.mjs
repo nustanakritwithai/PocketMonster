@@ -38,6 +38,21 @@ export function bindPagesRelease({
     fs.writeFileSync(file, html, 'utf8');
   }
 
+  // The Pirate child is mounted by a sandboxed iframe and historically used a
+  // static ?v= cache key. Bind its presentation bootstrap to this exact release
+  // so mobile browsers cannot reuse the pre-guard player presentation module.
+  const pirateEntryFile = path.join(output, 'pirate-fruit-offline/index.html');
+  let pirateHtml = fs.readFileSync(pirateEntryFile, 'utf8');
+  const pirateBefore = pirateHtml;
+  pirateHtml = pirateHtml.replace(
+    /src=(['"])\.\/pocket-presentation\.mjs(?:\?[^'"]*)?\1/,
+    `src="./pocket-presentation.mjs?release=${encoded}"`,
+  );
+  if (pirateHtml === pirateBefore || !pirateHtml.includes(`pocket-presentation.mjs?release=${encoded}`)) {
+    throw new Error('Pirate child presentation entry could not be bound to the deployed release');
+  }
+  fs.writeFileSync(pirateEntryFile, pirateHtml, 'utf8');
+
   const manifestFile = path.join(output, 'patch-manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
   if (!Array.isArray(manifest.files)) throw new Error('patch-manifest.json files are missing');

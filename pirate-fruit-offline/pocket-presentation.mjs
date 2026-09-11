@@ -4,6 +4,7 @@ import {
   receivePirateStudioCharacterPackage,
   subscribePirateStudioCharacterStatus,
 } from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=5';
+import { installPirateLocalPlayerVisibilityGuard } from '../asset-presentation/pirate-local-player-visibility-v1.mjs?v=1';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
   PIRATE_STUDIO_CHARACTER_FAILED,
@@ -83,6 +84,10 @@ window.addEventListener('message', event => {
   document.documentElement.dataset.controlPanel = message.panel;
 });
 
+// Arm before the vendored Pirate bootstrap executes. The world may render
+// immediately, but the old local player can never become the first visible
+// character while Blue Explorer is still loading.
+window.POCKETMONSTER_BLUE_VISIBILITY_GUARD = installPirateLocalPlayerVisibilityGuard(pirateFruitThree);
 hookPirateFruitRenderer(pirateFruitThree);
 if (studioCapability) {
   window.parent?.postMessage({ type: PIRATE_STUDIO_CHARACTER_READY, capability: studioCapability }, parentOrigin);
