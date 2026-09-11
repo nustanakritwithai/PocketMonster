@@ -24,9 +24,16 @@ export function bindPagesRelease({
       /src=(['"])\.\/entry-preload-v900\.mjs(?:\?[^'"]*)?\1/,
       `src="./entry-preload-v900.mjs?release=${encoded}"`,
     );
+    html = html.replace(/<html\b([^>]*)>/i, (match, attrs) => {
+      if (/\bhidden\b/i.test(attrs)) return match;
+      return `<html${attrs} hidden data-release-boot="waiting">`;
+    });
     if (html === before) throw new Error(`${entry} did not contain the active entry-preload-v900 module`);
     if (!html.includes(`entry-preload-v900.mjs?release=${encoded}`)) {
       throw new Error(`${entry} is not bound to release ${release}`);
+    }
+    if (!/<html\b[^>]*\bhidden\b[^>]*data-release-boot="waiting"/i.test(html)) {
+      throw new Error(`${entry} does not suppress the legacy top-level first paint`);
     }
     fs.writeFileSync(file, html, 'utf8');
   }
