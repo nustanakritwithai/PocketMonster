@@ -14,6 +14,7 @@ on:
       - 'tests/v90-pirate-observatory-status-transport.mjs'
       - 'tests/v90-pirate-observatory-websocket-session.mjs'
       - 'tests/v90-pirate-observatory-hybrid-session.mjs'
+      - 'tests/v90-pirate-observatory-map-interest.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
   pull_request:
@@ -27,6 +28,7 @@ on:
       - 'tests/v90-pirate-observatory-status-transport.mjs'
       - 'tests/v90-pirate-observatory-websocket-session.mjs'
       - 'tests/v90-pirate-observatory-hybrid-session.mjs'
+      - 'tests/v90-pirate-observatory-map-interest.mjs'
       - 'pirate-fruit-island-map-v900.mjs'
       - '.github/workflows/pirate-observatory-p0.yml'
 
@@ -49,6 +51,8 @@ jobs:
           node --check pirate-observatory/runtime-context.mjs
           node --check pirate-observatory/websocket-session.mjs
           node --check pirate-observatory/hybrid-session.mjs
+          node --check pirate-observatory/map-interest.mjs
+          node --check pirate-observatory/interest-session.mjs
           node --check pirate-observatory/dashboard.mjs
           node --check pirate-observatory/bootstrap.mjs
       - name: Observatory client regression
@@ -61,3 +65,4 @@ jobs:
           node tests/v90-pirate-observatory-status-transport.mjs
           node tests/v90-pirate-observatory-websocket-session.mjs
           node tests/v90-pirate-observatory-hybrid-session.mjs
+          node tests/v90-pirate-observatory-map-interest.mjs
