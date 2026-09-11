@@ -11,9 +11,11 @@ on:
       - 'unified-mobile-controls-v900.mjs'
       - 'online-world-shell-v900.mjs'
       - 'pirate-fruit-offline/**'
+      - 'scripts/build-github-pages.mjs'
       - 'patch-manifest.json'
       - 'tests/*monster*control*.mjs'
       - 'tests/monster-command-adapter.mjs'
+      - 'tests/v91-combat-artifact.mjs'
       - '.github/workflows/monster-controls-ci.yml'
   workflow_dispatch:
 
