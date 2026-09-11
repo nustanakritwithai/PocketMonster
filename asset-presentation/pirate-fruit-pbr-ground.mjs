@@ -1,17 +1,27 @@
-export const PIRATE_FRUIT_PBR_GROUND_SCHEMA = 'pocketmonster.pirate-fruit-pbr-ground.v1';
+export const PIRATE_FRUIT_PBR_GROUND_SCHEMA = 'pocketmonster.pirate-fruit-pbr-ground.v2';
 export const PIRATE_FRUIT_PBR_GROUND_PACK = '../assets/world-ground/material-pack-v1.json';
 
 const REPEAT_WRAPPING = 1000;
 const LINEAR_FILTER = 1006;
 const LINEAR_MIPMAP_LINEAR_FILTER = 1008;
+const TERRAIN_REPEAT = 34;
+const TERRAIN_LAYERS = Object.freeze({ sand: 'sand', grass: 'grass', rock: 'rock' });
+
+function profile() {
+  return Object.freeze({
+    mode: 'preserve-native-splat',
+    layers: TERRAIN_LAYERS,
+    repeat: TERRAIN_REPEAT,
+  });
+}
 
 export const PIRATE_FRUIT_TERRAIN_PBR = Object.freeze({
-  'STARTER-ISLAND': Object.freeze({ material: 'grass', tint: 0xffffff, fallback: 0x557a32, repeat: 18 }),
-  'MIST-JUNGLE': Object.freeze({ material: 'forest-floor', tint: 0xe9f2dc, fallback: 0x365126, repeat: 15 }),
-  'SUNSCAR-DESERT': Object.freeze({ material: 'sand', tint: 0xfff0ce, fallback: 0xb99862, repeat: 17 }),
-  'AZURE-FROST': Object.freeze({ material: 'rock', tint: 0xd7e7ef, fallback: 0x9eafb8, repeat: 13 }),
-  'TEMPEST-SKY': Object.freeze({ material: 'rock', tint: 0xbec8d2, fallback: 0x697783, repeat: 14 }),
-  'EMBER-VOLCANO': Object.freeze({ material: 'burned', tint: 0x7d5a50, fallback: 0x472d29, repeat: 15 }),
+  'STARTER-ISLAND': profile(),
+  'MIST-JUNGLE': profile(),
+  'SUNSCAR-DESERT': profile(),
+  'AZURE-FROST': profile(),
+  'TEMPEST-SKY': profile(),
+  'EMBER-VOLCANO': profile(),
 });
 
 function terrainKey(mesh) {
@@ -25,15 +35,7 @@ export function pirateFruitTerrainPbrProfile(meshOrName) {
   return PIRATE_FRUIT_TERRAIN_PBR[key] || PIRATE_FRUIT_TERRAIN_PBR['STARTER-ISLAND'];
 }
 
-function ensureAoUvAliases(geometry) {
-  const uv = geometry?.attributes?.uv;
-  if (!uv || typeof geometry?.setAttribute !== 'function') return false;
-  if (!geometry.attributes.uv1) geometry.setAttribute('uv1', uv);
-  if (!geometry.attributes.uv2) geometry.setAttribute('uv2', uv);
-  return true;
-}
-
-function configureTexture(texture, { srgb = false, repeat = 16, anisotropy = 1 } = {}) {
+function configureTexture(texture, { srgb = false, repeat = TERRAIN_REPEAT, anisotropy = 1 } = {}) {
   texture.wrapS = REPEAT_WRAPPING;
   texture.wrapT = REPEAT_WRAPPING;
   texture.repeat?.set?.(repeat, repeat);
@@ -62,8 +64,79 @@ function textureFromImage(THREE, image, options) {
   return configureTexture(new THREE.CanvasTexture(image), options);
 }
 
-function profileCacheKey(profile, hasAo) {
-  return `${profile.material}:${profile.tint}:${profile.repeat}:${hasAo ? 'ao' : 'noao'}`;
+function preserveTerrainForGroundPresentation(mesh) {
+  if (!mesh?.userData) mesh.userData = {};
+  // Shared marker with the legacy presentation bridge. Marking the real terrain
+  // before that bridge runs prevents paintTerrain() from replacing the native
+  // sand/grass/rock splat shader with a single four-side grid material.
+  mesh.userData.pocketTerrain = true;
+  mesh.userData.worldsimPbrGround = 'loading';
+  mesh.userData.surfaceStyle = 'pirate-native-splat-worldsim-pbr-v2';
+  mesh.userData.surfaceBlend = 'sand-grass-rock';
+  mesh.userData.presentationOnly = true;
+  mesh.userData.simulationAuthority = false;
+}
+
+function wrapNativeSplatShader(material, textures) {
+  const previousCompile = typeof material.onBeforeCompile === 'function'
+    ? material.onBeforeCompile
+    : () => {};
+  const previousCacheKey = typeof material.customProgramCacheKey === 'function'
+    ? material.customProgramCacheKey.bind(material)
+    : () => '';
+
+  // Keep the material object and shader callback from the real Pirate client.
+  // Only the grass base inputs and the sand/rock uniforms are replaced.
+  material.map = textures.grass.albedo;
+  material.normalMap = textures.grass.normal;
+  material.normalScale?.set?.(0.72, 0.72);
+  material.color?.set?.(0xffffff);
+  material.userData = {
+    ...(material.userData || {}),
+    presentationOnly: true,
+    simulationAuthority: false,
+    materialLibrary: 'worldsim-pbr-v1',
+    surfaceStyle: 'pirate-native-splat-worldsim-pbr-v2',
+    preservedNativeSplat: true,
+  };
+
+  material.onBeforeCompile = function onBeforeCompile(shader, renderer) {
+    previousCompile.call(this, shader, renderer);
+
+    // The real Pirate Fruit shader owns vSplat, terrain height, slope mixing and
+    // wetShore. Replace the image inputs only.
+    if (shader.uniforms?.uSandMap) shader.uniforms.uSandMap.value = textures.sand.albedo;
+    if (shader.uniforms?.uRockMap) shader.uniforms.uRockMap.value = textures.rock.albedo;
+    if (shader.uniforms?.uSandNormal) shader.uniforms.uSandNormal.value = textures.sand.normal;
+    if (shader.uniforms?.uRockNormal) shader.uniforms.uRockNormal.value = textures.rock.normal;
+
+    // Roughness is upgraded only when the expected native shader signature is
+    // present. If a future Pirate renderer changes that signature, the original
+    // roughness/wet-shore code remains untouched rather than risking shader failure.
+    const roughnessDeclaration = 'uniform sampler2D uRockNormal;\n';
+    const roughnessSignature = 'float terrainRoughness = dot( vSplat, vec3( 1.0, 0.95, 0.82 ) );';
+    if (typeof shader.fragmentShader === 'string'
+      && shader.fragmentShader.includes(roughnessDeclaration)
+      && shader.fragmentShader.includes(roughnessSignature)) {
+      shader.uniforms.uSandRoughness = { value: textures.sand.roughness };
+      shader.uniforms.uGrassRoughness = { value: textures.grass.roughness };
+      shader.uniforms.uRockRoughness = { value: textures.rock.roughness };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          roughnessDeclaration,
+          `${roughnessDeclaration}uniform sampler2D uSandRoughness;\nuniform sampler2D uGrassRoughness;\nuniform sampler2D uRockRoughness;\n`,
+        )
+        .replace(
+          roughnessSignature,
+          `float terrainRoughness = texture2D( uSandRoughness, vMapUv ).r * vSplat.x
+            + texture2D( uGrassRoughness, vMapUv ).r * vSplat.y
+            + texture2D( uRockRoughness, vMapUv * 0.55 ).r * vSplat.z;`,
+        );
+    }
+  };
+  material.customProgramCacheKey = () => `${previousCacheKey()}:pirate-native-splat-worldsim-pbr-v2`;
+  material.needsUpdate = true;
+  return material;
 }
 
 export function createPirateFruitPbrGroundPresentation({
@@ -72,16 +145,17 @@ export function createPirateFruitPbrGroundPresentation({
   manifestUrl = new URL(PIRATE_FRUIT_PBR_GROUND_PACK, import.meta.url),
   maxAnisotropy = 1,
 } = {}) {
-  if (!THREE?.MeshStandardMaterial || !THREE?.CanvasTexture) {
-    throw new TypeError('Pirate Fruit PBR ground requires MeshStandardMaterial and CanvasTexture');
+  if (!THREE?.CanvasTexture) {
+    throw new TypeError('Pirate Fruit PBR ground requires CanvasTexture');
   }
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl is required');
 
   const textureCache = new Map();
-  const materialCache = new Map();
   let manifestPromise = null;
+  let terrainTexturesPromise = null;
   let scanned = 0;
   let upgraded = 0;
+  let preserved = 0;
   let fallback = 0;
   let failed = 0;
   let lastError = null;
@@ -103,96 +177,72 @@ export function createPirateFruitPbrGroundPresentation({
     return manifestPromise;
   }
 
-  async function sharedTexture(relativeUrl, options) {
+  async function sharedTexture(relativeUrl, { srgb = false } = {}) {
     const absolute = new URL(relativeUrl, manifestUrl).href;
-    const key = `${absolute}:${options.srgb ? 'srgb' : 'linear'}:${options.repeat}`;
+    const key = `${absolute}:${srgb ? 'srgb' : 'linear'}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, loadImage(absolute).then(image => textureFromImage(THREE, image, options)));
+      textureCache.set(key, loadImage(absolute).then(image => textureFromImage(THREE, image, {
+        srgb,
+        repeat: TERRAIN_REPEAT,
+        anisotropy: maxAnisotropy,
+      })));
     }
     return textureCache.get(key);
   }
 
-  async function pbrMaterial(profile, geometry) {
-    const hasAo = ensureAoUvAliases(geometry);
-    const key = profileCacheKey(profile, hasAo);
-    if (!materialCache.has(key)) {
-      materialCache.set(key, (async () => {
-        const pack = await manifest();
-        const entry = pack.materials?.[profile.material];
-        if (!entry?.albedo || !entry?.normal || !entry?.roughness) {
-          throw new Error(`Missing PBR material family: ${profile.material}`);
-        }
-        const textureOptions = { repeat: profile.repeat, anisotropy: maxAnisotropy };
-        const [map, normalMap, roughnessMap, aoMap] = await Promise.all([
-          sharedTexture(entry.albedo, { ...textureOptions, srgb: true }),
-          sharedTexture(entry.normal, { ...textureOptions, srgb: false }),
-          sharedTexture(entry.roughness, { ...textureOptions, srgb: false }),
-          hasAo && entry.ao ? sharedTexture(entry.ao, { ...textureOptions, srgb: false }) : Promise.resolve(null),
-        ]);
-        const material = new THREE.MeshStandardMaterial({
-          color: profile.tint,
-          map,
-          normalMap,
-          roughnessMap,
-          aoMap,
-          roughness: 0.92,
-          metalness: 0,
-        });
-        material.name = `pirate-ground:worldsim-pbr:${profile.material}`;
-        material.normalScale?.set?.(0.8, 0.8);
-        material.userData = {
-          ...(material.userData || {}),
-          presentationOnly: true,
-          materialLibrary: 'worldsim-pbr-v1',
-          simulationAuthority: false,
-        };
-        return material;
-      })());
+  async function loadFamily(pack, family) {
+    const entry = pack.materials?.[family];
+    if (!entry?.albedo || !entry?.normal || !entry?.roughness) {
+      throw new Error(`Missing PBR material family: ${family}`);
     }
-    return materialCache.get(key);
+    const [albedo, normal, roughness] = await Promise.all([
+      sharedTexture(entry.albedo, { srgb: true }),
+      sharedTexture(entry.normal),
+      sharedTexture(entry.roughness),
+    ]);
+    return Object.freeze({ albedo, normal, roughness });
   }
 
-  function flatFallback(profile) {
-    const key = `fallback:${profile.material}:${profile.fallback}`;
-    if (!materialCache.has(key)) {
-      const material = new THREE.MeshStandardMaterial({ color: profile.fallback, roughness: 0.94, metalness: 0 });
-      material.name = `pirate-ground:fallback:${profile.material}`;
-      material.userData = {
-        ...(material.userData || {}),
-        presentationOnly: true,
-        materialLibrary: 'worldsim-pbr-v1',
-        simulationAuthority: false,
-      };
-      materialCache.set(key, Promise.resolve(material));
+  async function terrainTextures() {
+    if (!terrainTexturesPromise) {
+      terrainTexturesPromise = manifest().then(async pack => {
+        const [sand, grass, rock] = await Promise.all([
+          loadFamily(pack, TERRAIN_LAYERS.sand),
+          loadFamily(pack, TERRAIN_LAYERS.grass),
+          loadFamily(pack, TERRAIN_LAYERS.rock),
+        ]);
+        return Object.freeze({ sand, grass, rock });
+      });
     }
-    return materialCache.get(key);
+    return terrainTexturesPromise;
   }
 
   function scheduleUpgrade(mesh) {
     if (!mesh?.isMesh || !String(mesh.name || '').startsWith('PF_TERRAIN_')) return false;
     if (mesh.userData?.worldsimPbrGround) return false;
     scanned += 1;
-    const profile = pirateFruitTerrainPbrProfile(mesh);
-    mesh.userData.worldsimPbrGround = 'loading';
-    mesh.userData.surfaceStyle = 'worldsim-pbr-v1';
-    mesh.userData.surfaceMaterialFamily = profile.material;
-    mesh.userData.presentationOnly = true;
-    // Remove the visibly blocky grid immediately. This material is replaced
-    // asynchronously by the local PBR pack; geometry/collision stays untouched.
-    void flatFallback(profile).then(material => {
-      if (mesh.userData.worldsimPbrGround === 'loading') mesh.material = material;
-    });
-    void pbrMaterial(profile, mesh.geometry).then(material => {
-      mesh.material = material;
+    const originalMaterial = mesh.material;
+    preserveTerrainForGroundPresentation(mesh);
+    preserved += 1;
+
+    void terrainTextures().then(textures => {
+      if (!originalMaterial || Array.isArray(originalMaterial)) {
+        throw new Error(`Pirate terrain ${mesh.name || 'unknown'} has no preservable material`);
+      }
+      // Preserve the exact material object and onBeforeCompile callback. Geometry,
+      // splat weights, water height, wet shoreline and collision stay native.
+      if (mesh.material !== originalMaterial) mesh.material = originalMaterial;
+      wrapNativeSplatShader(originalMaterial, textures);
       mesh.receiveShadow = true;
       mesh.userData.worldsimPbrGround = 'ready';
       upgraded += 1;
     }).catch(error => {
-      mesh.userData.worldsimPbrGround = 'fallback';
+      // Never install a flat fallback. The real Pirate shader is the safe fallback.
+      if (mesh.material !== originalMaterial) mesh.material = originalMaterial;
+      mesh.userData.worldsimPbrGround = 'fallback-native';
       fallback += 1;
       failed += 1;
       lastError = String(error?.message || error);
-      void flatFallback(profile).then(material => { mesh.material = material; });
     });
     return true;
   }
@@ -207,15 +257,23 @@ export function createPirateFruitPbrGroundPresentation({
   return Object.freeze({
     schema: PIRATE_FRUIT_PBR_GROUND_SCHEMA,
     scan,
+    upgrade: scheduleUpgrade,
     diagnostics() {
       return Object.freeze({
         schema: PIRATE_FRUIT_PBR_GROUND_SCHEMA,
         scanned,
+        preserved,
         upgraded,
         fallback,
         failed,
         lastError,
-        materialFamilies: materialCache.size,
+        surfaceBlend: 'sand-grass-rock',
+        preservesNativeSplat: true,
+        preservesWetShore: true,
+        waterChanged: false,
+        dockChanged: false,
+        geometryChanged: false,
+        collisionChanged: false,
         textures: textureCache.size,
         presentationOnly: true,
         simulationAuthority: false,
@@ -225,50 +283,58 @@ export function createPirateFruitPbrGroundPresentation({
 }
 
 export function hookPirateFruitPbrGround({ THREE } = {}) {
-  if (!THREE?.Object3D?.prototype?.updateMatrixWorld) throw new TypeError('Pirate Fruit vendor Object3D is required');
-  const current = THREE.Object3D.prototype.updateMatrixWorld;
-  if (current.__pocketPiratePbrGround) return current.__pocketPiratePbrGround;
-  let presentation = null;
-  let pending = null;
+  if (!THREE?.Object3D?.prototype?.updateMatrixWorld || !THREE?.Object3D?.prototype?.add) {
+    throw new TypeError('Pirate Fruit vendor Object3D is required');
+  }
+  const proto = THREE.Object3D.prototype;
+  const currentUpdate = proto.updateMatrixWorld;
+  const currentAdd = proto.add;
+  if (currentUpdate.__pocketPiratePbrGround) return currentUpdate.__pocketPiratePbrGround;
+
+  // Create synchronously: the hook must claim PF_TERRAIN_* before the older bridge
+  // can replace the real terrain shader.
+  const presentation = createPirateFruitPbrGroundPresentation({ THREE });
   let scanAt = 0;
 
-  function ensurePresentation() {
-    if (presentation || pending) return;
-    pending = Promise.resolve().then(() => createPirateFruitPbrGroundPresentation({ THREE })).then(value => {
-      presentation = value;
-      if (typeof window !== 'undefined') window.POCKETMONSTER_PIRATE_GROUND = presentation.diagnostics();
-    }).catch(error => {
-      pending = null;
-      console.warn('Pirate Fruit PBR ground presentation failed', error);
-    });
+  function add(...objects) {
+    for (const object of objects) {
+      if (object?.isMesh && String(object.name || '').startsWith('PF_TERRAIN_')) {
+        presentation.upgrade(object);
+      }
+    }
+    return currentAdd.apply(this, objects);
   }
 
   function updateMatrixWorld(force) {
-    const result = current.call(this, force);
     if (this?.isScene) {
-      ensurePresentation();
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      if (presentation && now >= scanAt) {
+      if (now >= scanAt) {
         presentation.scan(this);
         scanAt = now + 400;
         if (typeof window !== 'undefined') window.POCKETMONSTER_PIRATE_GROUND = presentation.diagnostics();
       }
     }
-    return result;
+    // Existing Pirate bridge runs after this scan. It sees pocketTerrain=true and
+    // therefore leaves the native sand/grass/rock shader untouched.
+    return currentUpdate.call(this, force);
   }
 
   const info = Object.freeze({
     hooked: true,
     schema: PIRATE_FRUIT_PBR_GROUND_SCHEMA,
-    hook: 'object3d-updateMatrixWorld-post-pirate-presentation',
+    hook: 'object3d-add+updateMatrixWorld-pre-pirate-terrain',
+    preservesNativeSplat: true,
+    preservesWetShore: true,
+    waterChanged: false,
+    dockChanged: false,
     presentationOnly: true,
     simulationAuthority: false,
   });
+  add.__pocketPiratePbrGroundAdd = info;
   updateMatrixWorld.__pocketPiratePbrGround = info;
-  // Preserve the original Pirate bridge idempotency marker because this wrapper
-  // deliberately sits on top of that hook rather than replacing it.
-  if (current.__pocketPirateBridge) updateMatrixWorld.__pocketPirateBridge = current.__pocketPirateBridge;
-  THREE.Object3D.prototype.updateMatrixWorld = updateMatrixWorld;
+  if (currentUpdate.__pocketPirateBridge) updateMatrixWorld.__pocketPirateBridge = currentUpdate.__pocketPirateBridge;
+  proto.add = add;
+  proto.updateMatrixWorld = updateMatrixWorld;
   if (typeof window !== 'undefined') window.POCKETMONSTER_PIRATE_GROUND_HOOK = info;
   return info;
 }

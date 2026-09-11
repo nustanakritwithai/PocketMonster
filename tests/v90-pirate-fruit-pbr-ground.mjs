@@ -9,7 +9,7 @@ import {
   pirateFruitTerrainPbrProfile,
 } from '../asset-presentation/pirate-fruit-pbr-ground.mjs';
 
-assert.equal(PIRATE_FRUIT_PBR_GROUND_SCHEMA, 'pocketmonster.pirate-fruit-pbr-ground.v1');
+assert.equal(PIRATE_FRUIT_PBR_GROUND_SCHEMA, 'pocketmonster.pirate-fruit-pbr-ground.v2');
 assert.equal(PIRATE_FRUIT_PBR_GROUND_PACK, '../assets/world-ground/material-pack-v1.json');
 assert.deepEqual(Object.keys(PIRATE_FRUIT_TERRAIN_PBR), [
   'STARTER-ISLAND',
@@ -19,19 +19,19 @@ assert.deepEqual(Object.keys(PIRATE_FRUIT_TERRAIN_PBR), [
   'TEMPEST-SKY',
   'EMBER-VOLCANO',
 ]);
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_STARTER-ISLAND').material, 'grass');
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_MIST-JUNGLE').material, 'forest-floor');
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_SUNSCAR-DESERT').material, 'sand');
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_AZURE-FROST').material, 'rock');
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_TEMPEST-SKY').material, 'rock');
-assert.equal(pirateFruitTerrainPbrProfile('PF_TERRAIN_EMBER-VOLCANO').material, 'burned');
+for (const id of Object.keys(PIRATE_FRUIT_TERRAIN_PBR)) {
+  const p = pirateFruitTerrainPbrProfile(`PF_TERRAIN_${id}`);
+  assert.equal(p.mode, 'preserve-native-splat');
+  assert.deepEqual(p.layers, { sand: 'sand', grass: 'grass', rock: 'rock' });
+  assert.equal(p.repeat, 34);
+}
 
 const pack = JSON.parse(fs.readFileSync(new URL('../assets/world-ground/material-pack-v1.json', import.meta.url), 'utf8'));
 assert.equal(pack.installed, true);
-for (const profile of Object.values(PIRATE_FRUIT_TERRAIN_PBR)) {
-  assert.ok(pack.materials[profile.material], `PBR family ${profile.material} exists in WorldSim material pack`);
+for (const family of ['sand', 'grass', 'rock']) {
+  assert.ok(pack.materials[family], `PBR family ${family} exists in WorldSim material pack`);
   for (const slot of ['albedo', 'normal', 'roughness']) {
-    assert.ok(pack.materials[profile.material][slot], `${profile.material}.${slot} exists`);
+    assert.ok(pack.materials[family][slot], `${family}.${slot} exists`);
   }
 }
 
@@ -40,6 +40,7 @@ const presentationSrc = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-
 const groundEntrySrc = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-ground-presentation.mjs', import.meta.url), 'utf8');
 const offlineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const legacyBridgeSrc = fs.readFileSync(new URL('../asset-presentation/pirate-fruit-client-bridge.mjs', import.meta.url), 'utf8');
+const combinedSrc = fs.readFileSync(new URL('../combined-worlds-v900.mjs', import.meta.url), 'utf8');
 
 for (const file of [
   'asset-presentation/pirate-fruit-pbr-ground.mjs',
@@ -50,27 +51,70 @@ for (const file of [
   assert.equal(result.status, 0, result.stderr || `${file} syntax failed`);
 }
 
-assert.match(legacyBridgeSrc, /surfaceStyle = 'four-side-block-v1'/, 'test proves the old repaint path still exists and therefore needs a post-overlay');
-assert.match(presentationSrc, /hookPirateFruitRenderer\(pirateFruitThree\);/, 'existing Pirate/Studio presentation remains unchanged');
-assert.doesNotMatch(presentationSrc, /hookPirateFruitPbrGround/, 'ground is isolated from the Studio presentation entry');
-assert.match(groundEntrySrc, /threeFromPirateFruitVendor/, 'PBR overlay shares the exact Pirate Fruit Three instance');
-assert.match(groundEntrySrc, /hookPirateFruitPbrGround\(\{ THREE: pirateFruitThreeKit \}\)/, 'isolated ground entry installs the post-overlay');
-assert.match(offlineHtml, /pocket-presentation\.mjs\?v=29/, 'existing immediate attack presentation cache contract stays intact');
-assert.match(offlineHtml, /pocket-ground-presentation\.mjs\?v=1/, 'offline iframe loads the new isolated PBR ground entry');
+// PR #570 restored the multi-island ocean client as the active Pirate world.
+assert.match(combinedSrc, /boot-pirate-fruit-v900\.mjs\?v=953/);
+assert.doesNotMatch(combinedSrc, /world-pirate-native-v900\.mjs\?v=1/);
+
+// The older bridge still contains the grid repaint path, so the PBR hook must
+// claim native terrain before that bridge runs instead of replacing it later.
+assert.match(legacyBridgeSrc, /function paintTerrain\(mesh\)/);
+assert.match(legacyBridgeSrc, /if \(mesh\.userData\.pocketTerrain\) return/);
+assert.match(legacyBridgeSrc, /surfaceStyle = 'four-side-block-v1'/);
+assert.match(pbrSrc, /mesh\.userData\.pocketTerrain = true/,
+  'PBR presentation claims the real terrain before the old grid painter');
+
+assert.match(presentationSrc, /hookPirateFruitRenderer\(pirateFruitThree\);/,
+  'existing Pirate/Studio presentation remains unchanged');
+assert.doesNotMatch(presentationSrc, /hookPirateFruitPbrGround/,
+  'ground remains isolated from the player presentation entry');
+assert.match(groundEntrySrc, /threeFromPirateFruitVendor/,
+  'PBR layer shares the exact Pirate Fruit Three instance');
+assert.match(groundEntrySrc, /pirate-fruit-pbr-ground\.mjs\?v=2/);
+assert.match(offlineHtml, /pocket-presentation\.mjs\?v=29/,
+  'existing player/attack presentation cache contract stays intact');
+assert.match(offlineHtml, /pocket-ground-presentation\.mjs\?v=2/,
+  'multi-island terrain loads the corrected PBR v2 entry');
 assert.ok(
-  offlineHtml.indexOf('pocket-presentation.mjs?v=29') < offlineHtml.indexOf('pocket-ground-presentation.mjs?v=1'),
-  'legacy Pirate presentation is installed before the PBR post-overlay',
+  offlineHtml.indexOf('pocket-presentation.mjs?v=29') < offlineHtml.indexOf('pocket-ground-presentation.mjs?v=2'),
+  'bridge installs first and the PBR hook wraps it as the outer pre-terrain hook',
 );
 
-assert.match(pbrSrc, /material-pack-v1\.json/, 'PBR overlay consumes the shared WorldSim material library');
-assert.match(pbrSrc, /normalMap/, 'PBR overlay assigns normal maps');
-assert.match(pbrSrc, /roughnessMap/, 'PBR overlay assigns roughness maps');
-assert.match(pbrSrc, /aoMap/, 'PBR overlay supports AO when UVs are available');
-assert.match(pbrSrc, /surfaceStyle = 'worldsim-pbr-v1'/, 'terrain is marked with the new visible surface style');
-assert.match(pbrSrc, /simulationAuthority: false/, 'Pirate semantic material mapping never pretends to be WorldSim truth');
-assert.match(pbrSrc, /presentationOnly: true/, 'PBR terrain overlay is presentation-only');
-assert.match(pbrSrc, /geometry\/collision stays untouched/, 'source documents geometry/collision preservation');
-assert.doesNotMatch(pbrSrc, /geometry\.setAttribute\(['"]position|position\.set\(/, 'PBR overlay never changes terrain positions');
-assert.doesNotMatch(pbrSrc, /fetchWorldMapFrame|\/world\/zones\//, 'Pirate island material mapping does not invent a live WorldSim zone mapping');
+assert.match(pbrSrc, /material-pack-v1\.json/);
+assert.match(pbrSrc, /mode: 'preserve-native-splat'/);
+assert.match(pbrSrc, /surfaceBlend = 'sand-grass-rock'|surfaceBlend: 'sand-grass-rock'/);
+assert.match(pbrSrc, /previousCompile\.call\(this, shader, renderer\)/,
+  'native Pirate onBeforeCompile shader is preserved');
+assert.match(pbrSrc, /shader\.uniforms\.uSandMap\.value = textures\.sand\.albedo/);
+assert.match(pbrSrc, /shader\.uniforms\.uRockMap\.value = textures\.rock\.albedo/);
+assert.match(pbrSrc, /shader\.uniforms\.uSandNormal\.value = textures\.sand\.normal/);
+assert.match(pbrSrc, /shader\.uniforms\.uRockNormal\.value = textures\.rock\.normal/);
+assert.match(pbrSrc, /uSandRoughness/);
+assert.match(pbrSrc, /uGrassRoughness/);
+assert.match(pbrSrc, /uRockRoughness/);
+assert.match(pbrSrc, /roughnessDeclaration/,
+  'roughness injection is guarded by the native shader declaration');
+assert.match(pbrSrc, /preservesNativeSplat: true/);
+assert.match(pbrSrc, /preservesWetShore: true/);
+assert.match(pbrSrc, /waterChanged: false/);
+assert.match(pbrSrc, /dockChanged: false/);
+assert.match(pbrSrc, /geometryChanged: false/);
+assert.match(pbrSrc, /collisionChanged: false/);
+assert.match(pbrSrc, /presentation\.scan\(this\)[\s\S]*return currentUpdate\.call\(this, force\)/,
+  'terrain is claimed before the legacy bridge update is invoked');
+assert.match(pbrSrc, /proto\.add = add/,
+  'streamed terrain is claimed immediately when it is added to the real scene');
+assert.match(pbrSrc, /presentation\.upgrade\(object\)/,
+  'new PF_TERRAIN meshes are upgraded before later scene scans');
 
-console.log('V9.0 Pirate Fruit WorldSim PBR ground: PASS');
+// Regression for the bug reported by the user: never replace the whole terrain
+// with a new flat/one-family material, and never install a flat fallback.
+assert.doesNotMatch(pbrSrc, /mesh\.material\s*=\s*new THREE\.MeshStandardMaterial/);
+assert.doesNotMatch(pbrSrc, /flatFallback|paintGroundGrid/);
+assert.match(pbrSrc, /mesh\.material !== originalMaterial\) mesh\.material = originalMaterial/,
+  'failure path restores the exact native terrain material');
+assert.doesNotMatch(pbrSrc, /geometry\.setAttribute\(['"]position|position\.set\(/,
+  'PBR layer never changes terrain geometry/position');
+assert.doesNotMatch(pbrSrc, /fetchWorldMapFrame|\/world\/zones\//,
+  'visual layer does not invent WorldSim authority for Pirate islands');
+
+console.log('V9.0 Pirate Fruit multi-island PBR splat preservation: PASS');
