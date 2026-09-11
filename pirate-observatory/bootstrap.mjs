@@ -50,9 +50,14 @@ function ensureHealthSession(transport, partition) {
         waitingForAuthority: health.ready === false,
       });
     },
+    onWorldHealth: worldHealth => {
+      PirateObservatoryServerPanel.acceptWorldHealth(worldHealth, { source: 'rest-health' });
+      PirateObservatoryDashboard.setServerStatus({ issues: worldHealth.issueCount });
+    },
     onError: error => {
       if (error?.status === 401 || error?.status === 403) {
         PirateObservatoryServerPanel.clear('AUTH EXPIRED');
+        PirateObservatoryDashboard.setServerStatus({ issues: 0 });
       }
     },
   });
@@ -93,7 +98,6 @@ function applyDashboardState(partition, state, detail = {}) {
   const connected = detail.serverReachable ?? state !== SYNC_STATES.OFFLINE;
   PirateObservatoryDashboard.setServerStatus({
     connected,
-    issues: state === SYNC_STATES.LIVE ? 0 : connected ? 1 : 0,
     tick: detail.tick,
     reason: detail.reason ?? null,
     waitingForAuthority: detail.waitingForAuthority === true || detail.mode === 'waiting-authority',
@@ -111,6 +115,7 @@ function stopActiveSession() {
   activeSession?.stop?.();
   activeSession = null;
   activeTransport = null;
+  PirateObservatoryDashboard.setServerStatus({ issues: 0 });
 }
 
 export async function connectPirateObservatoryRest({
@@ -184,6 +189,7 @@ export async function connectPirateObservatoryHybrid({
       });
     },
     onWorldHealth: payload => {
+      PirateObservatoryServerPanel.acceptWorldHealth(payload, { source: 'websocket' });
       if (Number.isFinite(payload?.issueCount)) PirateObservatoryDashboard.setServerStatus({ issues: payload.issueCount });
     },
     onAlert: (payload, envelope) => PirateObservatoryDashboard.acceptEvent({
