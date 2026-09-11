@@ -1,13 +1,7 @@
-function ownProto(value, name) {
-  try { return !!Object.getOwnPropertyDescriptor(value?.prototype || {}, name); } catch { return false; }
-}
-
-function findObject3D(vendor) {
-  for (const value of Object.values(vendor || {})) {
-    if (typeof value === 'function' && ownProto(value, 'updateMatrixWorld') && ownProto(value, 'traverse') && ownProto(value, 'add')) return value;
-  }
-  return null;
-}
+import {
+  hidePirateFruitOriginalMeshes,
+  threeFromPirateFruitVendor,
+} from './pirate-fruit-client-bridge.mjs?v=5';
 
 function isLocalPlayerHost(node) {
   return node?.name === 'player:pirate-v1' || node?.name === 'player:gameplay-root';
@@ -31,16 +25,17 @@ function localPlayerHost(node) {
   return null;
 }
 
-function hideLegacyTree(node) {
-  if (!node || belongsToStudio(node)) return;
-  if (node?.userData?.pocketVisual === true && node?.userData?.pocketKind === 'player'
-      && node?.userData?.pocketVisualSource !== 'studio-character') {
-    node.visible = false;
+function suppressLegacyLocalPlayer(host, object = null) {
+  if (!host) return;
+  host.userData ??= {};
+  host.userData.hideLegacyLocalPlayer = true;
+  // Reuse the existing Pirate bridge policy so sockets/equipment/effects that
+  // are intentionally preserved are not accidentally removed with the body.
+  hidePirateFruitOriginalMeshes(host);
+  if (object?.userData?.pocketVisual === true && object?.userData?.pocketKind === 'player'
+      && object?.userData?.pocketVisualSource !== 'studio-character') {
+    object.visible = false;
   }
-  node?.traverse?.(child => {
-    if (belongsToStudio(child)) return;
-    if (child?.isMesh) child.visible = false;
-  });
 }
 
 /**
@@ -50,7 +45,7 @@ function hideLegacyTree(node) {
  * the hidden fallback when its Studio package arrives.
  */
 export function installPirateLocalPlayerVisibilityGuard(vendor) {
-  const Object3D = findObject3D(vendor);
+  const Object3D = threeFromPirateFruitVendor(vendor).Object3D;
   if (!Object3D?.prototype?.add) throw new Error('Pirate Object3D.add is unavailable');
   const current = Object3D.prototype.add;
   if (current.__pocketBlueVisibilityGuard) return current.__pocketBlueVisibilityGuard;
@@ -59,17 +54,11 @@ export function installPirateLocalPlayerVisibilityGuard(vendor) {
     const result = current.apply(this, objects);
     for (const object of objects) {
       if (isLocalPlayerHost(object)) {
-        object.userData ??= {};
-        object.userData.hideLegacyLocalPlayer = true;
-        hideLegacyTree(object);
+        suppressLegacyLocalPlayer(object);
         continue;
       }
       const host = localPlayerHost(this) || localPlayerHost(object);
-      if (host && !belongsToStudio(object)) hideLegacyTree(object);
-      if (object?.userData?.pocketVisual === true && object?.userData?.pocketKind === 'player'
-          && object?.userData?.pocketVisualSource !== 'studio-character') {
-        object.visible = false;
-      }
+      if (host && !belongsToStudio(object)) suppressLegacyLocalPlayer(host, object);
     }
     return result;
   }
