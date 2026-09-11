@@ -6,6 +6,9 @@ on:
       - 'asset-presentation/**'
       - 'pirate-fruit-offline/pocket-presentation.mjs'
       - 'boot-pirate-fruit-v900.mjs'
+      - 'scene-v900.html'
+      - 'pirate-studio-reveal-gate-v1.css'
+      - 'pirate-studio-reveal-gate-v1.mjs'
       - 'tests/v91-studio-*.mjs'
       - 'tests/v91-studio-browser-acceptance.py'
       - 'tests/v91-studio-fighting-wrap-browser-report.py'
@@ -64,11 +67,12 @@ jobs:
           python .ci-studio-source/scripts/generate_textures.py --output .ci-studio-source/assets/textures --resolution 2048
           python .ci-studio-source/scripts/build_pages.py
           cd .ci-studio-source && node scripts/test_pocket_studio_texture_export.mjs
-      - name: State and material unit regressions
+      - name: State, material and first-paint regressions
         run: |
           node tests/v91-studio-motion-completion.mjs
           node tests/v91-studio-character-render-profile.mjs
           node tests/v91-studio-blue-explorer-primary.mjs
+          node tests/v91-studio-no-legacy-flash.mjs
       - name: Real Studio to sandboxed Pirate browser acceptance
         run: python tests/v91-studio-browser-acceptance.py
       - name: Verify Fighting Style wraps follow Studio hand sockets

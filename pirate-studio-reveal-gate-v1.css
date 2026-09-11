@@ -1,0 +1,15 @@
+#game {
+  background: #06121f;
+}
+
+#pirateFruitFrame {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html[data-pirate-studio-ready="true"] #pirateFruitFrame {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
