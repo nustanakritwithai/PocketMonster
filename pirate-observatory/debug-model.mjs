@@ -21,6 +21,11 @@ export class PirateObservatoryDebugModel {
     this.changes = [];
   }
 
+  clear() {
+    this.snapshots.clear();
+    this.changes.length = 0;
+  }
+
   acceptSnapshot(snapshot) {
     if (!snapshot?.partition || !validCursor(snapshot.tick) || !validCursor(snapshot.sequence)) {
       return { ok: false, reason: 'INVALID_SNAPSHOT' };
