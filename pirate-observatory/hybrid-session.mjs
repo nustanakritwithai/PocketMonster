@@ -1,7 +1,7 @@
 import { PirateObservatoryRestTransport } from './transport.mjs';
 import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { PirateObservatoryWebSocketSession } from './websocket-session.mjs';
-import { assertPartition } from './protocol.mjs';
+import { SYNC_STATES, assertPartition } from './protocol.mjs';
 
 /// <summary-like>
 /// Bootstrap/resync always uses canonical REST snapshots. When a WebSocket is
@@ -68,6 +68,10 @@ export class PirateObservatoryHybridSession {
         this.onTransport('websocket', { sequence: initial.sequence });
         return { ok: true, mode: 'websocket', sequence: initial.sequence };
       }
+      this.onState(SYNC_STATES.LIVE, {
+        transport: 'rest', partition: this.partition, sequence: this.rest.sequence, tick: this.rest.tick,
+        reason: upgraded.reason ?? 'WEBSOCKET_UNAVAILABLE', fallback: true,
+      });
     }
 
     if (initial.ok || initial.serverReachable) {
@@ -105,6 +109,9 @@ export class PirateObservatoryHybridSession {
       onResyncRequired: detail => { void this.#recoverFromSocket(detail); },
       onClose: detail => {
         if (this.stopped || detail.reason === 'CLIENT_CLOSED' || this.recovery) return;
+        this.onState(SYNC_STATES.CATCHING_UP, {
+          transport: 'rest', partition: this.partition, reason: detail.reason ?? 'SOCKET_CLOSED', fallback: true,
+        });
         this.rest.start();
         this.onTransport('rest', { reason: detail.reason ?? 'SOCKET_CLOSED', fallback: true });
       },
@@ -133,6 +140,10 @@ export class PirateObservatoryHybridSession {
         this.onTransport('websocket', { recovered: true, sequence: recovered.sequence });
         return { ok: true, mode: 'websocket', recovered: true };
       }
+      this.onState(SYNC_STATES.LIVE, {
+        transport: 'rest', partition: this.partition, sequence: this.rest.sequence, tick: this.rest.tick,
+        reason: upgraded.reason ?? 'WEBSOCKET_UNAVAILABLE', fallback: true,
+      });
     }
 
     if (recovered.ok || recovered.serverReachable) {
