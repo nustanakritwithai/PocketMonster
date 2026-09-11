@@ -1,5 +1,12 @@
 const status = document.getElementById('startupStatus');
 
+function releaseBoundLaunchUrl(launchUrl, release) {
+  const url = new URL(launchUrl);
+  const token = String(release || '').trim();
+  if (token) url.searchParams.set('release', token);
+  return url.href;
+}
+
 try {
   const response = await fetch('./runtime-config.json', { cache: 'no-store' });
   if (!response.ok) throw new Error(`Launcher config failed (${response.status})`);
@@ -33,18 +40,19 @@ try {
     if (status) status.textContent = 'กำลังเปิดเกมอย่างปลอดภัย…';
     const launch = await issueLaunchTicket(config, user);
     if (launch) {
+      const targetUrl = releaseBoundLaunchUrl(launch.launchUrl, config.deployedRelease);
       if (!brave) {
         window.name = JSON.stringify(launch.launchContext);
-        location.replace(launch.launchUrl);
+        location.replace(targetUrl);
       } else {
         pendingLaunch = launch;
         const target = openGameWindow();
-        if (target) target.location.replace(launch.launchUrl);
+        if (target) target.location.replace(targetUrl);
         else {
           if (status) status.textContent = 'แตะเพื่อเปิดเกมบน Brave อย่างปลอดภัย';
           const button = document.createElement('button');
           button.type = 'button'; button.textContent = 'เปิดเกม'; button.className = 'account-primary';
-          button.addEventListener('click', () => { const popup = openGameWindow(); if (popup) popup.location.replace(launch.launchUrl); });
+          button.addEventListener('click', () => { const popup = openGameWindow(); if (popup) popup.location.replace(targetUrl); });
           status?.after(button);
         }
       }
