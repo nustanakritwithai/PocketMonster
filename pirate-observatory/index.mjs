@@ -10,3 +10,4 @@ export * from './hybrid-session.mjs';
 export * from './map-interest.mjs';
 export * from './interest-session.mjs';
 export * from './health-session.mjs';
+export * from './debug-model.mjs';
