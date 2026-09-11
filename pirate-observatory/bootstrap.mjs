@@ -1,6 +1,7 @@
 import { PirateObservatoryDashboard } from './dashboard.mjs';
 import { PirateObservatoryServerPanel } from './server-panel.mjs';
 import { PirateObservatoryDebugPanel } from './debug-panel.mjs';
+import { PirateObservatoryHistoryPanel } from './history-panel.mjs';
 import { PirateObservatoryRestTransport } from './transport.mjs';
 import { PirateObservatoryRestSession } from './rest-session.mjs';
 import { PirateObservatoryHybridSession } from './hybrid-session.mjs';
@@ -31,6 +32,14 @@ function acceptCanonicalDelta(packet) {
   const result = PirateObservatoryDashboard.acceptDelta(packet);
   if (result?.ok && result.duplicate !== true) PirateObservatoryDebugPanel.acceptDelta(packet);
   return result;
+}
+
+function configureHistory(transport, partition) {
+  PirateObservatoryHistoryPanel.configure({
+    transport,
+    partition,
+    dashboard: PirateObservatoryDashboard,
+  });
 }
 
 function stopInterestSession() {
@@ -131,6 +140,7 @@ function stopActiveSession() {
   activeSession = null;
   activeTransport = null;
   PirateObservatoryDebugPanel.clear();
+  PirateObservatoryHistoryPanel.clear();
   PirateObservatoryDashboard.setServerStatus({ issues: 0 });
 }
 
@@ -150,6 +160,7 @@ export async function connectPirateObservatoryRest({
   activeHealthPollMs = healthPollMs;
   const transport = new PirateObservatoryRestTransport({ baseUrl, headers, fetchImpl });
   activeTransport = transport;
+  configureHistory(transport, partition);
   ensureHealthSession(transport, partition);
   const session = new PirateObservatoryRestSession({
     transport,
@@ -219,6 +230,7 @@ export async function connectPirateObservatoryHybrid({
   });
   activeSession = session;
   activeTransport = session.transport;
+  configureHistory(activeTransport, partition);
   ensureHealthSession(activeTransport, partition);
   const result = await session.start();
   return { ...result, session, healthSession: activeHealthSession };
