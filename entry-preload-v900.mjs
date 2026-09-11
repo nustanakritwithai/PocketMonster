@@ -47,4 +47,17 @@ window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
 installPersistentMinimapOwner({ windowLike: window, documentLike: document });
 installReleaseBoundSceneFrames({ release: config.deployedRelease, windowLike: window });
-await import('./online-world-shell-v900.mjs?v=65');
+try {
+  await import('./online-world-shell-v900.mjs?v=65');
+  document.documentElement.dataset.releaseBoot = 'ready';
+  document.documentElement.hidden = false;
+} catch (error) {
+  const status = document.createElement('div');
+  status.id = 'startupStatus';
+  status.className = 'startup-status error';
+  status.textContent = `เปิดเกมไม่สำเร็จ: ${error?.message || error}`;
+  document.body.replaceChildren(status);
+  document.documentElement.dataset.releaseBoot = 'error';
+  document.documentElement.hidden = false;
+  throw error;
+}
