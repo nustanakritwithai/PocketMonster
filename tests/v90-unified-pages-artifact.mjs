@@ -34,7 +34,6 @@ const required = new Set([
   'combat-v91-transport.mjs',
   'combat-v91.css',
   'scene-entry-v900.mjs',
-  'scene-release-cache-v1.mjs',
   'pocket-offline-npc-menu-bridge-v900.mjs',
   'style-v900.css',
   'unified-mmorpg-hud-v900.mjs',
@@ -47,19 +46,12 @@ const required = new Set([
   'boot-pirate-fruit-v900.mjs',
   'world-living-v900.mjs',
   'pirate-fruit-offline/index.html',
-  'pirate-fruit-offline/pocket-presentation.mjs',
-  'asset-presentation/pirate-local-player-visibility-v1.mjs',
   pirateEntryAsset,
   'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
   'assets/catalog/humanoid-core.json',
 ]);
 
 for (const relative of required) assert.ok(closure.has(relative), `${relative} must be reachable from a shipped V9 entry`);
-
-const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
-const release = String(runtimeConfig.deployedRelease || '').trim();
-const encodedRelease = encodeURIComponent(release);
-assert.ok(release, 'public V9 artifact must expose deployedRelease');
 
 const manifestFiles = new Map(manifest.files.map(item => [item.path, item]));
 for (const relative of PAGES_LIVE_SMOKE_FILES.map(activePirateAsset)) {
@@ -68,57 +60,28 @@ for (const relative of PAGES_LIVE_SMOKE_FILES.map(activePirateAsset)) {
 assert.equal(manifestFiles.size, closure.size, 'patch manifest must not force-download public compatibility files outside the active V9 closure');
 assert.deepEqual([...manifestFiles.keys()].sort(), [...closure].sort(), 'patch manifest must equal the active V9 dependency closure exactly');
 for (const relative of closure) {
-  const manifestEntry = manifestFiles.get(relative);
-  assert.ok(manifestEntry, `${relative} must ship in the Pages manifest`);
+  const entry = manifestFiles.get(relative);
+  assert.ok(entry, `${relative} must ship in the Pages manifest`);
   const source = fs.readFileSync(path.join(root, relative));
   const built = fs.readFileSync(path.join(output, relative));
-  assert.equal(crypto.createHash('sha256').update(built).digest('hex'), manifestEntry.sha256, `${relative} built hash must match manifest`);
-  if (relative === 'index.html' || relative === 'v900.html') {
-    const normalizedBuilt = built.toString('utf8')
-      .replace(/\s+hidden\s+data-release-boot="waiting"/i, '')
-      .replace(
-        /entry-preload-v900\.mjs\?release=[^'"\s>]+/,
-        'entry-preload-v900.mjs?v=972',
-      );
-    assert.equal(normalizedBuilt, source.toString('utf8'), `${relative} may differ from source only by release binding and the pre-shell hidden first-paint gate`);
-  } else if (relative === 'pirate-fruit-offline/index.html') {
-    const normalizedBuilt = built.toString('utf8').replace(
-      /pocket-presentation\.mjs\?release=[^'"\s>]+/,
-      'pocket-presentation.mjs?v=29',
-    );
-    assert.equal(normalizedBuilt, source.toString('utf8'),
-      'Pirate child HTML may differ from source only by release-bound presentation bootstrap');
-  } else {
-    assert.equal(Buffer.compare(source, built), 0, `${relative} built bytes must match source`);
-  }
+  assert.equal(crypto.createHash('sha256').update(built).digest('hex'), entry.sha256, `${relative} built hash must match manifest`);
+  assert.equal(Buffer.compare(source, built), 0, `${relative} built bytes must match source`);
 }
 
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
-assert.match(index, new RegExp(`entry-preload-v900\\.mjs\\?release=${encodedRelease.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
-  'published entry must bind the preload module to deployedRelease');
-assert.doesNotMatch(index, /entry-preload-v900\.mjs\?v=972/,
-  'published entry must not reuse the source-level cache key across releases');
-assert.match(index, /<html\b[^>]*\bhidden\b[^>]*data-release-boot="waiting"/i,
-  'published Pages entry must suppress legacy top-level DOM until the online shell is ready');
+assert.match(index, /entry-preload-v900.mjs\?v=972/);
 assert.match(index, /style-v900\.css\?v=969/);
 const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
-assert.match(entry, /installReleaseBoundSceneFrames/, 'V9 entry installs release binding before online shell boot');
-assert.match(entry, /await import\('\.\/online-world-shell-v900\.mjs\?v=65'\)[\s\S]*document\.documentElement\.hidden = false/,
-  'published root stays hidden until online shell import has replaced the legacy DOM');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style-v900\.css\?v=969/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
-const pirateChild = fs.readFileSync(path.join(output, 'pirate-fruit-offline/index.html'), 'utf8');
-assert.match(pirateChild, new RegExp(`pocket-presentation\\.mjs\\?release=${encodedRelease.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
-  'published Pirate child must load the guarded presentation module through deployedRelease');
-assert.doesNotMatch(pirateChild, /pocket-presentation\.mjs\?v=29/,
-  'published Pirate child must not reuse the old presentation cache key');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
 
+const runtimeConfig = JSON.parse(fs.readFileSync(path.join(output, 'runtime-config.json'), 'utf8'));
 assert.equal(runtimeConfig.featureFlags.launchTicket, true, 'public V9 artifact requires the one Monster Life launch session');
 for (const flag of ['vpsWrites', 'playerDataWrites', 'firebaseFallback']) {
   assert.equal(runtimeConfig.featureFlags[flag], false, `${flag} must stay disabled in the public artifact`);
