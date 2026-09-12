@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.9dbc44d0fdd3",
+  "buildId": "8.4.0.content.1e5244d9af25",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T19:49:52.442Z",
+  "publishedAtUtc": "2026-09-12T19:58:57.533Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -508,7 +508,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2376,
-      "sha256": "30f26ccd13bac055f9c9b9193644107197792a7fa4a91835eb8e8de3a71f7317"
+      "sha256": "782c791917a758903d35ce05316c55c284723d99220dd6d7048fbe980befd304"
     },
     {
       "path": "equipment.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "index.html",
       "size": 38810,
-      "sha256": "201afbbc4d905c3bed6de6dbf7847d3356fb61dc7699794f2ae62080236d75b2"
+      "sha256": "b080b26b3a7a8938300cdc1f44980e136297ab815d41928166e1fa2184477f08"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -642,13 +642,13 @@
     },
     {
       "path": "online-world-bridge-v900.mjs",
-      "size": 4513,
-      "sha256": "d50da4cb43dbc929322611e994fc5bf912f232179d7c2beb41e955b21cf73b00"
+      "size": 4758,
+      "sha256": "7d7eafce582f00ecd4ff33f843fc078135478bb5f4b197546d512c4e0cba73ae"
     },
     {
       "path": "online-world-shell-v900.mjs",
       "size": 27858,
-      "sha256": "15cf3a5b803c11d59422afe6258060e9eca2d13c28ffb7749add33db7a8ea0e8"
+      "sha256": "377e659b3fcc2d710d5ae974c48dec44484a0e25fa68f1fbf4d665cb8325540c"
     },
     {
       "path": "passive-catalog.mjs",
@@ -848,7 +848,7 @@
     {
       "path": "scene-entry-v900.mjs",
       "size": 8434,
-      "sha256": "5ecdc62e0b264452a7c2237e48267febcb24fd607323a04f1df05c25f6f5a1b4"
+      "sha256": "1a303a4b83ea923bae0bbf7bc9fb8e5d21b1c8d49780dd31509c271617cf9c95"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -863,7 +863,7 @@
     {
       "path": "scene-v900.html",
       "size": 1332,
-      "sha256": "512f5e39e3d61a9a1799e4f6bc42274665c149415772674232b50b6e8140ab0f"
+      "sha256": "50a6dba9a65036a0dc4ca3ee4bdb8ab4516a1b837b0cbba9a4692d5fe0e5bf52"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -1033,7 +1033,7 @@
     {
       "path": "v900.html",
       "size": 38810,
-      "sha256": "201afbbc4d905c3bed6de6dbf7847d3356fb61dc7699794f2ae62080236d75b2"
+      "sha256": "b080b26b3a7a8938300cdc1f44980e136297ab815d41928166e1fa2184477f08"
     },
     {
       "path": "warp-routes.mjs",

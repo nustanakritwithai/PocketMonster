@@ -76,7 +76,10 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
     let pose = null;
     try {
       const read = target?.POCKETMONSTER_SCENE_PRESENCE?.state || target?.POCKETMONSTER_WORLD_STATE;
-      pose = sanitizeOnlineWorldPose(read?.call(target));
+      // Pirate's native producer carries the validated monster-intents
+      // extension (including an empty list). Preserve it for aim reads while
+      // keeping the protocol sanitizer as the structural gate.
+      pose = sanitizeOnlineWorldPose(read?.call(target), { allowMonsterIntents: true });
     } catch { pose = null; }
     if (!pose) { scenePresenceReady = false; lastAcceptedAt = null; return null; }
     if (activeZone && activeZone !== pose.zone) {

@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=6';
+} from './online-world-bridge-v900.mjs?v=7';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '77');
+  url.searchParams.set('shellRevision', '78');
   return url.href;
 }
 
