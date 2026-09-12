@@ -71,11 +71,11 @@ for (const relative of closure) {
 const index = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
 const versionedEntry = fs.readFileSync(path.join(output, 'v900.html'), 'utf8');
 assert.match(index, /entry-preload-v900.mjs\?v=974/);
-assert.match(index, /style-v900\.css\?v=972/);
+assert.match(index, /style-v900\.css\?v=973/);
 const entry = fs.readFileSync(path.join(output, 'entry-preload-v900.mjs'), 'utf8');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-busts the restored raster/near-far minimap owner');
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
-assert.match(scene, /style-v900\.css\?v=972/, 'scene entry loads the same HUD stylesheet revision as the parent');
+assert.match(scene, /style-v900\.css\?v=973/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
 assert.doesNotMatch(scene, /style-v900\.css\?v=913/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);

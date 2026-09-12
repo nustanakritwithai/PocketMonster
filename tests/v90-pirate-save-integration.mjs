@@ -32,10 +32,10 @@ assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical loc
 assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=958/, 'world catalog keeps the current Pirate boot module revision');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=66/, 'top-level entry cache-busts the unified ship-control shell');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=63/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
-assert.match(sceneHtml, /style-v900\.css\?v=972/, 'scene HTML cache-busts the helm placement beside chat');
+assert.match(sceneHtml, /style-v900\.css\?v=973/, 'scene HTML cache-busts the helm placement beside chat');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'offline HTML cache-busts presentation integration with a positive revision');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=[1-9]\d*'/, 'presentation cache-busts static-batch classification');
-assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=20/, 'presentation loads the HUD policy that retires the helm center-panel duplicate');
+assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=21/, 'presentation loads the HUD policy that retires the helm center-panel duplicate');
 assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!important/, 'Pirate child circular minimap is hidden by the parent-primary HUD policy');
 assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired by parent-primary HUD policy');
 
