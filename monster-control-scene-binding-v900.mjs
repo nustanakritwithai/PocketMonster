@@ -20,17 +20,38 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
     button.addEventListener('click', click, true);
     buttons.push({ button, slot, click });
   }
-  const unsubscribe = controller.subscribe(() => {
-    const snapshot = controller.snapshot();
+  const unsubscribe = controller.subscribe(snapshot => {
+    sceneWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(snapshot.held, snapshot);
+    try { sceneWindow.dispatchEvent?.(new CustomEvent('pocketmonster-held-monster', { detail: snapshot.held })); } catch {}
+    const throwButton = documentLike.getElementById('monsterThrowBtn');
+    if (throwButton) {
+      throwButton.hidden = snapshot.held === null || snapshot.pending === true;
+      throwButton.disabled = snapshot.held === null || snapshot.pending === true;
+    }
     for (const { button, slot } of buttons) {
+      if (!Number.isInteger(slot)) continue;
       const entry = snapshot.slots?.[slot];
+      if (entry) { button.dataset.pirateIcon = `${entry.icon || '🐾'}\n${(entry.name || 'ว่าง').slice(0, 12)}`; button.title = entry.name || 'ช่องว่าง'; }
       const opened = snapshot.controlPanel?.mode === 'monster' && snapshot.controlPanel.instanceId === entry?.instanceId;
       button.setAttribute('aria-label', !entry?.available ? 'ช่องมอนสเตอร์ว่าง'
-        : `${entry.name || 'มอนสเตอร์'} • ${opened ? 'กลับไปสกิลตัวละคร' : entry.active ? 'เปิดสกิลมอนสเตอร์' : 'ปามอนสเตอร์'}`);
+        : `${entry.name || 'มอนสเตอร์'} • ${opened ? 'กลับไปสกิลตัวละคร' : entry.active ? 'เปิดสกิลมอนสเตอร์' : entry.held ? 'พร้อมปามอนสเตอร์' : 'เตรียมมอนสเตอร์'}`);
       button.setAttribute('aria-pressed', String(opened));
       button.classList?.toggle?.('monster-control-open', opened);
     }
   });
+  const throwButton = documentLike.getElementById('monsterThrowBtn');
+  if (throwButton) {
+    const click = event => {
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      void Promise.resolve(controller.throwHeld?.()).then(result => {
+        const status = documentLike.getElementById('actionReason');
+        if (status && result?.ok === false) status.textContent = 'ยังปามอนสเตอร์ไม่ได้ กรุณาเตรียมมอนสเตอร์ก่อน';
+      });
+    };
+    throwButton.addEventListener('click', click, true);
+    buttons.push({ button: throwButton, click });
+  }
   for (const id of ['monsterRecallBtn', 'monsterReleaseBtn', 'monsterStoreBtn']) {
     const button = documentLike.getElementById(id);
     if (!button) continue;
@@ -47,6 +68,7 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   }
   return () => {
     unsubscribe?.();
+    sceneWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(null);
     for (const { button, click } of buttons) button.removeEventListener('click', click, true);
     mobile?.setMonsterController?.(null);
     if (sceneWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER === controller) delete sceneWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;

@@ -55,6 +55,7 @@ import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
+import { createMonsterBagStateProvider } from './monster-bag-state-provider-v900.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
 import { createWorldPresenceController } from './world-presence-v800.mjs?v=5';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
@@ -163,6 +164,8 @@ if (typeof window !== 'undefined') {
 await presentAuthProfileBridge(runtimeConfig, firebaseUser, authProfileBridge);
 await mountServerEconomy(runtimeConfig, authProfileBridge);
 const serverPlayerDataActive=canUseServerPlayerData(runtimeConfig,serverGate,authProfileBridge);
+const monsterBagStateProvider=createMonsterBagStateProvider({config:runtimeConfig,sessionToken:authProfileBridge.sessionToken,getSessionToken:()=>authProfileBridge.sessionToken});
+window.POCKETMONSTER_MONSTER_BAG=monsterBagStateProvider;
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_PLAYER_DATA_MODE=serverPlayerDataActive?'server':'firebase';
   window.POCKETMONSTER_ACCOUNT_ACTIONS=Object.freeze({
@@ -1675,6 +1678,23 @@ const evolutionVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'ev
 const breedingVisual=assets.spawn('character.human.blocky-bighead.v1',{role:'breeding',appearanceId:'appearance.human.breeding-pink.v1',quality:qualityProfile.tier});
 await Promise.all([playerVisual.ready,keeperVisual.ready,merchantVisual.ready,trainerVisual.ready,evolutionVisual.ready,breedingVisual.ready].filter(Boolean));
 const player=playerVisual.root; scene.add(player); player.position.set(0,0,5);
+let heldMonsterCarry=null;
+function setHeldMonsterVisual(held){
+  if(heldMonsterCarry?.userData.heldMonsterInstanceId===held?.instanceId)return;
+  if(heldMonsterCarry){
+    removeAndDispose(playerVisual.root,heldMonsterCarry);
+    heldMonsterCarry=null;
+  }
+  if(!held?.instanceId)return;
+  const carry=new THREE.Group();
+  carry.name='held-monster-carry';
+  carry.userData.heldMonsterInstanceId=held.instanceId;
+  // ใช้บอลเดิมติดข้างมือ เป็นภาพเตรียมปา ไม่สร้างสถานะต่อสู้ฝั่งไคลเอนต์
+  addCaptureBall(carry,{x:.34,y:1.02,z:-.18,scale:.82});
+  playerVisual.root.add(carry);
+  heldMonsterCarry=carry;
+}
+if(typeof window!=='undefined')window.POCKETMONSTER_HELD_MONSTER_VISUAL=setHeldMonsterVisual;
 if(typeof window!=='undefined'){
   window.POCKETMONSTER_PLAYER_CHARACTER=publishPlayerCharacterBinding({writeArmed:serverPlayerDataActive,name:authProfileBridge.profile?.character?.name||authProfileBridge.profile?.displayName});
 }
@@ -6202,9 +6222,39 @@ function revealMonsterManager(tab){
   managerDirty.consume(performance.now());
   playSFX('sfx_ui_open');
 }
+function installPirateMonsterBagButton(){
+  const controls=el('pirateUnifiedControls');
+  if(!controls||controls.querySelector('[data-monster-bag-open]'))return;
+  const actions=controls.querySelector('.controls-right');
+  if(!actions)return;
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='action tc-btn tc-monster-bag pirate-only';
+  button.dataset.pirateIcon='🎒';
+  button.dataset.monsterBagOpen='true';
+  button.setAttribute('aria-label','เปิดกระเป๋ามอนสเตอร์');
+  button.textContent='🎒';
+  button.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:true});});
+  actions.appendChild(button);
+}
 function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
-function showRanchStorageShell(){const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');renderRanchStoragePage();return result;}
-function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');}
+function showRanchStorageShell({remote=false}={}){
+  const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc(),allowRemote:remote});
+  if(!result.ok){msg(result.reasonText);return result;}
+  el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
+  remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
+  const request=++remoteBagRequest;
+  renderRanchStoragePage();
+  if(remote)void monsterBagStateProvider.refresh().then(remoteResult=>{
+    if(request!==remoteBagRequest||!remoteBagOpen)return;
+    remoteBagSnapshot=remoteResult.ok?remoteResult.state:null;
+    remoteBagStatus=remoteResult.ok?'':'โหลดกระเป๋าไม่สำเร็จ กรุณาปิดแล้วเปิดใหม่';
+    renderRanchStoragePage();
+  });
+  return result;
+}
+window.POCKETMONSTER_OPEN_MONSTER_BAG=()=>showRanchStorageShell({remote:true});
+function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');if(panel!=='storage'){remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;}}
 function openRanchBreeding(){if(!assertRanchOperation())return;el('ranchServices').classList.add('hidden');openManager({source:'npc'});setManagerTab('breeding');}
 function openManager(options={}){
   const source=options.source==='character'?'character':'npc';
@@ -6583,6 +6633,8 @@ function renderFullCharacterInfoTab(){
   return renderFullCharacterStatus();
 }
 let ranchStorageFocusId=null;
+let remoteBagSnapshot=null;
+let remoteBagOpen=false,remoteBagStatus='',remoteBagRequest=0;
 function syncRanchClubPreview(inst){
   if(!ranchClubPreviewScene&&!ranchClubPreviewRenderer)initRanchClubPreview3D();
   const species=inst?spById[inst.speciesId]:null;
@@ -6616,14 +6668,24 @@ function syncRanchClubPreview(inst){
 function renderRanchStoragePage(){
   const roster=el('ranchStorageRoster'),vault=el('ranchClubVault'),preview=el('ranchStoragePreview'),details=el('ranchStorageDetails');
   if(!roster||!preview||!details)return;
-  const ids=state.storage.filter(Boolean);
-  const partyIds=state.party.filter(Boolean);
+  if(remoteBagOpen&&(!remoteBagSnapshot?.available||!monsterBagStateProvider.snapshot().available)){
+    roster.textContent='';if(vault)vault.textContent='';
+    details.textContent=remoteBagStatus||'การเชื่อมต่อหมดอายุ กรุณาเปิดกระเป๋าใหม่';
+    el('ranchStorageCount').textContent='Storage —';el('ranchActiveCount').textContent='';
+    syncRanchClubPreview(null);return;
+  }
+  const remoteState=remoteBagOpen?remoteBagSnapshot.envelope.state:null;
+  const ranchIds=remoteState?.ranchActive||state.ranchActive;
+  const remoteById=new Map((remoteState?.collection||[]).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
+  const monsterForId=id=>remoteState?remoteById.get(id):getInst(id);
+  const ids=(remoteState?.storage||state.storage).filter(Boolean);
+  const partyIds=(remoteState?.party||state.party).filter(Boolean);
   const selectableIds=[...partyIds,...ids];
   el('ranchStorageCount').textContent=`Storage ${ids.length}`;
-  el('ranchActiveCount').textContent=`Ranch Active ${state.ranchActive.length}/${RANCH_ACTIVE_MAX}`;
+  el('ranchActiveCount').textContent=`Ranch Active ${ranchIds.length}/${RANCH_ACTIVE_MAX}`;
   const clubTint=(inst)=>{const sp=inst&&spById[inst.speciesId];return sp?`#${sp.color.toString(16).padStart(6,'0')}`:'#166534';};
   const clubCardHTML=(inst,kind)=>{
-    const ranch=state.ranchActive.includes(inst.instanceId);
+    const ranch=ranchIds.includes(inst.instanceId);
     const faint=inst.fainted||inst.hp<=0;
     const chip=kind==='party'?'พกอยู่':ranch?'Ranch':'คลัง';
     return `<span class="ranch-club-avatar" style="background:${clubTint(inst)}">${displayName(inst).slice(0,1)}</span><span class="ranch-club-card-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="ranch-club-chip">${chip}</span>`;
@@ -6643,7 +6705,7 @@ function renderRanchStoragePage(){
       return;
     }
     group.forEach(id=>{
-      const i=getInst(id);
+      const i=monsterForId(id);
       if(!i)return;
       const card=document.createElement('button');
       card.type='button';
@@ -6652,8 +6714,13 @@ function renderRanchStoragePage(){
       card.innerHTML=clubCardHTML(i,kind);
       card.classList.toggle('focused-monster',id===ranchStorageFocusId);
       card.classList.toggle('is-party',kind==='party');
-      card.classList.toggle('is-ranch',state.ranchActive.includes(id));
-      card.onclick=()=>{ranchStorageFocusId=id;renderRanchStoragePage();};
+      card.classList.toggle('is-ranch',ranchIds.includes(id));
+      card.onclick=()=>{
+        ranchStorageFocusId=id;
+        renderRanchStoragePage();
+        window.dispatchEvent(new CustomEvent('pocketmonster:monster-selected',{detail:{monsterId:id,source:'monster-bag'}}));
+        if(typeof window.POCKETMONSTER_SELECT_MONSTER==='function')window.POCKETMONSTER_SELECT_MONSTER(id);
+      };
       mount.appendChild(card);
     });
   };
@@ -6665,15 +6732,31 @@ function renderRanchStoragePage(){
     details.innerHTML='';
     return;
   }
-  const focused=getInst(ranchStorageFocusId),inParty=focused&&state.party.includes(focused.instanceId);
+  const focused=monsterForId(ranchStorageFocusId),inParty=focused&&(remoteState?.party||state.party).includes(focused.instanceId);
   if(!focused){
     syncRanchClubPreview(null);
     details.innerHTML='';
     return;
   }
   syncRanchClubPreview(focused);
-  const ranchOn=state.ranchActive.includes(focused.instanceId);
-  details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'}</b>Ranch</span></div><div class="storage-actions">${inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>'}</div>`;
+  const ranchOn=(remoteState?.ranchActive||state.ranchActive).includes(focused.instanceId);
+  const remoteSlots=monsterBagStateProvider.snapshot().slots||[];
+  const remoteStatus=!remoteBagOpen?'':monsterBagStateProvider.snapshot().available
+    ? `<div class="storage-actions remote-party-slots" aria-label="จัดช่องเรียกบนเซิร์ฟเวอร์">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่อง '+(index+1)}</button>`).join('')}</div>`
+    : '<div class="manager-empty remote-party-status">กำลังโหลดข้อมูล Party จากเซิร์ฟเวอร์…</div>';
+  const localActions=remoteState?'':'<div class="storage-actions">'+(inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>')+'</div>';
+  details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'} </b>Ranch</span></div>${remoteStatus}${localActions}`;
+  details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
+    details.querySelectorAll('[data-remote-party-slot]').forEach(item=>{item.disabled=true;});
+    const result=await monsterBagStateProvider.assignToSlot(focused.instanceId,Number(button.dataset.remotePartySlot));
+    if(result.ok){
+      remoteBagSnapshot=result.state;
+      msg(`บันทึก ${displayName(focused)} เข้า Party ช่อง ${Number(button.dataset.remotePartySlot)+1} แล้ว`);
+      try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;void provider?.refresh?.();}catch{}
+      renderRanchStoragePage();
+    }
+    else {const reason={SERVER_ASSIGN_TIMEOUT:'เซิร์ฟเวอร์ตอบช้า',SERVER_WRITES_DISABLED:'ระบบบันทึกยังไม่เปิด',MONSTER_NOT_OWNED:'ไม่พบมอนนี้ในบัญชี',SERVER_ASSIGN_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง',STALE_SESSION:'เซสชันหมดอายุ'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการจัดช่อง';msg(`บันทึกช่องเรียกไม่สำเร็จ: ${reason}`);renderRanchStoragePage();}
+  }));
   details.querySelector('[data-storage-deposit]')?.addEventListener('click',()=>depositMonster(focused.instanceId));
   details.querySelector('[data-storage-withdraw]')?.addEventListener('click',()=>withdrawMonster(focused.instanceId));
   details.querySelector('[data-storage-ranch]')?.addEventListener('click',()=>toggleRanchActive(focused.instanceId));
@@ -7311,6 +7394,7 @@ el('breedingSalonIncubator')?.addEventListener('click',e=>{
 });
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
 bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
+installPirateMonsterBagButton();
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
@@ -7693,7 +7777,7 @@ function loop(now){
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 if(typeof window!=='undefined'){
-  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
+window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{setHeldMonsterVisual(null);pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',

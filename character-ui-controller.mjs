@@ -514,8 +514,8 @@ export function createCharacterUIController(options = {}) {
     return { ok: true, snapshot: snapshot(), ranchPanel: current.ranchPanel };
   }
 
-  function requestOpenRanchStorage({ isNearNpc } = {}) {
-    if (!isNearNpc) return { ok: false, reason: 'npc-required', reasonText: FULL_MANAGER_NPC_REASON, panel: ui().ranchPanel || null };
+  function requestOpenRanchStorage({ isNearNpc, allowRemote = false } = {}) {
+    if (!isNearNpc && !allowRemote) return { ok: false, reason: 'npc-required', reasonText: FULL_MANAGER_NPC_REASON, panel: ui().ranchPanel || null };
     const current = ui();
     if (current.ranchPanel !== 'services') current.ranchStack = [];
     else current.ranchStack.push('services');

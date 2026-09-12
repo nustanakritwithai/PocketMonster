@@ -5,12 +5,53 @@ function endpoint(config, path) {
   return new URL(path.replace(/^\//, ''), `${config.apiBaseUrl.replace(/\/$/, '')}/`).href;
 }
 
+const DEFAULT_MONSTER_SLOT_ICON = '🐾';
+
+/** แปลง Party จากเซิร์ฟเวอร์เป็น 3 ช่องเรียกของ Pirate โดยใช้ instanceId เป็นตัวอ้างอิงหลัก */
+export function normalizeMonsterPartySlots(party) {
+  const source = Array.isArray(party) ? party : [];
+  return Array.from({ length: 3 }, (_, index) => {
+    const raw = source[index];
+    const instanceId = typeof raw?.instanceId === 'string' ? raw.instanceId : '';
+    const name = typeof raw?.name === 'string' ? raw.name : '';
+    const portraitKey = typeof raw?.portraitKey === 'string' && raw.portraitKey
+      ? raw.portraitKey
+      : (typeof raw?.speciesId === 'string' ? raw.speciesId : '');
+    const icon = typeof raw?.icon === 'string' && raw.icon ? raw.icon
+      : (typeof raw?.emoji === 'string' && raw.emoji ? raw.emoji : DEFAULT_MONSTER_SLOT_ICON);
+    const occupied = Boolean(instanceId);
+    return Object.freeze({
+      ...(raw && typeof raw === 'object' ? raw : {}),
+      slot: index,
+      id: `slot-${index + 1}`,
+      label: occupied ? (name || `มอนช่อง ${index + 1}`) : `ช่อง ${index + 1} ว่าง`,
+      instanceId,
+      name,
+      portraitKey,
+      icon,
+      occupied,
+      available: occupied && raw?.fainted !== true,
+    });
+  });
+}
+
+/** จับคู่ party IDs ใน save กับ collection ของเซิร์ฟเวอร์ โดยไม่สร้างข้อมูลมอนใหม่ฝั่งไคลเอนต์ */
+export function resolveMonsterPartySlots({ collection, party } = {}) {
+  const byId = new Map((Array.isArray(collection) ? collection : [])
+    .filter(monster => typeof monster?.instanceId === 'string')
+    .map(monster => [monster.instanceId, monster]));
+  const records = (Array.isArray(party) ? party : []).map(instanceId =>
+    typeof instanceId === 'string' ? (byId.get(instanceId) || { instanceId }) : null);
+  return normalizeMonsterPartySlots(records);
+}
+
 function stateFromPlayerPayload(payload) {
   const source = payload?.monsterControl || {};
-  const slots = Array.isArray(source.party) ? source.party.slice(0, 3).map((slot, index) => ({ ...slot,
-    slot: index, id: `slot-${index + 1}`, instanceId: typeof slot?.instanceId === 'string' ? slot.instanceId : '',
-    name: slot?.name || '', portraitKey: slot?.speciesId || '',
-    available: typeof slot?.instanceId === 'string' && /^[A-Za-z0-9._:-]{1,96}$/.test(slot.instanceId) && slot?.fainted !== true })) : null;
+  const slots = Array.isArray(source.party)
+    ? normalizeMonsterPartySlots(source.party).map(slot => ({ ...slot,
+      available: slot.occupied && /^[A-Za-z0-9._:-]{1,96}$/.test(slot.instanceId) && slot.fainted !== true,
+    }))
+    : null;
   const party = Array.isArray(slots) ? { available: true, slots } : source.party;
   const actors = Array.isArray(source.actors || payload?.actors) ? (source.actors || payload.actors).map(actor => {
     const { generation, ...rest } = actor || {};

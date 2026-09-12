@@ -8,6 +8,11 @@ const deferred = () => {
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 };
+async function throwSlot(controller, slot) {
+  const prepared = await controller.activateSlot(slot);
+  if (!prepared.ok) return prepared;
+  return controller.throwHeld();
+}
 function fixture(overrides = {}) {
   let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
   const calls = [];
@@ -53,7 +58,7 @@ function fixture(overrides = {}) {
     getConfirmedActors: () => provider.snapshot().actors, getCapabilities: () => provider.snapshot().capabilities,
   });
   await provider.refresh();
-  assert.equal((await controller.activateSlot(0)).ok, true, 'party จาก Server ต้องปาได้โดยไม่ต้องมี available ที่ Server ไม่ได้ส่ง');
+  assert.equal((await throwSlot(controller, 0)).ok, true, 'party จาก Server ต้องถือและปาได้โดยไม่ต้องมี available ที่ Server ไม่ได้ส่ง');
   await provider.refresh();
   controller.sync();
   assert.equal((await controller.activateSlot(0)).reason, 'panel-toggled');
@@ -70,7 +75,8 @@ function fixture(overrides = {}) {
 // การกดตัวเดิมเพื่อสลับแผงต้องไม่ยกเลิกคำสั่งเปลี่ยนตัวที่ยังรอ Server
 {
   const f = fixture();
-  const request = f.controller.activateSlot(1);
+  await f.controller.activateSlot(1);
+  const request = f.controller.throwHeld();
   await f.controller.activateSlot(0);
   const blockedRequest = f.controller.recall();
   const callCount = f.calls.length;
@@ -107,9 +113,9 @@ function fixture(overrides = {}) {
     switch: async command => { sent.push({ ...command, kind: 'switch' }); return { ok: false, code: 'TRANSPORT_TIMEOUT' }; },
     summon: async command => { sent.push({ ...command, kind: 'summon' }); return { ok: false, code: 'TRANSPORT_TIMEOUT' }; },
   });
-  await f.controller.activateSlot(1);
+  await throwSlot(f.controller, 1);
   f.setActors([]);
-  await f.controller.activateSlot(1);
+  await throwSlot(f.controller, 1);
   assert.equal(sent.length, 2);
   assert.deepEqual(sent[1], sent[0], 'retry switch ต้องไม่กลายเป็น summon เมื่อ snapshot เปลี่ยน');
   f.controller.dispose();
@@ -123,9 +129,9 @@ function fixture(overrides = {}) {
     switch: async command => { sent.push({ ...command, kind: 'switch' }); return { ok: false, code: 'TRANSPORT_TIMEOUT' }; },
   });
   f.setActors([]);
-  await f.controller.activateSlot(0);
+  await throwSlot(f.controller, 0);
   f.setActors([{ instanceId: 'b', active: true, zone: 'hub', generation: 30 }]);
-  await f.controller.activateSlot(0);
+  await throwSlot(f.controller, 0);
   assert.deepEqual(sent[1], sent[0], 'retry summon ต้องไม่เปลี่ยนเป็น switch เมื่อมี actor ใหม่');
   f.controller.dispose();
 }
@@ -137,7 +143,7 @@ function fixture(overrides = {}) {
   });
   await f.controller.recall();
   f.setActors([]);
-  await f.controller.activateSlot(0);
+  await throwSlot(f.controller, 0);
   assert.equal(sent[1].kind, 'summon');
   assert.notEqual(sent[1].commandId, sent[0].commandId, 'recall retry ต้องไม่ปนกับคำสั่งปาใหม่');
   assert.deepEqual(sent[1].targetPoint, { x: 1, y: 0, z: 1 });
