@@ -155,6 +155,7 @@ hud.mount();
 const utilityRoot = document.getElementById('mmorpgUtilities');
 const ids = utilityRoot.children.map(node => node.dataset.utility);
 assert.equal(ids[0], 'inventory', 'Pirate bag is the first under-minimap utility');
+assert.equal(ids[1], 'monster-bag', 'monster bag sits beside the Pirate inventory utility');
 assert.ok(ids.includes('character') && ids.includes('audio'), 'existing utilities remain');
 
 const bag = utilityRoot.children[0];
@@ -189,6 +190,7 @@ const hud2 = createUnifiedMmorpgHud({
 hud2.mount();
 const ids2 = document2.getElementById('mmorpgUtilities').children.map(node => node.dataset.utility);
 assert.equal(ids2[0], 'inventory', 'bag appears even when Pirate POCKET_HUD has no utilities stream');
+assert.equal(ids2[1], 'monster-bag', 'monster bag appears beside inventory without a utilities stream');
 hud2.unmount();
 
 // Live architecture: combinedWorld + #pirateFruitFrame live in #onlineWorldSceneFrame.
@@ -236,6 +238,7 @@ const hud3 = createUnifiedMmorpgHud({
 hud3.mount();
 const ids3 = document3.getElementById('mmorpgUtilities').children.map(node => node.dataset.utility);
 assert.equal(ids3[0], 'inventory', 'bag appears when pirate world/frame live only in the scene iframe');
+assert.equal(ids3[1], 'monster-bag', 'monster bag appears beside inventory for the scene iframe world');
 document3.getElementById('mmorpgUtilities').children[0].dispatch('click');
 await Promise.resolve();
 await Promise.resolve();
