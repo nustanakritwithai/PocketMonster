@@ -20,6 +20,7 @@ export function mountDirectMonsterControls({ windowLike, config, sessionToken })
   windowLike.POCKETMONSTER_MONSTER_STATE_PROVIDER = provider;
   const unsubscribe = provider.subscribe(() => controller.sync());
   const unbind = bindMonsterControlScene({ sceneWindow: windowLike, controller });
+  windowLike.POCKETMONSTER_UNIFIED_HUD?.rebind?.();
   void provider.refresh();
   provider.start();
   const dispose = () => { unbind(); unsubscribe(); provider.dispose(); windowLike.removeEventListener('pagehide', dispose); };

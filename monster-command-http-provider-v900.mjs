@@ -114,7 +114,9 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       return Object.freeze({ ok: false, code: error?.code || 'STATE_UNAVAILABLE' });
     }
   };
-  const refresh = () => {
+  const refresh = ({ afterPending = false } = {}) => {
+    // หลังจัดช่องต้องอ่านใหม่หลังคำขอก่อนหน้า เพื่อไม่รับรายการก่อนบันทึกกลับมา
+    if (afterPending && pendingRefresh) return pendingRefresh.then(() => refresh());
     if (pendingRefresh) return pendingRefresh;
     const request = requestState();
     pendingRefresh = request;

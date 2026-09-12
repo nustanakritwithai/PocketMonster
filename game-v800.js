@@ -6770,7 +6770,7 @@ function renderRanchStoragePage(){
     if(result.ok){
       remoteBagSnapshot=result.state;
       msg(`บันทึก ${displayName(focused)} เข้า Party ช่อง ${Number(button.dataset.remotePartySlot)+1} แล้ว`);
-      try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;void provider?.refresh?.();}catch{}
+      try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;await provider?.refresh?.({afterPending:true});}catch{}
       renderRanchStoragePage();
     }
     else {const reason={SERVER_ASSIGN_TIMEOUT:'เซิร์ฟเวอร์ตอบช้า',SERVER_WRITES_DISABLED:'ระบบบันทึกยังไม่เปิด',MONSTER_NOT_OWNED:'ไม่พบมอนนี้ในบัญชี',SERVER_ASSIGN_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง',STALE_SESSION:'เซสชันหมดอายุ',MIGRATION_REQUIRED:'ข้อมูลเดิมยังไม่ถูกย้ายขึ้นเซิร์ฟเวอร์'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการจัดช่อง';msg(`บันทึกช่องเรียกไม่สำเร็จ: ${reason}`);renderRanchStoragePage();}
@@ -7334,8 +7334,9 @@ function mapServerStateToRuntimeModel(source){
 function applyCanonicalMonsterSnapshot(snapshot){
   const canonical=snapshot.available?mapServerStateToRuntimeModel(snapshot.envelope.state):{collection:[],party:[null,null,null],storage:[],ranchActive:[]};
   state.collection=canonical.collection;state.party=canonical.party;state.storage=canonical.storage;state.ranchActive=canonical.ranchActive;
+  renderParty();
   syncRanchVisuals();syncHubCompanion();renderHUD();
-  window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.refresh?.();
+  try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;void provider?.refresh?.({afterPending:true});}catch{}
   if(remoteBagOpen){remoteBagSnapshot=snapshot;remoteBagStatus=snapshot.available?'':`โหลดกระเป๋าไม่สำเร็จ: ${snapshot.code||'SERVER_UNAVAILABLE'}`;renderRanchStoragePage();}
 }
 let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false,serverSaveRevision=0;

@@ -240,7 +240,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function partyAdapter() {
-    return monsterController || windowLike.POCKETMONSTER_PARTY_HUD || null;
+    return monsterController || windowLike.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER || windowLike.POCKETMONSTER_PARTY_HUD || null;
   }
 
   function pocketAdapter() {

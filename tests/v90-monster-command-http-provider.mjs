@@ -75,4 +75,25 @@ releaseBody({ ok: true, monsterControl: { party: [{ instanceId: 'old-scene' }], 
 assert.equal((await pendingBody).code, 'STALE_SCENE');
 assert.equal(bodyPending.snapshot().available, false);
 bodyPending.dispose();
+// จัดช่องสำเร็จระหว่างอ่านเก่า ต้องขอ snapshot ใหม่โดยไม่รอเปลี่ยนฉาก
+let finishOld;
+let reads = 0;
+const slotRefresh = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' }, sessionToken: 'fixture',
+  getZone: () => 'pirate-fruit', fetchImpl: async () => {
+    const read = ++reads;
+    if (read === 1) await new Promise(resolve => { finishOld = resolve; });
+    return { ok: true, json: async () => ({ ok: true, monsterControl: {
+      party: read === 1 ? [null, null, null] : [null, null, { instanceId: 'assigned' }], revision: read,
+    } }) };
+  },
+});
+slotRefresh.refresh();
+const updated = slotRefresh.refresh({ afterPending: true });
+finishOld();
+await updated;
+assert.equal(reads, 2);
+assert.equal(slotRefresh.snapshot().party.slots[2].instanceId, 'assigned');
+assert.equal(slotRefresh.snapshot().party.slots[0].occupied, false);
+slotRefresh.dispose();
 console.log('V9 monster HTTP provider: PASS');
