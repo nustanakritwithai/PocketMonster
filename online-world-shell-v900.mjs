@@ -17,7 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=948';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=949';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=1';
