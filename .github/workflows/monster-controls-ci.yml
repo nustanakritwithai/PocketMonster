@@ -6,6 +6,10 @@ on:
       - '*monster*control*.mjs'
       - 'monster-command-adapter.mjs'
       - 'monster-command-http-provider-v900.mjs'
+      - 'monster-bag-state-provider-v900.mjs'
+      - 'tests/monster-bag-state-provider.mjs'
+      - 'game-v800.js'
+      - 'character-ui-controller.mjs'
       - 'world-presence-v800.mjs'
       - 'unified-mmorpg-hud-v900.mjs'
       - 'unified-mobile-controls-v900.mjs'
@@ -34,7 +38,9 @@ jobs:
           node scripts/build-github-pages.mjs --write-root-manifest
           node tests/v91-combat-artifact.mjs
       - name: ตรวจคำสั่งมอนสเตอร์
-        run: node tests/monster-command-adapter.mjs
+        run: |
+          node tests/monster-command-adapter.mjs
+          node tests/monster-bag-state-provider.mjs
       - name: ตรวจการเชื่อมแผงควบคุม
         run: |
           node tests/v90-monster-control-controller.mjs

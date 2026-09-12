@@ -15,7 +15,7 @@ import {
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
-} from '../pirate-fruit-control-hud-v900.mjs?v=19';
+} from '../pirate-fruit-control-hud-v900.mjs?v=20';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 const studioCapability = new URLSearchParams(location.search).get('studioCapability');
@@ -35,7 +35,7 @@ let skipVendorFullscreen = false;
 window.addEventListener('pointerdown', event => {
   const target = event.target;
   skipVendorFullscreen = !!(target && typeof target.closest === 'function'
-    && target.closest('.interaction-prompt, .dialogue-root, .quest-board-root, .boat-shop-root, .potion-shop-root, .dealer-shop-root, .inv-root'));
+    && target.closest('.interaction-prompt, .dialogue-root, .quest-board-root, .boat-shop-root, .potion-shop-root, .dealer-shop-root, .trade-shop-root, .inv-root'));
 }, { capture: true });
 const wrapFullscreen = () => {
   const root = document.documentElement;
@@ -93,7 +93,7 @@ const postDialogue = open => {
     window.parent?.postMessage({ type: PIRATE_FRUIT_DIALOGUE_MESSAGE, open: open === true }, parentOrigin || '*');
   } catch {}
 };
-const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.boat-shop-root', '.potion-shop-root', '.dealer-shop-root', '.inv-root'];
+const OVERLAY_ROOTS = ['.dialogue-root', '.quest-board-root', '.boat-shop-root', '.potion-shop-root', '.dealer-shop-root', '.trade-shop-root', '.inv-root'];
 let lastOverlayOpen = null;
 const syncDialogue = () => {
   const open = OVERLAY_ROOTS.some(selector => document.querySelector(selector)?.style?.display === 'flex');
