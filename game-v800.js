@@ -6209,10 +6209,37 @@ function assertLocalRanchMutation(){
   if(hasOnlineMonsterSession){msg('ข้อมูลมอนสเตอร์ออนไลน์ใช้เซิร์ฟเวอร์เท่านั้น • คำสั่ง NPC นี้ยังไม่เปิด');return false;}
   return true;
 }
+
+function setMonsterOverlayOpen(open){
+  const apply=doc=>{
+    if(!doc?.body)return;
+    if(open) doc.body.dataset.monsterOverlay='open';
+    else delete doc.body.dataset.monsterOverlay;
+  };
+  apply(document);
+  try{
+    if(window.parent&&window.parent!==window) apply(window.parent.document);
+  }catch{}
+  try{
+    window.parent?.postMessage({type:'pocketmonster:monster-overlay-v1',open:!!open},'*');
+  }catch{}
+}
+function promoteMonsterOverlayNode(node){
+  if(!node)return;
+  const host=(()=>{try{return window.parent?.document?.body||document.body;}catch{return document.body;}})();
+  try{
+    if(host&&node.ownerDocument===host.ownerDocument&&node.parentElement!==host) host.appendChild(node);
+    else if(node.parentElement!==document.body) document.body.appendChild(node);
+  }catch{
+    try{ if(node.parentElement!==document.body) document.body.appendChild(node); }catch{}
+  }
+}
 function revealMonsterManager(tab){
   if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');
   applyLifeSimulation(Date.now(),true);
   const manager=el('monsterManager');
+  promoteMonsterOverlayNode(manager);
+  setMonsterOverlayOpen(true);
   manager.classList.remove('hidden');
   manager.classList.toggle('character-manager-mode',characterUI.snapshot().source==='character');
   const close=el('closeManager');
@@ -6233,14 +6260,16 @@ function installPirateMonsterBagButton(){
   // Keep POCKETMONSTER_OPEN_MONSTER_BAG as the open API for that utility.
   return;
 }
-function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
+function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}promoteMonsterOverlayNode(el('ranchServices'));setMonsterOverlayOpen(true);el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
 function showRanchStorageShell({remote=false}={}){
   const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc(),allowRemote:remote});
   if(!result.ok){msg(result.reasonText);return result;}
   // โลกโจรสลัดซ่อน HUD เดิมทั้งกลุ่ม ให้กระเป๋าเป็นหน้าต่างแยกจากกลุ่มนั้น
   const storagePage=el('ranchStoragePage');
-  if(remote&&storagePage.parentElement!==document.body)document.body.appendChild(storagePage);
-  el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
+  if(!storagePage){msg('ยังไม่พบหน้าต่างคลังมอนสเตอร์');return {ok:false,reason:'missing-ui'};}
+  promoteMonsterOverlayNode(storagePage);
+  setMonsterOverlayOpen(true);
+  el('ranchServices')?.classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
   remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
   const request=++remoteBagRequest;
   renderRanchStoragePage();
@@ -6253,7 +6282,7 @@ function showRanchStorageShell({remote=false}={}){
   return result;
 }
 window.POCKETMONSTER_OPEN_MONSTER_BAG=()=>showRanchStorageShell({remote:true});
-function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');if(panel!=='storage'){remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;}}
+function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');if(panel!=='storage'){remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;}if(panel!=='services'&&panel!=='storage')setMonsterOverlayOpen(false);}
 function openRanchBreeding(){if(!assertRanchOperation())return;if(serverPlayerDataActive){msg('Breeding ของ NPC ยังไม่เปิดคำสั่งเซิร์ฟเวอร์ • ยังไม่เปลี่ยนข้อมูล');return;}el('ranchServices').classList.add('hidden');openManager({source:'npc'});setManagerTab('breeding');}
 function openManager(options={}){
   const source=options.source==='character'?'character':'npc';
@@ -6272,6 +6301,7 @@ function openManager(options={}){
   return gate;
 }
 function closeManager(){
+  setMonsterOverlayOpen(false);
   const snap=characterUI.snapshot();
   const returnToQuick=snap.source==='character'&&snap.characterStack.some(frame=>frame.resumePanel==='quick'||frame.resumePanel==='tab'||frame.returnTo==='quick');
   if(returnToQuick){
