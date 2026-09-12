@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=5';
+} from './online-world-bridge-v900.mjs?v=6';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -20,9 +20,9 @@ import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=952';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=2';
+import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=3';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=2';
-import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs';
+import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '72');
+  url.searchParams.set('shellRevision', '73');
   return url.href;
 }
 
