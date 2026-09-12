@@ -21,7 +21,8 @@ assert.doesNotMatch(boot, /allow-same-origin/, 'opaque sandbox must not re-add a
 
 // The sandboxed child admits only its authenticated parent + session
 // capability, then hands the package to the live AssetEngine bridge.
-assert.match(client, /event\.source !== window\.parent \|\| event\.origin !== parentOrigin/);
+assert.match(client, /isTrustedShellSource/, 'nested Pirate client accepts trusted top-shell inventory posts');
+assert.match(client, /event\.origin !== parentOrigin/);
 assert.match(client, /message\?\.capability === studioCapability && message\.type === PIRATE_STUDIO_CHARACTER_PACKAGE/);
 assert.match(client, /receivePirateStudioCharacterPackage\(message\.package\)/);
 assert.match(client, /PIRATE_STUDIO_CHARACTER_READY/);

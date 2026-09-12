@@ -22,7 +22,8 @@ assert.doesNotMatch(boot, /frame\.hidden\s*=\s*true/);
 
 // The child must be able to complete the Studio handshake without exposing
 // gameplay state or accepting an unauthenticated cross-origin message.
-assert.match(child, /event\.source !== window\.parent \|\| event\.origin !== parentOrigin/);
+assert.match(child, /isTrustedShellSource/, 'nested Pirate client accepts trusted top-shell inventory posts');
+assert.match(child, /event\.origin !== parentOrigin/);
 assert.match(child, /message\?\.capability === studioCapability && message\.type === PIRATE_STUDIO_CHARACTER_PACKAGE/);
 assert.match(child, /receivePirateStudioCharacterPackage\(message\.package\)/);
 assert.match(child, /PIRATE_STUDIO_CHARACTER_READY/);
