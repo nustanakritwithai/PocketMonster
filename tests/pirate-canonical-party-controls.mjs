@@ -20,7 +20,7 @@ function button(id) {
   const classes = new Set();
   return {
     id, dataset: {}, title: '', hidden: false, disabled: false,
-    classList: { toggle(name, value) { value ? classes.add(name) : classes.delete(name); } },
+    classList: { toggle(name, value) { value ? classes.add(name) : classes.delete(name); }, contains(name) { return classes.has(name); } },
     addEventListener(type, fn) { listeners.set(type, fn); },
     removeEventListener(type, fn) { if (listeners.get(type) === fn) listeners.delete(type); },
     setAttribute(name, value) { attrs.set(name, String(value)); },
@@ -65,6 +65,9 @@ const inventorySync = createPirateMonsterInventorySync({
 assert.match(elements.get('monsterSlot1Btn').getAttribute('aria-label'), /Alpha/);
 elements.get('monsterSlot1Btn').dispatch('pointerdown');
 assert.equal(controller.snapshot().held?.instanceId, 'owned:a', 'pointerdown prepares the canonical server slot');
+assert.equal(elements.get('monsterSlot1Btn').dataset.held, 'true', 'held state stays on the canonical slot');
+assert.equal(elements.get('monsterSlot1Btn').getAttribute('aria-pressed'), 'true', 'held slot is exposed as pressed');
+assert.equal(elements.get('monsterSlot1Btn').classList.contains('selected'), true, 'held slot gets the Pirate selected state');
 
 canonicalBag = { available: true, revision: 2, slots: [
   { available: true, instanceId: 'owned:a', name: 'Alpha', icon: '🦊' },

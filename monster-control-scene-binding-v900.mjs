@@ -57,9 +57,26 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
       const entry = snapshot.slots?.[slot];
       if (entry) { button.dataset.pirateIcon = `${entry.icon || '🐾'}\n${(entry.name || 'ว่าง').slice(0, 12)}`; button.title = entry.name || 'ช่องว่าง'; }
       const opened = snapshot.controlPanel?.mode === 'monster' && snapshot.controlPanel.instanceId === entry?.instanceId;
+      const pirate = isPirate();
+      const held = pirate
+        ? snapshot.held?.index === slot && snapshot.held?.instanceId === entry?.instanceId
+        : Boolean(entry?.held);
+      const actionLabel = pirate
+        ? (opened ? 'กลับไปสกิลตัวละคร' : held ? 'พร้อมปามอนสเตอร์' : entry?.active ? 'เปิดสกิลมอนสเตอร์' : 'เตรียมมอนสเตอร์')
+        : (opened ? 'กลับไปสกิลตัวละคร' : entry?.active ? 'เปิดสกิลมอนสเตอร์' : entry?.held ? 'พร้อมปามอนสเตอร์' : 'เตรียมมอนสเตอร์');
       button.setAttribute('aria-label', !entry?.available ? 'ช่องมอนสเตอร์ว่าง'
-        : `${entry.name || 'มอนสเตอร์'} • ${opened ? 'กลับไปสกิลตัวละคร' : entry.active ? 'เปิดสกิลมอนสเตอร์' : entry.held ? 'พร้อมปามอนสเตอร์' : 'เตรียมมอนสเตอร์'}`);
-      button.setAttribute('aria-pressed', String(opened));
+        : `${entry.name || 'มอนสเตอร์'} • ${actionLabel}`);
+      button.setAttribute('aria-pressed', String(pirate ? opened || held : opened));
+      // Pirate owns these three scene buttons. Keep held/active state on the
+      // canonical slot instead of exposing a second selected-monster button.
+      if (pirate) {
+        button.dataset.held = String(held);
+        button.dataset.active = String(Boolean(entry?.active));
+        button.dataset.fainted = String(Boolean(entry?.fainted));
+        button.classList?.toggle?.('selected', held);
+        button.classList?.toggle?.('active-monster', Boolean(entry?.active));
+        button.classList?.toggle?.('fainted-slot', Boolean(entry?.fainted));
+      }
       button.classList?.toggle?.('monster-control-open', opened);
     }
   });

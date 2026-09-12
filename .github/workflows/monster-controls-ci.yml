@@ -53,6 +53,7 @@ jobs:
           node tests/pirate-active-presence-prewarm.mjs
           node tests/pirate-canonical-party-controls.mjs
           node tests/pirate-monster-bag-window.mjs
+          node tests/v90-pirate-hud-scene-slots.mjs
           node tests/v90-unified-roster-stack.mjs
           node tests/v90-unified-hud-world-lifecycle.mjs
           node tests/v90-remote-monster-combat-parity.mjs
