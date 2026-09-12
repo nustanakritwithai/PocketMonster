@@ -141,6 +141,9 @@ function requireHealthyParentServerGate() {
 }
 
 let bootStage = 'session';
+const recordStartupDiagnostic = (...args) => globalThis.POCKETMONSTER_RECORD_STARTUP_DIAGNOSTIC?.(...args);
+await import('./startup-errors.mjs');
+recordStartupDiagnostic('scene-entry-start', { stage: bootStage });
 try {
   sceneLease = registerParentSceneBoot();
   config = window.parent.POCKETMONSTER_RUNTIME_CONFIG || null;
@@ -162,6 +165,7 @@ try {
   window.POCKETMONSTER_SCENE_EMBEDDED = true;
 
   bootStage = 'template';
+  recordStartupDiagnostic('scene-boot-phase', { stage: bootStage });
   const templateUrl = new URL('./v900.html?v=919', import.meta.url);
   const templateResponse = await fetch(templateUrl, { cache: 'no-store', signal: sceneLifetime.signal });
   requireLiveScene();
@@ -190,16 +194,19 @@ try {
   });
 
   bootStage = 'startup';
+  recordStartupDiagnostic('scene-boot-phase', { stage: bootStage });
   requireLiveScene();
-  await import('./startup-errors.mjs');
   bootStage = 'runtime';
+  recordStartupDiagnostic('scene-boot-phase', { stage: bootStage });
   requireLiveScene();
   await import('./worlds-v900.mjs?v=961');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
   }
+  recordStartupDiagnostic('scene-ready', { stage: bootStage });
 } catch (error) {
+  recordStartupDiagnostic('scene-boot-error', { stage: bootStage, code: error?.code, message: error?.message });
   if (!sceneEnded && error?.name !== 'AbortError') {
     const reported = reportParentSceneBoot(Object.freeze({
       status: 'error',

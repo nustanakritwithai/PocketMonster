@@ -19,6 +19,7 @@ const actualSources = new Map([
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
   ['/unified-mobile-controls-v900.mjs', read('unified-mobile-controls-v900.mjs')],
   ['/mobile-dual-pointer-input-v900.mjs', read('mobile-dual-pointer-input-v900.mjs')],
+  ['/startup-errors.mjs', read('startup-errors.mjs')],
 ]);
 const realTemplateText = read('v900.html');
 
@@ -370,10 +371,7 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
         },
       });
     }
-    if (pathname === '/startup-errors.mjs') {
-      metrics.timeline.push('module:startup-errors');
-      return makeSynthetic(resolvedUrl, {});
-    }
+    if (pathname === '/startup-errors.mjs') metrics.timeline.push('module:startup-errors');
     if (pathname === '/chat-runtime.mjs') {
       throw new Error('hosted child attempted to import chat-runtime');
     }
@@ -459,7 +457,7 @@ function assertBootOrder(metrics) {
   assert.ok(index('scene:register') >= 0 && index('scene:register') < index('fetch:template'));
   assert.ok(index('dom:parse-template') > index('fetch:template-text'));
   assert.ok(index('dom:replace:2') > index('dom:parse-template'));
-  assert.ok(index('dynamic:/startup-errors.mjs') > index('dom:replace:2'));
+  assert.ok(index('dynamic:/startup-errors.mjs') < index('dom:replace:2'));
   assert.ok(index('dynamic:/worlds-v900.mjs') > index('dynamic:/startup-errors.mjs'));
   assert.ok(index('module:runtime:') > index('dynamic:/worlds-v900.mjs'));
   assert.ok(index('scene:report:ready') > index('module:runtime:'));
@@ -507,12 +505,22 @@ for (const expected of worldCases) {
   assert.equal(metrics.actualLoads.filter(path => path === '/worlds-v900.mjs').length, 1);
   assert.deepEqual(metrics.runtimeImports.map(url => new URL(url).pathname + new URL(url).search), [expected.runtime.slice(1)]);
   assert.equal(metrics.webSocketConstructs, 0);
-  assert.equal(metrics.sessionStorageReads, 0);
+  assert.ok(metrics.sessionStorageReads >= 1, 'startup diagnostics may read only its bounded same-origin session storage');
   assert.equal(metrics.dynamicImports.some(item => item.resolvedUrl.includes('/chat-runtime.mjs')), false);
   assert.equal(metrics.staticImports.some(item => item.fromPath === '/scene-entry-v900.mjs'
     && item.resolvedUrl.includes('/runtime-config.mjs')), false, 'hosted scene entry cannot independently load or normalize another config');
   assert.equal(metrics.staticImports.some(item => /entry-preload|firebase-launcher/.test(item.resolvedUrl)), false);
   assertBootOrder(metrics);
+
+  const startupStatus = elements.get('startupStatus');
+  childWindow.dispatchEvent(Object.assign(new Event('error'), {
+    message: 'post-template parent failure',
+    filename: 'https://game.example/scene-entry-v900.mjs?ticket=secret',
+    lineno: 17,
+  }));
+  assert.match(startupStatus.textContent, /post-template parent failure/,
+    'startup error handler resolves startupStatus after the DOM template replacement');
+  assert.match(startupStatus.className, /startup-status error/);
 
   const sceneHandle = childWindow.POCKETMONSTER_ONLINE_SCENE;
   assert.equal(sceneHandle.diagnostics().hasSessionToken, true);

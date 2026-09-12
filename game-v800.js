@@ -112,6 +112,8 @@ console.info(`Monster Life RPG V8.4.0 • PocketMonster latest progression live 
 
 const startup = document.getElementById('startupStatus');
 const sceneRuntimePrewarming=window.POCKETMONSTER_SCENE_PREWARM===true;
+const recordStartupDiagnostic = (...args) => globalThis.POCKETMONSTER_RECORD_STARTUP_DIAGNOSTIC?.(...args);
+recordStartupDiagnostic('pocket-runtime-start', { prewarming: sceneRuntimePrewarming });
 function startupText(text, cls=''){ if(startup&&!sceneRuntimePrewarming){ startup.textContent=text; startup.className='startup-status '+cls; } }
 
 async function loadThree(){
@@ -355,6 +357,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,qualityProfile.maxDpr));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=qualityProfile.shadows;
 gameMount().appendChild(renderer.domElement);
+recordStartupDiagnostic('pocket-renderer-created', { canvas: renderer.domElement?.tagName, prewarming: sceneRuntimePrewarming });
 
 const hemi=new THREE.HemisphereLight(0xffffff,0x42643d,1.55); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,2.15); sun.position.set(9,18,8); sun.castShadow=qualityProfile.shadows;
@@ -7682,6 +7685,7 @@ function loop(now){
     if(!pirateThrowPanelPaused()) renderer.render(scene,camera);
     if(firstFrame){
       firstFrame=false;
+      recordStartupDiagnostic('pocket-first-frame', { sceneRuntimeActive, renderPaused: pirateThrowPanelPaused() });
       if(startup){startup.classList.add('ok');setTimeout(()=>startup.remove(),450);}
     }
     requestAnimationFrame(loop);

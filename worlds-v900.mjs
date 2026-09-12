@@ -44,6 +44,7 @@ function combinedWorldLocation(worldId, panelId) {
 }
 
 const routeController = createSceneRouteController({ initialRoute: resolveCombinedWorld() });
+const recordStartupDiagnostic = (...args) => globalThis.POCKETMONSTER_RECORD_STARTUP_DIAGNOSTIC?.(...args);
 const savedWorldGameNodes = new Map();
 const runtimeLifecycles = new Map();
 const runtimePreparations = new Map();
@@ -165,6 +166,7 @@ function selectPanel(id) {
 async function bootWorld(id) {
   const world = worldById(id);
   if (!world) return;
+  recordStartupDiagnostic('world-boot-start', { world: world.id, runtime: world.runtime });
   document.body.dataset.combinedWorld = world.id;
   const panel = applyControlPanel(panelIdFromLocation(location, world.id), world.id);
   unifiedMobileControls.activate(world.id);
@@ -181,9 +183,11 @@ async function bootWorld(id) {
     startup.className = 'startup-status';
   }
   await import(world.runtime);
+  recordStartupDiagnostic('world-runtime-imported', { world: world.id, runtime: world.runtime });
   runtimeLifecycles.set(world.id, window.POCKETMONSTER_SCENE_LIFECYCLE || null);
   worldPresenceBindings.set(world.id, capturePresenceBindings());
   activeRuntimeId = world.id;
+  recordStartupDiagnostic('world-boot-complete', { world: world.id });
 }
 
 await bootWorld(resolveCombinedWorld());
