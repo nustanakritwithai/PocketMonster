@@ -164,6 +164,7 @@ if (typeof window !== 'undefined') {
 await presentAuthProfileBridge(runtimeConfig, firebaseUser, authProfileBridge);
 await mountServerEconomy(runtimeConfig, authProfileBridge);
 const serverPlayerDataActive=canUseServerPlayerData(runtimeConfig,serverGate,authProfileBridge);
+const hasOnlineMonsterSession=Boolean(authProfileBridge.sessionToken);
 const monsterBagStateProvider=createMonsterBagStateProvider({config:runtimeConfig,sessionToken:authProfileBridge.sessionToken,getSessionToken:()=>authProfileBridge.sessionToken});
 window.POCKETMONSTER_MONSTER_BAG=monsterBagStateProvider;
 if(typeof window!=='undefined'){
@@ -6199,9 +6200,14 @@ function assertCharacterMutable(id){
   return true;
 }
 function assertRanchOperation(){
+  if(hasOnlineMonsterSession){msg('ข้อมูลมอนสเตอร์ออนไลน์ใช้เซิร์ฟเวอร์เท่านั้น • คำสั่ง NPC นี้ยังไม่เปิด');return false;}
   if(isNearNpc()||isNearBreeding())return true;
   msg(FULL_MANAGER_NPC_REASON);
   return false;
+}
+function assertLocalRanchMutation(){
+  if(hasOnlineMonsterSession){msg('ข้อมูลมอนสเตอร์ออนไลน์ใช้เซิร์ฟเวอร์เท่านั้น • คำสั่ง NPC นี้ยังไม่เปิด');return false;}
+  return true;
 }
 function revealMonsterManager(tab){
   if(ensureCaptureBallSafety())msg('Keeper Starter Kit • Capture Ball +5');
@@ -6258,7 +6264,7 @@ function showRanchStorageShell({remote=false}={}){
 }
 window.POCKETMONSTER_OPEN_MONSTER_BAG=()=>showRanchStorageShell({remote:true});
 function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');if(panel!=='storage'){remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;}}
-function openRanchBreeding(){if(!assertRanchOperation())return;el('ranchServices').classList.add('hidden');openManager({source:'npc'});setManagerTab('breeding');}
+function openRanchBreeding(){if(!assertRanchOperation())return;if(serverPlayerDataActive){msg('Breeding ของ NPC ยังไม่เปิดคำสั่งเซิร์ฟเวอร์ • ยังไม่เปลี่ยนข้อมูล');return;}el('ranchServices').classList.add('hidden');openManager({source:'npc'});setManagerTab('breeding');}
 function openManager(options={}){
   const source=options.source==='character'?'character':'npc';
   const focused=options.monsterId||state.ui.focusedMonsterId||state.party[state.selectedSlot];
@@ -6673,13 +6679,15 @@ function renderRanchStoragePage(){
   if(!roster||!preview||!details)return;
   if(remoteBagOpen&&(!remoteBagSnapshot?.available||!monsterBagStateProvider.snapshot().available)){
     roster.textContent='';if(vault)vault.textContent='';
-    details.textContent=remoteBagStatus||'การเชื่อมต่อหมดอายุ กรุณาเปิดกระเป๋าใหม่';
+    const canClaim=monsterBagStateProvider.snapshot().code==='MIGRATION_REQUIRED';
+    details.innerHTML=(remoteBagStatus||'การเชื่อมต่อหมดอายุ กรุณาเปิดกระเป๋าใหม่')+(canClaim?'<button type="button" data-claim-starter>รับมอนสเตอร์เริ่มต้น</button>':'');
+    details.querySelector('[data-claim-starter]')?.addEventListener('click',async()=>{const result=await monsterBagStateProvider.claimStarter();if(result.ok){msg('รับมอนสเตอร์เริ่มต้นจากเซิร์ฟเวอร์แล้ว');await monsterBagStateProvider.refresh();}else msg(`รับมอนสเตอร์เริ่มต้นไม่สำเร็จ: ${result.code||'SERVER_CLAIM_FAILED'}`);renderRanchStoragePage();});
     el('ranchStorageCount').textContent='Storage —';el('ranchActiveCount').textContent='';
     syncRanchClubPreview(null);return;
   }
   const remoteState=remoteBagOpen?remoteBagSnapshot.envelope.state:null;
   const ranchIds=remoteState?.ranchActive||state.ranchActive;
-  const remoteById=new Map((remoteState?.collection||[]).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
+  const remoteById=new Map((remoteState?.collection||[]).map(mapServerMonsterToRuntimeModel).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
   const monsterForId=id=>remoteState?remoteById.get(id):getInst(id);
   const ids=(remoteState?.storage||state.storage).filter(Boolean);
   const partyIds=(remoteState?.party||state.party).filter(Boolean);
@@ -6732,7 +6740,14 @@ function renderRanchStoragePage(){
   fillColumn(vault,'ในคลัง',ids,'storage','Storage ว่าง');
   if(!selectableIds.length){
     syncRanchClubPreview(null);
-    details.innerHTML='';
+    details.textContent=remoteState?'ยังไม่มีมอนสเตอร์ในกระเป๋ากลาง':'';
+    if(remoteState&&remoteState.collection.length===0){
+      const claim=document.createElement('button');claim.type='button';claim.textContent='รับมอนสเตอร์เริ่มต้น';
+      claim.onclick=async()=>{claim.disabled=true;const result=await monsterBagStateProvider.claimStarter();
+        if(!result.ok){claim.disabled=false;details.append(document.createTextNode(` รับมอนไม่สำเร็จ: ${result.code}`));}
+        else {remoteBagSnapshot=result.state;renderRanchStoragePage();}
+      };details.appendChild(claim);
+    }
     return;
   }
   const focused=monsterForId(ranchStorageFocusId),inParty=focused&&(remoteState?.party||state.party).includes(focused.instanceId);
@@ -6745,11 +6760,11 @@ function renderRanchStoragePage(){
   const ranchOn=(remoteState?.ranchActive||state.ranchActive).includes(focused.instanceId);
   const remoteSlots=monsterBagStateProvider.snapshot().slots||[];
   const remoteStatus=!remoteBagOpen?'':monsterBagStateProvider.snapshot().available
-    ? `<div class="storage-actions remote-party-slots" aria-label="จัดช่องเรียกบนเซิร์ฟเวอร์">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่อง '+(index+1)}</button>`).join('')}</div>`
+    ? `<div class="storage-actions remote-party-slots" aria-label="จัดช่องเรียกบนเซิร์ฟเวอร์">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่อง '+(index+1)}</button>`).join('')}</div><div class="storage-actions remote-placement" aria-label="จัดตำแหน่งบนเซิร์ฟเวอร์">${inParty?'<button type="button" data-remote-move="storage">ฝากเข้าคลัง</button>':`<button type="button" data-remote-move="${ranchOn?'storage':'ranch'}">${ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active'}</button>`}</div>`
     : '<div class="manager-empty remote-party-status">กำลังโหลดข้อมูล Party จากเซิร์ฟเวอร์…</div>';
   const localActions=remoteState?'':'<div class="storage-actions">'+(inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>')+'</div>';
   details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'} </b>Ranch</span></div>${remoteStatus}${localActions}`;
-  details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
+   details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
     details.querySelectorAll('[data-remote-party-slot]').forEach(item=>{item.disabled=true;});
     const result=await monsterBagStateProvider.assignToSlot(focused.instanceId,Number(button.dataset.remotePartySlot));
     if(result.ok){
@@ -6758,8 +6773,14 @@ function renderRanchStoragePage(){
       try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;void provider?.refresh?.();}catch{}
       renderRanchStoragePage();
     }
-    else {const reason={SERVER_ASSIGN_TIMEOUT:'เซิร์ฟเวอร์ตอบช้า',SERVER_WRITES_DISABLED:'ระบบบันทึกยังไม่เปิด',MONSTER_NOT_OWNED:'ไม่พบมอนนี้ในบัญชี',SERVER_ASSIGN_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง',STALE_SESSION:'เซสชันหมดอายุ'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการจัดช่อง';msg(`บันทึกช่องเรียกไม่สำเร็จ: ${reason}`);renderRanchStoragePage();}
-  }));
+    else {const reason={SERVER_ASSIGN_TIMEOUT:'เซิร์ฟเวอร์ตอบช้า',SERVER_WRITES_DISABLED:'ระบบบันทึกยังไม่เปิด',MONSTER_NOT_OWNED:'ไม่พบมอนนี้ในบัญชี',SERVER_ASSIGN_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง',STALE_SESSION:'เซสชันหมดอายุ',MIGRATION_REQUIRED:'ข้อมูลเดิมยังไม่ถูกย้ายขึ้นเซิร์ฟเวอร์'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการจัดช่อง';msg(`บันทึกช่องเรียกไม่สำเร็จ: ${reason}`);renderRanchStoragePage();}
+   }));
+   details.querySelectorAll('[data-remote-move]').forEach(button=>button.addEventListener('click',async()=>{
+     details.querySelectorAll('[data-remote-move]').forEach(item=>{item.disabled=true;});
+     const result=await monsterBagStateProvider.moveTo(focused.instanceId,button.dataset.remoteMove);
+     if(result.ok){remoteBagSnapshot=result.state;msg(`${displayName(focused)} ${button.dataset.remoteMove==='ranch'?'ย้ายเข้า Ranch แล้ว':'ฝากเข้าคลังแล้ว'}`);renderRanchStoragePage();}
+     else {const reason={MIGRATION_REQUIRED:'ข้อมูลเดิมยังไม่ถูกย้ายขึ้นเซิร์ฟเวอร์',SESSION_UNAVAILABLE:'เซสชันไม่พร้อม',STALE_SESSION:'เซสชันหมดอายุ',SERVER_MOVE_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการย้ายตำแหน่ง';msg(`ย้ายตำแหน่งไม่สำเร็จ: ${reason}`);renderRanchStoragePage();}
+   }));
   details.querySelector('[data-storage-deposit]')?.addEventListener('click',()=>depositMonster(focused.instanceId));
   details.querySelector('[data-storage-withdraw]')?.addEventListener('click',()=>withdrawMonster(focused.instanceId));
   details.querySelector('[data-storage-ranch]')?.addEventListener('click',()=>toggleRanchActive(focused.instanceId));
@@ -7287,12 +7308,42 @@ function migrateLoadedState(s){
   attachCharacterUi(state);
   characterUI?.closeAll();
 }
+function mapServerMonsterToRuntimeModel(monster){
+  const raw=monster&&typeof monster==='object'?monster:{};
+  const candidates=[raw.runtimeSpeciesId,raw.speciesId,raw.species,raw.id].filter(v=>typeof v==='string'&&v);
+  let runtimeSpeciesId=candidates.find(id=>spById[id]);
+  if(!runtimeSpeciesId){
+    const formCandidates=[raw.formId,raw.canonicalFormId].filter(v=>typeof v==='string'&&v);
+    runtimeSpeciesId=Object.keys(spById).find(id=>{
+      const mapping=monsterCatalogEntry(id);
+      return candidates.includes(mapping?.runtimeSpeciesId)||formCandidates.includes(mapping?.workbookBaseMonsterId)||formCandidates.includes(mapping?.workbookStage2MonsterId);
+    });
+  }
+  if(!runtimeSpeciesId)return null;
+  const mapped={...raw,speciesId:runtimeSpeciesId,instanceId:raw.instanceId};
+  if(!mapped.formId)mapped.formId=runtimeSpeciesId;
+  return mapped;
+}
+function mapServerStateToRuntimeModel(source){
+  if(!source||typeof source!=='object')return null;
+  const collection=(Array.isArray(source.collection)?source.collection:[]).map(mapServerMonsterToRuntimeModel).filter(Boolean);
+  const known=new Set(collection.map(monster=>monster.instanceId));
+  const keepIds=values=>Array.isArray(values)?values.filter(id=>typeof id==='string'&&known.has(id)):[];
+  return {...source,collection,party:Array.from({length:3},(_,i)=>known.has(source.party?.[i])?source.party[i]:null),storage:keepIds(source.storage),ranchActive:keepIds(source.ranchActive)};
+}
+function applyCanonicalMonsterSnapshot(snapshot){
+  const canonical=snapshot.available?mapServerStateToRuntimeModel(snapshot.envelope.state):{collection:[],party:[null,null,null],storage:[],ranchActive:[]};
+  state.collection=canonical.collection;state.party=canonical.party;state.storage=canonical.storage;state.ranchActive=canonical.ranchActive;
+  syncRanchVisuals();syncHubCompanion();renderHUD();
+  window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.refresh?.();
+  if(remoteBagOpen){remoteBagSnapshot=snapshot;remoteBagStatus=snapshot.available?'':`โหลดกระเป๋าไม่สำเร็จ: ${snapshot.code||'SERVER_UNAVAILABLE'}`;renderRanchStoragePage();}
+}
 let remoteSaveReady=false,remoteSaveSyncing=false,remoteSavePending=false,serverSaveRevision=0;
 function currentSaveEnvelope(){
   return {state:sanitizeStateForPersistence(persistableState(state)),playerHp:playerData.hp,saveSchemaVersion:SAVE_SCHEMA_VERSION};
 }
 async function loadPrimaryRemoteSave(){
-  if(!serverPlayerDataActive)return loadRemoteSave();
+  if(!hasOnlineMonsterSession)return loadRemoteSave();
   const [saved,playerState]=await Promise.all([
     loadServerSave(runtimeConfig,authProfileBridge.sessionToken),
     readPlayerState(runtimeConfig,authProfileBridge.sessionToken),
@@ -7305,7 +7356,8 @@ async function loadPrimaryRemoteSave(){
   return saved?.envelope??null;
 }
 async function savePrimaryRemoteSave(envelope){
-  if(!serverPlayerDataActive)return saveRemoteSave(envelope);
+  if(!hasOnlineMonsterSession)return saveRemoteSave(envelope);
+  if(!serverPlayerDataActive)throw new Error('SERVER_WRITES_DISABLED');
   const result=await saveServerSave(runtimeConfig,authProfileBridge.sessionToken,envelope,{revision:serverSaveRevision,clientVersion:'8.4.0'});
   serverSaveRevision=result.revision;
   return result;
@@ -7400,7 +7452,7 @@ bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage
 installPirateMonsterBagButton();
 const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs');
 mountDirectMonsterControls({windowLike:window,config:runtimeConfig,sessionToken:authProfileBridge.sessionToken});
-document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
+document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:hasOnlineMonsterSession});});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
 document.querySelector('[data-ranch-back]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeRanchSurface();});
@@ -7635,7 +7687,13 @@ function ensureWildPopulation(dt){
 function updatePlayer(dt){if(pirateThrowPanelPaused()){playerData.invuln=Math.max(0,playerData.invuln-dt);playerVisual.update(dt,{moving:false});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});return;}playerData.invuln=Math.max(0,playerData.invuln-dt);let side=0,fwd=0;if(keys.KeyA)side-=1;if(keys.KeyD)side+=1;if(keys.KeyW)fwd+=1;if(keys.KeyS)fwd-=1;side+=joy.x;fwd+=-joy.y;const moving=Math.hypot(side,fwd)>.05;if(moving){const dir=cameraRight().multiplyScalar(side).add(forward().multiplyScalar(fwd)).normalize(),bounds=ZONES[state.currentZone]?.bounds||{minX:-32,maxX:32,minZ:-32,maxZ:32};player.position.addScaledVector(dir,playerData.speed*dt);player.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;player.position.x=THREE.MathUtils.clamp(player.position.x,bounds.minX,bounds.maxX);player.position.z=THREE.MathUtils.clamp(player.position.z,bounds.minZ,bounds.maxZ);}animateEntity(player,dt,moving,.8);playerVisual.update(dt,{moving});keeperVisual.update(dt,{moving:false});merchantVisual.update(dt,{moving:false});trainerVisual.update(dt,{moving:false});evolutionVisual.update(dt,{moving:false});breedingVisual.update(dt,{moving:false});}
 function updateCamera(dt){const f=forward(),distance=5.15,heightLift=.95,lookAhead=2.05,horizontal=Math.cos(cameraPitch)*distance,height=Math.sin(cameraPitch)*distance+heightLift,desired=player.position.clone().add(new THREE.Vector3(0,height,0)).add(f.clone().multiplyScalar(-horizontal));if(!updateCamera.ready){camera.position.copy(desired);updateCamera.ready=true;}else camera.position.lerp(desired,1-Math.pow(.001,dt));const look=player.position.clone().add(new THREE.Vector3(0,1.36,0)).add(f.clone().multiplyScalar(lookAhead));if(cameraShake.time>0){cameraShake.time=Math.max(0,cameraShake.time-dt);cameraShake.phase+=dt*56;const k=cameraShake.duration>0?cameraShake.time/cameraShake.duration:0,mag=cameraShake.mag*k,sx=Math.sin(cameraShake.phase)*mag,sy=Math.cos(cameraShake.phase*1.7)*mag*.62,sz=Math.sin(cameraShake.phase*.73)*mag*.42;camera.position.add(new THREE.Vector3(sx,sy,sz));look.add(new THREE.Vector3(-sx*.28,sy*.18,-sz*.18));if(cameraShake.time<=0){cameraShake.mag=0;cameraShake.duration=0;}}camera.lookAt(look);}
 
-loadGame();ensureStarter();const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);renderAll();saveGame(false);
+loadGame();
+if(hasOnlineMonsterSession){
+  // Online ใช้ชุดมอนสเตอร์จากเซิร์ฟเวอร์เท่านั้น; Save ในเครื่องยังคงอยู่แต่ห้ามนำมา bootstrap เกม
+  state.collection=[];state.party=[null,null,null];state.storage=[];state.ranchActive=[];state.selectedSlot=0;
+}
+const initialZone=state.currentZone;state.currentZone='hub';switchZone(initialZone,true);if(!hasOnlineMonsterSession){ensureStarter();saveGame(false);}renderAll();
+if(hasOnlineMonsterSession)monsterBagStateProvider.subscribe(applyCanonicalMonsterSnapshot);
 function reloadWorldFromLoadedState(){
   const loadedZone=state.currentZone;
   state.currentZone='hub';
@@ -7650,7 +7708,12 @@ async function flushRemoteSaveUntilSettled(){
   remoteSaveSyncing=false;
 }
 async function syncCloudSave(){
-  if(launchSession&&!serverPlayerDataActive){
+  if(hasOnlineMonsterSession){
+    remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
+    await monsterBagStateProvider.refresh();
+    return;
+  }
+  if(launchSession&&!hasOnlineMonsterSession){
     remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
     return;
   }
@@ -7658,15 +7721,20 @@ async function syncCloudSave(){
   try{
     const remote=await loadPrimaryRemoteSave();
     let successMessage='สร้างข้อมูลผู้เล่นบน Cloud สำเร็จ';
+    if(hasOnlineMonsterSession&&!remote?.state){
+      remoteSaveReady=false;remoteSaveSyncing=false;remoteSavePending=false;
+      msg('ยังไม่มี Save บนเซิร์ฟเวอร์ • ไม่โหลดหรืออัปโหลดข้อมูลในเครื่อง');
+      return;
+    }
     if(remote?.state){
-      migrateLoadedState(remote.state);
+      migrateLoadedState(hasOnlineMonsterSession?mapServerStateToRuntimeModel(remote.state):remote.state);
       playerData.hp=Number.isFinite(remote.playerHp)?remote.playerHp:100;
       applyLifeSimulation(Date.now(),true);
       reloadWorldFromLoadedState();
       renderAll();
       successMessage='โหลดข้อมูล Cloud สำเร็จ';
     }
-    await flushRemoteSaveUntilSettled();
+    if(serverPlayerDataActive)await flushRemoteSaveUntilSettled();
     if(serverPlayerDataActive){
       await syncPlayerData(runtimeConfig,authProfileBridge.sessionToken,{playerHp:String(playerData.hp),playerExp:String(state.exp??0),actionLog:'CLIENT_BOOT_SYNC'});
       try{

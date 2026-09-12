@@ -53,4 +53,49 @@ const unconfirmed = createMonsterBagStateProvider({ config, sessionToken: 'fixtu
 });
 assert.equal((await unconfirmed.assignToSlot('owned_b', 1)).code, 'SERVER_ASSIGN_UNCONFIRMED', 'ACK อย่างเดียวไม่ยืนยันว่าปุ่มผูกมอนถูกตัว');
 unconfirmed.dispose();
-console.log('Monster bag canonical assignment: PASS');
+let inventory = structuredClone(original.envelope.state), revision = 4;
+let readFails = false;
+const urls = [];
+const central = createMonsterBagStateProvider({ config, sessionToken: 'fixture-session', fetchImpl: async (url, init) => {
+  urls.push(url);
+  if (init.method === 'POST') {
+    const command = JSON.parse(init.body);
+    assert.equal(command.expectedRevision, revision);
+    assert.equal(command.destination, 'ranch');
+    assert.equal(command.instanceId, 'owned_b');
+    inventory.ranchActive = ['owned_b']; revision++;
+    return new Response(JSON.stringify({ ok: true, revision }));
+  }
+  if (readFails) return new Response(JSON.stringify({ ok: false, code: 'INVENTORY_UNAVAILABLE' }), { status: 503 });
+  return new Response(JSON.stringify({ ok: true, revision, inventory }));
+} });
+const changes = [];
+const unsubscribe = central.subscribe(value => changes.push(value.available));
+await central.refresh();
+assert.equal((await central.moveTo('owned_b', 'ranch')).ok, true);
+assert.deepEqual(central.snapshot().envelope.state.storage, ['owned_b']);
+assert.deepEqual(central.snapshot().envelope.state.ranchActive, ['owned_b']);
+assert.equal(urls.some(url => url.endsWith('/api/save')), false, 'กระเป๋าไม่อ่านเซฟออฟไลน์/เซฟรวมเป็น fallback');
+assert.ok(urls.some(url => url.endsWith('/api/monsters/placement')));
+readFails = true;
+assert.equal((await central.refresh()).code, 'INVENTORY_UNAVAILABLE');
+assert.equal(central.snapshot().available, false);
+assert.equal(changes.at(-1), false, 'ทุกหน้าต้องเห็นข้อมูลไม่พร้อมพร้อมกัน');
+unsubscribe(); central.dispose();
+let starterState = { collection: [], party: [null,null,null], storage: [], ranchActive: [] };
+const starterCommands = [];
+const fresh = createMonsterBagStateProvider({ config, sessionToken: 'fixture-session', fetchImpl: async (url, init) => {
+  if (init.method === 'POST') {
+    assert.ok(url.endsWith('/api/monsters/starter'));
+    const command = JSON.parse(init.body); starterCommands.push(command);
+    assert.deepEqual(Object.keys(command), ['commandId'], 'ชนิด/เลเวล/มอนเก่าไม่ถูกส่งจาก client');
+    starterState = { ...starterState, collection: [{ instanceId: 'server_starter', speciesId: 'normalooze' }], party: ['server_starter',null,null] };
+    return new Response(JSON.stringify({ ok: true, revision: 1 }));
+  }
+  return new Response(JSON.stringify({ ok: true, revision: starterState.collection.length, inventory: starterState }));
+} });
+assert.equal((await fresh.claimStarter()).ok, true);
+assert.equal(fresh.snapshot().slots[0].instanceId, 'server_starter');
+assert.equal(starterCommands.length, 1);
+fresh.dispose();
+console.log('Monster bag canonical assignment and ranch inventory: PASS');
