@@ -29,7 +29,7 @@ const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
-assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=956/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=957/, 'world catalog keeps the current Pirate boot module revision');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=66/, 'top-level entry cache-busts the unified ship-control shell');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=62/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
 assert.match(sceneHtml, /style-v900\.css\?v=970/, 'scene HTML cache-busts the helm placement beside chat');
