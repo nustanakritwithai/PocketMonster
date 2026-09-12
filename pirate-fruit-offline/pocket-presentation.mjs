@@ -15,7 +15,8 @@ import {
   PIRATE_FRUIT_CONTROL_HUD_MESSAGE,
   PIRATE_FRUIT_CONTROL_HUD_STYLE_ID,
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
-} from '../pirate-fruit-control-hud-v900.mjs?v=20';
+  PIRATE_FRUIT_INVENTORY_MESSAGE,
+} from '../pirate-fruit-control-hud-v900.mjs?v=22';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 const studioCapability = new URLSearchParams(location.search).get('studioCapability');
@@ -69,6 +70,11 @@ window.addEventListener('message', event => {
       source: 'pirate-fruit',
       error: message.error || 'Studio package unavailable',
     });
+    return;
+  }
+  if (message?.type === PIRATE_FRUIT_INVENTORY_MESSAGE) {
+    const button = document.querySelector('.inv-open-button');
+    if (button && typeof button.click === 'function') button.click();
     return;
   }
   if (message?.type !== PIRATE_FRUIT_CONTROL_HUD_MESSAGE || !['human', 'throw'].includes(message.panel)) return;
