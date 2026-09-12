@@ -1,0 +1,59 @@
+name: Player authority composed cross-repo proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_run_id:
+        description: Successful MonsterLifeServer run ID that uploaded the generated wire fixture
+        required: true
+      server_artifact_name:
+        description: Server artifact name containing player-authority-wire.actual.generated.json
+        required: true
+        default: player-authority-wire-export
+      pirate_run_id:
+        description: Successful Pirate-fruit run ID that uploaded the pinned receiver proof
+        required: true
+      pirate_artifact_name:
+        description: Pirate artifact name containing receiver-proof.json
+        required: true
+        default: player-authority-receiver-proof
+      fixture_sha256:
+        description: Expected SHA256 of the generated Server wire fixture
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  composed-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download generated Server wire fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVER_RUN_ID: ${{ inputs.server_run_id }}
+          SERVER_ARTIFACT_NAME: ${{ inputs.server_artifact_name }}
+        run: |
+          mkdir -p ci-input/server
+          gh run download "$SERVER_RUN_ID" --repo nustanakritwithai/MonsterLifeServer --name "$SERVER_ARTIFACT_NAME" --dir ci-input/server
+      - name: Download pinned Pirate receiver proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIRATE_RUN_ID: ${{ inputs.pirate_run_id }}
+          PIRATE_ARTIFACT_NAME: ${{ inputs.pirate_artifact_name }}
+        run: |
+          mkdir -p ci-input/pirate
+          gh run download "$PIRATE_RUN_ID" --repo nustanakritwithai/Pirate-fruit- --name "$PIRATE_ARTIFACT_NAME" --dir ci-input/pirate
+      - name: Run composed Server to Client to Pirate proof
+        env:
+          SERVER_PLAYER_AUTHORITY_FIXTURE: ci-input/server/player-authority-wire.actual.generated.json
+          SERVER_PLAYER_AUTHORITY_FIXTURE_SHA256: ${{ inputs.fixture_sha256 }}
+          PIRATE_RECEIVER_PROOF: ci-input/pirate/receiver-proof.json
+          PIRATE_RECEIVER_COMMIT: cda05f7594adc28c4194d0f8677a45f05d44a8cf
+        run: node tests/v90-player-authority-cross-repo.mjs
