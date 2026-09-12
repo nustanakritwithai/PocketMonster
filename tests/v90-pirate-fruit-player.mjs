@@ -127,7 +127,7 @@ assert.match(liveJs, /POCKETMONSTER_SCENE_MOUNT_TARGET[\s\S]*sceneRuntimeActive=
 assert.match(liveJs, /window\.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS\?\.reset\?\.\(reason\);[\s\S]*for\(const code of Object\.keys\(keys\)\)keys\[code\]=false;[\s\S]*window\.dispatchEvent\(new Event\('resize'\)\)/, 'Pocket lifecycle rearms the shared control surface after every scene mount');
 assert.match(liveJs, /pirateFruitReturnPortalNeedsExit=false/, 'Pocket return portal has an explicit re-arm state');
 assert.match(liveJs, /if\(pirateFruitReturnPortalNeedsExit\)\{[\s\S]*if\(distance>2\.75\)pirateFruitReturnPortalNeedsExit=false/, 'Pocket return portal waits for the player to leave its trigger radius before rearming');
-assert.match(liveJs, /unmount:\(\)=>\{pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive\(false\);\}/, 'Pocket return portal resets and rearms safely across repeated scene round trips');
+assert.match(liveJs, /unmount:\(\)=>\{setHeldMonsterVisual\(null\);pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive\(false\);\}/, 'ออกจากฉากต้องเก็บภาพบอลที่ถือและคืนสถานะประตูพร้อมเข้าใหม่');
 assert.doesNotMatch(liveJs, /\b(?:joyEnd|endCam)\s*\(/, 'Pocket lifecycle cannot call removed legacy pointer helpers');
 assert.match(boot, /pirateFrame\.contentWindow\?\.focus\?\.\(\)/, 'Pirate lifecycle restores iframe focus after returning without a document reload');
 assert.match(worldsJs, /history\.replaceState/, 'panel switch keeps the world loaded and updates ?panel=');
@@ -549,4 +549,3 @@ assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');
 player.dispose();
 
 console.log('V9.0 pirate-fruit player presentation: PASS');
-
