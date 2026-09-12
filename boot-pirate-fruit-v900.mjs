@@ -34,9 +34,11 @@ export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-
 
 function isolatedOfflinePirateClient() {
   try {
-    return new URL(location.href).searchParams.get('pirateClient') === 'offline';
+    // The reviewed local blocky/Blue route is the production default. Keep
+    // the remote client available only as an explicit diagnostic opt-in.
+    return new URL(location.href).searchParams.get('pirateClient') !== 'online';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -438,4 +440,3 @@ if (startup) {
 if (document.body?.dataset?.controlPanel === 'throw') {
   await ensurePocketAnimalControl();
 }
-
