@@ -118,7 +118,7 @@ assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: s
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
 assert.match(fullscreenBridge, /owner: 'opaque-parent-relay'/, 'opaque iframe patches requestFullscreen even when window.top throws');
 assert.match(fullscreenBridge, /PERSISTENT_FULLSCREEN_REQUEST_MESSAGE/, 'opaque fullscreen requests relay through a versioned parent message');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=4/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=5/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
 const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
 assert.ok(pirateEntryMatch, 'Pirate save bootstrap declares its compiled entry');
 assert.ok(
@@ -138,9 +138,9 @@ assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child log
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(shell, /combined-worlds-v900\.mjs\?v=959/, 'persistent shell cache-busts the changed world catalog');
+assert.match(shell, /combined-worlds-v900\.mjs\?v=960/, 'persistent shell cache-busts the changed world catalog');
 assert.match(shell, /searchParams\.set\('shellRevision', '73'\)/, 'persistent shell cache-busts the changed scene HTML');
-assert.match(worlds, /combined-worlds-v900\.mjs\?v=959/, 'scene router cache-busts the changed world catalog');
+assert.match(worlds, /combined-worlds-v900\.mjs\?v=960/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=964/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
