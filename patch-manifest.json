@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.5062603b40a6",
+  "buildId": "8.4.0.content.649319a55236",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T11:04:17.111Z",
+  "publishedAtUtc": "2026-09-12T12:25:46.408Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -332,8 +332,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 18174,
-      "sha256": "1e7a6b23c9a2b220ed93117ee30882dc353bb5c749a71ffee84401b18e28353c"
+      "size": 17339,
+      "sha256": "9444038bb256d1a6aa620abc50e43ab9aa8221e1901a08713378d3cedd538c67"
     },
     {
       "path": "boss-challenge.mjs",
@@ -478,7 +478,7 @@
     {
       "path": "combined-worlds-v900.mjs",
       "size": 2629,
-      "sha256": "fb74864d6482c89e7d83aabc8d0b0c9a5c88a714939b0b829c95670adebf6d02"
+      "sha256": "ed35a7e57c895692cfcfe35c43adfe4ec66d81799c6872f6d2e82b08957c58ce"
     },
     {
       "path": "content-catalog.mjs",
@@ -552,8 +552,8 @@
     },
     {
       "path": "index.html",
-      "size": 38414,
-      "sha256": "46a01dcd639beee602c38929e906421672af088919f5d6008e405a400f7102ae"
+      "size": 38375,
+      "sha256": "c611413401cfff267ea0a0a99af67ebbd67673aff95409642b5a4f5ea1638ec8"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -638,7 +638,7 @@
     {
       "path": "online-world-shell-v900.mjs",
       "size": 25012,
-      "sha256": "b025193a72b5dab5db01627e6b638e31ce8386885c668aeab6a9964e069e953d"
+      "sha256": "b897efd64f369ab9bce6b0f27272584ce2e47fe76f35ff2e9fd9675314533d69"
     },
     {
       "path": "passive-catalog.mjs",
@@ -677,8 +677,8 @@
     },
     {
       "path": "pirate-fruit-island-map-v900.mjs",
-      "size": 1622,
-      "sha256": "a81a1d12e0d4897fae9dcd160a7bc3aae74d278490164e3ffdceb719e9237a20"
+      "size": 1540,
+      "sha256": "96e0345b5362893acaf3a8dad46cdc0781563c14dd9b5d4bf45441b961707a74"
     },
     {
       "path": "pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js",
@@ -842,8 +842,8 @@
     },
     {
       "path": "scene-v900.html",
-      "size": 1371,
-      "sha256": "da769f7a6c71a3f2098db38f3e71bd42835d2dfeeeb47a727b56bfc5ecc10df5"
+      "size": 1332,
+      "sha256": "2a6d7d9c0a7ce755830448c8264b229b02a230c3f1a48dad7cfaf0a4f090ff9c"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -1007,8 +1007,8 @@
     },
     {
       "path": "v900.html",
-      "size": 38414,
-      "sha256": "46a01dcd639beee602c38929e906421672af088919f5d6008e405a400f7102ae"
+      "size": 38375,
+      "sha256": "c611413401cfff267ea0a0a99af67ebbd67673aff95409642b5a4f5ea1638ec8"
     },
     {
       "path": "warp-routes.mjs",
@@ -1038,7 +1038,7 @@
     {
       "path": "worlds-v900.mjs",
       "size": 8635,
-      "sha256": "bc6f0a2cb41c1e11901ae6e4b636423616ab240913064e0ae53490cd9b008033"
+      "sha256": "6266b8ede6b0b0ca5c3492bcbc1569bc424b38e677d33ebfef46f7f17def6b8a"
     }
   ]
 }

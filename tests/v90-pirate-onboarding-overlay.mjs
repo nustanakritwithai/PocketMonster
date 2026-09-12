@@ -58,7 +58,7 @@ assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
 assert.match(parentBoot, /event\.source !== frame\.contentWindow/);
-assert.match(parentBoot, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/);
+assert.match(parentBoot, /event\.origin !== 'null'/);
 assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'integrated shell consumes onboarding state without creating tutorial action buttons');
 assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated onboarding proxy layer is kept empty');
 assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell creates no invisible tutorial action buttons');
@@ -100,7 +100,7 @@ assert.match(pirateHud, /\.dialogue-card \{[\s\S]*height: auto[\s\S]*max-height:
 assert.match(pirateHud, /\.quest-board,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'quest board grows with content up to a phone max');
 assert.match(pirateHud, /\.boat-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'boat shop grows with content up to a phone max');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'potion shop grows with content up to a phone max');
-assert.match(parentBoot, /allow-same-origin/, 'live Pirate Fruit iframe keeps its own origin');
+assert.match(parentBoot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'/, 'local child keeps opaque sandbox');
 assert.match(childEntry, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'Pirate child HTML cache-busts presentation with a positive revision');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');

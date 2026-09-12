@@ -98,7 +98,7 @@ assert.equal(COMBINED_VERSION, '9.0.1-unified-online-shell');
 assert.equal(COMBINED_WORLD_COUNT, 3);
 assert.deepEqual(COMBINED_WORLDS.map(world => world.id), ['pocket-monster', 'pirate-fruit', 'living-world']);
 assert.equal(worldById('pocket-monster').runtime, './game-v800.js?v=829');
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=956');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=957');
 assert.equal(worldById('living-world').runtime, './world-living-v900.mjs?v=906');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html?world=pocket-monster' }), 'pocket-monster');
 assert.equal(worldIdFromLocation({ href: 'https://example.test/v900.html' }), null);
@@ -240,10 +240,10 @@ assert.match(liveJs, /hostCharacter:'pirate-fruit'/, 'animal control is hosted o
 assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'Pocket character server APIs are hosted on the pirate player');
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'live loop rebinds Pocket character server functions onto pirate');
 assert.match(html, /เริ่มที่โลก Pirate Fruit จริง/, 'gate describes the real Pirate Fruit client');
-assert.match(boot, /PIRATE_FRUIT_ONLINE_ENTRY/, 'pirate world boots the live Pirate Fruit client');
-assert.match(boot, /source: livePirate \? 'pirate-fruit-online' : 'pirate-fruit-offline'/, 'pirate world is the live Pirate Fruit client');
+assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'pirate world boots the canonical local Pirate client');
+assert.match(boot, /source: 'pirate-fruit-offline'/, 'pirate world is the canonical local Pirate client');
 assert.match(boot, /id = 'pirateFruitFrame'/, 'pirate world mounts the live client in a frame');
-assert.match(boot, /remote: livePirate/, 'pirate world loads the remote Pirate Fruit host');
+assert.match(boot, /remote: false/, 'pirate world never loads a remote host');
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
@@ -254,9 +254,9 @@ assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can reques
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
-assert.match(boot, /'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'/, 'live Pirate Fruit iframe keeps its own origin for parentOrigin');
-assert.match(boot, /allow-same-origin/, 'cross-origin live iframe may use allow-same-origin so event.origin is the Pirate host');
-assert.match(boot, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/, 'parent accepts portal messages only from the live Pirate origin');
+assert.match(boot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'/, 'local child keeps opaque sandbox');
+
+assert.match(boot, /event\.origin !== 'null'/, 'parent accepts portal messages only from the opaque local child');
 assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');
@@ -549,4 +549,3 @@ assert.equal(player.appearance().id, 'appearance.human.player-orange.v1');
 player.dispose();
 
 console.log('V9.0 pirate-fruit player presentation: PASS');
-
