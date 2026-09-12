@@ -6241,6 +6241,9 @@ function showRanchServices(){const result=characterUI.requestOpenRanchServices({
 function showRanchStorageShell({remote=false}={}){
   const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc(),allowRemote:remote});
   if(!result.ok){msg(result.reasonText);return result;}
+  // โลกโจรสลัดซ่อน HUD เดิมทั้งกลุ่ม ให้กระเป๋าเป็นหน้าต่างแยกจากกลุ่มนั้น
+  const storagePage=el('ranchStoragePage');
+  if(remote&&storagePage.parentElement!==document.body)document.body.appendChild(storagePage);
   el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
   remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
   const request=++remoteBagRequest;
@@ -7395,6 +7398,8 @@ el('breedingSalonIncubator')?.addEventListener('click',e=>{
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
 bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
 installPirateMonsterBagButton();
+const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs');
+mountDirectMonsterControls({windowLike:window,config:runtimeConfig,sessionToken:authProfileBridge.sessionToken});
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell();});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
