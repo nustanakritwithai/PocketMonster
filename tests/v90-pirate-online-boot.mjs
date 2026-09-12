@@ -20,9 +20,9 @@ assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origi
 assert.match(boot, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/);
 assert.match(boot, /source: livePirate \? 'pirate-fruit-online' : 'pirate-fruit-offline'/);
 assert.match(boot, /remote: livePirate/);
-assert.match(boot, /searchParams\.get\('pirateClient'\) === 'offline'/);
+assert.match(boot, /searchParams\.get\('pirateClient'\) !== 'online'/);
 assert.match(boot, /pirate-fruit-offline\/index\.html/);
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=955');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=956');
 assert.match(combined, /โลก Pirate Fruit ออนไลน์ชุดล่าสุด/);
 
 const timeout = serverSync.match(/timeoutMs = (\d+)/);
