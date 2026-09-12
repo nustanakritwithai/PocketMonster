@@ -1,5 +1,5 @@
 /** เชื่อม canonical bag ใน scene iframe กับ control-state provider ของ Pirate shell */
-export function createPirateMonsterInventorySync({ bagProvider, controlProvider, isPirate = () => true } = {}) {
+export function createPirateMonsterInventorySync({ bagProvider, controlProvider, isPirate = () => true, onSnapshot = () => {} } = {}) {
   if (!bagProvider || typeof bagProvider.subscribe !== 'function') {
     throw new TypeError('Pirate inventory sync requires the scene monster bag provider');
   }
@@ -23,6 +23,7 @@ export function createPirateMonsterInventorySync({ bagProvider, controlProvider,
     const revision = Number(snapshot?.revision);
     if (!isPirate() || snapshot?.available !== true || !Number.isSafeInteger(revision) || revision <= lastRevision) return;
     lastRevision = revision;
+    onSnapshot(snapshot);
     void refreshShell();
   };
   const unsubscribe = bagProvider.subscribe(onBagSnapshot);

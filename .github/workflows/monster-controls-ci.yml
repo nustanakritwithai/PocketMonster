@@ -50,6 +50,8 @@ jobs:
           node tests/v90-unified-mobile-controls.mjs
           node tests/v90-unified-shell-runtime.mjs early-monster-scene
           node tests/pirate-monster-ui-only.mjs
+          node tests/pirate-active-presence-prewarm.mjs
+          node tests/pirate-canonical-party-controls.mjs
           node tests/v90-unified-roster-stack.mjs
           node tests/v90-unified-hud-world-lifecycle.mjs
           node tests/v90-remote-monster-combat-parity.mjs

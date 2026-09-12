@@ -67,7 +67,15 @@ function stateFromPlayerPayload(payload) {
   });
 }
 
-export function createMonsterHttpProvider({ config, sessionToken, getSessionToken = null, isSessionActive = () => true, getZone = () => '', fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
+/**
+ * `isPresenceReady` is an optional Pirate scene-presence gate. It may return a boolean
+ * or `{ ready, accepted, zone }`; when a zone is supplied it must match the
+ * provider's current zone. `subscribeReadiness(listener)` may be supplied by
+ * the shell and should call the listener after accepted presence changes.
+ * The provider remains unavailable while the gate is closed and retries only
+ * after that callback (or the normal poll) reports readiness.
+ */
+export function createMonsterHttpProvider({ config, sessionToken, getSessionToken = null, isSessionActive = () => true, getZone = () => '', isPresenceReady = null, subscribeReadiness = null, fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Monster HTTP provider requires fetch');
   if (typeof sessionToken !== 'string' || !sessionToken) throw new TypeError('Monster HTTP provider requires session sessionToken');
   let current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false });
@@ -81,8 +89,18 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
   const tokenForRequest = () => typeof getSessionToken === 'function' ? getSessionToken() : sessionToken;
   const sessionReady = token => (typeof isSessionActive !== 'function' || isSessionActive() === true)
     && typeof token === 'string' && token.length > 0;
+  const readinessForZone = zone => {
+    if (typeof isPresenceReady !== 'function') return true;
+    let result;
+    try { result = isPresenceReady(zone); } catch { return false; }
+    if (result === true) return true;
+    if (!result || typeof result !== 'object') return false;
+    if (typeof result.zone === 'string' && result.zone !== zone) return false;
+    return result.ready === true || result.accepted === true;
+  };
   const stale = requestGeneration => disposed || requestGeneration !== generation;
   const clearState = () => { current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false }); notify(); };
+  const markUnavailable = () => { current = Object.freeze({ ...current, actors: [], skills: {}, capabilities: {}, available: false }); notify(); };
   const fetchBounded = async (url, init) => {
     const abort = new AbortController();
     requests.add(abort);
@@ -101,11 +119,12 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
     try {
       const zone = getZone();
       if (typeof zone !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(zone)) return Object.freeze({ ok: false, code: 'INVALID_ZONE' });
+      if (!readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'PRESENCE_NOT_READY' }); }
       const url = new URL(endpoint(config, 'api/monsters/control-state'));
       url.searchParams.set('zone', zone);
       const { response, payload } = await fetchBounded(url.href, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` } });
-      if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone) return Object.freeze({ ok: false, code: 'STALE_SCENE' });
-      if (!response.ok || !payload?.ok || !Array.isArray(payload?.monsterControl?.party)) { clearState(); return Object.freeze({ ok: false, code: payload?.code || 'STATE_UNAVAILABLE' }); }
+      if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'STALE_SCENE' }); }
+      if (!response.ok || !payload?.ok || !Array.isArray(payload?.monsterControl?.party)) { clearState(); return Object.freeze({ ok: false, code: payload?.errorCode || payload?.code || 'STATE_UNAVAILABLE' }); }
       current = stateFromPlayerPayload(payload);
       notify();
       return Object.freeze({ ok: true, state: current });
@@ -128,22 +147,38 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
     const requestToken = tokenForRequest();
     if (stale(requestGeneration) || !sessionReady(requestToken)) return Object.freeze({ ok: false, code: 'SESSION_UNAVAILABLE', commandId: command?.commandId });
     try {
+      const zone = getZone();
+      if (typeof zone !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(zone)) return Object.freeze({ ok: false, code: 'INVALID_ZONE', commandId: command?.commandId });
+      if (command?.zone !== zone) return Object.freeze({ ok: false, code: 'ZONE_MISMATCH', commandId: command?.commandId });
+      if (!readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'PRESENCE_NOT_READY', commandId: command?.commandId }); }
       const { response, payload } = await fetchBounded(endpoint(config, 'api/monsters/command'), {
         method: 'POST', cache: 'no-store',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` },
         body: JSON.stringify(command),
       });
       if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken)) return Object.freeze({ ok: false, code: 'STALE_SESSION', commandId: command?.commandId });
-      if (!response.ok || !payload || typeof payload.ok !== 'boolean') return Object.freeze({ ok: false, code: payload?.code || 'INVALID_SERVER_RESULT', commandId: command?.commandId });
+      if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command?.commandId });
+      if (!payload || typeof payload.ok !== 'boolean') return Object.freeze({ ok: false, code: payload?.errorCode || payload?.code || 'INVALID_SERVER_RESULT', commandId: command?.commandId });
+      if (typeof payload.zone === 'string' && payload.zone !== zone) return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command?.commandId });
+      if (!response.ok || !payload.ok) return Object.freeze({ ...payload, ok: false, code: payload.errorCode || payload.code || 'COMMAND_REJECTED', commandId: payload.commandId || command?.commandId });
       if (payload.ok) void (pendingRefresh || Promise.resolve()).then(() => { if (!stale(requestGeneration)) return refresh(); });
       return Object.freeze({ ...payload, commandId: payload.commandId || command?.commandId });
     } catch { return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command?.commandId }); }
   };
   const start = () => { if (disposed || pollTimer || !(pollMs > 0)) return false; pollTimer = setInterval(() => { void refresh(); }, Math.max(1000, pollMs)); return true; };
   const stop = () => { if (!pollTimer) return false; clearInterval(pollTimer); pollTimer = null; return true; };
+  let unsubscribeReadiness = null;
+  if (typeof subscribeReadiness === 'function') {
+    try {
+      const unsubscribe = subscribeReadiness(() => {
+        if (!disposed) void refresh();
+      });
+      if (typeof unsubscribe === 'function') unsubscribeReadiness = unsubscribe;
+    } catch {}
+  }
   return Object.freeze({ kind: MONSTER_STATE_PROVIDER_KIND, snapshot: () => current, refresh, send,
     subscribe(listener) { if (typeof listener !== 'function') return () => {}; listeners.add(listener); listener(current); return () => listeners.delete(listener); },
     start, stop, reset() { generation += 1; stop(); for (const request of requests) request.abort(); pendingRefresh = null; clearState(); },
-    reconnect: refresh, dispose() { disposed = true; generation += 1; stop(); for (const request of requests) request.abort(); pendingRefresh = null; listeners.clear(); },
+    reconnect: refresh, dispose() { disposed = true; generation += 1; stop(); try { unsubscribeReadiness?.(); } catch {} unsubscribeReadiness = null; for (const request of requests) request.abort(); pendingRefresh = null; listeners.clear(); },
   });
 }

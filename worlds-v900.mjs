@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=959';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=961';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -50,6 +50,15 @@ const runtimePreparations = new Map();
 const worldPresenceBindings = new Map();
 let activeRuntimeId = null;
 
+// prewarm เขียน globals ของฉากอื่นได้ระหว่าง await; online transport อ่านเฉพาะ binding ของโลกที่เล่นอยู่
+window.POCKETMONSTER_SCENE_PRESENCE = Object.freeze({
+  state: () => worldPresenceBindings.get(activeRuntimeId)?.state?.() || null,
+  accept: payload => {
+    const receive = worldPresenceBindings.get(activeRuntimeId)?.presence;
+    return typeof receive === 'function' ? receive(payload) : false;
+  },
+});
+
 function capturePresenceBindings() {
   return Object.freeze({
     state: window.POCKETMONSTER_WORLD_STATE,
@@ -87,6 +96,7 @@ function preparePocketRuntime(world) {
       savedWorldGameNodes.set(world.id, [...mountTarget.childNodes]);
       return true;
     } finally {
+      applyPresenceBindings(activePresenceBindings);
       if (window.POCKETMONSTER_SCENE_MOUNT_TARGET === mountTarget) delete window.POCKETMONSTER_SCENE_MOUNT_TARGET;
       delete window.POCKETMONSTER_SCENE_PREWARM;
     }

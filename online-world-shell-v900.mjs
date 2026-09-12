@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=959';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=961';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=5';
+} from './online-world-bridge-v900.mjs?v=6';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -20,9 +20,9 @@ import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=953';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=2';
+import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=3';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=2';
-import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs';
+import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -114,6 +114,7 @@ function bindSceneHudAdapters(sceneWindow) {
         bagProvider: sceneWindow.POCKETMONSTER_MONSTER_BAG,
         controlProvider: monsterStateProvider,
         isPirate: () => sceneWindow.document?.body?.dataset?.combinedWorld === 'pirate-fruit',
+        onSnapshot: () => monsterController.sync(),
       });
       if (timer) clearInterval(timer);
     };
@@ -157,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '73');
+  url.searchParams.set('shellRevision', '74');
   return url.href;
 }
 
@@ -431,7 +432,12 @@ function endSession(reason = 'session-ended') {
 }
 
 window.POCKETMONSTER_WORLD_STATE = () => presenceBridge.readPose();
-window.POCKETMONSTER_WORLD_PRESENCE = payload => presenceBridge.acceptSnapshot(payload);
+window.POCKETMONSTER_WORLD_PRESENCE = payload => {
+  const wasReady = presenceBridge.isReady(payload?.zone);
+  const accepted = presenceBridge.acceptSnapshot(payload);
+  if (accepted && !wasReady) void monsterStateProvider?.refresh?.({ afterPending: true });
+  return accepted;
+};
 window.addEventListener('pocketmonster:world-socket-status', event => {
   presenceBridge.setTransportConnected(event.detail?.connected === true);
 });
@@ -664,6 +670,7 @@ monsterStateProvider = createMonsterHttpProvider({
   getSessionToken: () => window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
   isSessionActive: () => isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
+  isPresenceReady: zone => presenceBridge.isReady(zone),
   pollMs: 2000,
 });
 window.POCKETMONSTER_MONSTER_STATE_PROVIDER = monsterStateProvider;
@@ -673,7 +680,16 @@ const monsterCommands = createMonsterCommandAdapter({
 });
 monsterController = createMonsterControlController({
   commands: monsterCommands,
-  getParty: () => monsterStateProvider.snapshot().party || null,
+  getParty: () => {
+    // ช่องมอนใช้กระเป๋าที่ server ยืนยันแล้ว แม้กำลังรอเข้าร่วมฉากต่อสู้
+    if (activeWorld === 'pirate-fruit') {
+      try {
+        const bag = sceneFrame.contentWindow?.POCKETMONSTER_MONSTER_BAG?.snapshot?.();
+        if (bag?.available === true && Array.isArray(bag.slots)) return { available: true, slots: bag.slots };
+      } catch {}
+    }
+    return monsterStateProvider.snapshot().party || null;
+  },
   getCapabilities: () => monsterStateProvider.snapshot().capabilities || {},
   getConfirmedActors: () => monsterStateProvider.snapshot().actors || [],
   getSkills: instanceId => monsterStateProvider.snapshot().skills?.[instanceId] || [],

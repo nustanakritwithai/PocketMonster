@@ -7,8 +7,8 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
-export const EXPECTED_PIRATE_SOURCE_COMMIT = 'c5dbb9c78e3abd695db5a2ff2c25bb8cdbd2d708';
-export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'e0ddda08106ed834728ec9d163069eb96828ab5deabf3e5c5c428901f9b5806a';
+export const EXPECTED_PIRATE_SOURCE_COMMIT = '412c10f3e9ae9669600744ccd4aadf794d4075b8';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'a22b8b23e7c032643cf768cbc59b7991a96e36ba474aef00d81f119fa930f8f2';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
@@ -44,12 +44,12 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-B4TDjvel.js',
-  'pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js',
-  'pirate-fruit-offline/assets/EmberVolcanoIsland-Dwvxnue6.js',
-  'pirate-fruit-offline/assets/MistJungleIsland-iKbiMxA3.js',
-  'pirate-fruit-offline/assets/SunscarDesertIsland-DRO7IMVp.js',
-  'pirate-fruit-offline/assets/TempestSkyIsland-BdTzGlWY.js',
+  'pirate-fruit-offline/assets/index-CSre5PAj.js',
+  'pirate-fruit-offline/assets/AzureFrostIsland-VoKMadr_.js',
+  'pirate-fruit-offline/assets/EmberVolcanoIsland-Yk2202Ka.js',
+  'pirate-fruit-offline/assets/MistJungleIsland-aMK6-VdC.js',
+  'pirate-fruit-offline/assets/SunscarDesertIsland-Cbn0DXrp.js',
+  'pirate-fruit-offline/assets/TempestSkyIsland-C_eTwMP1.js',
   'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
 ]);
 
@@ -245,7 +245,7 @@ async function verifyPages(options, runtimeConfig) {
     || !/\bcreateCombatV91Shell\b/.test(parentShell)) {
     throw new Error('online-world-shell-v900.mjs must import and install combat-v91-entry.mjs in the parent shell');
   }
-  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=4')) {
+  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=5')) {
     throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
   }
   const pirateBootstrap = bodies.get(bootstrapRelative);

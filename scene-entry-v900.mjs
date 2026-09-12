@@ -3,7 +3,7 @@ import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
 import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
-} from './online-world-bridge-v900.mjs?v=5';
+} from './online-world-bridge-v900.mjs?v=6';
 
 export const ONLINE_WORLD_SCENE_TEARDOWN_EVENT = 'pocketmonster:online-scene-teardown';
 
@@ -61,6 +61,7 @@ function clearSceneRuntimeGlobals() {
     'POCKETMONSTER_COMBINED_CHANNEL',
     'POCKETMONSTER_SCENE_EMBEDDED',
     'POCKETMONSTER_WORLD_STATE',
+    'POCKETMONSTER_SCENE_PRESENCE',
     'POCKETMONSTER_WORLD_PRESENCE',
     'POCKETMONSTER_WORLD_SOCKET_CONNECTED',
     'POCKETMONSTER_ONLINE_SCENE',
@@ -194,7 +195,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=963');
+  await import('./worlds-v900.mjs?v=965');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
