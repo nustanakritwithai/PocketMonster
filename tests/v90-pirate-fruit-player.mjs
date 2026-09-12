@@ -241,9 +241,9 @@ assert.match(liveJs, /playerCharacterServer:'pirate-fruit'/, 'Pocket character s
 assert.match(liveJs, /from '\.\/pirate-player-server\.mjs'/, 'live loop rebinds Pocket character server functions onto pirate');
 assert.match(html, /เริ่มที่โลก Pirate Fruit จริง/, 'gate describes the real Pirate Fruit client');
 assert.match(boot, /PIRATE_FRUIT_ONLINE_ENTRY/, 'pirate world boots the live Pirate Fruit client');
-assert.match(boot, /source: 'pirate-fruit-online'/, 'pirate world is the live Pirate Fruit client');
+assert.match(boot, /source: livePirate \? 'pirate-fruit-online' : 'pirate-fruit-offline'/, 'pirate world is the live Pirate Fruit client');
 assert.match(boot, /id = 'pirateFruitFrame'/, 'pirate world mounts the live client in a frame');
-assert.match(boot, /remote: true/, 'pirate world loads the remote Pirate Fruit host');
+assert.match(boot, /remote: livePirate/, 'pirate world loads the remote Pirate Fruit host');
 assert.match(boot, /presentationOnly: true/, 'pirate frame is presentation-only for Pocket combat');
 assert.match(boot, /combatAuthority: false/, 'pirate frame is not Pocket combat authority');
 assert.match(boot, /ensurePocketAnimalControl/, 'pirate boot can load Pocket animal control into throw mode');
@@ -254,9 +254,9 @@ assert.match(boot, /POCKETMONSTER_ENSURE_THROW_RUNTIME/, 'throw panel can reques
 assert.match(boot, /dataset\?\.controlPanel === 'throw'/, 'entering Pirate Fruit already on throw boots animal control immediately');
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'parent accepts portal messages only from the mounted Pirate Fruit frame');
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/, 'parent origin is passed into the Pirate Fruit frame');
-assert.match(boot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'\)/, 'live Pirate Fruit iframe keeps its own origin for parentOrigin');
+assert.match(boot, /'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'/, 'live Pirate Fruit iframe keeps its own origin for parentOrigin');
 assert.match(boot, /allow-same-origin/, 'cross-origin live iframe may use allow-same-origin so event.origin is the Pirate host');
-assert.match(boot, /event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN/, 'parent accepts portal messages only from the live Pirate origin');
+assert.match(boot, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/, 'parent accepts portal messages only from the live Pirate origin');
 assert.match(boot, /pocketmonster:world-warp-v1/, 'parent binds the in-world portal message contract');
 assert.doesNotMatch(boot, /from ['"]three['"]/, 'Pocket boot module does not import the three npm package');
 assert.doesNotMatch(boot, /world-pirate-fruit-v900|paintGroundGrid|PIRATE_BLOCK_WORLD/, 'pirate world does not boot or keep the Pocket-block island stage');

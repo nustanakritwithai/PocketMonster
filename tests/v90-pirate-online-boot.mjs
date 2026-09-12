@@ -17,12 +17,11 @@ assert.equal(PIRATE_FRUIT_LIVE_ORIGIN, LIVE_ORIGIN);
 assert.match(boot, /function mountPirateOnline\(/);
 assert.match(boot, /export const PIRATE_FRUIT_ONLINE_ENTRY/);
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/);
-assert.match(boot, /if \(event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN\) return;/);
-assert.match(boot, /source: 'pirate-fruit-online'/);
-assert.match(boot, /remote: true/);
-assert.doesNotMatch(boot, /function mountPirateOffline\(/);
-assert.doesNotMatch(boot, /pirate-fruit-offline\/index\.html/);
-assert.doesNotMatch(boot, /source: 'pirate-fruit-offline'/);
+assert.match(boot, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/);
+assert.match(boot, /source: livePirate \? 'pirate-fruit-online' : 'pirate-fruit-offline'/);
+assert.match(boot, /remote: livePirate/);
+assert.match(boot, /searchParams\.get\('pirateClient'\) === 'offline'/);
+assert.match(boot, /pirate-fruit-offline\/index\.html/);
 assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=954');
 assert.match(combined, /โลก Pirate Fruit ออนไลน์ชุดล่าสุด/);
 

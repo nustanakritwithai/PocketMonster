@@ -231,7 +231,7 @@ assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HU
 assert.match(parent, /POCKETMONSTER_POCKET_HUD/, 'Pirate boot exposes the Pocket HUD adapter the Dock already binds');
 assert.match(parent, /pocketPlayerHud.publish\(snapshot\.player\)/, 'telemetry snapshots fill the top-left player HP panel');
 assert.match(parent, /event\.source !== frame\.contentWindow/);
-assert.match(parent, /event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN/);
+assert.match(parent, /isolatedOfflinePirateClient\(\) \? 'null' : PIRATE_FRUIT_LIVE_ORIGIN/);
 assert.match(parent, /frameGeneration/);
 assert.match(parent, /pagehide/);
 assert.match(parent, /pocketmonster:world-warp-v1/);

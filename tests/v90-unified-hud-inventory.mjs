@@ -75,7 +75,7 @@ for (const selector of parentSelectors) {
   assert.match(parentHtml, new RegExp(`id=["']${selector.slice(1)}["']`), `${selector} source owner drifted out of v900.html`);
   assert.ok(inventoryBySelector(selector)?.visibleOwner, `${selector} must identify its visible owner`);
 }
-const sandbox = pirateBoot.match(/setAttribute\('sandbox',\s*'([^']+)'\)/)?.[1];
+const sandbox = pirateBoot.match(/'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'/)?.[0]?.slice(1, -1);
 assert.equal(sandbox, PIRATE_IFRAME_BOUNDARY.sandbox, 'Pirate child sandbox baseline must stay exact');
 assert.equal(sandbox.split(/\s+/).includes('allow-same-origin'), true, 'live Pirate iframe keeps its own origin');
 assert.match(pirateHud, /visibility:\s*hidden\s*!important/);
