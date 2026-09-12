@@ -355,10 +355,10 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     });
   }
 
-  function buildRosterEntries(partySnapshot) {
+  function buildRosterEntries(partySnapshot, { includeParty = true } = {}) {
     const target = pocketAdapter()?.target?.snapshot?.();
     const partyAvailable = partySnapshot?.available === true;
-    const slots = padPartySlots(partyAvailable ? partySnapshot.slots : []);
+    const slots = includeParty ? padPartySlots(partyAvailable ? partySnapshot.slots : []) : [];
     const entries = [];
     const used = new Set();
     if (target?.available === true && (target.name || target.id)) {
@@ -376,10 +376,10 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         entries.push({ kind: 'placeholder', key: `empty:${slot.slot}`, entity: slot });
       }
     }
-    while (entries.length < 3) {
+    while (includeParty && entries.length < 3) {
       entries.push({ kind: 'placeholder', key: `pad:${entries.length}`, entity: { slot: entries.length, available: false } });
     }
-    return entries.slice(0, 3);
+    return includeParty ? entries.slice(0, 3) : entries;
   }
 
   function renderRosterRow(entry) {
@@ -451,6 +451,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function paintOverlayMonsterSlots(slots) {
+    const pirateActive = pirateWorldActive();
+    const overlayDocument = pirateActive ? (sceneDocument() || documentLike) : documentLike;
     const controlPanel = partyAdapter()?.snapshot?.()?.controlPanel || { mode: 'character', slot: null };
     const partyState = partyAdapter()?.snapshot?.() || {};
     const recallButton = documentLike.getElementById?.('monsterRecallBtn');
@@ -461,25 +463,36 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
       recallButton.textContent = partyState.pending === true ? 'กำลังรอยืนยัน…' : 'เก็บมอนสเตอร์';
     }
     for (const slot of slots) {
-      const button = documentLike.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
+      const button = overlayDocument.getElementById?.(`monsterSlot${slot.slot + 1}Btn`);
       if (!button) continue;
       const glyph = slot.available === true ? rosterGlyph(slot) : '＋';
       button.textContent = glyph;
-      button.setAttribute('data-pirate-icon', glyph);
-      button.classList.toggle('empty', slot.available !== true);
-      button.classList.toggle('selected', slot.selected === true);
-      button.classList.toggle('active-monster', slot.active === true);
-      button.classList.toggle('fainted-slot', slot.fainted === true);
-      button.classList.toggle('monster-control-open', controlPanel.mode === 'monster' && controlPanel.slot === slot.slot);
+      button.setAttribute('data-pirate-icon', pirateActive
+        ? (slot.available === true ? `${glyph}\n${(slot.name || 'มอนสเตอร์').slice(0, 12)}` : '＋\nว่าง')
+        : glyph);
+      if (!pirateActive) {
+        button.classList.toggle('empty', slot.available !== true);
+        button.classList.toggle('selected', slot.selected === true);
+        button.classList.toggle('active-monster', slot.active === true);
+        button.classList.toggle('fainted-slot', slot.fainted === true);
+        button.classList.toggle('monster-control-open', controlPanel.mode === 'monster' && controlPanel.slot === slot.slot);
+      }
       button.dataset.partySlot = String(slot.slot);
+      const held = pirateActive && partyState.held?.index === slot.slot
+        && partyState.held?.instanceId === slot.instanceId;
       button.setAttribute('aria-label', slot.available === true
-        ? `${slot.name || 'Party'} ช่อง ${slot.slot + 1} • ${controlPanel.mode === 'monster' && controlPanel.slot === slot.slot ? 'กลับไปสกิลตัวละคร' : slot.active === true ? 'เปิดสกิลมอนสเตอร์' : 'ปามอนสเตอร์'}`
+        ? `${slot.name || 'Party'} ช่อง ${slot.slot + 1} • ${controlPanel.mode === 'monster' && controlPanel.slot === slot.slot ? 'กลับไปสกิลตัวละคร' : held ? 'พร้อมปามอนสเตอร์' : slot.active === true ? 'เปิดสกิลมอนสเตอร์' : 'ปามอนสเตอร์'}`
         : `Party ช่อง ${slot.slot + 1} ว่าง`);
       if (slot.available === true) {
         button.setAttribute('title', `${slot.name || 'Party'} • Lv.${slot.level || 0}`);
       } else {
         button.removeAttribute('title');
       }
+      // Pirate scene-binding owns pointerdown/click and held state.  HUD only
+      // paints the canonical scene button, otherwise one click activates twice.
+      const sceneWindow = pirateActive ? overlayDocument.defaultView : null;
+      const sceneController = sceneWindow?.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;
+      if (pirateActive && sceneController === partyAdapter()) continue;
       if (button.dataset.partyBound === '1') continue;
       button.dataset.partyBound = '1';
       button.addEventListener('click', event => {
@@ -498,13 +511,14 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function renderParty(snapshot) {
+    const pirateActive = pirateWorldActive();
     const slots = padPartySlots(snapshot?.available === true ? snapshot.slots : []);
     const roster = node('mmorpgRoster');
     if (roster) {
-      roster.replaceChildren(...buildRosterEntries(snapshot).map(entry => renderRosterRow(entry)));
+      roster.replaceChildren(...buildRosterEntries(snapshot, { includeParty: !pirateActive }).map(entry => renderRosterRow(entry)));
     }
     const companions = node('mmorpgCompanions');
-    if (companions) {
+    if (companions && !pirateActive) {
       const portraits = slots.map(slot => {
         const portrait = el(documentLike, 'button', '', 'mmorpg-companion');
         portrait.setAttribute('type', 'button');
@@ -521,9 +535,11 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         return portrait;
       });
       companions.replaceChildren(...portraits);
+    } else if (companions && pirateActive) {
+      companions.replaceChildren();
     }
     const partyPanel = node('mmorpgPartyPanel');
-    if (partyPanel) {
+    if (partyPanel && !pirateActive) {
       const controls = slots.map(slot => {
         const button = el(documentLike, 'button', '', 'mmorpg-party-slot');
         button.setAttribute('type', 'button');
@@ -538,6 +554,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         return button;
       });
       partyPanel.replaceChildren(...controls, node('monsterRecallBtn'));
+    } else if (partyPanel && pirateActive) {
+      partyPanel.replaceChildren(node('monsterRecallBtn'));
     }
     const summary = node('mmorpgDockSummary');
     if (summary) {

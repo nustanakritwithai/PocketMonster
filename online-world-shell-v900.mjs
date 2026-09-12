@@ -18,10 +18,10 @@ import {
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=954';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=955';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=3';
-import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=2';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
