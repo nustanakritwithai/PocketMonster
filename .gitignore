@@ -10,3 +10,5 @@ server_save_backup.json
 .cursor/
 dist-pages/
 firebase-launcher/
+test-output/
+tmp-*.py

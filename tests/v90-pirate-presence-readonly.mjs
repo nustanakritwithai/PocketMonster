@@ -20,7 +20,7 @@ const bridge = fs.readFileSync(new URL('../pirate-presence-bridge-v900.mjs', imp
 const actualWireFixture = JSON.parse(fs.readFileSync(new URL('./fixtures/monster-authority-wire.actual.json', import.meta.url), 'utf8'));
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
 const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmonster-status-v900.mjs', import.meta.url), 'utf8');
-const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-DKUYjNyH.js', import.meta.url), 'utf8');
+const pirateBundle = fs.readFileSync(new URL('../pirate-fruit-offline/assets/index-B4TDjvel.js', import.meta.url), 'utf8');
 assert.match(pirateBundle, /onCentralAuthority/, 'compiled Pirate adapter exposes the central capability callback');
 assert.match(pirateBundle, /getMonsterActors/, 'compiled Pirate adapter exposes the central actor source switch');
 assert.match(pirateBundle, /generation/, 'compiled Pirate adapter carries lifecycle generation validation');
