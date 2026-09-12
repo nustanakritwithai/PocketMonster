@@ -1,6 +1,5 @@
 /** Island geography shared with live Pirate Fruit Online. Presence pose is parked. */
 
-export const PIRATE_FRUIT_LIVE_ORIGIN = 'https://pirate-fruit-u555.onrender.com';
 export const PIRATE_FRUIT_MAP_SOURCE_COMMIT = '4df5721de8bdb20c28e53b6a8c933616e132c96d';
 export const PIRATE_FRUIT_PRESENCE_ZONE = 'pirate-fruit';
 

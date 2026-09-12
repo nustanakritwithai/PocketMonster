@@ -10,11 +10,10 @@ const input = read('unified-mobile-controls-v900.mjs');
 const presence = read('world-presence-v800.mjs');
 const game = read('game-v800.js');
 
-// Local Pirate is the reviewed blocky/Blue default; remote Render remains an
-// explicit diagnostic choice and must not silently become the production path.
+// Local Pirate is the reviewed and only production blocky/Blue route.
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/);
-assert.match(boot, /searchParams\.get\('pirateClient'\) !== 'online'/);
-assert.match(boot, /new URL\(live \? PIRATE_FRUIT_ONLINE_ENTRY : PIRATE_FRUIT_OFFLINE_ENTRY\)/);
+assert.doesNotMatch(boot, /pirateClient|PIRATE_FRUIT_ONLINE_ENTRY|onrender/);
+assert.match(boot, /new URL\(PIRATE_FRUIT_OFFLINE_ENTRY\)/);
 assert.match(boot, /frameUrl\.searchParams\.set\('parentOrigin', location\.origin\)/);
 assert.match(boot, /frameUrl\.searchParams\.set\('studioCapability', studioCapability\)/);
 assert.match(boot, /frame\.setAttribute\('sandbox'/);

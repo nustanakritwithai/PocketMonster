@@ -7,7 +7,6 @@ import {
   PIRATE_FRUIT_ISLAND_CENTERS,
   PIRATE_FRUIT_ISLAND_LAYOUT_OFFSETS,
   PIRATE_FRUIT_LAYOUT_OFFSET_NEEDLE,
-  PIRATE_FRUIT_LIVE_ORIGIN,
   PIRATE_FRUIT_MAP_SOURCE_COMMIT,
   PIRATE_FRUIT_PRESENCE_USES_IFRAME_POSE,
   PIRATE_FRUIT_PRESENCE_ZONE,
@@ -29,7 +28,7 @@ assert.equal(pirateSource.islandMap.sourceCommit, PIRATE_FRUIT_MAP_SOURCE_COMMIT
 assert.equal(pirateSource.mode, 'offline');
 assert.equal(pirateSource.remote, false);
 assert.equal(pirateSource.islandMap.matchesLiveOnline, true);
-assert.equal(pirateSource.islandMap.liveOrigin, PIRATE_FRUIT_LIVE_ORIGIN);
+assert.equal(pirateSource.islandMap.liveOrigin, 'https://pirate-fruit-u555.onrender.com', 'SOURCE.json retains the historical island provenance origin');
 assert.equal(pirateSource.islandMap.presenceUsesIframePose, true);
 assert.equal(pirateSource.islandMap.pocketServerHostsIslandCatalog, false);
 assert.equal(PIRATE_FRUIT_PRESENCE_ZONE, 'pirate-fruit');

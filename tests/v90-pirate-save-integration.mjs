@@ -28,7 +28,7 @@ assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cach
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
-assert.match(boot, /PIRATE_FRUIT_ONLINE_ENTRY/, 'parent loads the live Pirate Fruit client');
+assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
 assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=956/, 'world catalog keeps the current Pirate boot module revision');
 assert.match(entry, /online-world-shell-v900\.mjs\?v=66/, 'top-level entry cache-busts the unified ship-control shell');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=62/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
@@ -45,4 +45,3 @@ assert.match(packageJson.scripts['test:v90:pirate-player'], /v90-pirate-save-bri
 assert.match(packageJson.scripts['test:v90:pirate-player'], /v90-pirate-save-integration\.mjs/);
 
 console.log('V9 Pirate save bootstrap and cache chain: PASS');
-

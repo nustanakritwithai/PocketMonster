@@ -25,22 +25,9 @@ import {
   PIRATE_STUDIO_CHARACTER_PACKAGE,
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
-import { PIRATE_FRUIT_LIVE_ORIGIN } from './pirate-fruit-island-map-v900.mjs';
-
-export const PIRATE_FRUIT_ONLINE_ENTRY = `${PIRATE_FRUIT_LIVE_ORIGIN}/`;
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=941', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
-
-function isolatedOfflinePirateClient() {
-  try {
-    // The reviewed local blocky/Blue route is the production default. Keep
-    // the remote client available only as an explicit diagnostic opt-in.
-    return new URL(location.href).searchParams.get('pirateClient') !== 'online';
-  } catch {
-    return true;
-  }
-}
 
 const pocketPlayerHud = createPocketPlayerHudStore();
 if (typeof window !== 'undefined') {
@@ -74,19 +61,16 @@ export function ensurePocketAnimalControl() {
 
 function mountPirateOnline() {
   game.replaceChildren();
-  const live = !isolatedOfflinePirateClient();
   const frame = document.createElement('iframe');
   frame.id = 'pirateFruitFrame';
   frame.title = 'Pirate Fruit';
-  const frameUrl = new URL(live ? PIRATE_FRUIT_ONLINE_ENTRY : PIRATE_FRUIT_OFFLINE_ENTRY);
+  const frameUrl = new URL(PIRATE_FRUIT_OFFLINE_ENTRY);
   frameUrl.searchParams.set('parentOrigin', location.origin);
   const studioCapability = globalThis.crypto?.randomUUID?.()
     || `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   frameUrl.searchParams.set('studioCapability', studioCapability);
   frame.dataset.studioCapability = studioCapability;
-  frame.setAttribute('sandbox', live
-    ? 'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'
-    : 'allow-scripts allow-pointer-lock allow-fullscreen');
+  frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen');
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
   bindPirateSaveHost(frame);
@@ -302,7 +286,7 @@ function bindPocketMonsterLink(frame) {
       try { window.parent?.postMessage({ type: 'pocketmonster:pirate-dialogue-v1', open }, '*'); } catch {}
       return;
     }
-    if (event.origin !== (isolatedOfflinePirateClient() ? 'null' : PIRATE_FRUIT_LIVE_ORIGIN)) return;
+    if (event.origin !== 'null') return;
     if (hudTelemetry.accept(event)) return;
     const message = event.data;
     if (message?.capability === frame.dataset.studioCapability && message.type === PIRATE_STUDIO_CHARACTER_READY) {
@@ -375,13 +359,12 @@ function bindPocketMonsterLink(frame) {
 }
 
 if (typeof window !== 'undefined') {
-  const livePirate = !isolatedOfflinePirateClient();
   window.POCKETMONSTER_PIRATE_FRUIT = Object.freeze({
-    source: livePirate ? 'pirate-fruit-online' : 'pirate-fruit-offline',
+    source: 'pirate-fruit-offline',
     visual: 'pocket-asset-engine',
     ui: 'pirate-fruit-parent-primary',
-    entry: livePirate ? PIRATE_FRUIT_ONLINE_ENTRY : PIRATE_FRUIT_OFFLINE_ENTRY,
-    remote: livePirate,
+    entry: PIRATE_FRUIT_OFFLINE_ENTRY,
+    remote: false,
     mergedWithV800: false,
     presentationOnly: true,
     combatAuthority: false,
