@@ -786,7 +786,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     if (!Observer || !documentLike?.body?.attributes) return;
     try {
       worldInventoryObserver = new Observer(() => {
-        renderUtilities(lastUtilitiesSnapshot || { revision: 1, items: [] });
+        refreshUtilities();
       });
       worldInventoryObserver.observe(documentLike.body, {
         attributes: true,
@@ -1038,6 +1038,20 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
   // ---------- Lifecycle ----------
 
+  function utilitiesSnapshotFromAdapters() {
+    try {
+      const snap = pocketAdapter()?.utilities?.snapshot?.();
+      if (snap) return snap;
+    } catch {}
+    return lastUtilitiesSnapshot || { revision: 1, items: [] };
+  }
+
+  function refreshUtilities() {
+    // Pirate POCKET_HUD has player only — no utilities stream — so inventory
+    // must still be painted from mount/rebind/world changes.
+    renderUtilities(utilitiesSnapshotFromAdapters());
+  }
+
   function bindFeatures() {
     for (const unsubscribe of unsubscribers.splice(0)) {
       try { unsubscribe(); } catch {}
@@ -1055,6 +1069,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
       subscribeFeature('utilities', pocket.utilities);
       subscribeFeature('banner', pocket.banner);
     }
+    refreshUtilities();
   }
 
   function mount() {

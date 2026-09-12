@@ -165,5 +165,29 @@ assert.equal(document._posts.length, 1, 'bag click posts into Pirate iframe');
 assert.equal(document._posts[0].payload.type, PIRATE_FRUIT_INVENTORY_MESSAGE);
 assert.equal(document._posts[0].payload.action, 'toggle');
 
+
+
+// Pirate boot only exposes player on POCKET_HUD — bag must still appear.
 hud.unmount();
+const document2 = documentLike();
+const hud2 = createUnifiedMmorpgHud({
+  windowLike: {
+    POCKETMONSTER_POCKET_HUD: {
+      player: feature({ revision: 1, available: false, buffs: Object.freeze([]) }),
+    },
+    POCKETMONSTER_CHAT_RUNTIME: {
+      chat: feature({
+        revision: 1, channel: 'WORLD', channels: ['WORLD', 'ZONE'], rows: Object.freeze([]),
+        unread: 0, status: 'connected', canSend: true,
+      }),
+    },
+    POCKETMONSTER_SERVER_GATE: { state: 'healthy' },
+  },
+  documentLike: document2,
+});
+hud2.mount();
+const ids2 = document2.getElementById('mmorpgUtilities').children.map(node => node.dataset.utility);
+assert.equal(ids2[0], 'inventory', 'bag appears even when Pirate POCKET_HUD has no utilities stream');
+hud2.unmount();
+
 console.log('V9 Pirate inventory under-minimap utility: PASS');

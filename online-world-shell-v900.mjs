@@ -17,7 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=949';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=950';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=1';
@@ -126,7 +126,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '68');
+  url.searchParams.set('shellRevision', '69');
   return url.href;
 }
 
