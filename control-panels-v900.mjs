@@ -27,6 +27,7 @@ export function defaultPanelForWorld(worldId) {
 }
 
 export function allowedPanelForWorld(worldId, panelId) {
+  if (worldId === 'pirate-fruit') return HUMAN_CONTROL_PANEL;
   if (worldId === 'pocket-monster') return THROW_CONTROL_PANEL;
   return panelById(panelId)?.id || defaultPanelForWorld(worldId);
 }
@@ -66,7 +67,7 @@ export function applyControlPanel(id, worldId = globalThis.document?.body?.datas
   });
   const switcher = document.getElementById('controlPanelSwitcher');
   if (switcher) {
-    switcher.hidden = false;
+    switcher.hidden = worldId === 'pirate-fruit';
     for (const button of switcher.querySelectorAll('[data-control-panel]')) {
       button.setAttribute('aria-current', button.dataset.controlPanel === panel.id ? 'page' : 'false');
     }

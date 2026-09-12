@@ -79,8 +79,11 @@ const sceneWindow = {
   focus() { sceneFocusCount += 1; },
 };
 const sceneInputResets = [];
+let boundMonsterController = null;
+sceneWindow.document = { getElementById: () => null };
 sceneWindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS = {
   reset(reason) { sceneInputResets.push(reason); },
+  setMonsterController(controller) { boundMonsterController = controller; },
 };
 const frameListeners = new Map();
 const sceneFrame = element('iframe', 'onlineWorldSceneFrame');
@@ -96,6 +99,12 @@ Object.defineProperty(sceneFrame, 'src', {
     sceneWindow.location.href = value;
     delete sceneWindow.POCKETMONSTER_WORLD_STATE;
     delete sceneWindow.POCKETMONSTER_WORLD_PRESENCE;
+    if (scenario === 'early-monster-scene' && value !== 'about:blank') queueMicrotask(() => {
+      const owner = window.POCKETMONSTER_ONLINE_SHELL;
+      const lease = owner.registerSceneBoot(sceneWindow, value);
+      assert.equal(window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER, undefined);
+      assert.equal(owner.reportSceneBoot(sceneWindow, lease, { status: 'ready' }), true);
+    });
   },
 });
 sceneFrame.remove = () => {
@@ -202,6 +211,13 @@ if (scenario === 'missing-server-gate') {
   process.exit(0);
 }
 if (shellImportError) throw shellImportError;
+if (scenario === 'early-monster-scene') {
+  assert.ok(boundMonsterController, 'แผงโจรสลัดต้องเชื่อมเมื่อฉากพร้อมก่อน controller');
+  assert.equal(boundMonsterController, window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER);
+  window.POCKETMONSTER_ONLINE_SHELL.endSession('test-complete');
+  console.log('Early Pirate scene → primary monster controls: PASS');
+  process.exit(0);
+}
 await new Promise(resolve => setTimeout(resolve, 20));
 
 const onlineShell = window.POCKETMONSTER_ONLINE_SHELL;
