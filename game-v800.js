@@ -6229,19 +6229,9 @@ function revealMonsterManager(tab){
   playSFX('sfx_ui_open');
 }
 function installPirateMonsterBagButton(){
-  const controls=el('pirateUnifiedControls');
-  if(!controls||controls.querySelector('[data-monster-bag-open]'))return;
-  const actions=controls.querySelector('.controls-right');
-  if(!actions)return;
-  const button=document.createElement('button');
-  button.type='button';
-  button.className='action tc-btn tc-monster-bag pirate-only';
-  button.dataset.pirateIcon='🎒';
-  button.dataset.monsterBagOpen='true';
-  button.setAttribute('aria-label','เปิดกระเป๋ามอนสเตอร์');
-  button.textContent='🎒';
-  button.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:true});});
-  actions.appendChild(button);
+  // Under-minimap parent HUD owns the monster-bag control next to Pirate inventory.
+  // Keep POCKETMONSTER_OPEN_MONSTER_BAG as the open API for that utility.
+  return;
 }
 function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
 function showRanchStorageShell({remote=false}={}){
