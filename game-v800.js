@@ -6856,6 +6856,7 @@ function syncSkillButtonResourceUi(button,skill,cooldownSeconds=0){
 }
 function renderCombatPresentation(){
   publishPocketActionsHud();
+  if(document.body?.dataset?.combinedWorld==='pirate-fruit')return;
   const presentation=combatHudPresentation(),skillOwner=activeSummon?.inst||selectedInstance();
   const skillDefs=skillOwner?canonicalCombatSkills(skillOwner):[],activeType=skillOwner?monsterTypes(skillOwner)[0]:'Normal';
   const statusControl=activeSummon?resolveCombatStatusRuntime(activeSummon.statusState):null;
