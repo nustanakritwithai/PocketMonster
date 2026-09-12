@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=958';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=959';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -17,11 +17,12 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
+import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=951';
-import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=1';
-import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs';
+import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=2';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=2';
+import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
 export const ONLINE_WORLD_SCENE_ENTRY = new URL('./scene-v900.html', import.meta.url).href;
@@ -52,6 +53,7 @@ let monsterStateProvider = null;
 let unbindMonsterScene = null;
 let unsubscribeMonsterParty = null;
 let unsubscribeMonsterState = null;
+let disposePirateBagSync = null;
 const SCENE_HUD_ADAPTERS = Object.freeze([
   'POCKETMONSTER_QUEST_HUD',
   'POCKETMONSTER_PARTY_HUD',
@@ -60,6 +62,7 @@ const SCENE_HUD_ADAPTERS = Object.freeze([
 ]);
 
 function clearSceneHudAdapters() {
+  disposePirateBagSync?.(); disposePirateBagSync = null;
   unsubscribeMonsterParty?.();
   unsubscribeMonsterParty = null;
   unsubscribeMonsterState?.();
@@ -87,6 +90,7 @@ function syncParentWorldFlagsFromScene(sceneWindow) {
 }
 
 function bindSceneHudAdapters(sceneWindow) {
+  disposePirateBagSync?.(); disposePirateBagSync = null;
   syncParentWorldFlagsFromScene(sceneWindow);
   for (const name of SCENE_HUD_ADAPTERS) {
     try { window[name] = sceneWindow?.[name]; } catch { window[name] = undefined; }
@@ -102,6 +106,20 @@ function bindSceneHudAdapters(sceneWindow) {
     monsterStateProvider?.start?.();
     unbindMonsterScene = bindMonsterControlScene({ sceneWindow, controller: monsterController });
     monsterController.sync();
+    let bagSync = null;
+    let timer = null;
+    const attachBag = () => {
+      if (bagSync || !sceneWindow.POCKETMONSTER_MONSTER_BAG?.subscribe) return;
+      bagSync = createPirateMonsterInventorySync({
+        bagProvider: sceneWindow.POCKETMONSTER_MONSTER_BAG,
+        controlProvider: monsterStateProvider,
+        isPirate: () => sceneWindow.document?.body?.dataset?.combinedWorld === 'pirate-fruit',
+      });
+      if (timer) clearInterval(timer);
+    };
+    attachBag();
+    if (!bagSync) timer = setInterval(attachBag, 500);
+    disposePirateBagSync = () => { if (timer) clearInterval(timer); bagSync?.dispose(); };
   }
   unifiedHud?.rebind?.();
 }
@@ -139,7 +157,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '70');
+  url.searchParams.set('shellRevision', '71');
   return url.href;
 }
 

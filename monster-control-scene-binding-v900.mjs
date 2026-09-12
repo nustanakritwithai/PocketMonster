@@ -2,14 +2,17 @@
 export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   const documentLike = sceneWindow?.document;
   if (!documentLike || !controller) return () => {};
+  const controlWindow = sceneWindow;
+  const isPirate = () => documentLike.body?.dataset?.combinedWorld === 'pirate-fruit';
   const mobile = sceneWindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS;
   mobile?.setMonsterController?.(controller);
-  sceneWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = controller;
+  controlWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = controller;
   const buttons = [];
   for (let slot = 0; slot < 3; slot += 1) {
     const button = documentLike.getElementById(`monsterSlot${slot + 1}Btn`);
     if (!button) continue;
-    const click = event => {
+    let suppressCompatibilityClick = false;
+    const activate = event => {
       event.preventDefault?.();
       event.stopImmediatePropagation?.();
       void Promise.resolve(controller.activatePartySlot(slot)).then(result => {
@@ -17,16 +20,37 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
         if (status && result?.ok === false) status.textContent = 'ยังใช้มอนสเตอร์ไม่ได้ กรุณารอการเชื่อมต่อระบบมอนสเตอร์';
       });
     };
+    const pointerdown = event => {
+      if (!isPirate() || (event.button !== undefined && event.button !== 0)) return;
+      suppressCompatibilityClick = true;
+      activate(event);
+    };
+    const click = event => {
+      // Touch/pointer activation already happened on pointerdown. Preserve
+      // click for keyboard accessibility (detail === 0).
+      if (suppressCompatibilityClick && event.detail > 0) {
+        suppressCompatibilityClick = false;
+        event.preventDefault?.();
+        event.stopImmediatePropagation?.();
+        return;
+      }
+      suppressCompatibilityClick = false;
+      activate(event);
+    };
+    button.addEventListener('pointerdown', pointerdown, true);
     button.addEventListener('click', click, true);
-    buttons.push({ button, slot, click });
+    buttons.push({ button, slot, pointerdown, click });
   }
   const unsubscribe = controller.subscribe(snapshot => {
-    sceneWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(snapshot.held, snapshot);
-    try { sceneWindow.dispatchEvent?.(new CustomEvent('pocketmonster-held-monster', { detail: snapshot.held })); } catch {}
+    if (!isPirate()) controlWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(snapshot.held, snapshot);
+    try {
+      const EventCtor = controlWindow.CustomEvent || CustomEvent;
+      controlWindow.dispatchEvent?.(new EventCtor('pocketmonster-held-monster', { detail: snapshot.held }));
+    } catch {}
     const throwButton = documentLike.getElementById('monsterThrowBtn');
     if (throwButton) {
-      throwButton.hidden = snapshot.held === null || snapshot.pending === true;
-      throwButton.disabled = snapshot.held === null || snapshot.pending === true;
+      throwButton.hidden = isPirate() || snapshot.held === null || snapshot.pending === true;
+      throwButton.disabled = isPirate() || snapshot.held === null || snapshot.pending === true;
     }
     for (const { button, slot } of buttons) {
       if (!Number.isInteger(slot)) continue;
@@ -68,10 +92,13 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   }
   return () => {
     unsubscribe?.();
-    sceneWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(null);
-    for (const { button, click } of buttons) button.removeEventListener('click', click, true);
+    if (!isPirate()) controlWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(null);
+    for (const { button, pointerdown, click } of buttons) {
+      pointerdown && button.removeEventListener('pointerdown', pointerdown, true);
+      button.removeEventListener('click', click, true);
+    }
     mobile?.setMonsterController?.(null);
-    if (sceneWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER === controller) delete sceneWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;
+    if (controlWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER === controller) delete controlWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER;
   };
 }
 

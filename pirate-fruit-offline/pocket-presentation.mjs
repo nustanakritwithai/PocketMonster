@@ -3,7 +3,7 @@ import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
   subscribePirateStudioCharacterStatus,
-} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=5';
+} from '../asset-presentation/pirate-fruit-client-bridge.mjs?v=6';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
   PIRATE_STUDIO_CHARACTER_FAILED,
@@ -17,9 +17,12 @@ import {
   PIRATE_FRUIT_DIALOGUE_MESSAGE,
   PIRATE_FRUIT_INVENTORY_MESSAGE,
 } from '../pirate-fruit-control-hud-v900.mjs?v=22';
+import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-owned-monster-carry.mjs';
 
 const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 const studioCapability = new URLSearchParams(location.search).get('studioCapability');
+let pendingOwnedMonsterHeld = null;
+let pendingOwnedMonsterHeldSet = false;
 // ACCEPTED acknowledges an attached visual, never just an accepted envelope.
 subscribePirateStudioCharacterStatus(status => {
   window.POCKETMONSTER_PIRATE_STUDIO_CHARACTER = status;
@@ -77,6 +80,12 @@ window.addEventListener('message', event => {
     if (button && typeof button.click === 'function') button.click();
     return;
   }
+  if (message?.type === PIRATE_OWNED_MONSTER_CARRY_MESSAGE) {
+    pendingOwnedMonsterHeld = message.held ?? null;
+    pendingOwnedMonsterHeldSet = true;
+    window.POCKETMONSTER_PIRATE_OWNED_MONSTER_CARRY?.(pendingOwnedMonsterHeld);
+    return;
+  }
   if (message?.type !== PIRATE_FRUIT_CONTROL_HUD_MESSAGE || !['human', 'throw'].includes(message.panel)) return;
   let style = document.getElementById(PIRATE_FRUIT_CONTROL_HUD_STYLE_ID);
   if (!style) {
@@ -89,7 +98,11 @@ window.addEventListener('message', event => {
   document.documentElement.dataset.controlPanel = message.panel;
 });
 
+window.addEventListener('pocketmonster:pirate-carry-ready', () => {
+  if (pendingOwnedMonsterHeldSet) window.POCKETMONSTER_PIRATE_OWNED_MONSTER_CARRY?.(pendingOwnedMonsterHeld);
+});
 hookPirateFruitRenderer(pirateFruitThree);
+if (pendingOwnedMonsterHeldSet) window.POCKETMONSTER_PIRATE_OWNED_MONSTER_CARRY?.(pendingOwnedMonsterHeld);
 if (studioCapability) {
   window.parent?.postMessage({ type: PIRATE_STUDIO_CHARACTER_READY, capability: studioCapability }, parentOrigin);
 }
