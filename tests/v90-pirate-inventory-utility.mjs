@@ -10,6 +10,7 @@ const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8
 
 assert.match(hudSource, /'inventory'/, 'inventory is a first-class utility command');
 assert.match(presentation, /PIRATE_FRUIT_INVENTORY_MESSAGE/, 'Pirate child admits parent inventory toggles');
+assert.match(presentation, /isTrustedShellSource|source === window\.top/, 'nested Pirate iframe accepts inventory toggles from the top shell');
 assert.match(presentation, /\.inv-open-button/, 'parent toggle clicks InventoryUI open button');
 assert.match(css, /mmorpg-utility\[data-utility="inventory"\]/, 'bag utility sits in the under-minimap utility cluster');
 assert.match(pirateHud, /\.inv-panel[\s\S]*max-height: min\(78vh/, 'inventory panel fits phone height');
