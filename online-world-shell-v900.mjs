@@ -635,6 +635,7 @@ monsterStateProvider = createMonsterHttpProvider({
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
   pollMs: 2000,
 });
+window.POCKETMONSTER_MONSTER_STATE_PROVIDER = monsterStateProvider;
 const monsterCommands = createMonsterCommandAdapter({
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
   send: command => monsterStateProvider.send(command),

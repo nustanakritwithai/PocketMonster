@@ -12,6 +12,7 @@ export function createMonsterControlController({ commands, getParty = () => null
   let epoch = 0;
   let disposed = false;
   let waiting = null;
+  let held = null;
   const retryable = new Map();
   const listeners = new Set();
   const zone = () => getZone();
@@ -26,10 +27,12 @@ export function createMonsterControlController({ commands, getParty = () => null
     const slots = Object.freeze((party?.slots || []).map(slot => Object.freeze({ ...slot,
       active: Boolean(slot?.instanceId) && isActive(slot.instanceId),
       pending: slot?.instanceId === waiting?.instanceId,
+      held: slot?.instanceId === held?.instanceId,
     })));
     return Object.freeze({ ...party, available: !disposed && party?.available === true, slots,
       capabilities: Object.freeze({ recall: supports('recall'), switch: supports('switch') }),
       pending: waiting !== null, pendingKind: waiting?.kind || null,
+      held: held ? Object.freeze({ ...held }) : null,
       revision, mode: panel.mode, slot: panel.slot, instanceId: panel.instanceId || null,
       controlPanel: Object.freeze({ ...panel }) });
   };
@@ -46,30 +49,42 @@ export function createMonsterControlController({ commands, getParty = () => null
       : isActive(waiting.instanceId))) {
       retryable.delete(waiting.retryKey); waiting = null;
     }
+    if (held && (held.zone !== zone() || slotOf(held.index)?.instanceId !== held.instanceId || slotOf(held.index)?.available !== true)) held = null;
     if (panel.instanceId && (!isActive(panel.instanceId) || slotOf(panel.slot)?.instanceId !== panel.instanceId)) panel = emptyPanel();
     return emit();
   };
   const clear = () => {
     epoch += 1;
     waiting = null;
+    held = null;
     retryable.clear();
     panel = emptyPanel();
     commands.clearScene?.();
     return emit();
   };
-  const activateSlot = async index => {
+  const activateSlot = async (index, options = {}) => {
     const requestEpoch = epoch;
     let request = null;
     try {
       const slot = slotOf(index);
       if (disposed || !slot?.available || !slot.instanceId || slot.fainted) return { ok: false, reason: 'unavailable' };
       if (isActive(slot.instanceId)) {
+        held = null;
         panel = panel.mode === 'monster' && panel.instanceId === slot.instanceId ? emptyPanel()
           : { mode: 'monster', slot: index, instanceId: slot.instanceId };
         emit();
         return { ok: true, reason: 'panel-toggled', mode: panel.mode };
       }
       if (waiting) return { ok: false, reason: 'summon-pending' };
+      if (!options.throw) {
+        if (held?.instanceId === slot.instanceId && held?.index === index) {
+          return { ok: true, reason: 'already-prepared', mode: 'character', slot: index, instanceId: slot.instanceId };
+        }
+        held = { index, instanceId: slot.instanceId, zone: zone() };
+        panel = emptyPanel();
+        emit();
+        return { ok: true, reason: 'prepared', mode: 'character', slot: index, instanceId: slot.instanceId };
+      }
       const current = activeActor();
       if (current && !supports('switch')) return { ok: false, reason: 'switch-unavailable' };
       if (current && (!Number.isSafeInteger(current.generation) || current.generation < 1)) return { ok: false, reason: 'generation-unavailable' };
@@ -96,6 +111,8 @@ export function createMonsterControlController({ commands, getParty = () => null
         emit();
         return { ok: false, reason: result?.code || 'summon-rejected' };
       }
+      held = null;
+      panel = emptyPanel();
       if (current && isActive(slot.instanceId)) {
         if (waiting === request) waiting = null;
         retryable.delete(retryKey);
@@ -117,6 +134,16 @@ export function createMonsterControlController({ commands, getParty = () => null
       if (epoch === requestEpoch) emit();
       return { ok: false, reason: 'control-error' };
     }
+  };
+  const throwHeld = async () => {
+    if (!held) return { ok: false, reason: 'nothing-held' };
+    const slot = slotOf(held.index);
+    if (held.zone !== zone() || slot?.instanceId !== held.instanceId || slot?.available !== true || slot.fainted) {
+      held = null;
+      emit();
+      return { ok: false, reason: 'held-unavailable' };
+    }
+    return activateSlot(held.index, { throw: true });
   };
   const recall = async () => {
     const requestEpoch = epoch;
@@ -172,7 +199,7 @@ export function createMonsterControlController({ commands, getParty = () => null
       return result?.ok ? result : { ok: false, reason: result?.code || 'skill-rejected' };
     } catch { return { ok: false, reason: 'control-error' }; }
   };
-  return Object.freeze({ snapshot, sync, skills, useSkill, recall, recallActive: recall, activateSlot, activatePartySlot: activateSlot,
+  return Object.freeze({ snapshot, sync, skills, useSkill, recall, recallActive: recall, activateSlot, activatePartySlot: activateSlot, throwHeld,
     reset: clear, clearScene: clear,
     subscribe(listener) { if (disposed || typeof listener !== 'function') return () => {}; listeners.add(listener); listener(snapshot()); return () => listeners.delete(listener); },
     dispose() { disposed = true; clear(); listeners.clear(); },
