@@ -61,8 +61,21 @@ wrapFullscreen();
 window.addEventListener('load', wrapFullscreen);
 setTimeout(wrapFullscreen, 0);
 setTimeout(wrapFullscreen, 400);
+function isTrustedShellSource(source) {
+  try {
+    if (!source) return false;
+    if (source === window.parent) return true;
+    // Persistent V9 shell nests Pirate under #onlineWorldSceneFrame; the unified
+    // HUD posts from the top parent document, not the immediate scene parent.
+    if (source === window.top) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 window.addEventListener('message', event => {
-  if (event.source !== window.parent || event.origin !== parentOrigin) return;
+  if (!isTrustedShellSource(event.source) || event.origin !== parentOrigin) return;
   const message = event.data;
   if (message?.capability === studioCapability && message.type === PIRATE_STUDIO_CHARACTER_PACKAGE) {
     receivePirateStudioCharacterPackage(message.package);
