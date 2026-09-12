@@ -22,7 +22,7 @@ assert.match(boot, /source: livePirate \? 'pirate-fruit-online' : 'pirate-fruit-
 assert.match(boot, /remote: livePirate/);
 assert.match(boot, /searchParams\.get\('pirateClient'\) === 'offline'/);
 assert.match(boot, /pirate-fruit-offline\/index\.html/);
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=954');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=955');
 assert.match(combined, /โลก Pirate Fruit ออนไลน์ชุดล่าสุด/);
 
 const timeout = serverSync.match(/timeoutMs = (\d+)/);
@@ -31,6 +31,12 @@ assert.ok(Number(timeout[1]) >= 15000, 'slow MonsterLife /api/version must not t
 
 for (const page of pages) {
   assert.match(page.html, /frame-src[^"]*https:\/\/pirate-fruit-u555\.onrender\.com/, `${page.name} CSP must allow the live Pirate iframe`);
+  assert.match(page.html, /style-v900\.css\?v=970/, `${page.name} cache-busts the Pirate gate hit-test stylesheet`);
 }
+
+const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+assert.match(css, /body:not\(\[data-pirate-world-ready\]\) #pirateUnifiedControls #joystick\.tc-joyzone/);
+assert.match(css, /body:not\(\[data-pirate-world-ready\]\) #pirateUnifiedControls #cameraPad\.tc-camzone\{pointer-events:none!important\}/);
+assert.match(boot, /document\.body\.dataset\.pirateWorldReady = '1'/);
 
 console.log('pirate online boot contract passed');
