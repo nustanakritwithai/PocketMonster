@@ -45,11 +45,11 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
   'pirate-fruit-offline/assets/index-CSre5PAj.js',
-  'pirate-fruit-offline/assets/AzureFrostIsland-D93MG-Bt.js',
-  'pirate-fruit-offline/assets/EmberVolcanoIsland-Dwvxnue6.js',
-  'pirate-fruit-offline/assets/MistJungleIsland-iKbiMxA3.js',
-  'pirate-fruit-offline/assets/SunscarDesertIsland-DRO7IMVp.js',
-  'pirate-fruit-offline/assets/TempestSkyIsland-BdTzGlWY.js',
+  'pirate-fruit-offline/assets/AzureFrostIsland-VoKMadr_.js',
+  'pirate-fruit-offline/assets/EmberVolcanoIsland-Yk2202Ka.js',
+  'pirate-fruit-offline/assets/MistJungleIsland-aMK6-VdC.js',
+  'pirate-fruit-offline/assets/SunscarDesertIsland-Cbn0DXrp.js',
+  'pirate-fruit-offline/assets/TempestSkyIsland-C_eTwMP1.js',
   'pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js',
 ]);
 
