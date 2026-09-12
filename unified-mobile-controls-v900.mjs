@@ -443,6 +443,7 @@ export function createUnifiedMobileControls({
       const pocketId = POCKET_ACTION_IDS[action];
       paintActionButton(button, byId.get(pocketId) || byId.get(action) || null);
     }
+    paintMonsterThrow();
   };
 
   const bindActionVisuals = () => {
