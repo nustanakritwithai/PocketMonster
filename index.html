@@ -11,13 +11,15 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-  <script type="module" src="./entry-preload-v900.mjs?v=973"></script>
+  <script type="module" src="./entry-preload-v900.mjs?v=974"></script>
   <link rel="stylesheet" href="./style-v800.css?v=814" />
   <link rel="stylesheet" href="./style-v900.css?v=971" />
+  <link rel="stylesheet" href="./startup-surface-v900.css?v=1" />
   <link rel="stylesheet" href="./combat-v91.css?v=1" />
 </head>
-<body>
-  <div id="accountGate" class="account-gate">
+<body data-boot-pending>
+  <!-- firebase-launcher-auth-start -->
+  <div id="accountGate" class="account-gate hidden" aria-hidden="true" hidden>
     <div id="loginPage" class="account-card auth-page">
       <div class="account-logo">🐾</div><h1>Monster Life RPG V9.0</h1><p>เวอร์ชันรวม 3 โลก • เริ่มที่โลก Pirate Fruit จริง แล้ววาปเชื่อมเข้าเกมเดิม • V9 เป็น live entry หลัก</p>
       <form id="loginForm"><label>อีเมล<input id="loginEmail" type="email" autocomplete="email" required placeholder="อีเมลของคุณ" /></label><label>รหัสผ่าน<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="รหัสผ่าน" /></label><button id="loginAccountBtn" class="auth-primary" type="submit">เข้าสู่ระบบ</button></form><button id="googleLoginBtn" class="auth-google" type="button">เข้าสู่ระบบด้วย Google</button><button id="guestLoginBtn" class="auth-guest" type="button">เข้าเล่นแบบแขก</button>
@@ -29,6 +31,7 @@
       <div id="registerStatus" class="account-status"></div>
     </div>
   </div>
+  <!-- firebase-launcher-auth-end -->
   <div id="controlPanelHint" class="control-panel-hint hidden" aria-live="polite"></div>
   <div id="monsterLifeProfilePanel" class="monsterlife-profile-panel" hidden aria-live="polite"></div>
   <dialog id="monsterLifeLinkDialog" class="monsterlife-link-dialog">

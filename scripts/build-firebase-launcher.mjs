@@ -10,6 +10,27 @@ export function buildFirebaseLauncher({ root = process.cwd(), output = path.join
   if (new URL(apiOrigin).protocol !== 'https:') throw new Error('runtime-config.json requires an HTTPS apiBaseUrl');
   const release = encodeURIComponent(config.deployedRelease || Date.now());
   let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  html = html.replace(
+    /<div id="accountGate" class="account-gate hidden" aria-hidden="true" hidden>/,
+    '<div id="accountGate" class="account-gate">'
+  );
+  if (!html.includes('<div id="accountGate" class="account-gate">')) {
+    throw new Error('Firebase launcher requires a visible account gate');
+  }
+  html = html.replace(/href="\.\/startup-surface-v900\.css(?:\?[^"]*)?"/, 'href="' + assetBase + 'startup-surface-v900.css?v=' + release + '"');
+  const authStartMarker = '<!-- firebase-launcher-auth-start -->';
+  const authEndMarker = '<!-- firebase-launcher-auth-end -->';
+  const authStartIndex = html.indexOf(authStartMarker);
+  const authEndIndex = html.indexOf(authEndMarker);
+  const startupStatus = html.match(/<div id="startupStatus"[^>]*>[\s\S]*?<\/div>/)?.[0];
+  const bodyStart = html.indexOf('<body');
+  const bodyOpenEnd = html.indexOf('>', bodyStart);
+  if (authStartIndex < 0 || authEndIndex <= authStartIndex || bodyStart < 0 || bodyOpenEnd < 0 || !startupStatus) {
+    throw new Error('Firebase launcher requires a neutral pre-launch surface');
+  }
+  const authRegion = html.slice(authStartIndex + authStartMarker.length, authEndIndex);
+  const headAndBody = html.slice(0, bodyOpenEnd + 1).replace('<body data-boot-pending>', '<body>');
+  html = headAndBody + authRegion + '\n' + startupStatus + '\n<script type="module" src="./startup-errors.mjs"></script>\n</body>\n</html>\n';
   const isCombinedV9 = html.includes('entry-preload-v900.mjs');
   if (!html.includes(`connect-src 'self' ${apiOrigin}`)) {
     html = html.replace(`connect-src 'self'`, `connect-src 'self' ${apiOrigin}`);

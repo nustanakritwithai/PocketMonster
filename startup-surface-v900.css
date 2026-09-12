@@ -1,0 +1,2 @@
+body[data-boot-pending] > :not(#accountGate):not(#startupStatus):not(#patchUpdater),
+body[data-boot-pending] > :not(#accountGate):not(#startupStatus):not(#patchUpdater) *{visibility:hidden!important;pointer-events:none!important}
