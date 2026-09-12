@@ -22,9 +22,11 @@ assert.match(css, /\.ranch-storage-page[\s\S]*grid-template-columns/, 'Storage p
 assert.match(css, /@media\s*\(max-width:700px\)[\s\S]*\.ranch-storage-page/, 'Storage page keeps the narrow fallback');
 const lounge = css.match(/\/\* Ranch Club lounge \*\/([\s\S]*?)\/\* Keeper \/ Ranch Storage mobile bottom sheet \*\//)?.[1] || '';
 assert.ok(lounge, 'Ranch Club lounge CSS block is required');
-assert.match(lounge, /grid-template-rows:auto minmax\(120px,max-content\) minmax\(0,1fr\)/, 'list row keeps a 120px floor so the preview cannot collapse it');
+assert.match(lounge, /grid-template-rows:auto minmax\(120px,min\(34dvh,\.42fr\)\) minmax\(0,1fr\)/, 'list row keeps a 120px floor and caps to viewport so the panel cannot overflow');
 assert.match(lounge, /minmax\(96px,\.42fr\)/, 'short landscape keeps a list-row floor');
 assert.match(lounge, /38dvh|30dvh/, 'club stage scales with viewport height');
+assert.match(lounge, /height:100dvh/, 'club lounge locks to the viewport height');
+assert.match(lounge, /overflow:hidden/, 'club lounge scrolls inside columns instead of past the screen');
 assert.doesNotMatch(lounge, /grid-template-rows:auto minmax\(0,1fr\) auto/, 'list row must not be the unbounded leftover track');
 for (const cls of ['.ranch-club-kicker', '.ranch-club-card', '.ranch-club-stage', '.ranch-club-dossier', '.ranch-club-avatar', '.ranch-club-chip', '.ranch-club-vault', '.ranch-club-carry', '.ranch-club-preview-canvas']) {
   assert.ok(lounge.includes(cls), `club lounge CSS missing ${cls}`);
@@ -35,7 +37,7 @@ assert.match(lounge, /#14532d|#166534/, 'club lounge uses an emerald accent');
 const start = js.indexOf('function renderRanchStoragePage(');
 assert.notEqual(start, -1, 'renderRanchStoragePage exists');
 const storage = js.slice(start, js.indexOf('\nfunction ', start + 1));
-assert.match(storage, /state\.storage\.filter\(Boolean\)/, 'renderer still uses canonical Storage IDs');
+assert.match(storage, /\(remoteState\?\.storage\|\|state\.storage\)\.filter\(Boolean\)/, 'renderer still uses canonical Storage IDs');
 assert.match(storage, /ranch-club-card/, 'renderer emits club member cards');
 assert.match(storage, /fillColumn\(roster,'พกอยู่',partyIds/, 'Party fills the left carry column');
 assert.match(storage, /fillColumn\(vault,'ในคลัง',ids/, 'Storage fills the right vault column');
