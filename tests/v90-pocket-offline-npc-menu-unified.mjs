@@ -24,7 +24,7 @@ const ROOTS = Object.freeze([
 ]);
 
 function stylesheetRevision(html, entry) {
-  const match = html.match(/<link rel="stylesheet" href="\.\/___([^"']+)"\s*\/>/);
+  const match = html.match(/<link rel="stylesheet" href="\.\/(style-v900\.css\?v=\d+)"\s*\/>/);
   assert.ok(match, `${entry} loads the active unified stylesheet`);
   return match[1];
 }
