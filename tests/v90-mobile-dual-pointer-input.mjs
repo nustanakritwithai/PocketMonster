@@ -6,11 +6,14 @@ import {
 } from '../mobile-dual-pointer-input-v900.mjs';
 
 class FakeTarget extends EventTarget {
-  constructor() {
+  constructor(rect = { left: 0, top: 0, width: 400, height: 400, right: 400, bottom: 400 }) {
     super();
     this.style = {};
     this.capturedPointers = new Set();
+    this.rect = rect;
   }
+
+  getBoundingClientRect() { return this.rect; }
 
   setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
   hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
@@ -35,8 +38,8 @@ function pointerEvent(type, pointerId, x, y) {
 const windowLike = new FakeTarget();
 const documentLike = new FakeTarget();
 documentLike.visibilityState = 'visible';
-const joystick = new FakeTarget();
-const camera = new FakeTarget();
+const joystick = new FakeTarget({ left: 0, top: 0, width: 200, height: 400, right: 200, bottom: 400 });
+const camera = new FakeTarget({ left: 200, top: 0, width: 200, height: 400, right: 400, bottom: 400 });
 const calls = [];
 
 const input = bindMobileDualPointerInput({
@@ -163,6 +166,28 @@ joystick.capturedPointers.delete(81);
 joystick.dispatchEvent(pointerEvent('pointerdown', 82, 40, 50));
 assert.equal(input.diagnostics().joystickPointerId, 82, 'a new joystick drag also recovers from silently dropped capture');
 assert.ok(calls.some(call => call[0] === 'joy-end' && call[1] === 'stale-pointercapture'));
+
+input.reset('retarget-fixture');
+calls.length = 0;
+joystick.dispatchEvent(pointerEvent('pointerdown', 91, 40, 200));
+joystick.dispatchEvent(pointerEvent('pointerdown', 92, 300, 120));
+assert.equal(input.diagnostics().joystickPointerId, 91, 'walking pointer stays on the left pad');
+assert.equal(input.diagnostics().cameraPointerId, 92, 'retargeted right-finger starts look even when the event target is the capturing joystick');
+assert.ok(calls.some(call => call[0] === 'camera-start' && call[1] === 92));
+
+input.reset('retarget-fixture');
+calls.length = 0;
+camera.dispatchEvent(pointerEvent('pointerdown', 93, 300, 120));
+camera.dispatchEvent(pointerEvent('pointerdown', 94, 40, 200));
+assert.equal(input.diagnostics().cameraPointerId, 93);
+assert.equal(input.diagnostics().joystickPointerId, 94, 'retargeted left-finger starts walk when the event target is the capturing camera');
+
+input.reset('retarget-fixture');
+calls.length = 0;
+joystick.dispatchEvent(pointerEvent('pointerdown', 95, 40, 200));
+joystick.dispatchEvent(pointerEvent('pointerdown', 96, 60, 220));
+assert.equal(input.diagnostics().joystickPointerId, 95);
+assert.equal(input.diagnostics().cameraPointerId, null, 'a second finger still on the joystick does not steal look');
 
 input.dispose();
 joystick.dispatchEvent(pointerEvent('pointerdown', 66, 40, 50));

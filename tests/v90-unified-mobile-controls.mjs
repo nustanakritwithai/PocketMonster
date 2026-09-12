@@ -285,11 +285,11 @@ assert.match(styleSource, /#cameraPad\.tc-camzone\{[^}]*bottom:168px/, 'camera p
 assert.doesNotMatch(styleSource, /#cameraPad\.tc-camzone\{[^}]*height:100%/, 'camera pad cannot cover the bottom talk prompt');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldSceneFrame\{[^}]*z-index:40/, 'open Pirate window raises the scene above HUD buttons');
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
-assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=9/, 'updated touch recovery dependency bypasses stale mobile caches');
+assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=11/, 'world shell cache-busts the audio-retry controls module');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=11/, 'Pirate boot bypasses cached controls that predate the iframe audio retry');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=62/, 'online scene cache-busts the unified Pirate ship-control bridge');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=12/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=12/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=63/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 
