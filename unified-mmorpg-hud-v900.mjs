@@ -697,7 +697,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     map.replaceChildren(...dots);
   }
 
-  const UTILITY_COMMANDS = Object.freeze(['fullscreen', 'menu', 'character', 'audio', 'map', 'home', 'world', 'save', 'inventory']);
+  const UTILITY_COMMANDS = Object.freeze(['fullscreen', 'menu', 'character', 'audio', 'map', 'home', 'world', 'save', 'inventory', 'monster-bag']);
   const PIRATE_INVENTORY_MESSAGE = 'pocketmonster:pirate-inventory-v1';
   const BANNER_DEFAULT_MS = 8000;
   const ACTIVITY_INTERVAL_MS = 5 * 60 * 1000;
@@ -747,6 +747,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   function utilitySupported(id) {
     if (!UTILITY_COMMANDS.includes(id)) return false;
     if (id === 'inventory') return pirateInventoryAvailable();
+    if (id === 'monster-bag') return pirateInventoryAvailable();
     if (typeof pocketAdapter()?.utilities?.invokeUtility === 'function') return true;
     if (id === 'character' && typeof partyAdapter()?.openCharacter === 'function') return true;
     if (id === 'fullscreen' && documentLike.getElementById?.('persistentFullscreenBtn')) return true;
@@ -870,10 +871,24 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     }
   }
 
+  function openMonsterBag() {
+    const open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
+    if (typeof open !== 'function') {
+      return { ok: false, reason: 'unavailable', message: 'ยังไม่พร้อมเปิดกระเป๋ามอนสเตอร์' };
+    }
+    try {
+      open();
+      return { ok: true, reason: 'opened', message: '' };
+    } catch (error) {
+      return { ok: false, reason: 'failed', message: String(error?.message || error) };
+    }
+  }
+
   async function runUtility(id) {
     try {
       // Pirate InventoryUI lives in the iframe; never hand it to Pocket utility adapters.
       if (id === 'inventory') return togglePirateInventory();
+      if (id === 'monster-bag') return openMonsterBag();
       const invoke = pocketAdapter()?.utilities?.invokeUtility;
       if (typeof invoke === 'function') return commandResult(await invoke(id), 'invoked');
       if (id === 'character') return commandResult(partyAdapter()?.openCharacter?.(), 'opened');
@@ -992,6 +1007,19 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
         reason: 'กระเป๋า Pirate (อาวุธ / ผลไม้ / ยา)',
       }));
     }
+    if (pirateInventoryAvailable() && !items.some(item => item?.id === 'monster-bag')) {
+      const invAt = items.findIndex(item => item?.id === 'inventory');
+      const monsterBag = Object.freeze({
+        id: 'monster-bag',
+        label: '',
+        visualKey: 'monster-bag',
+        enabled: true,
+        badge: '',
+        reason: 'กระเป๋ามอนสเตอร์',
+      });
+      if (invAt >= 0) items.splice(invAt + 1, 0, monsterBag);
+      else items.unshift(monsterBag);
+    }
     for (const item of items) {
       if (!item?.id || !utilitySupported(item.id)) continue;
       const button = el(documentLike, 'button', '', 'mmorpg-utility');
@@ -999,7 +1027,10 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
       button.dataset.utility = item.id;
       button.textContent = item.id === 'inventory'
         ? (item.label || '🎒')
-        : (item.label || item.id).slice(0, 2);
+        : item.id === 'monster-bag'
+          ? ''
+          : (item.label || item.id).slice(0, 2);
+      if (item.id === 'monster-bag') button.dataset.monsterBagIcon = 'pokeball';
       button.setAttribute('aria-label', item.label || item.id);
       if (item.reason) button.setAttribute('title', item.reason);
       if (item.enabled !== true) {

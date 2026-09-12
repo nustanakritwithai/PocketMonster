@@ -28,8 +28,8 @@ assert.match(shell, /createUnifiedMmorpgHud/, 'production shell owns one Dock');
 assert.match(shell, /unifiedHud\?\.unmount/, 'session end tears the Dock down');
 assert.match(hud, /UNIFIED_MMORPG_HUD_KIND/, 'Dock exports a single kind');
 assert.doesNotMatch(css, /viewer-annotation|black-arrow-overlay/, 'reference viewer overlay is not a game HUD');
-assert.match(index, /style-v900\.css\?v=976/);
-assert.match(scene, /style-v900\.css\?v=976/);
+assert.match(index, /style-v900\.css\?v=978/);
+assert.match(scene, /style-v900\.css\?v=978/);
 assert.equal(index, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'));
 
 for (const flag of ['vpsWrites', 'playerDataWrites']) {
@@ -53,5 +53,12 @@ assert.match(pirateHud, /\.game-minimap\s*\{[\s\S]*visibility:\s*hidden\s*!impor
 assert.match(pirateHud, /.progression-hud/, 'Pirate child HP cluster is retired');
 assert.match(css, /#pirateUnifiedControls\{[^}]*--arc-r:60px/, 'combat cluster stays an arc');
 assert.ok(index.indexOf('id="pirateUnifiedControls"') < index.indexOf('<div id="hud">'), 'combat cluster is not nested inside retired #hud');
+
+const gameV800 = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
+assert.match(gameV800, /POCKETMONSTER_OPEN_MONSTER_BAG/, 'monster bag open API stays on the Pocket runtime');
+assert.match(gameV800, /Under-minimap parent HUD owns the monster-bag control/, 'combat cluster no longer mounts a duplicate monster bag');
+assert.match(hud, /id: 'monster-bag'/, 'unified HUD exposes monster-bag beside Pirate inventory');
+assert.match(css, /data-utility="monster-bag"/, 'monster bag utility matches under-minimap inventory size');
+assert.match(css, /#pirateUnifiedControls \.tc-monster-bag\{display:none!important\}/, 'old combat-cluster monster bag is hidden');
 
 console.log('V9 HUD Phase B verification gates: PASS');
