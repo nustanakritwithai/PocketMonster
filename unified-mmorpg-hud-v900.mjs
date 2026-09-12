@@ -871,8 +871,27 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     }
   }
 
+  function sceneWindow() {
+    try {
+      return documentLike.getElementById?.('onlineWorldSceneFrame')?.contentWindow || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function resolveMonsterBagOpen() {
+    const local = windowLike?.POCKETMONSTER_OPEN_MONSTER_BAG;
+    if (typeof local === 'function') return local;
+    try {
+      const remote = sceneWindow()?.POCKETMONSTER_OPEN_MONSTER_BAG;
+      if (typeof remote === 'function') return remote;
+    } catch {}
+    return null;
+  }
+
   function openMonsterBag() {
-    const open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
+    // Animal-control game-v800 registers the open API on the scene iframe, not the parent shell.
+    const open = resolveMonsterBagOpen();
     if (typeof open !== 'function') {
       return { ok: false, reason: 'unavailable', message: 'ยังไม่พร้อมเปิดกระเป๋ามอนสเตอร์' };
     }

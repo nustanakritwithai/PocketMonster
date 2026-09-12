@@ -255,8 +255,29 @@ function ensureDirection(v){
   return d.normalize();
 }
 
-const el=id=>document.getElementById(id);
 const pirateThrowWorld=new URL(import.meta.url).searchParams.get('animalControl')==='pirate-fruit';
+function parentGameDocument(){
+  if(!pirateThrowWorld) return null;
+  try{
+    const parentDoc=window.parent?.document;
+    if(parentDoc && parentDoc!==document) return parentDoc;
+  }catch{}
+  return null;
+}
+function hostDocument(){
+  return parentGameDocument() || document;
+}
+function hostQuery(selector){
+  return document.querySelector(selector) || parentGameDocument()?.querySelector?.(selector) || null;
+}
+const el=id=>{
+  const local=document.getElementById(id);
+  if(local) return local;
+  // Pirate animal-control runs in the scene iframe; Monster Club / ranch UI lives on the parent shell.
+  if(!pirateThrowWorld) return null;
+  if(!(id==='ranchServices' || id.startsWith('ranch'))) return null;
+  try{ return parentGameDocument()?.getElementById?.(id) || null; }catch{ return null; }
+};
 function pirateThrowPanelPaused(){
   return pirateThrowWorld&&(document.body?.dataset?.combinedWorld!=='pirate-fruit'||document.body?.dataset?.controlPanel!=='throw');
 }
@@ -6239,8 +6260,10 @@ function showRanchStorageShell({remote=false}={}){
   if(!result.ok){msg(result.reasonText);return result;}
   // โลกโจรสลัดซ่อน HUD เดิมทั้งกลุ่ม ให้กระเป๋าเป็นหน้าต่างแยกจากกลุ่มนั้น
   const storagePage=el('ranchStoragePage');
-  if(remote&&storagePage.parentElement!==document.body)document.body.appendChild(storagePage);
-  el('ranchServices').classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
+  if(!storagePage){msg('ยังไม่พบหน้าต่างคลังมอนสเตอร์');return {ok:false,reason:'missing-ui'};}
+  const hostBody=storagePage.ownerDocument?.body||document.body;
+  if(remote&&storagePage.parentElement!==hostBody)hostBody.appendChild(storagePage);
+  el('ranchServices')?.classList.add('hidden');storagePage.classList.remove('hidden');
   remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
   const request=++remoteBagRequest;
   renderRanchStoragePage();
@@ -7443,11 +7466,11 @@ bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage
 installPirateMonsterBagButton();
 const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs');
 mountDirectMonsterControls({windowLike:window,config:runtimeConfig,sessionToken:authProfileBridge.sessionToken});
-document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:hasOnlineMonsterSession});});
-document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
-document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
-document.querySelector('[data-ranch-back]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeRanchSurface();});
-document.querySelector('[data-ranch-close]')?.addEventListener('click',()=>{playSFX('sfx_ui_close');closeRanchSurface();});
+hostQuery('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:hasOnlineMonsterSession});});
+hostQuery('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
+hostQuery('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
+hostQuery('[data-ranch-back]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeRanchSurface();});
+hostQuery('[data-ranch-close]')?.addEventListener('click',()=>{playSFX('sfx_ui_close');closeRanchSurface();});
 bindCharacterAccessControl(el('globalCharacterBtn'),()=>{
   playSFX('sfx_ui_click');
   toggleCharacterAccess();

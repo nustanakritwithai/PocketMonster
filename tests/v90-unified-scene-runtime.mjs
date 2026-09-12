@@ -31,7 +31,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pocket-monster',
     panel: 'throw',
-    runtime: './game-v800.js?v=830',
+    runtime: './game-v800.js?v=831',
   }),
   Object.freeze({
     world: 'living-world',
