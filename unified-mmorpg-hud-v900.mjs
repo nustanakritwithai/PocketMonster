@@ -871,13 +871,32 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     }
   }
 
-  function openMonsterBag() {
-    const open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
+  async function openMonsterBag() {
+    // Pirate's game runtime lives in the scene iframe.  The shell deliberately
+    // does not relay this legacy Pocket API, so resolve the current scene first
+    // and retain the parent lookup only as the Pirate legacy fallback.
+    const pirate = pirateWorldActive();
+    let open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
+    let owner = windowLike;
+    if (pirate) {
+      let sceneWindow = null;
+      try { sceneWindow = sceneDocument()?.defaultView || null; } catch {}
+      if (typeof sceneWindow?.POCKETMONSTER_OPEN_MONSTER_BAG === 'function') {
+        open = sceneWindow.POCKETMONSTER_OPEN_MONSTER_BAG;
+        owner = sceneWindow;
+      }
+    }
     if (typeof open !== 'function') {
       return { ok: false, reason: 'unavailable', message: 'ยังไม่พร้อมเปิดกระเป๋ามอนสเตอร์' };
     }
     try {
-      open();
+      const result = await open.call(owner);
+      if (result && typeof result === 'object' && result.ok === false) {
+        return {
+          ...result,
+          message: String(result.message || result.reasonText || result.reason || ''),
+        };
+      }
       return { ok: true, reason: 'opened', message: '' };
     } catch (error) {
       return { ok: false, reason: 'failed', message: String(error?.message || error) };
