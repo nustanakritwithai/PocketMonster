@@ -165,4 +165,5 @@ assert.equal(document._posts.length, 1, 'bag click posts into Pirate iframe');
 assert.equal(document._posts[0].payload.type, PIRATE_FRUIT_INVENTORY_MESSAGE);
 assert.equal(document._posts[0].payload.action, 'toggle');
 
+hud.unmount();
 console.log('V9 Pirate inventory under-minimap utility: PASS');

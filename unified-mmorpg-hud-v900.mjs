@@ -756,15 +756,50 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     return false;
   }
 
-  function pirateInventoryAvailable() {
+  function pirateWorldActive() {
     try {
-      if (documentLike.body?.dataset?.combinedWorld && documentLike.body.dataset.combinedWorld !== 'pirate-fruit') {
-        return false;
-      }
+      return documentLike.body?.dataset?.combinedWorld === 'pirate-fruit';
+    } catch {
+      return false;
+    }
+  }
+
+  function pirateInventoryAvailable() {
+    // Prefer the combined-world flag (set before the Pirate iframe often mounts).
+    // Fall back to the iframe so a late frame still unlocks the bag if world is unset.
+    try {
+      if (pirateWorldActive()) return true;
+      const world = documentLike.body?.dataset?.combinedWorld;
+      if (world) return false;
       return Boolean(documentLike.getElementById?.('pirateFruitFrame'));
     } catch {
       return false;
     }
+  }
+
+  let lastUtilitiesSnapshot = null;
+  let worldInventoryObserver = null;
+
+  function observePirateWorldForInventory() {
+    if (worldInventoryObserver) return;
+    const Observer = windowLike?.MutationObserver || globalThis.MutationObserver;
+    if (!Observer || !documentLike?.body?.attributes) return;
+    try {
+      worldInventoryObserver = new Observer(() => {
+        renderUtilities(lastUtilitiesSnapshot || { revision: 1, items: [] });
+      });
+      worldInventoryObserver.observe(documentLike.body, {
+        attributes: true,
+        attributeFilter: ['data-combined-world'],
+      });
+    } catch {
+      worldInventoryObserver = null;
+    }
+  }
+
+  function stopPirateWorldInventoryObserver() {
+    try { worldInventoryObserver?.disconnect?.(); } catch {}
+    worldInventoryObserver = null;
   }
 
   function togglePirateInventory() {
@@ -888,6 +923,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   function renderUtilities(snapshot) {
     const utilities = node('mmorpgUtilities');
     if (!utilities) return;
+    if (snapshot) lastUtilitiesSnapshot = snapshot;
+    observePirateWorldForInventory();
     const buttons = [];
     const items = [...(snapshot?.items || [])];
     if (pirateInventoryAvailable() && !items.some(item => item?.id === 'inventory')) {
@@ -1049,6 +1086,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   }
 
   function unmount() {
+    stopPirateWorldInventoryObserver();
     recallBinding?.node.removeEventListener?.('click', recallBinding.onRecall);
     recallBinding = null;
     for (const unsubscribe of unsubscribers.splice(0)) {

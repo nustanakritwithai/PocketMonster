@@ -215,7 +215,7 @@ body[data-combined-world="pirate-fruit"][data-control-panel="human"] #pirateUnif
 .mmorpg-companion.active{box-shadow:0 0 0 2px #86efac}
 .mmorpg-companion.fainted{opacity:.45;border-color:#f87171}
 .mmorpg-companion.empty{opacity:1;border-style:dashed}
-.mmorpg-utilities{position:absolute;left:88.4%;top:30.6%;width:11.4%;height:15%;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:flex-start;justify-content:flex-end;z-index:32}
+.mmorpg-utilities{position:absolute;left:88.4%;top:30.6%;width:11.4%;height:15%;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:flex-start;justify-content:flex-end;z-index:42;pointer-events:auto;min-height:48px}
 .mmorpg-utility{position:relative;min-height:var(--hud-hit-min);min-width:var(--hud-hit-min);width:48px;height:48px;border:1px solid var(--hud-line);border-radius:50%;background:var(--hud-glass);color:var(--hud-text);padding:0}
 .mmorpg-utility[data-utility="inventory"]{font-size:22px;border-color:rgba(250,204,21,.55);background:linear-gradient(145deg,rgba(20,83,45,.72),rgba(15,23,42,.82));color:#fef3c7;box-shadow:0 0 0 1px #facc1533,0 6px 14px #0006}
 .mmorpg-utility-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f43f5e;color:#fff;font-size:10px}
