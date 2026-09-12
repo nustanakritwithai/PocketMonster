@@ -21,7 +21,7 @@ assert.equal(activeCssName, 'style-v800.css');
 assert.ok(activeCssRef.endsWith(`?v=${ASSET_REVISION}`));
 assert.match(activeHtml, /<title>[^<]*V9(?:\.0)?[^<]*<\/title>/);
 assert.match(activeHtml, /entry-preload-v900\.mjs/);
-assert.match(activeHtml, /entry-preload-v900\.mjs\?v=977/, 'active entry bypasses cached bootstrap modules');
+assert.match(activeHtml, /entry-preload-v900\.mjs\?v=978/, 'active entry bypasses cached bootstrap modules');
 assert.match(activeEntry, /prepareLaunch/);
 assert.match(activeEntry, /applyPendingPatch/);
 assert.match(activeEntry, /online-world-shell-v900.mjs\?v=69/);

@@ -756,22 +756,53 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     return false;
   }
 
+  function sceneDocument() {
+    // Persistent shell hosts Pirate inside #onlineWorldSceneFrame, not on the parent.
+    try {
+      return documentLike.getElementById?.('onlineWorldSceneFrame')?.contentWindow?.document || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function readCombinedWorld(doc) {
+    try {
+      return doc?.body?.dataset?.combinedWorld || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function pirateFruitFrameNode() {
+    try {
+      return documentLike.getElementById?.('pirateFruitFrame')
+        || sceneDocument()?.getElementById?.('pirateFruitFrame')
+        || null;
+    } catch {
+      return null;
+    }
+  }
+
   function pirateWorldActive() {
     try {
-      return documentLike.body?.dataset?.combinedWorld === 'pirate-fruit';
+      const parentWorld = readCombinedWorld(documentLike);
+      if (parentWorld === 'pirate-fruit') return true;
+      if (parentWorld && parentWorld !== 'pirate-fruit') return false;
+      return readCombinedWorld(sceneDocument()) === 'pirate-fruit';
     } catch {
       return false;
     }
   }
 
   function pirateInventoryAvailable() {
-    // Prefer the combined-world flag (set before the Pirate iframe often mounts).
-    // Fall back to the iframe so a late frame still unlocks the bag if world is unset.
+    // Parent HUD must read scene document: worlds-v900 + #pirateFruitFrame live there.
     try {
       if (pirateWorldActive()) return true;
-      const world = documentLike.body?.dataset?.combinedWorld;
-      if (world) return false;
-      return Boolean(documentLike.getElementById?.('pirateFruitFrame'));
+      const parentWorld = readCombinedWorld(documentLike);
+      if (parentWorld) return false;
+      const sceneWorld = readCombinedWorld(sceneDocument());
+      if (sceneWorld) return sceneWorld === 'pirate-fruit';
+      return Boolean(pirateFruitFrameNode());
     } catch {
       return false;
     }
@@ -779,31 +810,55 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
   let lastUtilitiesSnapshot = null;
   let worldInventoryObserver = null;
+  let sceneWorldInventoryObserver = null;
 
   function observePirateWorldForInventory() {
-    if (worldInventoryObserver) return;
     const Observer = windowLike?.MutationObserver || globalThis.MutationObserver;
-    if (!Observer || !documentLike?.body?.attributes) return;
+    if (!Observer) return;
+    if (!worldInventoryObserver && documentLike?.body?.attributes) {
+      try {
+        worldInventoryObserver = new Observer(() => {
+          refreshUtilities();
+          observeSceneWorldForInventory();
+        });
+        worldInventoryObserver.observe(documentLike.body, {
+          attributes: true,
+          attributeFilter: ['data-combined-world'],
+        });
+      } catch {
+        worldInventoryObserver = null;
+      }
+    }
+    observeSceneWorldForInventory();
+  }
+
+  function observeSceneWorldForInventory() {
+    if (sceneWorldInventoryObserver) return;
+    const Observer = windowLike?.MutationObserver || globalThis.MutationObserver;
+    const scene = sceneDocument();
+    if (!Observer || !scene?.body?.attributes) return;
     try {
-      worldInventoryObserver = new Observer(() => {
+      sceneWorldInventoryObserver = new Observer(() => {
         refreshUtilities();
       });
-      worldInventoryObserver.observe(documentLike.body, {
+      sceneWorldInventoryObserver.observe(scene.body, {
         attributes: true,
         attributeFilter: ['data-combined-world'],
       });
     } catch {
-      worldInventoryObserver = null;
+      sceneWorldInventoryObserver = null;
     }
   }
 
   function stopPirateWorldInventoryObserver() {
     try { worldInventoryObserver?.disconnect?.(); } catch {}
+    try { sceneWorldInventoryObserver?.disconnect?.(); } catch {}
     worldInventoryObserver = null;
+    sceneWorldInventoryObserver = null;
   }
 
   function togglePirateInventory() {
-    const frame = documentLike.getElementById?.('pirateFruitFrame');
+    const frame = pirateFruitFrameNode();
     if (!frame?.contentWindow?.postMessage) {
       return { ok: false, reason: 'unavailable', message: 'ยังไม่พร้อมเปิดกระเป๋า Pirate' };
     }
