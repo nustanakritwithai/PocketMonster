@@ -17,7 +17,7 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=950';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=951';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=1';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=1';
@@ -74,7 +74,20 @@ function clearSceneHudAdapters() {
   unifiedHud?.rebind?.();
 }
 
+function syncParentWorldFlagsFromScene(sceneWindow) {
+  try {
+    const sceneBody = sceneWindow?.document?.body;
+    const world = sceneBody?.dataset?.combinedWorld;
+    const panel = sceneBody?.dataset?.controlPanel;
+    if (world) document.body.dataset.combinedWorld = world;
+    else delete document.body.dataset.combinedWorld;
+    if (panel) document.body.dataset.controlPanel = panel;
+    else delete document.body.dataset.controlPanel;
+  } catch {}
+}
+
 function bindSceneHudAdapters(sceneWindow) {
+  syncParentWorldFlagsFromScene(sceneWindow);
   for (const name of SCENE_HUD_ADAPTERS) {
     try { window[name] = sceneWindow?.[name]; } catch { window[name] = undefined; }
   }
@@ -126,7 +139,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '69');
+  url.searchParams.set('shellRevision', '70');
   return url.href;
 }
 

@@ -190,4 +190,56 @@ const ids2 = document2.getElementById('mmorpgUtilities').children.map(node => no
 assert.equal(ids2[0], 'inventory', 'bag appears even when Pirate POCKET_HUD has no utilities stream');
 hud2.unmount();
 
+// Live architecture: combinedWorld + #pirateFruitFrame live in #onlineWorldSceneFrame.
+const scenePosts = [];
+const parentBody = new FakeNode('body');
+// Parent must NOT carry combinedWorld or pirateFruitFrame (those live in the scene).
+const sceneBody = new FakeNode('body');
+sceneBody.dataset.combinedWorld = 'pirate-fruit';
+const nestedFrame = new FakeNode('iframe', 'pirateFruitFrame');
+nestedFrame.contentWindow = {
+  postMessage(payload, target) { scenePosts.push({ payload, target }); },
+};
+sceneBody.append(nestedFrame);
+const sceneDoc = {
+  body: sceneBody,
+  getElementById: id => sceneBody.byId(id),
+};
+const sceneFrame = new FakeNode('iframe', 'onlineWorldSceneFrame');
+sceneFrame.contentWindow = { document: sceneDoc };
+parentBody.append(sceneFrame);
+const document3 = {
+  body: parentBody,
+  hidden: false,
+  visibilityState: 'visible',
+  createElement: tag => new FakeNode(tag),
+  getElementById: id => parentBody.byId(id),
+  addEventListener() {},
+  removeEventListener() {},
+};
+const hud3 = createUnifiedMmorpgHud({
+  windowLike: {
+    POCKETMONSTER_POCKET_HUD: {
+      player: feature({ revision: 1, available: false, buffs: Object.freeze([]) }),
+    },
+    POCKETMONSTER_CHAT_RUNTIME: {
+      chat: feature({
+        revision: 1, channel: 'WORLD', channels: ['WORLD', 'ZONE'], rows: Object.freeze([]),
+        unread: 0, status: 'connected', canSend: true,
+      }),
+    },
+    POCKETMONSTER_SERVER_GATE: { state: 'healthy' },
+  },
+  documentLike: document3,
+});
+hud3.mount();
+const ids3 = document3.getElementById('mmorpgUtilities').children.map(node => node.dataset.utility);
+assert.equal(ids3[0], 'inventory', 'bag appears when pirate world/frame live only in the scene iframe');
+document3.getElementById('mmorpgUtilities').children[0].dispatch('click');
+await Promise.resolve();
+await Promise.resolve();
+assert.equal(scenePosts.length, 1, 'bag click posts into scene-nested pirateFruitFrame');
+assert.equal(scenePosts[0].payload.type, PIRATE_FRUIT_INVENTORY_MESSAGE);
+hud3.unmount();
+
 console.log('V9 Pirate inventory under-minimap utility: PASS');
