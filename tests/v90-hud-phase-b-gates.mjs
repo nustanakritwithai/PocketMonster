@@ -61,4 +61,7 @@ assert.match(hud, /id: 'monster-bag'/, 'unified HUD exposes monster-bag beside P
 assert.match(css, /data-utility="monster-bag"/, 'monster bag utility matches under-minimap inventory size');
 assert.match(css, /#pirateUnifiedControls \.tc-monster-bag\{display:none!important\}/, 'old combat-cluster monster bag is hidden');
 
+assert.match(gameV800, /parentGameDocument|hostDocument/, 'animal-control opens ranch UI from the parent shell document');
+assert.match(hud, /resolveMonsterBagOpen|sceneWindow\(\)\?\.POCKETMONSTER_OPEN_MONSTER_BAG/, 'under-minimap bag reaches the scene open API');
+
 console.log('V9 HUD Phase B verification gates: PASS');

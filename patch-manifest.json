@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.8d4692de508c",
+  "buildId": "8.4.0.content.562d526c5c52",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T17:35:50.831Z",
+  "publishedAtUtc": "2026-09-12T17:47:22.783Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -333,7 +333,7 @@
     {
       "path": "boot-pirate-fruit-v900.mjs",
       "size": 17950,
-      "sha256": "5fcc3ee5574e007a807dc817154267c151dfe962580b59b2a1e05f59da1aeb45"
+      "sha256": "13d471565ebc1b140a3c0e1be9e81475c310396882eba0cd64aa33be6f4d76af"
     },
     {
       "path": "boss-challenge.mjs",
@@ -478,7 +478,7 @@
     {
       "path": "combined-worlds-v900.mjs",
       "size": 2629,
-      "sha256": "7262cb6785369c5afa84c9613998fb0265fba742b24618515f40b84e3cedbb6e"
+      "sha256": "193c53874feabef7b323862f3183bacff1488bdb1bd0b8ea9d4380dc1efe009d"
     },
     {
       "path": "content-catalog.mjs",
@@ -508,7 +508,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2376,
-      "sha256": "b13af68cb5bda37bbf3e3cd80d2a6e6869a8ac570a9e8d7ce71cc00d918a2640"
+      "sha256": "118ef82d5ae402d05b6f3d230568f12cdc0d9cbfb0fe619418fbdb1ca872a945"
     },
     {
       "path": "equipment.mjs",
@@ -547,13 +547,13 @@
     },
     {
       "path": "game-v800.js",
-      "size": 539186,
-      "sha256": "28d8890ca0aa5d15a050397ee5d636358c94355104ae0db9d821ea354da55846"
+      "size": 540076,
+      "sha256": "6fa1c8eccc4541a13c15b9571783d376db4526a73fee7aef9c4607f9c3dcda97"
     },
     {
       "path": "index.html",
       "size": 38810,
-      "sha256": "f84d2d9a76607663013197f9aa633cecb0aa965d2d8c9c8224a7a310d291e392"
+      "sha256": "d9f232ed03d97839be1b11acba488ec536816ccf198153b121d565aa20afb5c7"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -648,7 +648,7 @@
     {
       "path": "online-world-shell-v900.mjs",
       "size": 26706,
-      "sha256": "1ff6fc041fcafb3c6d694ed5e6ea6a2190d19f4c2d47c6767a62768b69bfd0b3"
+      "sha256": "f7d72c689da72f49c8624cc26c6fe4c7b6b4e3fa5c9f43fe9755bbc4e7642912"
     },
     {
       "path": "passive-catalog.mjs",
@@ -1022,8 +1022,8 @@
     },
     {
       "path": "unified-mmorpg-hud-v900.mjs",
-      "size": 49650,
-      "sha256": "3cf0f0eb8e6081e5d0fdae528688d09fa5d5bb2d11a74530c8d4e68ecb9f2aac"
+      "size": 50223,
+      "sha256": "f3026fe0f842e941ba355238aa88dc8b6de0784e63b3e1f78ddf38685327430c"
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
@@ -1033,7 +1033,7 @@
     {
       "path": "v900.html",
       "size": 38810,
-      "sha256": "f84d2d9a76607663013197f9aa633cecb0aa965d2d8c9c8224a7a310d291e392"
+      "sha256": "d9f232ed03d97839be1b11acba488ec536816ccf198153b121d565aa20afb5c7"
     },
     {
       "path": "warp-routes.mjs",
