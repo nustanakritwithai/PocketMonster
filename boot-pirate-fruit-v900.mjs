@@ -17,7 +17,8 @@ import {
   pirateCentralAuthorityOwnsZone,
 } from './pirate-presence-bridge-v900.mjs?v=6';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=12';
+import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-fruit-offline/pirate-owned-monster-carry.mjs';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=13';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
@@ -25,7 +26,7 @@ import {
   PIRATE_STUDIO_CHARACTER_PACKAGE,
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=941', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=942', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=829&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
@@ -382,6 +383,13 @@ if (startup) {
 }
 
 const pirateFrame = mountPirateOnline();
+let heldMonsterIntent = null;
+const forwardHeldMonster = held => {
+  heldMonsterIntent = pirateRuntimeActive && held?.instanceId ? { instanceId: held.instanceId } : null;
+  pirateFrame.contentWindow?.postMessage({ type: PIRATE_OWNED_MONSTER_CARRY_MESSAGE, held: heldMonsterIntent }, '*');
+};
+window.addEventListener('pocketmonster-held-monster', event => forwardHeldMonster(event.detail));
+pirateFrame.addEventListener('load', () => forwardHeldMonster(heldMonsterIntent));
 const pirateHudTelemetry = bindPocketMonsterLink(pirateFrame);
 window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   mount:()=>{
@@ -395,6 +403,7 @@ window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({
   },
   unmount:()=>{
     pirateRuntimeActive=false;
+    forwardHeldMonster(null);
     registerExternalPose(null);
     delete window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS;
     pirateHudTelemetry.clearPresenceQueue();

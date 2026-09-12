@@ -8,6 +8,7 @@ import { createPirateFruitRigRetargeter } from './pirate-fruit-rig-retarget.mjs'
 import { createStudioCharacterProvider } from './providers/studio-character.mjs';
 import { applyStudioCharacterRenderProfile } from './studio-character-render-profile.mjs';
 import { applyPirateFruitStudioPresentation, createStudioControllerSampler } from './studio-character-action-state.mjs';
+import { createPirateOwnedMonsterCarry } from '../pirate-fruit-offline/pirate-owned-monster-carry.mjs';
 export { applyPirateFruitStudioPresentation, selectPirateFruitStudioAction } from './studio-character-action-state.mjs';
 import {
   installStudioCharacterPackage,
@@ -291,6 +292,7 @@ export function threeFromPirateFruitVendor(vendor) {
   const Group = find((_v, src) => src.includes('isGroup=!0'));
   const Mesh = find((v, src) => src.includes('isMesh=!0') && ownProto(v, 'raycast'));
   const BoxGeometry = find((_v, src) => src.includes('BoxGeometry') && !src.includes('isWebGLRenderer'));
+  const SphereGeometry = find((_v, src) => src.includes('SphereGeometry') && !src.includes('isWebGLRenderer'));
   const MeshStandardMaterial = find((_v, src) => src.includes('isMeshStandardMaterial') && !src.includes('isWebGLRenderer'));
   const MeshBasicMaterial = find((_v, src) => src.includes('isMeshBasicMaterial') && !src.includes('isWebGLRenderer'));
   const CanvasTexture = find((_v, src) => src.includes('isCanvasTexture'));
@@ -307,7 +309,7 @@ export function threeFromPirateFruitVendor(vendor) {
   if (!Object3D || !Group || !Mesh || !BoxGeometry || !MeshStandardMaterial || !BufferGeometry || !BufferAttribute) {
     throw new Error('Pocket bridge could not resolve Three constructors from the Pirate Fruit vendor');
   }
-  return { WebGLRenderer, Object3D, Scene, Group, Mesh, BoxGeometry, MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, BufferGeometry, BufferAttribute, Vector3, Box3 };
+  return { WebGLRenderer, Object3D, Scene, Group, Mesh, BoxGeometry, SphereGeometry, MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, BufferGeometry, BufferAttribute, Vector3, Box3 };
 }
 
 function canvasTexFromRgba(THREE, img, { nearest = true } = {}) {
@@ -390,6 +392,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
   }
   const engineThree = {
     Group: kit.Group, Mesh: kit.Mesh, BoxGeometry: kit.BoxGeometry,
+    SphereGeometry: kit.SphereGeometry,
     MeshStandardMaterial: kit.MeshStandardMaterial,
     MeshBasicMaterial: kit.MeshBasicMaterial || kit.MeshStandardMaterial,
     CanvasTexture: kit.CanvasTexture, BufferGeometry: kit.BufferGeometry,
@@ -409,6 +412,9 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
   assets.registerProvider('pirate-fruit', createPirateFruitPlayerProvider({ THREE: engineThree, box, material }));
   const humanoidProvider = createBigheadProvider({ THREE: engineThree, box, material });
   const monsterProvider = createBigheadMonsterProvider({ THREE: engineThree, box, material, basicMaterial: color => material(color, 1, 0) });
+  const ownedMonsterCarry = createPirateOwnedMonsterCarry({ THREE: engineThree });
+  if (typeof window !== 'undefined') window.POCKETMONSTER_PIRATE_OWNED_MONSTER_CARRY = ownedMonsterCarry.setHeld;
+  if (typeof window !== 'undefined') window.dispatchEvent?.(new Event('pocketmonster:pirate-carry-ready'));
   assets.registerProvider('procedural', ctx => ctx.def?.kind === 'monster' ? monsterProvider(ctx) : humanoidProvider(ctx));
   assets.registerProvider('studio-character', createStudioCharacterProvider({ THREE: engineThree }));
   const attached = new WeakSet(), visuals = [];
@@ -441,6 +447,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       motionReady: false, motionPosition: new kit.Vector3(),
       lastX: host.position.x, lastZ: host.position.z, source: 'pirate-fruit' };
     visuals.push(item);
+    if (kind === 'player') ownedMonsterCarry.setPlayerHost(handle.root);
     return item;
   }
   function visibleStudioRoot(handle) {
@@ -487,6 +494,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
     item.handle.root.visible = false;
     item.host.remove?.(item.handle.root);
     item.handle = studio;
+    ownedMonsterCarry.setPlayerHost(studio.root);
     item.source = 'studio-character';
     item.rigRetargeter = null;
     item.sourcePoseDriven = false;
@@ -597,6 +605,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
     last = now;
     paintSky(scene);
     if (now >= scanAt) { visit(scene); scanAt = now + 400; }
+    ownedMonsterCarry.update();
     for (const item of visuals) {
       // The visible host is a stationary child. Sample the moving controller or
       // world position; local host coordinates previously kept Studio on idle.
@@ -643,6 +652,7 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       rigRetargeted: visuals.filter(item => item.rigRetargeter).length,
       actionDriven: visuals.filter(item => item.actionTracker).length,
       localAttackPresentation: localAttackPresentation.diagnostics(),
+      ownedMonsterCarry: ownedMonsterCarry.diagnostics(),
       providers: assets.diagnostics().providers,
       studioPlayers: visuals.filter(item => item.source === 'studio-character').length,
       playerVisualSource: visuals.find(item => item.kind === 'player')?.source || 'pending',

@@ -287,9 +287,9 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=12/, 'world shell cache-busts analog handoff controls');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=12/, 'Pirate boot cache-busts analog handoff controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=63/, 'online scene cache-busts analog handoff graph');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=13/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=13/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=64/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 
@@ -322,7 +322,12 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   const throwButton = new FakeTarget('monsterThrowBtn');
   elements.set('monsterThrowBtn', throwButton);
   const detach = bindMonsterControlScene({ sceneWindow: windowLike, controller: monster });
-  monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
+  documentLike.body.dataset.combinedWorld = 'pirate-fruit';
+  monsterButton.dispatchEvent(pointer('pointerdown', 899, 0, 0));
+  assert.equal(monster.snapshot().held?.instanceId, 'owned-a', 'กดบนแผง Pirate ต้องถือทันทีโดยไม่รอ click');
+  const compatibilityClick = new Event('click', { cancelable: true });
+  Object.defineProperty(compatibilityClick, 'detail', { value: 1 });
+  monsterButton.dispatchEvent(compatibilityClick);
   await flush();
   assert.equal(commands.length, 0, 'กดช่องมอนต้องถือไว้ก่อน');
   monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
