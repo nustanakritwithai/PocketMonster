@@ -111,7 +111,7 @@ assert.match(shell, /lease === activeSceneLease|activeSceneLease === lease/, 'st
 const rawLoadHandler = shell.match(/sceneFrame\.addEventListener\('load', \(\) => \{([\s\S]*?)\n\}\);/)?.[1] || '';
 assert.doesNotMatch(rawLoadHandler, /classList\.add\('hidden'\)|online-scene-loaded/, 'iframe load remains diagnostic and cannot publish false readiness');
 assert.match(shell, /POCKETMONSTER_WORLD_STATE = \(\) => presenceBridge\.readPose\(\)/, 'shell owns the stable pose provider');
-assert.match(shell, /POCKETMONSTER_WORLD_PRESENCE = payload => presenceBridge\.acceptSnapshot\(payload\)/, 'shell owns the stable snapshot consumer');
+assert.match(shell, /POCKETMONSTER_WORLD_PRESENCE = payload => \{[\s\S]*presenceBridge\.acceptSnapshot\(payload\)/, 'shell owns the stable snapshot consumer and resumes monster control after acceptance');
 assert.match(sceneEntry, /window\.parent\.POCKETMONSTER_LAUNCH_SESSION/, 'hosted scenes reuse the parent session object without redeeming it');
 assert.match(sceneEntry, /persistent-fullscreen-v900\.mjs\?v=4/, 'hosted scene installs the persistent fullscreen bridge before the world runtime');
 assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: sceneLifetime\.signal \}\)/, 'scene entry binds visible fullscreen controls before any world runtime starts');

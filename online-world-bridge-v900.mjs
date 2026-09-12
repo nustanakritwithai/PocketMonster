@@ -23,11 +23,12 @@ export function isHostedOnlineWorldScene(windowLike = globalThis.window) {
   }
 }
 
-export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
+export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now } = {}) {
   let activeZone = null;
   let scenePresenceReady = false;
   let forwardedConnected = null;
   let acceptedSnapshots = 0;
+  let lastAcceptedAt = null;
   let routeGenerationHighWater = null;
 
   function sceneWindow() {
@@ -50,9 +51,10 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
 
   function clearScenePresence(zone = activeZone) {
     const target = sceneWindow();
-    if (!zone || typeof target?.POCKETMONSTER_WORLD_PRESENCE !== 'function') return;
+    const receive = target?.POCKETMONSTER_SCENE_PRESENCE?.accept || target?.POCKETMONSTER_WORLD_PRESENCE;
+    if (!zone || typeof receive !== 'function') return;
     try {
-      target.POCKETMONSTER_WORLD_PRESENCE(Object.freeze({
+      receive.call(target, Object.freeze({
         zone,
         players: Object.freeze([]),
       }));
@@ -64,6 +66,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
     clearScenePresence(previousZone);
     activeZone = null;
     scenePresenceReady = false;
+    lastAcceptedAt = null;
     forwardedConnected = null;
     forwardStatus(false);
   }
@@ -71,10 +74,14 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
   function readPose() {
     const target = sceneWindow();
     let pose = null;
-    try { pose = sanitizeOnlineWorldPose(target?.POCKETMONSTER_WORLD_STATE?.()); } catch { pose = null; }
-    if (!pose) return null;
+    try {
+      const read = target?.POCKETMONSTER_SCENE_PRESENCE?.state || target?.POCKETMONSTER_WORLD_STATE;
+      pose = sanitizeOnlineWorldPose(read?.call(target));
+    } catch { pose = null; }
+    if (!pose) { scenePresenceReady = false; lastAcceptedAt = null; return null; }
     if (activeZone && activeZone !== pose.zone) {
       scenePresenceReady = false;
+      lastAcceptedAt = null;
       forwardedConnected = null;
       clearScenePresence(pose.zone);
       forwardStatus(false);
@@ -93,10 +100,12 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
       routeGenerationHighWater = snapshot.generation;
     }
     const target = sceneWindow();
-    if (typeof target?.POCKETMONSTER_WORLD_PRESENCE !== 'function') return false;
-    try { target.POCKETMONSTER_WORLD_PRESENCE(snapshot); } catch { return false; }
+    const receive = target?.POCKETMONSTER_SCENE_PRESENCE?.accept || target?.POCKETMONSTER_WORLD_PRESENCE;
+    if (typeof receive !== 'function') return false;
+    try { if (receive.call(target, snapshot) === false) return false; } catch { return false; }
     acceptedSnapshots += 1;
     scenePresenceReady = true;
+    lastAcceptedAt = now();
     forwardStatus(true);
     return true;
   }
@@ -105,6 +114,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
     if (connected !== true) {
       routeGenerationHighWater = null;
       scenePresenceReady = false;
+      lastAcceptedAt = null;
       clearScenePresence();
       forwardStatus(false);
       return;
@@ -113,8 +123,14 @@ export function createOnlineScenePresenceBridge({ getSceneWindow } = {}) {
   }
 
   function diagnostics() {
-    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots, routeGenerationHighWater });
+    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots, routeGenerationHighWater, lastAcceptedAt });
   }
 
-  return Object.freeze({ readPose, acceptSnapshot, setTransportConnected, reset, diagnostics });
+  function isReady(zone) {
+    const pose = readPose();
+    const age = lastAcceptedAt === null ? Infinity : now() - lastAcceptedAt;
+    return Boolean(pose && pose.zone === zone && scenePresenceReady && age >= 0 && age < 15000);
+  }
+
+  return Object.freeze({ readPose, acceptSnapshot, setTransportConnected, reset, diagnostics, isReady });
 }
