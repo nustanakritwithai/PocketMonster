@@ -137,9 +137,9 @@ assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child log
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(shell, /combined-worlds-v900\.mjs\?v=956/, 'persistent shell cache-busts the changed world catalog');
+assert.match(shell, /combined-worlds-v900\.mjs\?v=957/, 'persistent shell cache-busts the changed world catalog');
 assert.match(shell, /searchParams\.set\('shellRevision', '68'\)/, 'persistent shell cache-busts the changed scene HTML');
-assert.match(worlds, /combined-worlds-v900\.mjs\?v=956/, 'scene router cache-busts the changed world catalog');
+assert.match(worlds, /combined-worlds-v900\.mjs\?v=957/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=961/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
