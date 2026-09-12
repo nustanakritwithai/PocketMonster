@@ -903,7 +903,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
 
   function syncMonsterOverlayFromDom() {
     try {
-      const open = ['ranchStoragePage', 'ranchServices', 'monsterManager'].some((id) => {
+      const open = ['ranchStoragePage', 'ranchServices', 'monsterFieldBag', 'monsterManager'].some((id) => {
         const node = documentLike.getElementById?.(id);
         return Boolean(node && !node.classList?.contains?.('hidden'));
       });
@@ -916,7 +916,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     if (!Observer || watchMonsterOverlayNodes.bound) return;
     watchMonsterOverlayNodes.bound = true;
     const obs = new Observer(() => syncMonsterOverlayFromDom());
-    for (const id of ['ranchStoragePage', 'ranchServices', 'monsterManager']) {
+    for (const id of ['ranchStoragePage', 'ranchServices', 'monsterFieldBag', 'monsterManager']) {
       const node = documentLike.getElementById?.(id);
       if (node) obs.observe(node, { attributes: true, attributeFilter: ['class'] });
     }

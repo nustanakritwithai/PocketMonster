@@ -18,7 +18,7 @@ import {
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=958';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=959';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=3';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '78');
+  url.searchParams.set('shellRevision', '79');
   return url.href;
 }
 

@@ -749,6 +749,109 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .ranch-club-dossier span{padding:5px 6px}
 }
 
+
+/* Field monster bag (Pokéball button only — not NPC Monster Club) */
+.monster-field-bag{
+  position:fixed;inset:0;z-index:10050;pointer-events:auto;
+  display:grid;
+  grid-template-columns:minmax(160px,.9fr) minmax(200px,1.2fr) minmax(180px,1fr);
+  grid-template-rows:auto minmax(0,1fr);
+  width:100%;height:100dvh;max-height:100dvh;min-height:0;overflow:hidden;box-sizing:border-box;
+  background:
+    radial-gradient(ellipse at 12% -10%,#1d4ed8aa 0 24%,transparent 56%),
+    radial-gradient(ellipse at 88% 110%,#7c3aed66 0 22%,transparent 54%),
+    linear-gradient(180deg,#0f172af2,#020617f8);
+  padding:max(10px,var(--safe-top)) max(10px,var(--safe-right)) max(10px,var(--safe-bottom)) max(10px,var(--safe-left));
+  gap:12px;
+}
+.monster-field-bag-head{
+  grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px;border:1px solid #60a5fa55;border-radius:18px;
+  background:linear-gradient(135deg,#1e3a8ad9,#0f172aee 55%,#4c1d95aa);
+  box-shadow:0 12px 36px #0007,inset 0 1px 0 #93c5fd33;
+}
+.monster-field-bag-brand{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+.monster-field-bag-kicker{font-size:9px;letter-spacing:2.2px;font-weight:1000;color:#bfdbfe}
+.monster-field-bag-head h2{margin:0;color:#eff6ff;font-size:18px;text-shadow:0 1px 0 #1e3a8a}
+.monster-field-bag-stats{display:flex;gap:6px;flex-wrap:wrap}
+.monster-field-bag-stats span{
+  padding:5px 9px;border-radius:999px;font-size:10px;font-weight:900;
+  background:#172554;border:1px solid #60a5fa55;color:#dbeafe;white-space:nowrap
+}
+#monsterFieldBagClose{
+  border:1px solid #93c5fd55;border-radius:999px;background:#1e3a8a;color:#eff6ff;
+  font-weight:900;font-size:14px;padding:7px 12px;min-height:var(--touch-min);cursor:pointer
+}
+.monster-field-bag-pool,.monster-field-bag-preview,.monster-field-bag-details{
+  min-width:0;min-height:0;overflow:auto;
+  border:1px solid #60a5fa36;border-radius:14px;padding:10px;
+  background:linear-gradient(180deg,#111827,#0b1220);
+  box-shadow:inset 0 1px 0 #ffffff10,0 10px 28px #0005;
+}
+.monster-field-bag-pool{grid-column:1;grid-row:2}
+.monster-field-bag-preview{grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:center}
+.monster-field-bag-details{grid-column:3;grid-row:2}
+.monster-field-bag-group{opacity:.95;color:#93c5fd;font-weight:1000;letter-spacing:.8px;font-size:10px;padding:4px 6px 8px}
+.monster-field-bag-empty{text-align:center;color:#bfdbfe;opacity:.9;padding:12px 8px}
+.monster-field-bag-slot{
+  display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:8px;
+  width:100%;margin:0 0 6px;padding:8px;text-align:left;cursor:pointer;touch-action:manipulation;
+  background:linear-gradient(135deg,#1e293b,#111827);border:1px solid #ffffff1a;border-radius:12px;
+  color:#fff;font:inherit
+}
+.monster-field-bag-slot.is-empty{opacity:.55;cursor:default}
+.monster-field-bag-slot.is-active{border-color:#38bdf866}
+.monster-field-bag-slot.is-reserve{border-color:#a78bfa66}
+.monster-field-bag-slot.focused-monster{
+  border-color:#60a5fa;box-shadow:0 0 0 1px #60a5fa55,0 8px 22px #1d4ed855
+}
+.monster-field-bag-avatar{
+  width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+  font-weight:1000;color:#fff;border:1px solid #ffffff44
+}
+.monster-field-bag-slot-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.monster-field-bag-slot-copy b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.monster-field-bag-slot-copy small{font-size:9px;color:#bfdbfe}
+.monster-field-bag-chip{font-size:8px;font-weight:1000;padding:3px 6px;border-radius:999px;background:#1e3a8a;color:#dbeafe;border:1px solid #60a5fa44}
+.monster-field-bag-chip.reserve{background:#4c1d95}
+.monster-field-bag-stage{display:flex;flex-direction:column;align-items:center;text-align:center;padding:10px 8px;width:100%}
+.monster-field-bag-stage-art{
+  position:relative;width:min(220px,42vw,42dvh);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+  overflow:hidden;font-size:clamp(28px,6vw,52px);font-weight:1000;color:#fff;margin-bottom:10px;
+  background:radial-gradient(circle,#1d4ed8 0 18%,#0f172a 62%);
+  border:3px solid #93c5fd99;box-shadow:0 0 32px #3b82f655,inset 0 0 24px #0005
+}
+.monster-field-bag-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
+.monster-field-bag-stage-art span{position:relative;z-index:0;width:62%;aspect-ratio:1;border-radius:28%;display:grid;place-items:center;background:#1e3a8a;border:2px solid #93c5fd66;color:#eff6ff}
+.monster-field-bag-stage-art.has-3d span{display:none}
+.monster-field-bag-empty-stage .monster-field-bag-stage-art{background:#1e3a8a;color:#93c5fd}
+.monster-field-bag-name{font-size:20px;font-weight:1000;color:#eff6ff;margin:0 0 4px}
+.monster-field-bag-meta{font-size:11px;color:#bfdbfe}
+.monster-field-bag-hp{width:min(220px,90%);height:8px;margin:8px auto 0;border-radius:999px;background:#1e3a8a;overflow:hidden;border:1px solid #60a5fa44}
+.monster-field-bag-hp i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#a78bfa)}
+.monster-field-bag-types{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.monster-field-bag-status{color:#dbeafe;background:#1e3a8a66;border:1px solid #60a5fa33;border-radius:12px;margin-bottom:8px;padding:8px}
+.monster-field-bag-dossier{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.monster-field-bag-dossier span{display:flex;flex-direction:column;gap:2px;padding:7px 8px;border-radius:10px;background:#17255488;border:1px solid #ffffff14;font-size:10px;color:#bfdbfe}
+.monster-field-bag-dossier b{color:#eff6ff;font-size:12px}
+.monster-field-bag .storage-actions{display:flex;flex-wrap:wrap;gap:6px}
+.monster-field-bag .storage-actions button{
+  flex:1 1 40%;min-height:var(--touch-min);border-radius:12px;border:1px solid #ffffff22;
+  background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;font-weight:900;cursor:pointer
+}
+@media(max-width:700px){
+  .monster-field-bag{
+    grid-template-columns:1fr;
+    grid-template-rows:auto minmax(140px,.9fr) minmax(160px,1.1fr) minmax(0,1fr);
+  }
+  .monster-field-bag-pool{grid-column:1;grid-row:2}
+  .monster-field-bag-preview{grid-column:1;grid-row:3}
+  .monster-field-bag-details{grid-column:1;grid-row:4}
+}
+@media (max-height:560px) and (min-width:701px){
+  .monster-field-bag-stage-art{width:min(160px,28vw,32dvh)}
+}
+
 /* Keeper / Ranch Storage mobile bottom sheet */
 .ranch-services-card button{border:1px solid #ffffff18;border-radius:12px;background:#172554;color:#fff;font-weight:900;font-size:13px;text-align:left;padding:10px 12px;transition:transform .16s ease,background .16s ease}
 .ranch-services-card button:active{transform:scale(.98);background:#1d4ed8}
