@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '75');
+  url.searchParams.set('shellRevision', '76');
   return url.href;
 }
 
@@ -207,6 +207,11 @@ function clearPocketNpcMenu() {
 
 window.addEventListener('message', event => {
   if (event.source !== sceneFrame.contentWindow) return;
+  if (event.data?.type === 'pocketmonster:monster-overlay-v1') {
+    if (event.data.open === true) document.body.dataset.monsterOverlay = 'open';
+    else delete document.body.dataset.monsterOverlay;
+    return;
+  }
   if (event.data?.type === 'pocketmonster:pirate-dialogue-v1') {
     if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
     else delete document.body.dataset.pirateDialogue;
