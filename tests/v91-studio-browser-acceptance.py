@@ -101,7 +101,7 @@ try:
         def has_motion(values, actions):
             matching = [v for v in values if v and v.get('animation', {}).get('action') in actions]
             return len(matching) >= 2 and any(v['animation'].get('changedJoints', 0) > 0 for v in matching)
-        page.goto(base + '/studio-browser-entry.html', wait_until='domcontentloaded')
+        page.goto(base + '/studio-browser-entry.html?pirateClient=offline', wait_until='domcontentloaded')
         page.wait_for_timeout(12000)
         child = child_frame()
         assert child is not None, 'Active Pirate iframe missing'
