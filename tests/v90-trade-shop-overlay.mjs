@@ -7,7 +7,7 @@ const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 
 assert.match(presentation, /OVERLAY_ROOTS[\s\S]*\.trade-shop-root/, 'trade shop stands parent HUD down while open');
-assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=21/, 'presentation cache-busts trade-shop HUD policy');
+assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=22/, 'presentation cache-busts trade-shop HUD policy');
 assert.match(pirateHud, /\.trade-shop-root[\s\S]*z-index: 90/, 'trade shop root stacks above iframe chrome');
 assert.match(pirateHud, /\.trade-shop[\s\S]*width: min\(560px, 96vw\)[\s\S]*max-height: min\(78vh/, 'trade shop keeps a readable maritime market panel');
 assert.doesNotMatch(css, /Merchant market: vertical portrait card/, 'wrong #591 merchant portrait card CSS is gone');

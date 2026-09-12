@@ -4,6 +4,7 @@ import { createUnifiedMmorpgHud } from '../unified-mmorpg-hud-v900.mjs';
 import { PIRATE_FRUIT_INVENTORY_MESSAGE } from '../pirate-fruit-control-hud-v900.mjs';
 
 const hudSource = fs.readFileSync(new URL('../unified-mmorpg-hud-v900.mjs', import.meta.url), 'utf8');
+const pirateHud = fs.readFileSync(new URL('../pirate-fruit-control-hud-v900.mjs', import.meta.url), 'utf8');
 const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-presentation.mjs', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 
@@ -11,6 +12,9 @@ assert.match(hudSource, /'inventory'/, 'inventory is a first-class utility comma
 assert.match(presentation, /PIRATE_FRUIT_INVENTORY_MESSAGE/, 'Pirate child admits parent inventory toggles');
 assert.match(presentation, /\.inv-open-button/, 'parent toggle clicks InventoryUI open button');
 assert.match(css, /mmorpg-utility\[data-utility="inventory"\]/, 'bag utility sits in the under-minimap utility cluster');
+assert.match(pirateHud, /\.inv-panel[\s\S]*max-height: min\(78vh/, 'inventory panel fits phone height');
+assert.match(pirateHud, /\.inv-cards[\s\S]*grid-template-columns: 1fr/, 'inventory cards stay single-column on parent phones');
+
 assert.equal(PIRATE_FRUIT_INVENTORY_MESSAGE, 'pocketmonster:pirate-inventory-v1');
 
 class FakeNode {

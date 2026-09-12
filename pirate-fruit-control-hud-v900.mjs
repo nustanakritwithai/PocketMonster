@@ -131,6 +131,47 @@ html[data-pirate-hud="pirate-primary-parent"] .trade-shop {
   margin: 0 auto !important;
   box-sizing: border-box !important;
 }
+html[data-pirate-hud="pirate-primary-parent"] .inv-root {
+  align-items: center !important;
+  justify-content: center !important;
+  inset: 0 !important;
+  padding: max(10px, env(safe-area-inset-top, 0px)) 10px max(10px, env(safe-area-inset-bottom, 0px)) 10px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  z-index: 90 !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-panel {
+  width: min(420px, 96vw) !important;
+  max-width: min(420px, 96vw) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(78vh, calc(100dvh - 96px)) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  margin: 0 auto !important;
+  padding: 12px 12px 10px !important;
+  border-radius: 14px !important;
+  box-sizing: border-box !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-cards {
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-panel h2 {
+  font-size: 16px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-section {
+  margin: 10px 0 6px !important;
+  font-size: 12px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-card {
+  padding: 8px !important;
+}
+html[data-pirate-hud="pirate-primary-parent"] .inv-card>button,
+html[data-pirate-hud="pirate-primary-parent"] .inv-slot-btns>button {
+  min-height: 40px !important;
+}
 html[data-pirate-hud="pirate-primary-parent"] .quest-board-cards,
 html[data-pirate-hud="pirate-primary-parent"] .boat-shop-cards,
 html[data-pirate-hud="pirate-primary-parent"] .potion-shop-cards,
