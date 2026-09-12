@@ -1,5 +1,5 @@
 import { bindPersistentFullscreenControls } from './persistent-fullscreen-v900.mjs?v=4';
-import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=912';
+import { requireActiveOnlineLaunchSession } from './launch-bootstrap.mjs?v=913';
 import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
@@ -194,7 +194,7 @@ try {
   await import('./startup-errors.mjs');
   bootStage = 'runtime';
   requireLiveScene();
-  await import('./worlds-v900.mjs?v=960');
+  await import('./worlds-v900.mjs?v=961');
   requireLiveScene();
   if (!reportParentSceneBoot(Object.freeze({ status: 'ready' }))) {
     throw Object.assign(new Error('Online scene boot lease expired'), { code: 'ONLINE_SCENE_LEASE_EXPIRED' });
