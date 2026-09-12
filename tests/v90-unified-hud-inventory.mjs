@@ -56,7 +56,7 @@ export const LEGACY_HUD_INVENTORY = Object.freeze([
 
 export const PIRATE_IFRAME_BOUNDARY = Object.freeze({
   frameSelector: '#pirateFruitFrame',
-  sandbox: 'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen',
+  sandbox: 'allow-scripts allow-pointer-lock allow-fullscreen',
   opaqueOrigin: false,
   parentCanInspectChildDom: false,
   allowSameOrigin: true,
@@ -75,9 +75,9 @@ for (const selector of parentSelectors) {
   assert.match(parentHtml, new RegExp(`id=["']${selector.slice(1)}["']`), `${selector} source owner drifted out of v900.html`);
   assert.ok(inventoryBySelector(selector)?.visibleOwner, `${selector} must identify its visible owner`);
 }
-const sandbox = pirateBoot.match(/'allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen'/)?.[0]?.slice(1, -1);
+const sandbox = pirateBoot.match(/'allow-scripts allow-pointer-lock allow-fullscreen'/)?.[0]?.slice(1, -1);
 assert.equal(sandbox, PIRATE_IFRAME_BOUNDARY.sandbox, 'Pirate child sandbox baseline must stay exact');
-assert.equal(sandbox.split(/\s+/).includes('allow-same-origin'), true, 'live Pirate iframe keeps its own origin');
+assert.equal(sandbox.split(/\s+/).includes('allow-same-origin'), false, 'live Pirate iframe stays opaque without allow-same-origin');
 assert.match(pirateHud, /visibility:\s*hidden\s*!important/);
 assert.match(pirateHud, /pointer-events:\s*none\s*!important/);
 assert.match(pirateHud, /postMessage\([\s\S]*, '\*'\)/, 'opaque child HUD ownership is synchronized through postMessage, not DOM inspection');

@@ -19,9 +19,11 @@ const chat = fs.readFileSync(new URL('../chat-runtime.mjs', import.meta.url), 'u
 const bridge = fs.readFileSync(new URL('../pirate-presence-bridge-v900.mjs', import.meta.url), 'utf8');
 const actualWireFixture = JSON.parse(fs.readFileSync(new URL('./fixtures/monster-authority-wire.actual.json', import.meta.url), 'utf8'));
 const pirateOfflineHtml = fs.readFileSync(new URL('../pirate-fruit-offline/index.html', import.meta.url), 'utf8');
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
 const pirateStatus = fs.readFileSync(new URL('../pirate-fruit-offline/pocketmonster-status-v900.mjs', import.meta.url), 'utf8');
-const pirateEntry = pirateOfflineHtml.match(/src="\.\/assets\/([^"?]+\.js)/)?.[1];
-assert.ok(pirateEntry, 'offline HTML declares the active Pirate bundle');
+assert.match(pirateOfflineHtml, /pocket-bootstrap\.mjs\?v=[1-9]\d*"/, 'offline HTML boots through the save-aware bootstrap');
+const pirateEntry = pirateBootstrap.match(/import\('\.\/assets\/([^']+\.js)'\)/)?.[1];
+assert.ok(pirateEntry, 'offline bootstrap declares the active Pirate bundle');
 const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/assets/${pirateEntry}`, import.meta.url), 'utf8');
 assert.match(pirateBundle, /onCentralAuthority/, 'compiled Pirate adapter exposes the central capability callback');
 assert.match(pirateBundle, /getMonsterActors/, 'compiled Pirate adapter exposes the central actor source switch');

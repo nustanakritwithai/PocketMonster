@@ -16,7 +16,8 @@ assert.match(boot, /studioCapability/);
 assert.match(boot, /PIRATE_STUDIO_CHARACTER_READY/);
 assert.match(boot, /PIRATE_STUDIO_CHARACTER_PACKAGE/);
 assert.match(boot, /frame\.contentWindow\?\.postMessage\([\s\S]*PIRATE_STUDIO_CHARACTER_PACKAGE/);
-assert.match(boot, /allow-same-origin/);
+assert.match(boot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'/, 'Pirate iframe stays opaque (no allow-same-origin)');
+assert.doesNotMatch(boot, /allow-same-origin/, 'opaque sandbox must not re-add allow-same-origin');
 
 // The sandboxed child admits only its authenticated parent + session
 // capability, then hands the package to the live AssetEngine bridge.
