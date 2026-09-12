@@ -11,6 +11,6 @@ assert.match(presentation, /pirate-fruit-control-hud-v900\.mjs\?v=22/, 'presenta
 assert.match(pirateHud, /\.trade-shop-root[\s\S]*z-index: 90/, 'trade shop root stacks above iframe chrome');
 assert.match(pirateHud, /\.trade-shop[\s\S]*width: min\(560px, 96vw\)[\s\S]*max-height: min\(78vh/, 'trade shop keeps a readable maritime market panel');
 assert.doesNotMatch(css, /Merchant market: vertical portrait card/, 'wrong #591 merchant portrait card CSS is gone');
-assert.match(html, /style-v900\.css\?v=979/, 'active HTML cache-busts after removing merchant portrait CSS');
+assert.match(html, /style-v900\.css\?v=980/, 'active HTML cache-busts after removing merchant portrait CSS');
 
 console.log('V9 maritime trade shop overlay: PASS');

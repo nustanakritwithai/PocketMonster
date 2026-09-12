@@ -889,10 +889,54 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     }
   }
 
+  function setParentMonsterOverlay(open) {
+    try {
+      if (open) {
+        documentLike.body.dataset.monsterOverlay = 'open';
+        documentLike.documentElement.dataset.monsterOverlay = 'open';
+      } else {
+        delete documentLike.body.dataset.monsterOverlay;
+        delete documentLike.documentElement.dataset.monsterOverlay;
+      }
+    } catch {}
+  }
+
+  function syncMonsterOverlayFromDom() {
+    try {
+      const open = ['ranchStoragePage', 'ranchServices', 'monsterManager'].some((id) => {
+        const node = documentLike.getElementById?.(id);
+        return Boolean(node && !node.classList?.contains?.('hidden'));
+      });
+      setParentMonsterOverlay(open);
+    } catch {}
+  }
+
+  function watchMonsterOverlayNodes() {
+    const Observer = windowLike?.MutationObserver || globalThis.MutationObserver;
+    if (!Observer || watchMonsterOverlayNodes.bound) return;
+    watchMonsterOverlayNodes.bound = true;
+    const obs = new Observer(() => syncMonsterOverlayFromDom());
+    for (const id of ['ranchStoragePage', 'ranchServices', 'monsterManager']) {
+      const node = documentLike.getElementById?.(id);
+      if (node) obs.observe(node, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
+
   async function openMonsterBag() {
     // Pirate's game runtime lives in the scene iframe.  The shell deliberately
     // does not relay this legacy Pocket API, so resolve the current scene first
     // and retain the parent lookup only as the Pirate legacy fallback.
+    const markOverlay = (open) => {
+      try {
+        if (open) {
+          documentLike.body.dataset.monsterOverlay = 'open';
+          documentLike.documentElement.dataset.monsterOverlay = 'open';
+        } else {
+          delete documentLike.body.dataset.monsterOverlay;
+          delete documentLike.documentElement.dataset.monsterOverlay;
+        }
+      } catch {}
+    };
     const pirate = pirateWorldActive();
     let open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
     let owner = windowLike;
@@ -908,15 +952,20 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
       return { ok: false, reason: 'unavailable', message: 'ยังไม่พร้อมเปิดกระเป๋ามอนสเตอร์' };
     }
     try {
+      // Hide every parent chrome immediately — do not wait for the scene postMessage.
+      markOverlay(true);
       const result = await open.call(owner);
       if (result && typeof result === 'object' && result.ok === false) {
+        markOverlay(false);
         return {
           ...result,
           message: String(result.message || result.reasonText || result.reason || ''),
         };
       }
+      markOverlay(true);
       return { ok: true, reason: 'opened', message: '' };
     } catch (error) {
+      markOverlay(false);
       return { ok: false, reason: 'failed', message: String(error?.message || error) };
     }
   }
@@ -1201,6 +1250,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     documentLike.body.append(shell);
     if (chatKeyboardDismiss?.node) documentLike.body.append(chatKeyboardDismiss.node);
     documentLike.body.classList.add('unified-hud-active');
+    watchMonsterOverlayNodes();
+    syncMonsterOverlayFromDom();
     sessionStartedAt = Date.now();
     documentLike.addEventListener?.('visibilitychange', onDocumentVisibility);
     stripTimer = setInterval(() => renderStrip(), 1000);

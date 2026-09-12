@@ -18,7 +18,7 @@ import {
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
-import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=956';
+import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=958';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=3';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '76');
+  url.searchParams.set('shellRevision', '77');
   return url.href;
 }
 
@@ -206,12 +206,17 @@ function clearPocketNpcMenu() {
 }
 
 window.addEventListener('message', event => {
-  if (event.source !== sceneFrame.contentWindow) return;
   if (event.data?.type === 'pocketmonster:monster-overlay-v1') {
-    if (event.data.open === true) document.body.dataset.monsterOverlay = 'open';
-    else delete document.body.dataset.monsterOverlay;
+    if (event.data.open === true) {
+      document.body.dataset.monsterOverlay = 'open';
+      document.documentElement.dataset.monsterOverlay = 'open';
+    } else {
+      delete document.body.dataset.monsterOverlay;
+      delete document.documentElement.dataset.monsterOverlay;
+    }
     return;
   }
+  if (event.source !== sceneFrame.contentWindow) return;
   if (event.data?.type === 'pocketmonster:pirate-dialogue-v1') {
     if (event.data.open === true) document.body.dataset.pirateDialogue = 'open';
     else delete document.body.dataset.pirateDialogue;

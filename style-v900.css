@@ -87,12 +87,31 @@ body[data-pirate-dialogue="open"] .mmorpg-hud{visibility:hidden!important;pointe
    otherwise outrank them. */
 body[data-pocket-npc-menu="open"] #pirateUnifiedControls{visibility:hidden!important;pointer-events:none!important}
 body[data-pocket-npc-menu="open"] .mmorpg-hud{visibility:hidden!important;pointer-events:none!important}
-/* Monster Club / manager must sit above Pirate HUD + combat chrome while open. */
-body[data-monster-overlay="open"] #pirateUnifiedControls{visibility:hidden!important;pointer-events:none!important}
-body[data-monster-overlay="open"] .mmorpg-hud{visibility:hidden!important;pointer-events:none!important}
-body[data-monster-overlay="open"] #ranchStoragePage:not(.hidden),
-body[data-monster-overlay="open"] #ranchServices:not(.hidden),
-body[data-monster-overlay="open"] #monsterManager:not(.hidden){z-index:10050!important}
+/* Monster Club / manager: hide every chrome layer while open. */
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #pirateUnifiedControls,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] .mmorpg-hud,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] .mmorpg-chat-dismiss,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #pirateOnboardingActionProxies,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #versionBadge,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #saveIndicator,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] .control-panel-hint,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] .quest-tracker,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] .quest-tracker-toggle,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #monsterLifeProfilePanel,
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #combatV91Shell{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #ranchStoragePage:not(.hidden),
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #ranchServices:not(.hidden),
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #monsterManager:not(.hidden){
+  display:grid!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  z-index:10050!important;
+}
+html[data-monster-overlay="open"],body[data-monster-overlay="open"] #monsterManager:not(.hidden){display:grid!important}
 #pirateOnboardingActionProxies{position:fixed;inset:0;z-index:31;pointer-events:none}
 .pirate-onboarding-action-proxy{position:absolute;display:block;padding:0;border:0;background:transparent;color:transparent;pointer-events:auto;touch-action:manipulation}
 #pirateUnifiedControls .camera-hint{display:none}

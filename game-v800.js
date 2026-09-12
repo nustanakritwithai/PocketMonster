@@ -6213,8 +6213,13 @@ function assertLocalRanchMutation(){
 function setMonsterOverlayOpen(open){
   const apply=doc=>{
     if(!doc?.body)return;
-    if(open) doc.body.dataset.monsterOverlay='open';
-    else delete doc.body.dataset.monsterOverlay;
+    if(open){
+      doc.body.dataset.monsterOverlay='open';
+      doc.documentElement.dataset.monsterOverlay='open';
+    }else{
+      delete doc.body.dataset.monsterOverlay;
+      delete doc.documentElement.dataset.monsterOverlay;
+    }
   };
   apply(document);
   try{
