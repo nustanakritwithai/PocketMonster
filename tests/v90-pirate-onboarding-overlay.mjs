@@ -97,9 +97,12 @@ assert.match(pirateHud, /\.tc-root \{[\s\S]*display: none/,
   'old iframe punch/shield cluster is retired');
 assert.match(pirateHud, /\.dialogue-root \{[\s\S]*inset: auto/, 'talk window is not a fullscreen overlay');
 assert.match(pirateHud, /\.dialogue-card \{[\s\S]*height: auto[\s\S]*max-height: 70vh/, 'talk card grows with text up to a phone max');
-assert.match(pirateHud, /\.quest-board,[\s\S]*width: min\(280px, 72vw\)[\s\S]*max-height: min\(64vh/, 'quest board is a portrait card up to a phone max');
-assert.match(pirateHud, /\.boat-shop,[\s\S]*width: min\(280px, 72vw\)[\s\S]*max-height: min\(64vh/, 'boat shop is a portrait card up to a phone max');
-assert.match(pirateHud, /\.potion-shop,[\s\S]*width: min\(280px, 72vw\)[\s\S]*max-height: min\(64vh/, 'potion shop is a portrait card up to a phone max');
+assert.match(pirateHud, /\.quest-board,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'quest board grows with content up to a phone max');
+assert.match(pirateHud, /\.boat-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'boat shop grows with content up to a phone max');
+assert.match(pirateHud, /\.potion-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'potion shop grows with content up to a phone max');
+assert.match(pirateHud, /\.trade-shop-root[\s\S]*z-index: 90/, 'maritime trade shop sits above iframe HUD chrome');
+assert.match(pirateHud, /\.trade-shop[\s\S]*max-height: min\(78vh/, 'maritime trade shop fits phone height');
+assert.match(presentation, /\.trade-shop-root/, 'trade shop opens raise the parent dialogue stand-down');
 assert.match(parentBoot, /frame\.setAttribute\('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen'/, 'local child keeps opaque sandbox');
 assert.match(childEntry, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'Pirate child HTML cache-busts presentation with a positive revision');
 
