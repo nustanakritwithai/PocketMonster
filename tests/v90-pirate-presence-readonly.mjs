@@ -238,7 +238,7 @@ relayAllowed = true;
 publishWorldState({ getZone: () => 'pirate-fruit', getPosition: () => pose, getDir: () => pose?.dir });
 
 assert.match(boot, /event\.source !== frame\.contentWindow/, 'frame source is checked before accepting pose');
-assert.match(boot, /event\.origin !== 'null'/, 'opaque sandbox origin is checked before accepting pose');
+assert.match(boot, /event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN/, 'live Pirate origin is checked before accepting pose');
 assert.match(boot, /sanitizePirateLocalPresence\(message\)/, 'parent accepts only the validated local pose contract');
 assert.match(boot, /allowActors: true/, 'Pirate parent preserves actor relay until Server central-authority capability is verified');
 assert.match(boot, /getAllowActors:/, 'Pirate parent evaluates central authority dynamically per WORLD_STATE frame');

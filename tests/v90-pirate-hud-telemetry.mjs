@@ -231,7 +231,7 @@ assert.match(parent, /createPocketPlayerHudStore/, 'Pirate boot owns a player HU
 assert.match(parent, /POCKETMONSTER_POCKET_HUD/, 'Pirate boot exposes the Pocket HUD adapter the Dock already binds');
 assert.match(parent, /pocketPlayerHud.publish\(snapshot\.player\)/, 'telemetry snapshots fill the top-left player HP panel');
 assert.match(parent, /event\.source !== frame\.contentWindow/);
-assert.match(parent, /event\.origin !== 'null'/);
+assert.match(parent, /event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN/);
 assert.match(parent, /frameGeneration/);
 assert.match(parent, /pagehide/);
 assert.match(parent, /pocketmonster:world-warp-v1/);
@@ -240,6 +240,6 @@ assert.match(parent, /const markFrameReady = \(\) => \{[\s\S]*if \(!pirateRuntim
 assert.match(parent, /frame\.addEventListener\('load', markFrameReady\)/,
   'iframe load is routed through the guarded ready handler');
 assert.match(parent, /mount:\(\)=>\{[\s\S]*pirateHudTelemetry\.activate\('mount'\)/, 'scene remount starts a fresh telemetry generation');
-assert.doesNotMatch(parent, /allow-same-origin/);
+assert.match(parent, /allow-same-origin/);
 assert.ok(PIRATE_HUD_MAX_PAYLOAD_BYTES > 0);
 console.log('V9 sanitized Pirate HUD telemetry: PASS');

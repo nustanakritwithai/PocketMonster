@@ -16,7 +16,7 @@ assert.match(boot, /studioCapability/);
 assert.match(boot, /PIRATE_STUDIO_CHARACTER_READY/);
 assert.match(boot, /PIRATE_STUDIO_CHARACTER_PACKAGE/);
 assert.match(boot, /frame\.contentWindow\?\.postMessage\([\s\S]*PIRATE_STUDIO_CHARACTER_PACKAGE/);
-assert.doesNotMatch(boot, /allow-same-origin/);
+assert.match(boot, /allow-same-origin/);
 
 // The sandboxed child admits only its authenticated parent + session
 // capability, then hands the package to the live AssetEngine bridge.

@@ -181,7 +181,7 @@ async function readJson(response) {
   }
 }
 
-export async function requestServerContract(config, { fetchImpl = globalThis.fetch, signal, timeoutMs = 5000, correlationId = `pm-${Date.now().toString(36)}` } = {}) {
+export async function requestServerContract(config, { fetchImpl = globalThis.fetch, signal, timeoutMs = 15000, correlationId = `pm-${Date.now().toString(36)}` } = {}) {
   if (!config?.featureFlags?.vpsEnabled || !config?.featureFlags?.vpsReads) return { state: 'disabled', reason: 'vps-read-disabled', correlationId };
   if (typeof fetchImpl !== 'function') return { state: 'offline', reason: 'fetch-unavailable', correlationId };
   if (signal?.aborted) return { state: 'offline', reason: 'timeout', correlationId };

@@ -47,7 +47,7 @@ const presentation = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-pre
 const shell = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
 
 assert.match(childEntry, /unified-input-bridge-v900\.mjs\?v=11/);
-assert.match(worldCatalog, /boot-pirate-fruit-v900\.mjs\?v=953/);
+assert.match(worldCatalog, /boot-pirate-fruit-v900.mjs\?v=954/);
 
 assert.match(childBridge, /MutationObserver/);
 assert.match(childBridge, /\.onboarding-root/);
@@ -58,7 +58,7 @@ assert.doesNotMatch(childBridge, /pirate-onboarding-local/);
 
 assert.match(parentBoot, /readPirateOnboardingState\(message\)/);
 assert.match(parentBoot, /event\.source !== frame\.contentWindow/);
-assert.match(parentBoot, /event\.origin !== 'null'/);
+assert.match(parentBoot, /event\.origin !== PIRATE_FRUIT_LIVE_ORIGIN/);
 assert.match(parentBoot, /syncPirateOnboardingActionProxies\(onboarding\)/, 'integrated shell consumes onboarding state without creating tutorial action buttons');
 assert.match(parentBoot, /layer\.replaceChildren\(\)/, 'integrated onboarding proxy layer is kept empty');
 assert.doesNotMatch(parentBoot, /data-onboarding-action/, 'integrated shell creates no invisible tutorial action buttons');
@@ -100,7 +100,7 @@ assert.match(pirateHud, /\.dialogue-card \{[\s\S]*height: auto[\s\S]*max-height:
 assert.match(pirateHud, /\.quest-board,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'quest board grows with content up to a phone max');
 assert.match(pirateHud, /\.boat-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'boat shop grows with content up to a phone max');
 assert.match(pirateHud, /\.potion-shop,[\s\S]*height: auto[\s\S]*max-height: min\(78vh/, 'potion shop grows with content up to a phone max');
-assert.doesNotMatch(parentBoot, /allow-same-origin/, 'nested Pirate Fruit stays in an opaque iframe sandbox');
+assert.match(parentBoot, /allow-same-origin/, 'live Pirate Fruit iframe keeps its own origin');
 assert.match(childEntry, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'Pirate child HTML cache-busts presentation with a positive revision');
 
 assert.match(presentation, /skipVendorFullscreen/, 'talk taps skip vendor fullscreen without blocking Pirate pointerdown');
