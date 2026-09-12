@@ -40,7 +40,12 @@ export function cleanLaunchUrl(locationLike = globalThis.location, historyLike =
   const verifier = validContext && /^[A-Za-z0-9_-]{43,128}$/.test(context.verifier || '') ? context.verifier : null;
   const attempted = fragment.has('ticket') || url.searchParams.has('ticket') || url.searchParams.has('state');
   const launch = Object.freeze({ ticket, state, verifier, invalid: attempted && !ticket });
-  historyLike.replaceState(null, '', `${url.pathname}`);
+  // Keep world/panel (and other non-launch) query params so deep links like
+  // ?world=pocket-monster survive ticket cleanup / launcher handoff.
+  url.searchParams.delete('ticket');
+  url.searchParams.delete('state');
+  url.hash = '';
+  historyLike.replaceState(null, '', `${url.pathname}${url.search}`);
   return launch;
 }
 

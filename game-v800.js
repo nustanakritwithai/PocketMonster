@@ -795,10 +795,17 @@ function makePirateFruitReturnPortal(){
 const pirateFruitReturnPortal=makePirateFruitReturnPortal();
 let pirateFruitReturnPortalBusy=false;
 let pirateFruitReturnPortalNeedsExit=false;
+let pirateFruitReturnPortalArmed=false;
 function updatePirateFruitReturnPortal(dt){
   const active=typeof window!=='undefined'&&window.POCKETMONSTER_COMBINED_BOOT?.worldId==='pocket-monster'&&state.currentZone==='hub';
   pirateFruitReturnPortal.group.visible=active;
-  if(!active){pirateFruitReturnPortalBusy=false;return;}
+  if(!active){pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalArmed=false;return;}
+  if(!pirateFruitReturnPortalArmed){
+    // First frame in Pocket hub: never auto-warp from a spawn/save that already sits inside the portal.
+    pirateFruitReturnPortalArmed=true;
+    pirateFruitReturnPortalNeedsExit=true;
+    pirateFruitReturnPortalBusy=false;
+  }
   pirateFruitReturnPortal.outer.rotation.z+=dt*.42;
   pirateFruitReturnPortal.inner.rotation.z-=dt*.7;
   const pulse=.5+.5*Math.sin(performance.now()*.0032);
@@ -7693,7 +7700,7 @@ function loop(now){
 requestAnimationFrame(loop);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 if(typeof window!=='undefined'){
-  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
+  window.POCKETMONSTER_SCENE_LIFECYCLE=Object.freeze({mount:()=>setSceneRuntimeActive(true),unmount:()=>{pirateFruitReturnPortalBusy=false;pirateFruitReturnPortalNeedsExit=true;pirateFruitReturnPortalArmed=false;return setSceneRuntimeActive(false);},diagnostics:()=>Object.freeze({active:sceneRuntimeActive})});
   window.POCKETMONSTER_ANIMAL_CONTROL=Object.freeze({
     source:'pocket-monster',
     hostCharacter:'pirate-fruit',

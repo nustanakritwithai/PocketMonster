@@ -2,7 +2,7 @@ import {
   clearLaunchSession,
   prepareLaunch,
   requireActiveOnlineLaunchSession,
-} from './launch-bootstrap.mjs?v=912';
+} from './launch-bootstrap.mjs?v=913';
 import { applyPendingPatch } from './patch-updater.mjs';
 import { loadRuntimeConfig } from './runtime-config.mjs';
 import { installPersistentMinimapOwner } from './persistent-minimap-owner-v900.mjs?v=2';
@@ -45,4 +45,4 @@ document.getElementById('accountGate')?.classList.add('hidden');
 window.POCKETMONSTER_RUNTIME_CONFIG = config;
 window.POCKETMONSTER_COMBINED_CHANNEL = true;
 installPersistentMinimapOwner({ windowLike: window, documentLike: document });
-await import('./online-world-shell-v900.mjs?v=65');
+await import('./online-world-shell-v900.mjs?v=66');

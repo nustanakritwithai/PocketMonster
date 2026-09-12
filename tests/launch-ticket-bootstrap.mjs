@@ -24,6 +24,9 @@ const launch = cleanLaunchUrl({ href: `https://nustanakritwithai.github.io/Pocke
 assert.deepEqual(launch, { ticket: rawTicket, state: 'nonce-state-value', verifier: 'v'.repeat(43), invalid: false });
 assert.equal(cleaned, '/PocketMonster/');
 assert.equal(handoffWindow.name, '', 'window.name handoff must be cleared immediately');
+let preserved = '';
+cleanLaunchUrl({ href: 'https://nustanakritwithai.github.io/PocketMonster/?world=pocket-monster&panel=human#ticket=' + rawTicket }, { replaceState(_state, _title, value) { preserved = value; } }, { name: JSON.stringify({ kind: 'monsterlife-launch-v1', verifier: 'v'.repeat(43), state: 'nonce-state-value' }) });
+assert.equal(preserved, '/PocketMonster/?world=pocket-monster&panel=human', 'world/panel deep links must survive launch cleanup');
 const legacyQuery = cleanLaunchUrl({ href: 'https://nustanakritwithai.github.io/PocketMonster/?ticket=old&state=old-state' }, { replaceState() {} });
 assert.deepEqual(legacyQuery, { ticket: null, state: null, verifier: null, invalid: true }, 'query-string tickets must never be accepted');
 const duplicateTicket = cleanLaunchUrl({ href: `https://nustanakritwithai.github.io/PocketMonster/#ticket=${rawTicket}&ticket=${'x'.repeat(43)}` }, { replaceState() {} }, { name: JSON.stringify({ kind: 'monsterlife-launch-v1', verifier: 'v'.repeat(43), state: 'nonce-state-value' }) });
