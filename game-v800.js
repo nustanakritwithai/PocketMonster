@@ -6263,7 +6263,7 @@ function showRanchStorageShell({remote=false}={}){
   if(!storagePage){msg('ยังไม่พบหน้าต่างคลังมอนสเตอร์');return {ok:false,reason:'missing-ui'};}
   const hostBody=storagePage.ownerDocument?.body||document.body;
   if(remote&&storagePage.parentElement!==hostBody)hostBody.appendChild(storagePage);
-  el('ranchServices')?.classList.add('hidden');storagePage.classList.remove('hidden');
+  el('ranchServices')?.classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
   remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
   const request=++remoteBagRequest;
   renderRanchStoragePage();
