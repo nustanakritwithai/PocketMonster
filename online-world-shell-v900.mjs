@@ -650,6 +650,8 @@ monsterController = createMonsterControlController({
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
 });
 window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = monsterController;
+// ฉากอาจพร้อมก่อน await chat-runtime จบ ต้องผูกแผงหลักทันทีในทั้งสองลำดับ
+if (sceneBootState === 'ready') bindSceneHudAdapters(sceneFrame.contentWindow);
 void monsterStateProvider.refresh();
 monsterStateProvider.start();
 unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document, monsterController });
