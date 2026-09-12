@@ -1162,3 +1162,11 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   .chat-toggle{top:max(8px,var(--safe-top));right:max(86px,calc(var(--safe-right) + 74px));left:auto;bottom:auto;z-index:15000}
   .game-chat{top:max(48px,calc(var(--safe-top) + 40px));left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:min(340px,46vw);height:min(48dvh,calc(100dvh - 48px - 140px));max-height:calc(100dvh - 48px - 140px);z-index:15001}
 }
+.tc-monster-bag{
+  background:linear-gradient(145deg,#14532d,#166534 55%,#854d0e);
+  border-color:#facc15aa;
+  color:#fef3c7;
+  font-size:clamp(18px,3.4vw,28px);
+  box-shadow:0 0 0 1px #facc1533,0 6px 18px #0006;
+}
+.tc-monster-bag:active{transform:scale(.94)}

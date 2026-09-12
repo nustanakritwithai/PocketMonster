@@ -121,11 +121,15 @@ body[data-pocket-npc-menu="open"] .mmorpg-hud{visibility:hidden!important;pointe
 #pirateUnifiedControls #monsterSlot2Btn.tc-monster2{right:54px!important;bottom:180px!important;width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;z-index:5}
 #pirateUnifiedControls #monsterSlot3Btn.tc-monster3{right:104px!important;bottom:180px!important;width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;z-index:5}
 #pirateUnifiedControls .tc-monster.selected{border-color:#fbbf24!important}
+#pirateUnifiedControls .tc-monster-bag{right:154px!important;bottom:180px!important;width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;z-index:5}
+#pirateUnifiedControls #monsterThrowBtn{right:54px!important;bottom:234px!important;width:98px!important;height:48px!important;min-height:48px!important;border-radius:16px!important;z-index:6}
+#pirateUnifiedControls #monsterThrowBtn[hidden]{display:none!important}
 #pirateUnifiedControls .tc-monster.active-monster{box-shadow:0 0 0 2px #86efac}
 #pirateUnifiedControls .tc-monster.fainted-slot{opacity:.45;border-color:#f87171!important}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn{background-image:none!important}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn>*{visibility:hidden!important}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn::after{content:attr(data-pirate-icon);position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:inherit;line-height:1;text-shadow:0 2px 4px #0009}
+#pirateUnifiedControls[data-control-mode="pirate"] .tc-monster:not(.monster-throw)::after{white-space:pre-line;font-size:10px;line-height:1.2;overflow:hidden}
 #pirateUnifiedControls[data-control-mode="capture"] .pirate-only,
 #pirateUnifiedControls[data-control-mode="travel"] .controls-right{display:none!important}
 #pirateUnifiedControls[data-control-mode="capture"] .tc-btn::after{content:none}
