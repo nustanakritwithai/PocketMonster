@@ -19,7 +19,7 @@ assert.match(boot, /source: 'pirate-fruit-offline'/);
 assert.match(boot, /remote: false/);
 assert.doesNotMatch(boot, /pirateClient/);
 assert.match(boot, /pirate-fruit-offline\/index\.html/);
-assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=961');
+assert.equal(worldById('pirate-fruit').runtime, './boot-pirate-fruit-v900.mjs?v=962');
 assert.match(combined, /โลก Pirate Fruit ออนไลน์ชุดล่าสุด/);
 
 const timeout = serverSync.match(/timeoutMs = (\d+)/);

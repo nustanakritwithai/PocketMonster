@@ -287,9 +287,9 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=13/, 'world shell cache-busts analog handoff controls');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=13/, 'Pirate boot cache-busts analog handoff controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=66/, 'online scene cache-busts analog handoff graph');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=14/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=14/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=67/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 

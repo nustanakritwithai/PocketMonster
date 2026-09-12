@@ -602,6 +602,20 @@ export function createUnifiedMobileControls({
   const throwMonster = async () => {
     if (monsterController?.snapshot?.()?.pending) return;
     const result = await monsterController?.throwHeld?.();
+    if (activeWorldId === 'pirate-fruit' && result?.ok === false) {
+      const message = `ปามอนสเตอร์ไม่สำเร็จ: ${result.reason || result.code || 'SERVER_UNAVAILABLE'}`;
+      const failure = { ...result, message };
+      try {
+        const parentHud = windowLike?.parent?.POCKETMONSTER_UNIFIED_HUD;
+        if (typeof parentHud?.showCommandFailure === 'function') {
+          parentHud.showCommandFailure(failure);
+          return;
+        }
+      } catch {}
+      const localStatus = documentLike.getElementById('actionReason');
+      if (localStatus) localStatus.textContent = `${message}${result.code ? ` (${result.code})` : ''}`;
+      return;
+    }
     const status = documentLike.getElementById('actionReason');
     if (status && result?.ok === false) status.textContent = `ปามอนสเตอร์ไม่สำเร็จ: ${result.reason || result.code || 'SERVER_UNAVAILABLE'}`;
   };

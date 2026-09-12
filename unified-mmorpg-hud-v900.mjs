@@ -1265,5 +1265,6 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     unmount,
     setTab,
     setExpanded,
+    showCommandFailure,
   });
 }

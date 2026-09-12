@@ -18,7 +18,7 @@ import {
 } from './pirate-presence-bridge-v900.mjs?v=6';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-fruit-offline/pirate-owned-monster-carry.mjs';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=13';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=14';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
@@ -27,7 +27,7 @@ import {
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=943', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=830&animalControl=pirate-fruit';
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=832&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const pocketPlayerHud = createPocketPlayerHudStore();
@@ -50,7 +50,7 @@ export function ensurePocketAnimalControl() {
     return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
   }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=830&animalControl=pirate-fruit').then(() => {
+    throwRuntimePromise = import('./game-v800.js?v=832&animalControl=pirate-fruit').then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
