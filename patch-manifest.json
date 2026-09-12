@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.5696efc3c6f7",
+  "buildId": "8.4.0.content.70bf3536f7d8",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T19:33:51.679Z",
+  "publishedAtUtc": "2026-09-12T19:36:30.682Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "index.html",
       "size": 38810,
-      "sha256": "66b2c7e2e1d3d8e1b7ab642a827ef326cf5cc333b87c87921eb43b55cf61bc88"
+      "sha256": "ed5f4dfd28b0ec18e04a4b439f86ac4592b575995db1fd431b10e37c6bcb84eb"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -863,7 +863,7 @@
     {
       "path": "scene-v900.html",
       "size": 1332,
-      "sha256": "fe15d3cbdf14b56cc00e5db9306612ef0415ee3a602d06012a4489117ad8d3cf"
+      "sha256": "9c84ac0f97a8cb6b57333f3f5bd42434639c876cc024944bd9d9eda3d8433356"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -982,8 +982,8 @@
     },
     {
       "path": "style-v800.css",
-      "size": 123837,
-      "sha256": "2b4f95e1061fef97086e9b3302118edabdeeba8a86c939f4c8b85fffa72d2c22"
+      "size": 124455,
+      "sha256": "0fc6c2999f7254427125ff6d16272dde35a28b26e55bbb1739c47b8c1e6da366"
     },
     {
       "path": "style-v900.css",
@@ -1033,7 +1033,7 @@
     {
       "path": "v900.html",
       "size": 38810,
-      "sha256": "66b2c7e2e1d3d8e1b7ab642a827ef326cf5cc333b87c87921eb43b55cf61bc88"
+      "sha256": "ed5f4dfd28b0ec18e04a4b439f86ac4592b575995db1fd431b10e37c6bcb84eb"
     },
     {
       "path": "warp-routes.mjs",

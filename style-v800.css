@@ -550,12 +550,16 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
   padding-left:max(14px,var(--safe-left));
 }
 #closeManager{min-width:var(--touch-min);min-height:var(--touch-min)}
+.manager-card{width:min(960px,96vw);max-height:min(91vh,calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px));overflow:auto;overscroll-behavior:contain}
 .manager-item.focused-monster{outline:2px solid #facc15;box-shadow:0 0 0 2px #facc1533}
 
 /* Character UI Phase 6 — landscape-first three-column composition */
 .character-manager-layout{
   display:grid!important;grid-template-columns:minmax(180px,1fr) minmax(250px,1.35fr) minmax(210px,1fr);
-  gap:12px;align-items:stretch;min-height:430px;
+  gap:12px;align-items:stretch;min-height:0;max-height:100%;
+}
+@media (min-height:560px){
+  .character-manager-layout{min-height:min(430px,70dvh)}
 }
 .character-roster,.character-information{min-width:0;background:linear-gradient(180deg,#132139,#0b1220)}
 .character-section-head{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:8px}
@@ -575,7 +579,7 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .character-preview-art span{width:62%;aspect-ratio:1;border-radius:28%;display:grid;place-items:center;background:#334155;border:2px solid #ffffff55;color:#fff;font-size:clamp(28px,5vw,54px);font-weight:1000;text-shadow:0 2px 4px #0009}
 .character-preview-art.has-3d span{display:none}
 .character-preview-name{font-size:clamp(17px,2.4vw,25px);font-weight:1000;color:#fff}.character-preview-meta{margin-top:4px;font-size:11px;color:#dbeafe}.character-preview-types{margin-top:8px;color:#bfdbfe;font-size:11px}.character-preview-place{margin-top:8px;padding:4px 9px;border-radius:999px;background:#0f172aaa;border:1px solid #fde68a55;color:#fde68a;font-size:10px;font-weight:900}.character-preview-growth{margin-top:9px;color:#a7f3d0;font-size:10px;font-weight:800}.character-preview-empty{margin-top:auto;padding-top:12px;color:#94a3b8;font-size:9px;line-height:1.4}
-.character-info-tabs{display:flex;gap:5px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #ffffff14}.character-info-tab{pointer-events:auto!important;touch-action:manipulation;position:relative;z-index:12;border:1px solid #ffffff1f;border-radius:999px;background:#172033;color:#cbd5e1;padding:6px 8px;min-height:32px;font-size:10px;font-weight:900}.character-info-tab.active{background:#2563eb;color:#fff;border-color:#93c5fd}.character-info-body{min-height:235px;padding-top:10px}.character-info-empty{border:1px dashed #ffffff2b;border-radius:12px;padding:14px;color:#94a3b8;font-size:11px;line-height:1.55}
+.character-info-tabs{display:flex;gap:5px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #ffffff14}.character-info-tab{pointer-events:auto!important;touch-action:manipulation;position:relative;z-index:12;border:1px solid #ffffff1f;border-radius:999px;background:#172033;color:#cbd5e1;padding:6px 8px;min-height:32px;font-size:10px;font-weight:900}.character-info-tab.active{background:#2563eb;color:#fff;border-color:#93c5fd}.character-info-body{min-height:0;padding-top:10px}.character-info-empty{border:1px dashed #ffffff2b;border-radius:12px;padding:14px;color:#94a3b8;font-size:11px;line-height:1.55}
 
 /* Character UI mobile landscape overflow guard */
 @media (pointer:coarse) and (orientation:landscape){
@@ -627,13 +631,18 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .ranch-storage-page.ranch-club{
   display:grid;
   grid-template-columns:minmax(240px,1fr) minmax(240px,1fr);
-  grid-template-rows:auto minmax(120px,max-content) minmax(0,1fr);
+  grid-template-rows:auto minmax(120px,min(34dvh,.42fr)) minmax(0,1fr);
+  width:100%;
+  height:100dvh;
+  max-height:100dvh;
   min-height:0;
+  overflow:hidden;
+  box-sizing:border-box;
   background:
     radial-gradient(ellipse at 16% -12%,#166534aa 0 26%,transparent 58%),
     radial-gradient(ellipse at 92% 108%,#854d0e77 0 24%,transparent 56%),
     linear-gradient(180deg,#022c22f0,#020617f5);
-  padding:16px;
+  padding:max(10px,var(--safe-top)) max(10px,var(--safe-right)) max(10px,var(--safe-bottom)) max(10px,var(--safe-left));
 }
 .ranch-club .ranch-storage-head{grid-column:1/-1}
 .ranch-club-carry{min-width:0}
@@ -724,7 +733,9 @@ button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 @media (max-height:560px){
   .ranch-storage-page.ranch-club{
     grid-template-rows:auto minmax(96px,.42fr) minmax(0,1fr);
-    gap:8px;padding:10px;
+    gap:8px;
+    height:100dvh;max-height:100dvh;overflow:hidden;
+    padding:max(6px,var(--safe-top)) max(6px,var(--safe-right)) max(6px,var(--safe-bottom)) max(6px,var(--safe-left));
   }
   .ranch-club .ranch-storage-roster,
   .ranch-club .ranch-club-vault,
