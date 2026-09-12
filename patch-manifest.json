@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.344ea8e0f0db",
+  "buildId": "8.4.0.content.8e1b8816aecc",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T16:03:09.435Z",
+  "publishedAtUtc": "2026-09-12T16:19:53.387Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -497,8 +497,8 @@
     },
     {
       "path": "control-panels-v900.mjs",
-      "size": 3738,
-      "sha256": "2fb099aac0128cf36ef898fa966a73fedbb64f7acca69467d9d0eb1f68e134cc"
+      "size": 3821,
+      "sha256": "8c4111bd995d06d2465a466006a7a0bbc2948535ebe3c4f5919053ebab637478"
     },
     {
       "path": "damage-resolver.mjs",
@@ -508,7 +508,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2376,
-      "sha256": "a943b200dc7034c9cb7de532877ea966cb62a3ebab6f4bd8ce4dc50682ee23c4"
+      "sha256": "456d7562c4587b7cbcb6807b34a813f74157d09eb8b24a792059f09edefffeed"
     },
     {
       "path": "equipment.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "index.html",
       "size": 38812,
-      "sha256": "f10fe6db05a41b65b811183fce0048d2a8c5d31ceb2dfe843d40152d553cab26"
+      "sha256": "a77dea69e5bb43a0f2bcc43ccf9071c52a258b1ae8e51f7c735b3d49a42a9626"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -647,8 +647,8 @@
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 25080,
-      "sha256": "d17e1556bbcbab089744f50466dbe626350a5df30235ca12a0c8a88696b7c9d5"
+      "size": 25335,
+      "sha256": "ad7eaabc24bf3ebda7169c0f94bb30333773c34b82be32f96a6c48738dc250d2"
     },
     {
       "path": "passive-catalog.mjs",
@@ -1012,8 +1012,8 @@
     },
     {
       "path": "unified-mmorpg-hud-v900.mjs",
-      "size": 46297,
-      "sha256": "9b5d49780833a84089ff62fba9f4c4843c380aba3da34cb84e51fa93efc9be03"
+      "size": 46735,
+      "sha256": "d48566c7fbdb6427b19790995e992066020e8a75687fec3d94ce822319f46361"
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
@@ -1023,7 +1023,7 @@
     {
       "path": "v900.html",
       "size": 38812,
-      "sha256": "f10fe6db05a41b65b811183fce0048d2a8c5d31ceb2dfe843d40152d553cab26"
+      "sha256": "a77dea69e5bb43a0f2bcc43ccf9071c52a258b1ae8e51f7c735b3d49a42a9626"
     },
     {
       "path": "warp-routes.mjs",
