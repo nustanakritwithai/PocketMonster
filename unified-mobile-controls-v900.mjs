@@ -443,6 +443,7 @@ export function createUnifiedMobileControls({
       const pocketId = POCKET_ACTION_IDS[action];
       paintActionButton(button, byId.get(pocketId) || byId.get(action) || null);
     }
+    paintMonsterThrow();
   };
 
   const bindActionVisuals = () => {
@@ -497,6 +498,7 @@ export function createUnifiedMobileControls({
     else restorePiratePlayerButtons();
     applyPirateHelmButton();
     bindActionVisuals();
+    paintMonsterThrow();
     return mode;
   };
 
@@ -581,6 +583,28 @@ export function createUnifiedMobileControls({
   let monsterController = null;
   let unsubscribeMonster = null;
   const monsterPointers = new Set();
+  let suppressThrowClick = false;
+  const monsterThrowMode = () => {
+    const snapshot = monsterController?.snapshot?.();
+    return Boolean(snapshot?.held || ['summon', 'switch'].includes(snapshot?.pendingKind));
+  };
+  const paintMonsterThrow = () => {
+    if (!monsterThrowMode()) return;
+    const button = documentLike.getElementById('captureBtn');
+    if (!button) return;
+    const pending = monsterController.snapshot().pending === true;
+    button.disabled = false;
+    button.setAttribute?.('data-pirate-icon', pending ? '…' : 'ปา');
+    button.setAttribute?.('aria-label', pending ? 'กำลังเรียกมอนสเตอร์' : 'ปามอนสเตอร์');
+    button.setAttribute?.('aria-disabled', String(pending));
+    if (button.style) button.style.backgroundImage = '';
+  };
+  const throwMonster = async () => {
+    if (monsterController?.snapshot?.()?.pending) return;
+    const result = await monsterController?.throwHeld?.();
+    const status = documentLike.getElementById('actionReason');
+    if (status && result?.ok === false) status.textContent = `ปามอนสเตอร์ไม่สำเร็จ: ${result.reason || result.code || 'SERVER_UNAVAILABLE'}`;
+  };
   const monsterSkillPanel = () => monsterController?.snapshot?.()?.controlPanel?.mode === 'monster';
   const paintMonsterSkills = () => {
     if (!monsterSkillPanel()) return;
@@ -616,6 +640,18 @@ export function createUnifiedMobileControls({
     const button = documentLike.getElementById(buttonId);
     if (!button) continue;
     button.addEventListener('pointerdown', event => {
+      if (buttonId === 'captureBtn') {
+        suppressThrowClick = false;
+        if (monsterThrowMode()) {
+          stopMonsterEvent(event);
+          if (monsterPointers.has(event.pointerId)) return;
+          monsterPointers.add(event.pointerId);
+          suppressThrowClick = true;
+          try { button.setPointerCapture?.(event.pointerId); } catch {}
+          void throwMonster();
+          return;
+        }
+      }
       if (/^skill[1-4]Btn$/.test(buttonId) && monsterSkillPanel()) {
         stopMonsterEvent(event);
         if (monsterPointers.has(event.pointerId)) return;
@@ -630,7 +666,11 @@ export function createUnifiedMobileControls({
       activeAdapter()?.action?.({ action, phase: 'start', pointerId: event.pointerId });
     }, { capture: true, passive: false });
     const finish = event => {
-      if (monsterPointers.delete(event.pointerId)) { stopMonsterEvent(event); return; }
+      if (monsterPointers.delete(event.pointerId)) {
+        stopMonsterEvent(event);
+        try { button.releasePointerCapture?.(event.pointerId); } catch {}
+        return;
+      }
       const active = actionPointers.get(event.pointerId);
       if (!active || active.button !== button) return;
       stopPirateAction(event);
@@ -646,6 +686,13 @@ export function createUnifiedMobileControls({
     button.addEventListener('pointercancel', finish, { capture: true, passive: false });
     button.addEventListener('lostpointercapture', finish, { capture: true, passive: false });
     button.addEventListener('click', event => {
+      if (buttonId === 'captureBtn' && (suppressThrowClick || monsterThrowMode())) {
+        stopMonsterEvent(event);
+        const pointerHandled = suppressThrowClick;
+        suppressThrowClick = false;
+        if (!pointerHandled && event.detail === 0) void throwMonster();
+        return;
+      }
       if (!/^skill[1-4]Btn$/.test(buttonId) || !monsterSkillPanel()) return;
       stopMonsterEvent(event);
       // Keyboard-generated clicks have no preceding pointerdown.

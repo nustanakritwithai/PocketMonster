@@ -343,6 +343,11 @@ function bootWorld(hudOptions = {}) {
   windowLike.POCKETMONSTER_PARTY_HUD.selectPartySlot = slot => { windowLike.lastPartyCommand = ['select', slot]; return { ok: true }; };
   hud.rebind();
   assert.equal(documentLike.getElementById('monsterSlot1Btn').textContent, 'M', 'rebind paints overlay slots from the scene party adapter');
+  windowLike.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = fakeFeature({
+    revision: 1, available: true, slots: [{ slot: 0, available: true, instanceId: 'online-b', name: 'คู่หู', portraitKey: '' }],
+  });
+  hud.rebind();
+  assert.equal(documentLike.getElementById('monsterSlot1Btn').textContent, 'ค', 'ออนไลน์ใช้ controller แทนรายการออฟไลน์');
   hud.unmount();
 }
 
