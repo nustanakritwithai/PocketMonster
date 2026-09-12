@@ -5,6 +5,7 @@ import {
   PLAYER_PRESENTATION_PARITY_SCHEMA,
   computePlayerPresentationRetarget,
   resolvePlayerPresentationAction,
+  shouldDeferPlayerPresentationParity,
 } from '../asset-presentation/player-presentation-parity.mjs';
 
 assert.equal(PLAYER_PRESENTATION_PARITY_SCHEMA, 'pocket-player-presentation-parity-v1');
@@ -22,6 +23,15 @@ assert.equal(computePlayerPresentationRetarget({
   studioBounds: { minY: 0, maxY: 1.8 },
   targetWorld: 'pirate-fruit',
 }).yaw, 0, 'Pirate world does not get the host-world forward-axis correction');
+
+assert.equal(shouldDeferPlayerPresentationParity({
+  POCKETMONSTER_SCENE_PREWARM: true,
+  POCKETMONSTER_COMBINED_BOOT: { worldId: 'pirate-fruit' },
+}), true, 'Pocket runtime prewarm must defer parity instead of caching a null presentation');
+assert.equal(shouldDeferPlayerPresentationParity({
+  POCKETMONSTER_SCENE_PREWARM: false,
+  POCKETMONSTER_COMBINED_BOOT: { worldId: 'pocket-monster' },
+}), false, 'mounted Pocket world must be allowed to run parity after prewarm clears');
 
 assert.equal(resolvePlayerPresentationAction({ requestedAction: 'idle', moving: true, now: 100 }), 'walk',
   'Monster moving=true must actively select the Studio walk clip');
@@ -62,6 +72,12 @@ assert.match(parity, /function ensureLocomotionParity\(\)/,
   'cross-world wrapper must actively bridge moving state into Studio locomotion actions');
 assert.match(parity, /session\.presentationSource !== 'studio-character'/,
   'locomotion bridge must only override the upgraded Studio visual');
+const prewarmGuard = parity.indexOf('if (shouldDeferPlayerPresentationParity(windowRef)) return Promise.resolve(null);');
+const cachedPromiseReuse = parity.indexOf('if (parityPromise) return parityPromise;');
+assert.ok(prewarmGuard >= 0 && cachedPromiseReuse >= 0 && prewarmGuard < cachedPromiseReuse,
+  'prewarm deferral must happen before parityPromise reuse so a null prewarm result cannot poison the mounted world');
+assert.match(parity, /if \(!studio \|\| disposed\) \{[\s\S]{0,180}parityPromise = null;/,
+  'transient null Studio readiness must clear the parity promise so the mounted world can retry');
 assert.doesNotMatch(parity, /saveCharacterProfile|syncPlayerData|playerHp|damage|\bhp\b|\batk\b/,
   'visual parity layer must remain presentation-only');
 
