@@ -35,7 +35,7 @@ assert.match(
 );
 assert.match(
   css,
-  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterManager,#skillItemConfirm,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
+  /body\.unified-hud-active\[data-combined-world="pocket-monster"\] #hud>:not\(:is\(#npcBtn,#merchantShop,#trainerPanel,#evolutionPanel,#breedingPanel,#ranchServices,#ranchStoragePage,#monsterFieldBag,#monsterManager,#skillItemConfirm,#monsterPicker\)\)\{visibility:hidden!important;pointer-events:none!important\}/,
   'only original NPC route roots escape the retired Pocket HUD',
 );
 assert.match(
