@@ -28,7 +28,7 @@ assert.ok(Number(timeout[1]) >= 15000, 'slow MonsterLife /api/version must not t
 
 for (const page of pages) {
   assert.doesNotMatch(page.html, /pirate-fruit-u555\.onrender\.com/, `${page.name} CSP must not allow the retired remote Pirate iframe`);
-  assert.match(page.html, /style-v900\.css\?v=972/, `${page.name} cache-busts the Pirate gate hit-test stylesheet`);
+  assert.match(page.html, /style\-v900\.css\?v=982/, `${page.name} cache-busts the Pirate gate hit-test stylesheet`);
 }
 
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');

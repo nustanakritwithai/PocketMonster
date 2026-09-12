@@ -11,11 +11,10 @@
   <meta http-equiv="Expires" content="0" />
   <title>Monster Life RPG V9.0 • รวม 3 โลก</title>
 <script>(()=>{const u=new URL(location.href),f=new URLSearchParams(u.hash.slice(1));let c={};try{c=JSON.parse(window.name||'{}')}catch{}window.name='';const ok=c?.kind==='monsterlife-launch-v1',ts=f.getAll('ticket'),ot=[...f.keys()].every(k=>k==='ticket'),t=ts.length===1&&ot&&/^[A-Za-z0-9_-]{43,128}$/.test(ts[0])?ts[0]:null,s=ok&&/^[A-Za-z0-9_-]{16,128}$/.test(c.state||'')?c.state:null,v=ok&&/^[A-Za-z0-9_-]{43,128}$/.test(c.verifier||'')?c.verifier:null,a=f.has('ticket')||u.searchParams.has('ticket')||u.searchParams.has('state');window.__POCKETMONSTER_CLEAN_LAUNCH__=Object.freeze({ticket:t,state:s,verifier:v,invalid:a&&!t});u.searchParams.delete('ticket');u.searchParams.delete('state');u.hash='';history.replaceState(null,'',u.pathname+u.search);})();</script>
-<script type="module" src="./entry-preload-v900.mjs?v=988"></script>
-  <link rel="stylesheet" href="./style-v800.css?v=816" />
+<script type="module" src="./entry-preload-v900.mjs?v=989"></script>
+  <link rel="stylesheet" href="./style-v800.css?v=817" />
   <link rel="stylesheet" href="./startup-surface-v900.css?v=1" />
-  <link rel="stylesheet" href="./style-v900.css?v=980" />
-  <link rel="stylesheet" href="./startup-surface-v900.css?v=1" />
+  <link rel="stylesheet" href="./style-v900.css?v=982" />
   <link rel="stylesheet" href="./combat-v91.css?v=1" />
 </head>
 <body data-boot-pending>
@@ -240,6 +239,35 @@
     <section id="ranchStoragePage" class="ranch-storage-page ranch-club hidden" aria-label="คลังมอนสเตอร์">
       <header class="ranch-storage-head"><div class="npc-sheet-handle" data-npc-sheet-handle aria-hidden="true"></div><button type="button" data-ranch-back>← ผู้ดูแลฟาร์ม</button><div class="ranch-club-brand"><span class="ranch-club-kicker">MONSTER CLUB</span><h2>คลังมอนสเตอร์</h2></div><div class="ranch-club-stats"><span id="ranchStorageCount">Storage 0</span><span id="ranchActiveCount">Ranch Active 0/6</span></div></header>
       <aside id="ranchStorageRoster" class="ranch-storage-roster ranch-club-carry" aria-label="มอนที่พก"></aside><aside id="ranchClubVault" class="ranch-club-vault" aria-label="มอนในคลัง"></aside><section id="ranchStoragePreview" class="ranch-storage-preview"><div class="ranch-club-stage" id="ranchClubStage"><div class="ranch-club-stage-art" id="ranchClubStageArt" aria-hidden="true"><canvas id="ranchClubPreviewCanvas" class="ranch-club-preview-canvas" aria-label="โมเดลมอนสเตอร์"></canvas><span id="ranchClubPreviewPortrait">♣</span></div><div id="ranchClubPreviewName" class="focused-name">Monster Club</div><div id="ranchClubPreviewMeta" class="ranch-club-stage-meta">ฝากมอนจาก Party เพื่อเข้าคลับ</div><div id="ranchClubPreviewHp" class="ranch-club-hp hidden" aria-hidden="true"><i id="ranchClubPreviewHpFill"></i></div><div id="ranchClubPreviewTypes" class="ranch-club-types"></div></div></section><section id="ranchStorageDetails" class="ranch-storage-details"></section>
+    </section>
+
+
+    <section id="monsterFieldBag" class="monster-field-bag hidden" aria-label="กระเป๋ามอนสเตอร์">
+      <header class="monster-field-bag-head">
+        <div class="monster-field-bag-brand">
+          <span class="monster-field-bag-kicker">MONSTER BAG</span>
+          <h2>พูลมอนสเตอร์</h2>
+        </div>
+        <div class="monster-field-bag-stats">
+          <span id="monsterFieldBagCount">พก 0/6</span>
+          <span id="monsterFieldBagActive">ใช้ได้ 0/3</span>
+        </div>
+        <button type="button" id="monsterFieldBagClose" aria-label="ปิด">✕</button>
+      </header>
+      <aside id="monsterFieldBagPool" class="monster-field-bag-pool" aria-label="พูลมอนที่พก"></aside>
+      <section id="monsterFieldBagPreview" class="monster-field-bag-preview" aria-label="พรีวิวมอนสเตอร์">
+        <div class="monster-field-bag-stage" id="monsterFieldBagStage">
+          <div class="monster-field-bag-stage-art" id="monsterFieldBagStageArt" aria-hidden="true">
+            <canvas id="monsterFieldBagCanvas" class="monster-field-bag-canvas" aria-label="โมเดลมอนสเตอร์"></canvas>
+            <span id="monsterFieldBagPortrait">?</span>
+          </div>
+          <div id="monsterFieldBagName" class="monster-field-bag-name">เลือกมอนสเตอร์</div>
+          <div id="monsterFieldBagMeta" class="monster-field-bag-meta">พกได้ 6 ตัว · ใช้ทีละ 3</div>
+          <div id="monsterFieldBagHp" class="monster-field-bag-hp hidden" aria-hidden="true"><i id="monsterFieldBagHpFill"></i></div>
+          <div id="monsterFieldBagTypes" class="monster-field-bag-types"></div>
+        </div>
+      </section>
+      <section id="monsterFieldBagDetails" class="monster-field-bag-details" aria-label="รายละเอียดมอนสเตอร์"></section>
     </section>
 
     <div id="monsterManager" class="manager hidden">

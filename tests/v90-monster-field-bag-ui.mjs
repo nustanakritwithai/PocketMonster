@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { activeCss as css, activeHtml as html, activeJs as js } from './active-assets.mjs';
+
+assert.match(html, /id="monsterFieldBag"[^>]*monster-field-bag/, 'field bag page exists');
+assert.match(html, /id="monsterFieldBagPool"/, 'pool column mount');
+assert.match(html, /id="monsterFieldBagPreview"/, 'preview column mount');
+assert.match(html, /id="monsterFieldBagDetails"/, 'details column mount');
+assert.match(html, /id="ranchStoragePage"[^>]*ranch-club/, 'NPC Monster Club page remains');
+assert.match(css, /\.monster-field-bag\{[\s\S]*grid-template-columns:minmax\(160px,\.9fr\) minmax\(200px,1\.2fr\) minmax\(180px,1fr\)/, 'field bag is three columns');
+assert.match(css, /\.monster-field-bag-pool\{grid-column:1/, 'pool on the left');
+assert.match(css, /\.monster-field-bag-preview\{grid-column:2/, 'preview in the center');
+assert.match(css, /\.monster-field-bag-details\{grid-column:3/, 'details on the right');
+assert.match(js, /const FIELD_BAG_CARRY_MAX=6/, 'carry pool capacity is 6');
+assert.match(js, /const FIELD_BAG_ACTIVE_MAX=3/, 'active usable count is 3');
+assert.match(js, /window\.POCKETMONSTER_OPEN_MONSTER_BAG=\(\)=>showMonsterFieldBag\(\)/, 'monster button opens field bag');
+assert.match(js, /function showRanchStorageShell\(/, 'NPC storage shell remains');
+assert.match(js, /function showMonsterFieldBag\(/, 'field bag open route exists');
+assert.match(js, /function renderMonsterFieldBag\(/, 'field bag renderer exists');
+assert.doesNotMatch(js, /window\.POCKETMONSTER_OPEN_MONSTER_BAG=\(\)=>showRanchStorageShell/, 'monster button no longer opens NPC club');
+assert.equal(html, fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8'), 'active V9 HTML parity remains exact');
+console.log('V9 monster field bag UI: PASS');

@@ -903,6 +903,8 @@ const MASTERY_NEXT_TH={novice:'คุ้นเคย',familiar:'ชำนาญ'
 const TRAIN_STAT_MAP={power:'atk',defense:'def',speed:'spd',technique:'atk',spirit:'hp'};
 const GENDER_TH={Male:'♂ Male',Female:'♀ Female',Genderless:'◇ Genderless'};
 const RANCH_ACTIVE_MAX=6;
+const FIELD_BAG_CARRY_MAX=6;
+const FIELD_BAG_ACTIVE_MAX=3;
 const BALANCE={bossRespawnMs:15000,wildRespawnMs:7000,captureRange:10,captureAimRadius:1.4,grassMeadowBoss:{level:5,respawnMs:30000},grassMeadowNormal:{battleExpBase:8,battleExpPerLevel:4,captureExp:8,respawnMs:12000},grassMeadowRare:{chance:.24,level:2,respawnMs:18000}};
 
 function rollGender(sp){
@@ -2463,6 +2465,65 @@ function updateRanchClubPreview(dt){
   if(ranchClubPreviewMesh){animateMonster(ranchClubPreviewMesh,dt,false); if(!ranchClubPreviewDrag)ranchClubPreviewMesh.rotation.y+=dt*.22;}
   try{ranchClubPreviewRenderer.render(ranchClubPreviewScene,ranchClubPreviewCamera);}catch(error){console.warn('3D ranch club preview render failed',error);ranchClubPreviewRenderer=null;}
 }
+
+let fieldBagPreviewRenderer=null;
+let fieldBagPreviewScene=null;
+let fieldBagPreviewCamera=null;
+let fieldBagPreviewMesh=null;
+let fieldBagPreviewId=null;
+let fieldBagPreviewZoom=4.2;
+let fieldBagPreviewDrag=null;
+let fieldBagPreviewSize={width:0,height:0};
+function initFieldBagPreview3D(){
+  const canvas=el('monsterFieldBagCanvas');
+  if(!canvas||typeof THREE==='undefined')return;
+  try{
+    fieldBagPreviewRenderer=new THREE.WebGLRenderer({canvas,antialias:qualityProfile.antialias,alpha:true,powerPreference:'low-power'});
+    fieldBagPreviewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,qualityProfile.maxDpr));
+    fieldBagPreviewRenderer.setClearColor(0x000000,0);
+    fieldBagPreviewScene=new THREE.Scene();
+    fieldBagPreviewCamera=new THREE.PerspectiveCamera(28,1,.1,30);
+    fieldBagPreviewCamera.position.set(0,1.05,fieldBagPreviewZoom);
+    const hemi=new THREE.HemisphereLight(0xbfd4ff,0x1e1b4b,1.05);
+    const key=new THREE.DirectionalLight(0xffffff,1.05); key.position.set(2.2,4.2,2.4);
+    fieldBagPreviewScene.add(hemi,key);
+    const ring=new THREE.Mesh(new THREE.RingGeometry(.72,.86,48),new THREE.MeshBasicMaterial({color:0x60a5fa,transparent:true,opacity:.55,side:THREE.DoubleSide}));
+    ring.rotation.x=Math.PI/2; ring.position.y=.04; ring.name='fieldBagPreviewRing';
+    fieldBagPreviewScene.add(ring);
+    canvas.addEventListener('pointerdown',event=>{
+      fieldBagPreviewDrag={x:event.clientX,rotation:fieldBagPreviewMesh?.rotation.y||0};
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('pointermove',event=>{
+      if(!fieldBagPreviewDrag||!fieldBagPreviewMesh)return;
+      fieldBagPreviewMesh.rotation.y=fieldBagPreviewDrag.rotation+(event.clientX-fieldBagPreviewDrag.x)*.012;
+    });
+    const stopDrag=()=>{fieldBagPreviewDrag=null;};
+    canvas.addEventListener('pointerup',stopDrag);
+    canvas.addEventListener('pointercancel',stopDrag);
+    canvas.addEventListener('wheel',event=>{
+      event.preventDefault();
+      fieldBagPreviewZoom=THREE.MathUtils.clamp(fieldBagPreviewZoom+event.deltaY*.002,2.8,6);
+    },{passive:false});
+  }catch(error){
+    console.warn('3D field bag preview init failed',error);
+    fieldBagPreviewRenderer=null; fieldBagPreviewScene=null; fieldBagPreviewCamera=null;
+  }
+}
+function updateFieldBagPreview(dt){
+  if(!fieldBagPreviewRenderer||!fieldBagPreviewScene||!fieldBagPreviewCamera)return;
+  const page=el('monsterFieldBag'),canvas=el('monsterFieldBagCanvas');
+  if(!page||page.classList.contains('hidden')||!canvas)return;
+  const rect=canvas.getBoundingClientRect();
+  const width=Math.round(rect.width),height=Math.round(rect.height);
+  if(width<2||height<2)return;
+  if(fieldBagPreviewSize.width!==width||fieldBagPreviewSize.height!==height){fieldBagPreviewRenderer.setSize(Math.max(2,width),Math.max(2,height),false);fieldBagPreviewSize={width,height};}
+  fieldBagPreviewCamera.aspect=rect.width/Math.max(1,rect.height); fieldBagPreviewCamera.position.z+=(fieldBagPreviewZoom-fieldBagPreviewCamera.position.z)*Math.min(1,dt*8); fieldBagPreviewCamera.lookAt(0,.78,0);
+  const ring=fieldBagPreviewScene.getObjectByName('fieldBagPreviewRing'); if(ring)ring.rotation.z+=dt*.35;
+  if(fieldBagPreviewMesh){animateMonster(fieldBagPreviewMesh,dt,false); if(!fieldBagPreviewDrag)fieldBagPreviewMesh.rotation.y+=dt*.22;}
+  try{fieldBagPreviewRenderer.render(fieldBagPreviewScene,fieldBagPreviewCamera);}catch(error){console.warn('3D field bag preview render failed',error);fieldBagPreviewRenderer=null;}
+}
+
 function monsterLookYaw(dir,mesh){ return Math.atan2(dir.x,dir.z) + (mesh?.userData?.faceOffset??Math.PI); }
 
 // ---------- V7.0 Combat feedback: floating damage, camera shake, elemental ground decals ----------
@@ -6265,7 +6326,162 @@ function installPirateMonsterBagButton(){
   // Keep POCKETMONSTER_OPEN_MONSTER_BAG as the open API for that utility.
   return;
 }
-function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}promoteMonsterOverlayNode(el('ranchServices'));setMonsterOverlayOpen(true);el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');return result;}
+
+let fieldBagFocusId=null;
+function syncFieldBagPreview(inst){
+  if(!fieldBagPreviewScene&&!fieldBagPreviewRenderer)initFieldBagPreview3D();
+  const species=inst?spById[inst.speciesId]:null;
+  const previewId=inst?.instanceId||null;
+  if(previewId!==fieldBagPreviewId){
+    if(fieldBagPreviewMesh&&fieldBagPreviewScene)removeAndDispose(fieldBagPreviewScene,fieldBagPreviewMesh);
+    fieldBagPreviewMesh=null; fieldBagPreviewId=previewId;
+    if(inst&&species&&fieldBagPreviewScene){
+      fieldBagPreviewMesh=monsterMesh(species,true,inst);
+      fieldBagPreviewMesh.scale.multiplyScalar(.9);
+      fieldBagPreviewMesh.position.y=.02;
+      setupMonsterMotion(fieldBagPreviewMesh,species,inst);
+      fieldBagPreviewScene.add(fieldBagPreviewMesh);
+    }
+  }
+  const portrait=el('monsterFieldBagPortrait');
+  const portraitColor=species?`#${species.color.toString(16).padStart(6,'0')}`:'#1e3a8a';
+  setTextIfChanged(portrait,inst?displayName(inst).slice(0,1):'?');
+  if(portrait&&portrait.dataset.color!==portraitColor){portrait.dataset.color=portraitColor;portrait.style.backgroundColor=portraitColor;}
+  el('monsterFieldBagStage')?.classList.toggle('monster-field-bag-empty-stage',!inst);
+  el('monsterFieldBagStageArt')?.classList.toggle('has-3d',Boolean(fieldBagPreviewMesh));
+  setTextIfChanged(el('monsterFieldBagName'),inst?displayName(inst):'เลือกมอนสเตอร์');
+  setTextIfChanged(el('monsterFieldBagMeta'),inst?`Lv.${inst.level} • HP ${fmt(inst.hp)}/${fmt(inst.maxHp)}`:'พกได้ 6 ตัว · ใช้ทีละ 3');
+  const hpPct=inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
+  const hpBar=el('monsterFieldBagHp'),hpFill=el('monsterFieldBagHpFill');
+  hpBar?.classList.toggle('hidden',!inst);
+  if(hpFill)hpFill.style.width=`${hpPct}%`;
+  const typesBox=el('monsterFieldBagTypes');
+  if(typesBox)typesBox.innerHTML=inst?monsterTypes(inst).map(typeBadge).join(''):'';
+}
+function closeMonsterFieldBag(){
+  remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;fieldBagFocusId=null;
+  el('monsterFieldBag')?.classList.add('hidden');
+  setMonsterOverlayOpen(false);
+  try{characterUI?.backRanch?.();}catch{}
+  playSFX('sfx_ui_close');
+}
+function showMonsterFieldBag(){
+  const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc(),allowRemote:true});
+  if(!result.ok){msg(result.reasonText);return result;}
+  const page=el('monsterFieldBag');
+  if(!page){msg('ยังไม่พบหน้าต่างกระเป๋ามอนสเตอร์');return {ok:false,reason:'missing-ui'};}
+  el('ranchServices')?.classList.add('hidden');
+  el('ranchStoragePage')?.classList.add('hidden');
+  el('monsterManager')?.classList.add('hidden');
+  promoteMonsterOverlayNode(page);
+  setMonsterOverlayOpen(true);
+  page.classList.remove('hidden');
+  remoteBagOpen=true;remoteBagSnapshot=null;remoteBagStatus='กำลังโหลดกระเป๋ามอนสเตอร์…';
+  const request=++remoteBagRequest;
+  renderMonsterFieldBag();
+  void monsterBagStateProvider.refresh().then(remoteResult=>{
+    if(request!==remoteBagRequest||!remoteBagOpen)return;
+    remoteBagSnapshot=remoteResult.ok?remoteResult.state:null;
+    remoteBagStatus=remoteResult.ok?'':'โหลดกระเป๋าไม่สำเร็จ กรุณาปิดแล้วเปิดใหม่';
+    renderMonsterFieldBag();
+  });
+  playSFX('sfx_ui_open');
+  return {ok:true,reason:'opened'};
+}
+function renderMonsterFieldBag(){
+  const pool=el('monsterFieldBagPool'),details=el('monsterFieldBagDetails');
+  if(!pool||!details)return;
+  if(remoteBagOpen&&(!remoteBagSnapshot?.available||!monsterBagStateProvider.snapshot().available)){
+    pool.innerHTML='<div class="monster-field-bag-empty">'+(remoteBagStatus||'การเชื่อมต่อหมดอายุ กรุณาเปิดกระเป๋าใหม่')+'</div>';
+    const canClaim=monsterBagStateProvider.snapshot().code==='MIGRATION_REQUIRED';
+    details.innerHTML=canClaim?'<button type="button" data-claim-starter>รับมอนสเตอร์เริ่มต้น</button>':'';
+    details.querySelector('[data-claim-starter]')?.addEventListener('click',async()=>{const result=await monsterBagStateProvider.claimStarter();if(result.ok){msg('รับมอนสเตอร์เริ่มต้นจากเซิร์ฟเวอร์แล้ว');await monsterBagStateProvider.refresh();}else msg(`รับมอนสเตอร์เริ่มต้นไม่สำเร็จ: ${result.code||'SERVER_CLAIM_FAILED'}`);renderMonsterFieldBag();});
+    el('monsterFieldBagCount').textContent=`พก —/${FIELD_BAG_CARRY_MAX}`;
+    el('monsterFieldBagActive').textContent=`ใช้ได้ —/${FIELD_BAG_ACTIVE_MAX}`;
+    syncFieldBagPreview(null);return;
+  }
+  const remoteState=remoteBagOpen?remoteBagSnapshot?.envelope?.state:null;
+  const remoteById=new Map((remoteState?.collection||[]).map(mapServerMonsterToRuntimeModel).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
+  const monsterForId=id=>remoteState?remoteById.get(id):getInst(id);
+  const partyIds=(remoteState?.party||state.party).filter(Boolean).slice(0,FIELD_BAG_ACTIVE_MAX);
+  const storageIds=(remoteState?.storage||state.storage).filter(Boolean);
+  // Carry pool: active party (usable) + reserve from storage up to 6 total
+  const reserveIds=[];
+  for(const id of storageIds){
+    if(partyIds.includes(id))continue;
+    if(partyIds.length+reserveIds.length>=FIELD_BAG_CARRY_MAX)break;
+    reserveIds.push(id);
+  }
+  const poolIds=[...partyIds,...reserveIds];
+  const activeCount=partyIds.length;
+  el('monsterFieldBagCount').textContent=`พก ${poolIds.length}/${FIELD_BAG_CARRY_MAX}`;
+  el('monsterFieldBagActive').textContent=`ใช้ได้ ${activeCount}/${FIELD_BAG_ACTIVE_MAX}`;
+  if(!poolIds.includes(fieldBagFocusId))fieldBagFocusId=poolIds[0]||null;
+  const tint=(inst)=>{const sp=inst&&spById[inst.speciesId];return sp?`#${sp.color.toString(16).padStart(6,'0')}`:'#1e3a8a';};
+  pool.innerHTML='';
+  const head=document.createElement('div');
+  head.className='monster-field-bag-group';
+  head.textContent=`พูลพก · ใช้ได้ ${FIELD_BAG_ACTIVE_MAX} จาก ${FIELD_BAG_CARRY_MAX}`;
+  pool.appendChild(head);
+  for(let slot=0;slot<FIELD_BAG_CARRY_MAX;slot++){
+    const id=poolIds[slot]||null;
+    const isActive=slot<FIELD_BAG_ACTIVE_MAX;
+    const card=document.createElement(id?'button':'div');
+    if(id)card.type='button';
+    card.className='monster-field-bag-slot'+(id?'':' is-empty')+(id&&isActive?' is-active':'')+(id&&!isActive?' is-reserve':'');
+    if(id&&id===fieldBagFocusId)card.classList.add('focused-monster');
+    if(!id){
+      card.innerHTML=`<span class="monster-field-bag-avatar">+</span><span class="monster-field-bag-slot-copy"><b>ช่อง ${slot+1}</b><small>${isActive?'ว่าง · ใช้งาน':'ว่าง · สำรอง'}</small></span><span class="monster-field-bag-chip${isActive?'':' reserve'}">${isActive?'ใช้':'สำรอง'}</span>`;
+      pool.appendChild(card);continue;
+    }
+    const inst=monsterForId(id);
+    if(!inst){pool.appendChild(card);continue;}
+    const faint=inst.fainted||inst.hp<=0;
+    card.innerHTML=`<span class="monster-field-bag-avatar" style="background:${tint(inst)}">${displayName(inst).slice(0,1)}</span><span class="monster-field-bag-slot-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="monster-field-bag-chip${isActive?'':' reserve'}">${isActive?'ใช้':'สำรอง'}</span>`;
+    card.onclick=()=>{fieldBagFocusId=id;renderMonsterFieldBag();window.dispatchEvent(new CustomEvent('pocketmonster:monster-selected',{detail:{monsterId:id,source:'monster-field-bag'}}));if(typeof window.POCKETMONSTER_SELECT_MONSTER==='function')window.POCKETMONSTER_SELECT_MONSTER(id);};
+    pool.appendChild(card);
+  }
+  const focused=fieldBagFocusId?monsterForId(fieldBagFocusId):null;
+  if(!focused){
+    syncFieldBagPreview(null);
+    details.innerHTML='<div class="monster-field-bag-empty">ยังไม่มีมอนในพูลพก</div>';
+    if(remoteState&&remoteState.collection.length===0){
+      const claim=document.createElement('button');claim.type='button';claim.textContent='รับมอนสเตอร์เริ่มต้น';
+      claim.onclick=async()=>{claim.disabled=true;const result=await monsterBagStateProvider.claimStarter();
+        if(!result.ok){claim.disabled=false;details.append(document.createTextNode(` รับมอนไม่สำเร็จ: ${result.code}`));}
+        else {remoteBagSnapshot=result.state;renderMonsterFieldBag();}
+      };details.appendChild(claim);
+    }
+    return;
+  }
+  syncFieldBagPreview(focused);
+  const inParty=partyIds.includes(focused.instanceId);
+  const remoteSlots=monsterBagStateProvider.snapshot().slots||[];
+  const statusText=inParty?'อยู่ในช่องใช้งาน (ใช้ต่อสู้ได้)':'อยู่ในช่องสำรอง · ใส่ช่องใช้งาน 1–3 เพื่อใช้ต่อสู้';
+  const slotActions=remoteBagOpen?`<div class="storage-actions remote-party-slots" aria-label="จัดช่องใช้งาน">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่องใช้ '+(index+1)}</button>`).join('')}</div><div class="storage-actions remote-placement">${inParty?'<button type="button" data-remote-move="storage">ย้ายเป็นสำรอง</button>':''}</div>`:'<div class="storage-actions">'+(inParty?'':'<button type="button" data-storage-withdraw>ใส่ช่องใช้งาน</button>')+(inParty?'<button type="button" data-storage-deposit>ย้ายเป็นสำรอง</button>':'')+'</div>';
+  details.innerHTML=`<div class="monster-field-bag-status">${statusText}</div><div class="monster-field-bag-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${inParty?'ใช้งาน':'สำรอง'}</b>สถานะ</span></div>${slotActions}`;
+  details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
+    details.querySelectorAll('[data-remote-party-slot]').forEach(item=>{item.disabled=true;});
+    const result=await monsterBagStateProvider.assignToSlot(focused.instanceId,Number(button.dataset.remotePartySlot));
+    if(result.ok){
+      remoteBagSnapshot=result.state;
+      msg(`บันทึก ${displayName(focused)} เข้าช่องใช้ ${Number(button.dataset.remotePartySlot)+1} แล้ว`);
+      try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;await provider?.refresh?.({afterPending:true});}catch{}
+      renderMonsterFieldBag();
+    }
+    else {const reason={SERVER_ASSIGN_TIMEOUT:'เซิร์ฟเวอร์ตอบช้า',SERVER_WRITES_DISABLED:'ระบบบันทึกยังไม่เปิด',MONSTER_NOT_OWNED:'ไม่พบมอนนี้ในบัญชี',SERVER_ASSIGN_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง',STALE_SESSION:'เซสชันหมดอายุ',MIGRATION_REQUIRED:'ข้อมูลเดิมยังไม่ถูกย้ายขึ้นเซิร์ฟเวอร์'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการจัดช่อง';msg(`บันทึกช่องใช้ไม่สำเร็จ: ${reason}`);renderMonsterFieldBag();}
+  }));
+  details.querySelectorAll('[data-remote-move]').forEach(button=>button.addEventListener('click',async()=>{
+    details.querySelectorAll('[data-remote-move]').forEach(item=>{item.disabled=true;});
+    const result=await monsterBagStateProvider.moveTo(focused.instanceId,button.dataset.remoteMove);
+    if(result.ok){remoteBagSnapshot=result.state;msg(`${displayName(focused)} ย้ายเป็นสำรองแล้ว`);renderMonsterFieldBag();}
+    else {const reason={MIGRATION_REQUIRED:'ข้อมูลเดิมยังไม่ถูกย้ายขึ้นเซิร์ฟเวอร์',SESSION_UNAVAILABLE:'เซสชันไม่พร้อม',STALE_SESSION:'เซสชันหมดอายุ',SERVER_MOVE_UNCONFIRMED:'เซิร์ฟเวอร์ยังไม่ยืนยันตำแหน่ง'}[result.code]||'เซิร์ฟเวอร์ปฏิเสธการย้ายตำแหน่ง';msg(`ย้ายไม่สำเร็จ: ${reason}`);renderMonsterFieldBag();}
+  }));
+  details.querySelector('[data-storage-deposit]')?.addEventListener('click',()=>depositMonster(focused.instanceId));
+  details.querySelector('[data-storage-withdraw]')?.addEventListener('click',()=>withdrawMonster(focused.instanceId));
+}
+
+function showRanchServices(){const result=characterUI.requestOpenRanchServices({isNearNpc:isNearNpc()});if(!result.ok){msg(result.reasonText);return result;}promoteMonsterOverlayNode(el('ranchServices'));setMonsterOverlayOpen(true);el('ranchServices').classList.remove('hidden');el('ranchStoragePage').classList.add('hidden');el('monsterFieldBag')?.classList.add('hidden');return result;}
 function showRanchStorageShell({remote=false}={}){
   const result=characterUI.requestOpenRanchStorage({isNearNpc:isNearNpc(),allowRemote:remote});
   if(!result.ok){msg(result.reasonText);return result;}
@@ -6274,7 +6490,7 @@ function showRanchStorageShell({remote=false}={}){
   if(!storagePage){msg('ยังไม่พบหน้าต่างคลังมอนสเตอร์');return {ok:false,reason:'missing-ui'};}
   promoteMonsterOverlayNode(storagePage);
   setMonsterOverlayOpen(true);
-  el('ranchServices')?.classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');
+  el('ranchServices')?.classList.add('hidden');el('ranchStoragePage').classList.remove('hidden');el('monsterFieldBag')?.classList.add('hidden');
   remoteBagOpen=remote;remoteBagSnapshot=null;remoteBagStatus=remote?'กำลังโหลดกระเป๋ามอนสเตอร์…':'';
   const request=++remoteBagRequest;
   renderRanchStoragePage();
@@ -6286,7 +6502,7 @@ function showRanchStorageShell({remote=false}={}){
   });
   return result;
 }
-window.POCKETMONSTER_OPEN_MONSTER_BAG=()=>showRanchStorageShell({remote:true});
+window.POCKETMONSTER_OPEN_MONSTER_BAG=()=>showMonsterFieldBag();
 function closeRanchSurface(){characterUI.backRanch();const panel=characterUI.snapshot().ranchPanel;el('ranchServices').classList.toggle('hidden',panel!=='services');el('ranchStoragePage').classList.toggle('hidden',panel!=='storage');if(panel!=='storage'){remoteBagOpen=false;remoteBagSnapshot=null;remoteBagRequest+=1;}if(panel!=='services'&&panel!=='storage')setMonsterOverlayOpen(false);}
 function openRanchBreeding(){if(!assertRanchOperation())return;if(serverPlayerDataActive){msg('Breeding ของ NPC ยังไม่เปิดคำสั่งเซิร์ฟเวอร์ • ยังไม่เปลี่ยนข้อมูล');return;}el('ranchServices').classList.add('hidden');openManager({source:'npc'});setManagerTab('breeding');}
 function openManager(options={}){
@@ -6326,8 +6542,8 @@ function closeManager(){
   renderCharacterAccess();
   playSFX('sfx_ui_close');
 }
-function depositMonster(id){if(!assertRanchOperation())return;if(state.party.filter(Boolean).length<=1){msg('ต้องเหลือมอนอย่างน้อย 1 ตัวใน Party');return;}if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderRanchStoragePage();renderParty();saveGame(false);}
-function withdrawMonster(id){if(!assertRanchOperation())return;const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderRanchStoragePage();renderParty();saveGame(false);}
+function depositMonster(id){if(!assertRanchOperation())return;if(state.party.filter(Boolean).length<=1){msg('ต้องเหลือมอนอย่างน้อย 1 ตัวใน Party');return;}if(activeSummon?.inst.instanceId===id)recall(false);const slot=state.party.findIndex(x=>x===id);if(slot<0)return;state.party[slot]=null;if(!state.storage.includes(id))state.storage.push(id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.lifeLastAt=Date.now();syncRanchVisuals();syncHubCompanion();msg('ฝากมอนเข้า Storage/Ranch แล้ว');renderManager();renderRanchStoragePage();if(el('monsterFieldBag')&&!el('monsterFieldBag').classList.contains('hidden'))renderMonsterFieldBag();renderParty();saveGame(false);}
+function withdrawMonster(id){if(!assertRanchOperation())return;const empty=state.party.findIndex(x=>x===null);if(empty<0){msg('Party เต็ม 3 ตัว');return;}applyLifeSimulation(Date.now(),true);state.storage=state.storage.filter(x=>x!==id);state.ranchActive=state.ranchActive.filter(x=>x!==id);state.party[empty]=id;syncRanchVisuals();syncHubCompanion();msg(`รับมอนเข้า Party ช่อง ${empty+1}`);renderManager();renderRanchStoragePage();if(el('monsterFieldBag')&&!el('monsterFieldBag').classList.contains('hidden'))renderMonsterFieldBag();renderParty();saveGame(false);}
 function needsHTML(inst){
   syncToBodyMind(inst);
   const cond=deriveCondition(inst)||'normal';
@@ -7483,6 +7699,8 @@ document.querySelector('[data-ranch-service="storage"]')?.addEventListener('clic
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});
 document.querySelector('[data-ranch-service="breeding"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');openRanchBreeding();});
 document.querySelector('[data-ranch-back]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeRanchSurface();});
+el('monsterFieldBagClose')?.addEventListener('click',()=>{playSFX('sfx_ui_click');closeMonsterFieldBag();});
+el('monsterFieldBag')?.addEventListener('pointerdown',e=>{if(e.target===el('monsterFieldBag'))closeMonsterFieldBag();});
 document.querySelector('[data-ranch-close]')?.addEventListener('click',()=>{playSFX('sfx_ui_close');closeRanchSurface();});
 bindCharacterAccessControl(el('globalCharacterBtn'),()=>{
   playSFX('sfx_ui_click');
@@ -7862,7 +8080,7 @@ function loop(now){
       if(!el('monsterManager').classList.contains('hidden')&&managerDirty.consume(now))renderManager();
     }
     updateCharacterPreview(dt);
-    updateRanchClubPreview(dt);
+    updateRanchClubPreview(dt);updateFieldBagPreview(dt);
     if(!pirateThrowPanelPaused()) renderer.render(scene,camera);
     if(firstFrame){
       firstFrame=false;
