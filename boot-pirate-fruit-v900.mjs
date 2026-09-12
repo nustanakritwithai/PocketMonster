@@ -322,6 +322,7 @@ function bindPocketMonsterLink(frame) {
     }
     const nextPose = sanitizePirateLocalPresence(message);
     if (nextPose) {
+      document.body.dataset.pirateWorldReady = '1';
       const previousVisualSession = piratePose?.visual?.sessionId;
       const nextVisualSession = nextPose.visual?.sessionId;
       if (previousVisualSession && nextVisualSession && previousVisualSession !== nextVisualSession) {
