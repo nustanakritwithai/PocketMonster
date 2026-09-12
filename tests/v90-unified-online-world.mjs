@@ -52,7 +52,7 @@ assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-ide
 assert.match(indexHtml, /entry\-preload\-v900\.mjs\?v=989/, 'active HTML cache-busts the unified ship-control entry');
 assert.match(indexHtml, /style\-v900\.css\?v=982/, 'active HTML cache-busts the helm placement beside chat');
 assert.match(sceneHtml, /style\-v900\.css\?v=982/, 'hosted scene cache-busts the same V9 stylesheet');
-assert.doesNotMatch(sceneHtml, /style\-v900\.css\?v=982/, 'hosted scene cannot mix a stale stylesheet');
+assert.doesNotMatch(sceneHtml, /style\-v900\.css\?v=981/, 'hosted scene cannot mix a stale stylesheet');
 assert.equal((indexHtml.match(/href="\.\/combat-v91\.css\?v=1"/g) || []).length, 1,
   'the parent document loads one Combat V9.1 stylesheet');
 assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'top-level entry loads the restored raster/near-far minimap owner revision');

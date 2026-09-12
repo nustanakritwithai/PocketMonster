@@ -77,7 +77,7 @@ assert.match(entry, /persistent-minimap-owner-v900\.mjs\?v=2/, 'V9 entry cache-b
 const scene = fs.readFileSync(path.join(output, 'scene-v900.html'), 'utf8');
 assert.match(scene, /style\-v900\.css\?v=982/, 'scene entry loads the same HUD stylesheet revision as the parent');
 assert.doesNotMatch(scene, /npc-overhead-action-v900\.mjs/, 'Pirate scenes must not activate the replaced outer NPC action owner');
-assert.doesNotMatch(scene, /style\-v900\.css\?v=982/, 'scene cannot mix a stale V9 stylesheet');
+assert.doesNotMatch(scene, /style\-v900\.css\?v=981/, 'scene cannot mix a stale V9 stylesheet');
 assert.match(index, /id="pirateUnifiedControls"[\s\S]*id="captureBtn"[^>]*tc-attack/);
 assert.equal(versionedEntry, index, 'index.html and v900.html must boot the same unified V9 shell');
 
