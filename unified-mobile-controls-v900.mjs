@@ -1,4 +1,4 @@
-import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=9';
+import { bindMobileDualPointerInput } from './mobile-dual-pointer-input-v900.mjs?v=10';
 import { initAudio } from './audio-engine.mjs';
 import { resumeAudio } from './audio-engine.mjs';
 

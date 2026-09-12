@@ -4,6 +4,17 @@ function validPointerId(value) {
   return Number.isFinite(value) ? value : null;
 }
 
+function pointInElement(event, element) {
+  const rect = element?.getBoundingClientRect?.();
+  if (!rect) return false;
+  const x = event?.clientX;
+  const y = event?.clientY;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const right = Number.isFinite(rect.right) ? rect.right : rect.left + rect.width;
+  const bottom = Number.isFinite(rect.bottom) ? rect.bottom : rect.top + rect.height;
+  return x >= rect.left && x <= right && y >= rect.top && y <= bottom;
+}
+
 export function bindMobileDualPointerInput({
   windowLike = globalThis.window,
   documentLike = globalThis.document,
@@ -61,7 +72,7 @@ export function bindMobileDualPointerInput({
     return true;
   };
 
-  const startJoystick = event => {
+  function startJoystick(event) {
     const pointerId = validPointerId(event?.pointerId);
     if (disposed || pointerId === null || pointerId === cameraPointerId) return;
     recoverUncapturedPointer(joystickElement, joystickPointerId, reason => {
@@ -70,14 +81,17 @@ export function bindMobileDualPointerInput({
       releasePointer(joystickElement, stalePointerId);
       onJoystickEnd(reason);
     });
-    if (joystickPointerId !== null) return;
+    if (joystickPointerId !== null) {
+      if (cameraPointerId === null && pointInElement(event, cameraElement)) startCamera(event);
+      return;
+    }
     preventGesture(event);
     joystickPointerId = pointerId;
     capturePointer(joystickElement, pointerId);
     onJoystickStart(event);
-  };
+  }
 
-  const startCamera = event => {
+  function startCamera(event) {
     const pointerId = validPointerId(event?.pointerId);
     if (disposed || pointerId === null || pointerId === joystickPointerId) return;
     recoverUncapturedPointer(cameraElement, cameraPointerId, reason => {
@@ -86,12 +100,15 @@ export function bindMobileDualPointerInput({
       releasePointer(cameraElement, stalePointerId);
       onCameraEnd(reason);
     });
-    if (cameraPointerId !== null) return;
+    if (cameraPointerId !== null) {
+      if (joystickPointerId === null && pointInElement(event, joystickElement)) startJoystick(event);
+      return;
+    }
     preventGesture(event);
     cameraPointerId = pointerId;
     capturePointer(cameraElement, pointerId);
     onCameraStart(event);
-  };
+  }
 
   const movePointer = event => {
     if (disposed) return;
