@@ -7,6 +7,10 @@ on:
       - 'monster-command-adapter.mjs'
       - 'monster-command-http-provider-v900.mjs'
       - 'monster-bag-state-provider-v900.mjs'
+      - 'server-sync.mjs'
+      - 'tests/pirate-canonical-party-controls.mjs'
+      - 'tests/pirate-party-live-hp.mjs'
+      - 'tests/v90-npc-online-recovery.mjs'
       - 'tests/monster-bag-state-provider.mjs'
       - 'game-v800.js'
       - 'character-ui-controller.mjs'
@@ -53,6 +57,8 @@ jobs:
           node tests/pirate-active-presence-prewarm.mjs
           node tests/pirate-presence-aim-intents.mjs
           node tests/pirate-command-rejection-envelope.mjs
+          node tests/pirate-party-live-hp.mjs
+          node tests/v90-npc-online-recovery.mjs
           node tests/pirate-canonical-party-controls.mjs
           node tests/pirate-monster-bag-window.mjs
           node tests/v90-pirate-hud-scene-slots.mjs

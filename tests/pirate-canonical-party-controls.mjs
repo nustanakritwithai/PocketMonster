@@ -1,17 +1,19 @@
+import { mergeMonsterPartyControlState } from '../monster-command-http-provider-v900.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createMonsterControlController } from '../monster-control-controller-v900.mjs';
 import { bindMonsterControlScene } from '../monster-control-scene-binding-v900.mjs';
 import { createPirateMonsterInventorySync } from '../pirate-monster-inventory-sync.mjs';
 
-const shellSource = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
+const shellSource = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const getPartyMatch = shellSource.match(/getParty: \(\) => \{[\s\S]*?\n  \},\n  getCapabilities/);
 assert.ok(getPartyMatch, 'extracts the production shell getParty callback');
-const getParty = new Function('activeWorld', 'sceneFrame', 'monsterStateProvider',
+const getParty = new Function('activeWorld', 'sceneFrame', 'monsterStateProvider', 'mergeMonsterPartyControlState',
   `return (${getPartyMatch[0].replace(/^getParty: /, '').replace(/,\n  getCapabilities$/, '')});`)(
   'pirate-fruit',
   { contentWindow: { POCKETMONSTER_MONSTER_BAG: { snapshot: () => canonicalBag } } },
   { snapshot: () => ({ party: null }) },
+  mergeMonsterPartyControlState,
 );
 
 function button(id) {

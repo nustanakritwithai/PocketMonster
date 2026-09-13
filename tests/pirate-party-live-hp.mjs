@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { mergeMonsterPartyControlState as merge } from '../monster-command-http-provider-v900.mjs';
+const bag={available:true,slots:[{instanceId:'m1',occupied:true,available:true,label:'ชื่อจากกระเป๋า'}, {instanceId:'m2',occupied:true,available:true}]};
+const live={available:true,slots:[{instanceId:'m1',hp:0,maxHp:90,fainted:true,available:false}]};
+let state=merge(bag,live);
+assert.equal(state.slots[0].available,false); assert.equal(state.slots[0].fainted,true);
+assert.equal(state.slots[0].label,'ชื่อจากกระเป๋า'); assert.equal(state.slots[1],bag.slots[1]);
+state=merge(bag,{available:true,slots:[{instanceId:'m1',hp:90,maxHp:90,fainted:false,available:true}]});
+assert.equal(state.slots[0].available,true); assert.equal(state.slots[0].hp,90);
+assert.equal(merge(null,live),live); assert.equal(bag.slots[0].available,true);
+console.log('Pirate party live HP: PASS');

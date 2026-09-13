@@ -53,7 +53,7 @@ import { loadRuntimeConfig } from './runtime-config.mjs';
 import { establishReadOnlyBridge, logoutMonsterLifeSession, readMonsterLifeProfile } from './server-auth.mjs';
 import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
-import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs';
+import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, recoverMonsters as requestRecoverMonsters, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs?v=1';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { createMonsterBagStateProvider } from './monster-bag-state-provider-v900.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
@@ -5892,7 +5892,36 @@ async function setTraining(id,focus){const inst=getInst(id);if(!inst)return;if(!
   try{const result=await applyMonsterAction(id,'TRAIN',focus);applyAuthoritativeMonster(id,result.monsterJson);spawnTrainingEffect(fxWorldPos(id),focus);msg(result.message||`${displayName(inst)} → Training: ${TRAIN_FOCUS[focus]}`);renderManager();if(currentManagerTab==='training')renderTraining();if(!el('trainerPanel').classList.contains('hidden'))renderTrainerPanel();saveGame(false);}
   catch(error){msg(`Training: ${error.message}`);}}
 let keeperRecoveryCommandSequence=0;
-function healAll(){if(!assertRanchOperation())return;const recovery=recoverSkillUses(state.collection,{routeId:'REC_NPC',commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence)});if(!recovery.ok){msg('Keeper Recovery ไม่สำเร็จ • '+recovery.reason);return;}for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();saveGame(false);}
+let keeperRecoveryPending=null;
+let keeperRecoveryRetryRequest=null;
+async function healAll(){
+  if(!assertRanchOperation({allowOnline:true}))return;
+  if(hasOnlineMonsterSession){
+    if(keeperRecoveryPending)return;
+    const work=(async()=>{
+      const request=keeperRecoveryRetryRequest||{commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence),expectedRevision:null};
+      try{
+        let snapshot=monsterBagStateProvider.snapshot();
+        if(!snapshot.available){const loaded=await monsterBagStateProvider.refresh();if(!loaded.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์ก่อนรักษาไม่สำเร็จ'),{code:loaded.code||'RECOVERY_REFRESH_FAILED'});snapshot=monsterBagStateProvider.snapshot();}
+        if(request.expectedRevision===null)request.expectedRevision=snapshot.revision;
+        const result=await requestRecoverMonsters(runtimeConfig,authProfileBridge.sessionToken,request.commandId,request.expectedRevision);
+        if(result?.ok!==true||result?.success!==true)throw Object.assign(new Error(result?.message||'NPC Recovery ไม่สำเร็จ'),{code:result?.code||'RECOVERY_REJECTED'});
+        request.acknowledged=true;
+        const refreshed=await monsterBagStateProvider.refresh();
+        if(!refreshed.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์หลังรักษาไม่สำเร็จ'),{code:refreshed.code||'RECOVERY_REFRESH_FAILED'});
+        keeperRecoveryRetryRequest=null;
+        playSFX('sfx_heal');msg(result.message||'NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();
+      }catch(error){
+        if(!error?.status&&!request.acknowledged)keeperRecoveryRetryRequest=request;else keeperRecoveryRetryRequest=null;
+        msg(`Keeper Recovery ไม่สำเร็จ • ${error.code||error.message}`);
+      }
+    })();
+    keeperRecoveryPending=work;await work;keeperRecoveryPending=null;
+    return;
+  }
+  const commandId='keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence);
+  const recovery=recoverSkillUses(state.collection,{routeId:'REC_NPC',commandId});if(!recovery.ok){msg('Keeper Recovery ไม่สำเร็จ • '+recovery.reason);return;}for(const inst of state.collection){refreshStats(inst,true);inst.fainted=false;}playerData.hp=playerData.maxHp;playSFX('sfx_heal');msg('NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();saveGame(false);
+}
 const ranchVisuals=new Map();
 function syncRanchVisuals(){
   for(const [id,obj] of ranchVisuals){removeAndDispose(scene, obj.mesh);ranchVisuals.delete(id);}
@@ -6260,8 +6289,12 @@ function assertCharacterMutable(id){
   if(!gate.ok){msg(gate.reasonText);return false;}
   return true;
 }
-function assertRanchOperation(){
-  if(hasOnlineMonsterSession){msg('ข้อมูลมอนสเตอร์ออนไลน์ใช้เซิร์ฟเวอร์เท่านั้น • คำสั่ง NPC นี้ยังไม่เปิด');return false;}
+function assertRanchOperation({allowOnline=false}={}){
+  if(hasOnlineMonsterSession){
+    if(!allowOnline){msg('ข้อมูลมอนสเตอร์ออนไลน์ใช้เซิร์ฟเวอร์เท่านั้น • คำสั่ง NPC นี้ยังไม่เปิด');return false;}
+    if(!isNearNpc()){msg(FULL_MANAGER_NPC_REASON);return false;}
+    return true;
+  }
   if(isNearNpc()||isNearBreeding())return true;
   msg(FULL_MANAGER_NPC_REASON);
   return false;
