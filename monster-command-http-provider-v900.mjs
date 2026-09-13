@@ -160,7 +160,13 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command?.commandId });
       if (!payload || typeof payload.ok !== 'boolean') return Object.freeze({ ok: false, code: payload?.errorCode || payload?.code || 'INVALID_SERVER_RESULT', commandId: command?.commandId });
       if (typeof payload.zone === 'string' && payload.zone !== zone) return Object.freeze({ ok: false, code: 'STALE_SCENE', commandId: command?.commandId });
-      if (!response.ok || !payload.ok) return Object.freeze({ ...payload, ok: false, code: payload.errorCode || payload.code || 'COMMAND_REJECTED', commandId: payload.commandId || command?.commandId });
+      if (!response.ok || !payload.ok) {
+        // ตัวห่อข้อผิดพลาดของเซิร์ฟเวอร์ใส่ REQUEST_FAILED มาด้วย
+        // ให้แสดงรหัสปฏิเสธคำสั่งจริงใน code แทนข้อความกลาง
+        const code = payload.errorCode && payload.errorCode !== 'REQUEST_FAILED'
+          ? payload.errorCode : payload.code || payload.errorCode || 'COMMAND_REJECTED';
+        return Object.freeze({ ...payload, ok: false, code, commandId: payload.commandId || command?.commandId });
+      }
       if (payload.ok) void (pendingRefresh || Promise.resolve()).then(() => { if (!stale(requestGeneration)) return refresh(); });
       return Object.freeze({ ...payload, commandId: payload.commandId || command?.commandId });
     } catch { return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command?.commandId }); }
