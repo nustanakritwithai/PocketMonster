@@ -5,7 +5,7 @@ import { createMonsterControlController } from '../monster-control-controller-v9
 import { bindMonsterControlScene } from '../monster-control-scene-binding-v900.mjs';
 import { createPirateMonsterInventorySync } from '../pirate-monster-inventory-sync.mjs';
 
-const shellSource = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8');
+const shellSource = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const getPartyMatch = shellSource.match(/getParty: \(\) => \{[\s\S]*?\n  \},\n  getCapabilities/);
 assert.ok(getPartyMatch, 'extracts the production shell getParty callback');
 const getParty = new Function('activeWorld', 'sceneFrame', 'monsterStateProvider', 'mergeMonsterPartyControlState',
