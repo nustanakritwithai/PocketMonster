@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.75260e37d784",
+  "buildId": "8.4.0.content.8154612bb762",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-13T08:47:27.487Z",
+  "publishedAtUtc": "2026-09-13T09:02:39.225Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -547,8 +547,8 @@
     },
     {
       "path": "game-v800.js",
-      "size": 560839,
-      "sha256": "d2183e78c8bab3ca7cd652aea84fa880a656f5c22927351a2828c4e3850451da"
+      "size": 568766,
+      "sha256": "94d70b861822d4bd11f182d005b4f5af849413cf81fd0cd3b7c85d0ff451b8a1"
     },
     {
       "path": "index.html",

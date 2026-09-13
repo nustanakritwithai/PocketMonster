@@ -49,7 +49,7 @@ console.log('v90-npc-online-recovery: PASS');
 const source=game.slice(game.indexOf('let keeperRecoveryCommandSequence='),game.indexOf('const ranchVisuals='));
 function fixture(send) {
   const log=[]; const snapshot={available:true,revision:7}; let near=true;
-  const deps={assertRanchOperation:()=>near,hasOnlineMonsterSession:true,serverPlayerDataActive:true,
+  const deps={assertRanchOperation:()=>near,hasOnlineMonsterSession:true,serverPlayerDataActive:false,
     monsterBagStateProvider:{snapshot:()=>snapshot,refresh:async()=>{log.push('refresh');return {ok:true};}},
     runtimeConfig:{},authProfileBridge:{sessionToken:'test'},requestRecoverMonsters:send,
     msg:()=>{},playSFX:()=>{},renderAll:()=>log.push('render'),renderManager:()=>{},
@@ -68,4 +68,4 @@ await r.heal();r.snapshot.revision=9;await r.heal();
 assert.equal(retries[0][2],retries[1][2]);assert.equal(retries[1][3],7,'retry preserves original revision');
 const rejected=fixture(async()=>{throw Object.assign(new Error('NPC_REQUIRED'),{status:409,code:'NPC_REQUIRED'});});
 await rejected.heal();assert.deepEqual(rejected.log,[],'rejection changes no local state');
-console.log('Actual NPC heal flow: PASS');
+console.log('Actual NPC heal flow: PASS, general player writes remain disabled');

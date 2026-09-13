@@ -5898,7 +5898,6 @@ async function healAll(){
   if(!assertRanchOperation({allowOnline:true}))return;
   if(hasOnlineMonsterSession){
     if(keeperRecoveryPending)return;
-    if(!serverPlayerDataActive){msg('เซิร์ฟเวอร์ข้อมูลผู้เล่นยังไม่พร้อม • ยังไม่เปลี่ยนข้อมูล');return;}
     const work=(async()=>{
       const request=keeperRecoveryRetryRequest||{commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence),expectedRevision:null};
       try{
