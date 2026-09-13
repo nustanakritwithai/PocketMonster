@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.d3d16beecfa7",
+  "buildId": "8.4.0.content.ef038d31c397",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-12T20:21:22.438Z",
+  "publishedAtUtc": "2026-09-13T08:05:53.867Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -507,8 +507,8 @@
     },
     {
       "path": "entry-preload-v900.mjs",
-      "size": 2376,
-      "sha256": "988aeed1f5822654d34e62e93f7b810d2eda3b93d2158efca1f2b72be189dcd2"
+      "size": 2425,
+      "sha256": "98a8147456e72d599ebb8e89e1ec7c0fbd1156f524ade1a252ca3ef8720235e5"
     },
     {
       "path": "equipment.mjs",
@@ -552,8 +552,8 @@
     },
     {
       "path": "index.html",
-      "size": 40734,
-      "sha256": "8389790f23194077d8f37b8adf943cbbe7cde4048e1a804fb50e7deee908d6a3"
+      "size": 41175,
+      "sha256": "3e4ac8539a57274df83f7b98d3f010bbc90ce3dd68123601a57b3ff7bdecd787"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -602,8 +602,8 @@
     },
     {
       "path": "monster-command-http-provider-v900.mjs",
-      "size": 12289,
-      "sha256": "d66b5fd415fdbc0fd79fe00d29c32880ac0d1e46fc4deae4f67d42adb2ad1fb8"
+      "size": 12902,
+      "sha256": "9e151c961593b0b4e746b40f460a80d284f034a25ec11ed6067844c4298cdd12"
     },
     {
       "path": "monster-control-controller-v900.mjs",
@@ -647,8 +647,8 @@
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 27858,
-      "sha256": "2f518146c1547322d0d68a394574d600e98d0339243c7b19cb767dfad2ebf215"
+      "size": 28585,
+      "sha256": "3ae97e21c8c57ec03d43fb90208f5f390cea72e005067639e0bc18cebd519eb3"
     },
     {
       "path": "passive-catalog.mjs",
@@ -1032,8 +1032,8 @@
     },
     {
       "path": "v900.html",
-      "size": 40734,
-      "sha256": "8389790f23194077d8f37b8adf943cbbe7cde4048e1a804fb50e7deee908d6a3"
+      "size": 41175,
+      "sha256": "3e4ac8539a57274df83f7b98d3f010bbc90ce3dd68123601a57b3ff7bdecd787"
     },
     {
       "path": "warp-routes.mjs",
