@@ -45,6 +45,21 @@ export function resolveMonsterPartySlots({ collection, party } = {}) {
   return normalizeMonsterPartySlots(records);
 }
 
+/** ใช้ช่องกระเป๋าล่าสุด แต่รับพลังต่อสู้จาก server เฉพาะ instance เดียวกัน */
+export function mergeMonsterPartyControlState(bag, control) {
+  if (bag?.available !== true || !Array.isArray(bag.slots)) return control || null;
+  const byId = new Map((control?.available === true && Array.isArray(control.slots) ? control.slots : [])
+    .filter(slot => slot?.instanceId).map(slot => [slot.instanceId, slot]));
+  return { available: true, slots: bag.slots.map(slot => {
+    const live = byId.get(slot.instanceId);
+    if (!live) return slot;
+    const fainted = live.fainted === true || (Number.isFinite(live.hp) && live.hp <= 0);
+    return { ...slot, ...(Number.isFinite(live.hp) ? { hp: live.hp } : {}),
+      ...(Number.isFinite(live.maxHp) ? { maxHp: live.maxHp } : {}),
+      fainted, available: slot.occupied === true && !fainted && live.available !== false };
+  }) };
+}
+
 function stateFromPlayerPayload(payload) {
   const source = payload?.monsterControl || {};
   const slots = Array.isArray(source.party)

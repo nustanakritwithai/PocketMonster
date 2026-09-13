@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=962';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=963';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -20,7 +20,7 @@ import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=959';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=4';
+import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=5';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '80');
+  url.searchParams.set('shellRevision', '81');
   return url.href;
 }
 
@@ -695,7 +695,7 @@ monsterController = createMonsterControlController({
     if (activeWorld === 'pirate-fruit') {
       try {
         const bag = sceneFrame.contentWindow?.POCKETMONSTER_MONSTER_BAG?.snapshot?.();
-        if (bag?.available === true && Array.isArray(bag.slots)) return { available: true, slots: bag.slots };
+        if (bag?.available === true && Array.isArray(bag.slots)) return mergeMonsterPartyControlState(bag, monsterStateProvider.snapshot().party);
       } catch {}
     }
     return monsterStateProvider.snapshot().party || null;

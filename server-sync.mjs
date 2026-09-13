@@ -100,7 +100,7 @@ async function serverMutation(config, sessionToken, path, body, { fetchImpl = gl
   const payload = await readJson(response) || { success: false, message: 'Invalid server response' };
   if (!response.ok || payload.success === false) {
     const error = new Error(payload.message || `MonsterLife mutation failed (${response.status})`);
-    error.code = payload.errorCode || 'MUTATION_REJECTED';
+    error.code = payload.errorCode || payload.code || 'MUTATION_REJECTED';
     error.status = response.status;
     throw error;
   }
@@ -125,6 +125,10 @@ export async function learnMonsterSkillFromItem(config, sessionToken, instanceId
 
 export async function applyMonsterAction(config, sessionToken, instanceId, action, value, options = {}) {
   return serverMutation(config, sessionToken, '/api/player/monster-action', { instanceId, action, value }, options);
+}
+
+export async function recoverMonsters(config, sessionToken, commandId, expectedRevision, options = {}) {
+  return serverMutation(config, sessionToken, '/api/monsters/recover', { commandId, expectedRevision }, options);
 }
 
 export async function redeemItemCode(config, sessionToken, code, options = {}) {
