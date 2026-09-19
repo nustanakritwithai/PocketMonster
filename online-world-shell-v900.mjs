@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=963';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=964';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=7';
+} from './online-world-bridge-v900.mjs?v=8';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -20,7 +20,7 @@ import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=2';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=959';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=5';
+import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=6';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '81');
+  url.searchParams.set('shellRevision', '82');
   return url.href;
 }
 
@@ -680,7 +680,15 @@ monsterStateProvider = createMonsterHttpProvider({
   getSessionToken: () => window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
   isSessionActive: () => isActiveLaunchSession(window.POCKETMONSTER_LAUNCH_SESSION),
   getZone: () => presenceBridge.readPose()?.zone || activeWorld,
-  isPresenceReady: zone => presenceBridge.isReady(zone),
+  isPresenceReady: zone => {
+    const readiness = presenceBridge.readiness(zone);
+    if (readiness.ready) return readiness;
+    const chat = window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
+    if (chat && chat.socketReadyState !== 1 && chat.worldConnected !== true) {
+      return Object.freeze({ ...readiness, reason: 'WORLD_SOCKET_DISCONNECTED' });
+    }
+    return readiness;
+  },
   pollMs: 2000,
 });
 window.POCKETMONSTER_MONSTER_STATE_PROVIDER = monsterStateProvider;

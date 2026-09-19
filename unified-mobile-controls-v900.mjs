@@ -704,7 +704,7 @@ export function createUnifiedMobileControls({
         stopMonsterEvent(event);
         const pointerHandled = suppressThrowClick;
         suppressThrowClick = false;
-        if (!pointerHandled && event.detail === 0) void throwMonster();
+        if (!pointerHandled) void throwMonster();
         return;
       }
       if (!/^skill[1-4]Btn$/.test(buttonId) || !monsterSkillPanel()) return;

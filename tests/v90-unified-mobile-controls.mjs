@@ -123,6 +123,32 @@ assert.deepEqual(
   [['capture', 'start'], ['capture', 'end']],
 );
 
+let throwCalls = 0;
+const mountedThrowController = {
+  snapshot: () => ({ held: { instanceId: 'owned-a' }, pending: false }),
+  throwHeld: async () => { throwCalls += 1; return { ok: true }; },
+  subscribe: listener => { listener(); return () => {}; },
+};
+controls.setMonsterController(mountedThrowController);
+const clickOnlyThrow = new Event('click', { bubbles: true, cancelable: true });
+Object.defineProperty(clickOnlyThrow, 'detail', { value: 1 });
+elements.get('captureBtn').dispatchEvent(clickOnlyThrow);
+await Promise.resolve();
+assert.equal(throwCalls, 1, 'click-only touch activation dispatches one throw');
+elements.get('captureBtn').dispatchEvent(pointer('pointerdown', 34, 0, 0));
+elements.get('captureBtn').dispatchEvent(pointer('pointerup', 34, 0, 0));
+const pointerThrowClick = new Event('click', { bubbles: true, cancelable: true });
+Object.defineProperty(pointerThrowClick, 'detail', { value: 1 });
+elements.get('captureBtn').dispatchEvent(pointerThrowClick);
+await Promise.resolve();
+assert.equal(throwCalls, 2, 'pointerdown followed by click dispatches one throw');
+const keyboardThrowClick = new Event('click', { bubbles: true, cancelable: true });
+Object.defineProperty(keyboardThrowClick, 'detail', { value: 0 });
+elements.get('captureBtn').dispatchEvent(keyboardThrowClick);
+await Promise.resolve();
+assert.equal(throwCalls, 3, 'keyboard click dispatches one throw');
+controls.setMonsterController(null);
+
 // The helm remains a native proximity interaction.  The parent button appears
 // only after the child reports the native helm prompt; it cannot auto-board or
 // acquire the helm from elsewhere on the deck.
@@ -287,9 +313,9 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=14/, 'world shell cache-busts analog handoff controls');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=14/, 'Pirate boot cache-busts analog handoff controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=69/, 'online scene cache-busts analog handoff graph');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=15/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=15/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=70/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 

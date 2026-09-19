@@ -14,6 +14,11 @@ const target = {
   },
 };
 const bridge = createOnlineScenePresenceBridge({ getSceneWindow: () => target });
+assert.deepEqual(bridge.readiness('pirate-fruit'), {
+  ready: false,
+  zone: 'pirate-fruit',
+  reason: 'NO_SERVER_SNAPSHOT',
+});
 const pose = bridge.readPose();
 assert.deepEqual({ zone: pose?.zone, x: pose?.x, y: pose?.y, z: pose?.z, dir: pose?.dir },
   { zone: 'pirate-fruit', x: 3, y: 1, z: -2, dir: 0.5 },
@@ -27,6 +32,11 @@ target.POCKETMONSTER_SCENE_PRESENCE.state = () => ({ zone: 'pirate-fruit', x: 3,
 assert.equal(bridge.readPose()?.monsterIntents[0].forwardX, .6, 'non-empty intents remain validated and normalized');
 target.POCKETMONSTER_SCENE_PRESENCE.state = () => ({ zone: 'pirate-fruit', x: 3, z: -2, dir: 0.5, monsterIntents: {} });
 assert.equal(bridge.readPose(), null, 'malformed monsterIntents remains rejected by the sanitizer');
+target.POCKETMONSTER_SCENE_PRESENCE.state = () => ({ zone: 'pirate-fruit', x: 3, z: -2, dir: 0.5, monsterIntents: [] });
+assert.equal(bridge.acceptSnapshot({ zone: 'living-world', players: [] }), false);
+assert.equal(bridge.readiness('pirate-fruit').reason, 'NO_SERVER_SNAPSHOT');
+assert.equal(bridge.acceptSnapshot({ zone: 'pirate-fruit', players: [] }), true);
+assert.deepEqual(bridge.readiness('pirate-fruit'), { ready: true, zone: 'pirate-fruit', reason: 'READY' });
 console.log('Pirate presence aim with monster intents: PASS');
 
 // Full bounded pipeline: native message -> Pirate sanitizer -> world-state
@@ -46,7 +56,7 @@ assert.deepEqual(monsterThrowAimFromPose(fullPose)?.targetPoint, { x: 4.91770215
 const requests = [];
 const provider = createMonsterHttpProvider({
   config: { apiBaseUrl: 'https://example.test', apiVersion: '1.1' }, sessionToken: 'session',
-  getZone: () => 'pirate-fruit', isPresenceReady: zone => fullBridge.isReady(zone), pollMs: 0,
+  getZone: () => 'pirate-fruit', isPresenceReady: zone => fullBridge.readiness(zone), pollMs: 0,
   fetchImpl: async (_url, init) => {
     requests.push(init.method);
     if (init.method === 'GET') return { ok: true, json: async () => ({ ok: true, monsterControl: { party: [{ instanceId: 'owned:aim', name: 'Aimmon' }], capabilities: {} } }) };
@@ -54,7 +64,7 @@ const provider = createMonsterHttpProvider({
     return { ok: true, json: async () => ({ ok: true, commandId: command.commandId }) };
   },
 });
-assert.equal((await provider.refresh()).code, 'PRESENCE_NOT_READY');
+assert.equal((await provider.refresh()).code, 'NO_SERVER_SNAPSHOT');
 assert.equal(requests.length, 0, 'no HTTP request before accepted scene presence');
 assert.equal(fullBridge.acceptSnapshot({ zone: 'pirate-fruit', players: [] }), true);
 await provider.refresh();
