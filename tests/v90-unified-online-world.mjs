@@ -139,7 +139,7 @@ assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSessio
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
 assert.match(shell, /combined-worlds-v900\.mjs\?v=964/, 'persistent shell cache-busts the changed world catalog');
-assert.match(shell, /searchParams\.set\('shellRevision', '81'\)/, 'persistent shell cache-busts the changed scene HTML');
+assert.match(shell, /searchParams\.set\('shellRevision', '82'\)/, 'persistent shell cache-busts the changed scene HTML');
 assert.match(worlds, /combined-worlds-v900\.mjs\?v=964/, 'scene router cache-busts the changed world catalog');
 assert.match(sceneEntry, /worlds-v900\.mjs\?v=968/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
