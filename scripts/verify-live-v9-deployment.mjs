@@ -8,7 +8,7 @@ const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
 export const EXPECTED_PIRATE_SOURCE_COMMIT = '44b701afdf055c7d457301bba62fe202dc2957bd';
-export const EXPECTED_PIRATE_ARTIFACT_SHA256 = 'a22b8b23e7c032643cf768cbc59b7991a96e36ba474aef00d81f119fa930f8f2';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '3416c7b82b08b4bdf336691abddb65f95204c8a6dea71d8f68d2bf997a8b1103';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
