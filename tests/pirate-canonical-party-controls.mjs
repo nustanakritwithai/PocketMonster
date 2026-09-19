@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createMonsterControlController } from '../monster-control-controller-v900.mjs';
 import { bindMonsterControlScene } from '../monster-control-scene-binding-v900.mjs';
 import { createPirateMonsterInventorySync } from '../pirate-monster-inventory-sync.mjs';
+import { createMonsterHttpProvider } from '../monster-command-http-provider-v900.mjs';
 
 const shellSource = fs.readFileSync(new URL('../online-world-shell-v900.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const getPartyMatch = shellSource.match(/getParty: \(\) => \{[\s\S]*?\n  \},\n  getCapabilities/);
@@ -12,7 +13,7 @@ const getParty = new Function('activeWorld', 'sceneFrame', 'monsterStateProvider
   `return (${getPartyMatch[0].replace(/^getParty: /, '').replace(/,\n  getCapabilities$/, '')});`)(
   'pirate-fruit',
   { contentWindow: { POCKETMONSTER_MONSTER_BAG: { snapshot: () => canonicalBag } } },
-  { snapshot: () => ({ party: null }) },
+  { snapshot: () => ({ available: false, party: { available: true, slots: [{ instanceId: 'owned:a', fainted: true, available: false }] } }) },
   mergeMonsterPartyControlState,
 );
 
@@ -44,6 +45,7 @@ let canonicalBag = { available: true, revision: 1, slots: [
   { available: true, instanceId: 'owned:b', name: 'Beta', icon: '🐢' },
   { available: false, instanceId: '', name: 'ว่าง' },
 ] };
+assert.equal(getParty().slots[0].fainted, undefined, 'stale unavailable control-state cannot reapply fainted after NPC recovery');
 const bagListeners = new Set();
 const bagProvider = { subscribe(listener) { bagListeners.add(listener); listener(canonicalBag); return () => bagListeners.delete(listener); } };
 let refreshCount = 0;
@@ -83,4 +85,44 @@ assert.ok(refreshCount >= 1, 'canonical bag revision triggered control refresh')
 binding();
 inventorySync.dispose();
 finishControlRead({ ok: false, code: 'MONSTER_ZONE_MISMATCH' });
+
+// NPC Recovery: provider อาจ unavailable ระหว่างเปลี่ยนฉาก แต่ bag ฟื้นแล้ว
+let presenceReady = true;
+let liveParty = [{ instanceId: 'owned:a', name: 'Alpha', fainted: true, hp: 0 }];
+const recoveryProvider = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' },
+  sessionToken: 'session-token', getZone: () => 'pirate-fruit',
+  isPresenceReady: () => presenceReady,
+  fetchImpl: async () => new Response(JSON.stringify({ ok: true,
+    monsterControl: { party: liveParty, actors: [], capabilities: {}, revision: 4 } }), { status: 200 }),
+});
+await recoveryProvider.refresh();
+assert.equal(recoveryProvider.snapshot().party.slots[0].fainted, true);
+presenceReady = false;
+await recoveryProvider.refresh();
+assert.equal(recoveryProvider.snapshot().available, false, 'presence gate marks stale control unavailable');
+const healedBag = { available: true, slots: [
+  { slot: 0, instanceId: 'owned:a', occupied: true, available: true, fainted: false, name: 'Alpha' },
+  { slot: 1, instanceId: '', occupied: false, available: false },
+  { slot: 2, instanceId: '', occupied: false, available: false },
+] };
+const recoverySceneFrame = { contentWindow: { POCKETMONSTER_MONSTER_BAG: { snapshot: () => healedBag } } };
+const recoveryGetParty = new Function('activeWorld', 'sceneFrame', 'monsterStateProvider', 'mergeMonsterPartyControlState',
+  `return (${getPartyMatch[0].replace(/^getParty: /, '').replace(/,\n  getCapabilities$/, '')});`)(
+  'pirate-fruit', recoverySceneFrame, recoveryProvider, mergeMonsterPartyControlState);
+const transitionController = createMonsterControlController({
+  commands, getParty: recoveryGetParty, getZone: () => 'pirate-fruit',
+  getAim: () => ({ x: 1, y: 0, z: 2 }),
+});
+assert.equal((await transitionController.activateSlot(0)).reason, 'prepared', 'healed bag remains usable while control snapshot is unavailable');
+liveParty = [{ instanceId: 'owned:a', name: 'Alpha', fainted: false, hp: 100 }];
+presenceReady = true;
+await recoveryProvider.refresh();
+transitionController.sync();
+assert.ok(['prepared', 'already-prepared'].includes((await transitionController.activateSlot(0)).reason), 'healed live control-state keeps the slot usable');
+liveParty = [{ instanceId: 'owned:a', name: 'Alpha', fainted: true, hp: 0 }];
+await recoveryProvider.refresh();
+transitionController.sync();
+assert.equal((await transitionController.activateSlot(0)).reason, 'unavailable', 'live dead control-state still overrides healed bag');
+recoveryProvider.dispose();
 console.log('Pirate canonical party controls: PASS');
