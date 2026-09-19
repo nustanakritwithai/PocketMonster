@@ -113,6 +113,6 @@ const legacyHtml = fs.readFileSync(new URL('v800.html', root), 'utf8');
 assert.match(legacyHtml, /entry-preload\.mjs\?v=820/, 'legacy V8 entry must cache-bust the updated game preload');
 const preload = fs.readFileSync(new URL('entry-preload.mjs', root), 'utf8');
 assert.match(preload, /await prepareLaunch/);
-assert.match(preload, /await import\('\.\/game\-v800\.js\?v=836'\)/, 'preload must import game only after launch gate');
+assert.match(preload, /await import\('\.\/game\-v800\.js\?v=837'\)/, 'preload must import game only after launch gate');
 
 console.log('Launch-ticket client bootstrap contract: PASS');
