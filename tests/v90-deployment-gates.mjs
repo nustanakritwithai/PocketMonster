@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
+  EXPECTED_PIRATE_ARTIFACT_SHA256,
   PAGES_LIVE_SMOKE_FILES,
   runDeploymentVerifierCli,
   verifyLiveV9Deployment,
@@ -21,6 +22,12 @@ const SERVER_RELEASE = Object.freeze({
 });
 
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const pirateBootstrap = fs.readFileSync(new URL('../pirate-fruit-offline/pocket-bootstrap.mjs', import.meta.url), 'utf8');
+const activePirateEntry = pirateBootstrap.match(/await import\('(.+?)'\)/)?.[1];
+assert.ok(activePirateEntry, 'bootstrap must select the active Pirate artifact');
+const pirateEntryBytes = fs.readFileSync(new URL(activePirateEntry, new URL('../pirate-fruit-offline/', import.meta.url)));
+assert.equal(crypto.createHash('sha256').update(pirateEntryBytes).digest('hex'), EXPECTED_PIRATE_ARTIFACT_SHA256,
+  'deployment hash must match the actual Pirate artifact before publishing');
 const pagesWorkflow = fs.readFileSync(new URL('../.github/workflows/github-pages.yml', import.meta.url), 'utf8');
 const firebaseWorkflow = fs.readFileSync(new URL('../.github/workflows/firebase-hosting-merge.yml', import.meta.url), 'utf8');
 for (const testFile of [
