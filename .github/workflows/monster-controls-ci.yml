@@ -57,6 +57,7 @@ jobs:
           node tests/pirate-active-presence-prewarm.mjs
           node tests/pirate-presence-aim-intents.mjs
           node tests/pirate-command-rejection-envelope.mjs
+          node tests/v90-pirate-authority-animation-transport.mjs
           node tests/pirate-party-live-hp.mjs
           node tests/v90-npc-online-recovery.mjs
           node tests/pirate-canonical-party-controls.mjs
