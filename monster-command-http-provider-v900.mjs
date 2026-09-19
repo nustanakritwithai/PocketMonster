@@ -104,15 +104,16 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
   const tokenForRequest = () => typeof getSessionToken === 'function' ? getSessionToken() : sessionToken;
   const sessionReady = token => (typeof isSessionActive !== 'function' || isSessionActive() === true)
     && typeof token === 'string' && token.length > 0;
-  const readinessForZone = zone => {
-    if (typeof isPresenceReady !== 'function') return true;
+  const readinessDetailForZone = zone => {
+    if (typeof isPresenceReady !== 'function') return Object.freeze({ ready: true, zone, reason: 'READY' });
     let result;
-    try { result = isPresenceReady(zone); } catch { return false; }
-    if (result === true) return true;
-    if (!result || typeof result !== 'object') return false;
-    if (typeof result.zone === 'string' && result.zone !== zone) return false;
-    return result.ready === true || result.accepted === true;
+    try { result = isPresenceReady(zone); } catch { return Object.freeze({ ready: false, zone, reason: 'PRESENCE_NOT_READY' }); }
+    if (result === true) return Object.freeze({ ready: true, zone, reason: 'READY' });
+    if (!result || typeof result !== 'object') return Object.freeze({ ready: false, zone, reason: 'PRESENCE_NOT_READY' });
+    if (typeof result.zone === 'string' && result.zone !== zone) return Object.freeze({ ready: false, zone: result.zone, reason: 'ZONE_MISMATCH' });
+    return Object.freeze({ ready: result.ready === true || result.accepted === true, zone: result.zone || zone, reason: result.reason || (result.ready === true || result.accepted === true ? 'READY' : 'PRESENCE_NOT_READY') });
   };
+  const readinessForZone = zone => readinessDetailForZone(zone).ready;
   const stale = requestGeneration => disposed || requestGeneration !== generation;
   const clearState = () => { current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false }); notify(); };
   const markUnavailable = () => { current = Object.freeze({ ...current, actors: [], skills: {}, capabilities: {}, available: false }); notify(); };
@@ -134,7 +135,8 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
     try {
       const zone = getZone();
       if (typeof zone !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(zone)) return Object.freeze({ ok: false, code: 'INVALID_ZONE' });
-      if (!readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'PRESENCE_NOT_READY' }); }
+      const readiness = readinessDetailForZone(zone);
+      if (!readiness.ready) { markUnavailable(); return Object.freeze({ ok: false, code: readiness.reason, message: readiness.reason }); }
       const url = new URL(endpoint(config, 'api/monsters/control-state'));
       url.searchParams.set('zone', zone);
       const { response, payload } = await fetchBounded(url.href, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` } });
@@ -165,7 +167,8 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       const zone = getZone();
       if (typeof zone !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(zone)) return Object.freeze({ ok: false, code: 'INVALID_ZONE', commandId: command?.commandId });
       if (command?.zone !== zone) return Object.freeze({ ok: false, code: 'ZONE_MISMATCH', commandId: command?.commandId });
-      if (!readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'PRESENCE_NOT_READY', commandId: command?.commandId }); }
+      const readiness = readinessDetailForZone(zone);
+      if (!readiness.ready) return Object.freeze({ ok: false, code: readiness.reason, message: readiness.reason, commandId: command?.commandId });
       const { response, payload } = await fetchBounded(endpoint(config, 'api/monsters/command'), {
         method: 'POST', cache: 'no-store',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` },

@@ -18,7 +18,7 @@ import {
 } from './pirate-presence-bridge-v900.mjs?v=6';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-fruit-offline/pirate-owned-monster-carry.mjs';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=14';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=15';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,

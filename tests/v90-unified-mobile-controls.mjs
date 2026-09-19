@@ -123,6 +123,28 @@ assert.deepEqual(
   [['capture', 'start'], ['capture', 'end']],
 );
 
+let throwCalls = 0;
+const mountedThrowController = {
+  snapshot: () => ({ held: { instanceId: 'owned-a' }, pending: false }),
+  throwHeld: async () => { throwCalls += 1; return { ok: true }; },
+  subscribe: listener => { listener(); return () => {}; },
+};
+controls.setMonsterController(mountedThrowController);
+const clickOnlyThrow = new Event('click', { bubbles: true, cancelable: true });
+Object.defineProperty(clickOnlyThrow, 'detail', { value: 1 });
+elements.get('captureBtn').dispatchEvent(clickOnlyThrow);
+await Promise.resolve();
+assert.equal(throwCalls, 1, 'click-only touch activation dispatches one throw');
+elements.get('captureBtn').dispatchEvent(pointer('pointerdown', 34, 0, 0));
+elements.get('captureBtn').dispatchEvent(pointer('pointerup', 34, 0, 0));
+elements.get('captureBtn').dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+await Promise.resolve();
+assert.equal(throwCalls, 2, 'pointerdown followed by click dispatches one throw');
+elements.get('captureBtn').dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+await Promise.resolve();
+assert.equal(throwCalls, 3, 'keyboard click dispatches one throw');
+controls.setMonsterController(null);
+
 // The helm remains a native proximity interaction.  The parent button appears
 // only after the child reports the native helm prompt; it cannot auto-board or
 // acquire the helm from elsewhere on the deck.

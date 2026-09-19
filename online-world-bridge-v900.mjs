@@ -29,6 +29,8 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
   let forwardedConnected = null;
   let acceptedSnapshots = 0;
   let lastAcceptedAt = null;
+  let readinessReason = null;
+  let lastRejectionReason = null;
   let routeGenerationHighWater = null;
 
   function sceneWindow() {
@@ -67,6 +69,8 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
     activeZone = null;
     scenePresenceReady = false;
     lastAcceptedAt = null;
+    readinessReason = null;
+    lastRejectionReason = null;
     forwardedConnected = null;
     forwardStatus(false);
   }
@@ -81,10 +85,12 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
       // keeping the protocol sanitizer as the structural gate.
       pose = sanitizeOnlineWorldPose(read?.call(target), { allowMonsterIntents: true });
     } catch { pose = null; }
-    if (!pose) { scenePresenceReady = false; lastAcceptedAt = null; return null; }
+    if (!pose) { scenePresenceReady = false; lastAcceptedAt = null; readinessReason = 'NO_LOCAL_POSE'; return null; }
     if (activeZone && activeZone !== pose.zone) {
       scenePresenceReady = false;
       lastAcceptedAt = null;
+      readinessReason = 'ZONE_MISMATCH';
+      lastRejectionReason = null;
       forwardedConnected = null;
       clearScenePresence(pose.zone);
       forwardStatus(false);
@@ -95,20 +101,41 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
 
   function acceptSnapshot(payload) {
     const pose = readPose();
-    if (!pose) return false;
+    if (!pose) { readinessReason = 'NO_LOCAL_POSE'; lastRejectionReason = 'NO_LOCAL_POSE'; return false; }
+    if (typeof payload?.zone === 'string' && payload.zone !== pose.zone) {
+      readinessReason = 'ZONE_MISMATCH';
+      lastRejectionReason = 'ZONE_MISMATCH';
+      return false;
+    }
     const snapshot = sanitizeOnlineWorldSnapshot(payload, pose.zone);
-    if (!snapshot) return false;
+    if (!snapshot) { readinessReason = 'SCENE_REJECTED_SNAPSHOT'; lastRejectionReason = 'SCENE_REJECTED_SNAPSHOT'; return false; }
     if (snapshot.generation !== undefined) {
-      if (routeGenerationHighWater !== null && snapshot.generation < routeGenerationHighWater) return false;
+      if (routeGenerationHighWater !== null && snapshot.generation < routeGenerationHighWater) {
+        readinessReason = 'SCENE_REJECTED_SNAPSHOT';
+        lastRejectionReason = 'SCENE_REJECTED_SNAPSHOT';
+        return false;
+      }
       routeGenerationHighWater = snapshot.generation;
     }
     const target = sceneWindow();
     const receive = target?.POCKETMONSTER_SCENE_PRESENCE?.accept || target?.POCKETMONSTER_WORLD_PRESENCE;
-    if (typeof receive !== 'function') return false;
-    try { if (receive.call(target, snapshot) === false) return false; } catch { return false; }
+    if (typeof receive !== 'function') { readinessReason = 'SCENE_REJECTED_SNAPSHOT'; lastRejectionReason = 'SCENE_REJECTED_SNAPSHOT'; return false; }
+    try {
+      if (receive.call(target, snapshot) === false) {
+        readinessReason = 'SCENE_REJECTED_SNAPSHOT';
+        lastRejectionReason = 'SCENE_REJECTED_SNAPSHOT';
+        return false;
+      }
+    } catch {
+      readinessReason = 'SCENE_REJECTED_SNAPSHOT';
+      lastRejectionReason = 'SCENE_REJECTED_SNAPSHOT';
+      return false;
+    }
     acceptedSnapshots += 1;
     scenePresenceReady = true;
     lastAcceptedAt = now();
+    readinessReason = 'READY';
+    lastRejectionReason = null;
     forwardStatus(true);
     return true;
   }
@@ -118,6 +145,7 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
       routeGenerationHighWater = null;
       scenePresenceReady = false;
       lastAcceptedAt = null;
+      readinessReason = 'NO_SERVER_SNAPSHOT';
       clearScenePresence();
       forwardStatus(false);
       return;
@@ -125,15 +153,31 @@ export function createOnlineScenePresenceBridge({ getSceneWindow, now = Date.now
     if (scenePresenceReady) forwardStatus(true);
   }
 
+  function readiness(zone) {
+    const pose = readPose();
+    const actualZone = pose?.zone || activeZone || null;
+    if (!pose) return Object.freeze({ ready: false, zone: actualZone, reason: 'NO_LOCAL_POSE' });
+    if (pose.zone !== zone) return Object.freeze({ ready: false, zone: pose.zone, reason: 'ZONE_MISMATCH' });
+    const age = lastAcceptedAt === null ? Infinity : now() - lastAcceptedAt;
+    if (lastAcceptedAt === null || acceptedSnapshots < 1) {
+      const reason = lastRejectionReason === 'SCENE_REJECTED_SNAPSHOT'
+        ? lastRejectionReason
+        : 'NO_SERVER_SNAPSHOT';
+      return Object.freeze({ ready: false, zone: pose.zone, reason });
+    }
+    if (!scenePresenceReady || age < 0 || age >= 15000) {
+      return Object.freeze({ ready: false, zone: pose.zone, reason: 'STALE_SERVER_SNAPSHOT' });
+    }
+    return Object.freeze({ ready: true, zone: pose.zone, reason: 'READY' });
+  }
+
   function diagnostics() {
-    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots, routeGenerationHighWater, lastAcceptedAt });
+    return Object.freeze({ activeZone, scenePresenceReady, acceptedSnapshots, routeGenerationHighWater, lastAcceptedAt, readinessReason });
   }
 
   function isReady(zone) {
-    const pose = readPose();
-    const age = lastAcceptedAt === null ? Infinity : now() - lastAcceptedAt;
-    return Boolean(pose && pose.zone === zone && scenePresenceReady && age >= 0 && age < 15000);
+    return readiness(zone).ready;
   }
 
-  return Object.freeze({ readPose, acceptSnapshot, setTransportConnected, reset, diagnostics, isReady });
+  return Object.freeze({ readPose, acceptSnapshot, setTransportConnected, reset, diagnostics, readiness, isReady });
 }
