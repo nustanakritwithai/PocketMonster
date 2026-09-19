@@ -8032,7 +8032,15 @@ void syncCloudSave();
 let last=performance.now(),targetTick=0,lifeTick=0,eggTick=0,firstFrame=true;
 const wildFrameSnapshot=[];
 function loop(now){
-  if(!sceneRuntimeActive){requestAnimationFrame(loop);return;}
+  if(!sceneRuntimeActive){
+    // ระหว่าง prewarm ของ Pirate ให้หยุด simulation ไว้ แต่ยังหมุนรอบ render
+    // ของกระเป๋ามอนสเตอร์ เพื่อให้โมเดลตัวกลางแสดงผลได้ตามปกติ
+    try {
+      if(document.body?.dataset?.combinedWorld==='pirate-fruit')updateFieldBagPreview(Math.min(.033,Math.max(0,(now-last)/1000)));
+    } catch {}
+    last=now;
+    requestAnimationFrame(loop);return;
+  }
   try{
     const frameMs=now-last;
     const dt=Math.min(.033,frameMs/1000);
