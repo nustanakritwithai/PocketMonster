@@ -11,5 +11,5 @@ const { createUnifiedMmorpgHud } = await import('./unified-mmorpg-hud-v900.mjs?v
 const unifiedHud = createUnifiedMmorpgHud({ windowLike: window, documentLike: document });
 unifiedHud.mount();
 window.POCKETMONSTER_UNIFIED_HUD = unifiedHud;
-await import('./game-v800.js?v=837');
+await import('./game-v800.js?v=838');
 unifiedHud.rebind();

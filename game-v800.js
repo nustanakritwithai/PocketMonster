@@ -5909,6 +5909,9 @@ async function healAll(){
         request.acknowledged=true;
         const refreshed=await monsterBagStateProvider.refresh();
         if(!refreshed.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์หลังรักษาไม่สำเร็จ'),{code:refreshed.code||'RECOVERY_REFRESH_FAILED'});
+        // NPC Recovery แก้สถานะต่อสู้บนเซิร์ฟเวอร์ด้วย อาจไม่เปลี่ยน revision ของกระเป๋า
+        // จึงสั่งอ่าน control-state โดยตรงเพื่อเคลียร์ fainted/active ที่ค้างในแผง Pirate
+        try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;await provider?.refresh?.({afterPending:true});}catch{}
         keeperRecoveryRetryRequest=null;
         playSFX('sfx_heal');msg(result.message||'NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();
       }catch(error){
