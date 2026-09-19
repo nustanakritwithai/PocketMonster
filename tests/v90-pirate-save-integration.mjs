@@ -13,7 +13,7 @@ const pirateHud = read('pirate-fruit-control-hud-v900.mjs');
 const build = read('scripts/build-github-pages.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
-assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=5"/, 'offline HTML loads the save-aware bootstrap');
+assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=6"/, 'offline HTML loads the save-aware bootstrap');
 assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
 const bundleMatch = bootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);

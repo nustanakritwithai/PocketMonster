@@ -118,7 +118,7 @@ assert.match(sceneEntry, /bindPersistentFullscreenControls\(window, \{ signal: s
 assert.match(fullscreenBridge, /shell\.requestFullscreen\(options\)/, 'child fullscreen requests delegate to the top-level owner');
 assert.match(fullscreenBridge, /owner: 'opaque-parent-relay'/, 'opaque iframe patches requestFullscreen even when window.top throws');
 assert.match(fullscreenBridge, /PERSISTENT_FULLSCREEN_REQUEST_MESSAGE/, 'opaque fullscreen requests relay through a versioned parent message');
-assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=5/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
+assert.match(pirateOfflineHtml, /persistent-fullscreen-v900\.mjs\?v=4[\s\S]*pocket-bootstrap\.mjs\?v=6/, 'Pirate iframe installs the fullscreen bridge before its save bootstrap');
 const pirateEntryMatch = pirateBootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
 assert.ok(pirateEntryMatch, 'Pirate save bootstrap declares its compiled entry');
 assert.ok(
