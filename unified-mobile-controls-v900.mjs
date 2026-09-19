@@ -611,7 +611,7 @@ export function createUnifiedMobileControls({
       try {
         const parentHud = windowLike?.parent?.POCKETMONSTER_UNIFIED_HUD;
         if (typeof parentHud?.showCommandFailure === 'function') {
-          parentHud.showCommandFailure(failure);
+          parentHud.showCommandFailure(failure, { monsterCommand: true });
         }
       } catch {}
     }

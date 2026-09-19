@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.cc701fb1c3ab",
+  "buildId": "8.4.0.content.9fb6bf20792a",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-19T13:31:52.822Z",
+  "publishedAtUtc": "2026-09-19T13:42:00.694Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -1022,13 +1022,13 @@
     },
     {
       "path": "unified-mmorpg-hud-v900.mjs",
-      "size": 54776,
-      "sha256": "63ba7da35ccf59c6ade5e85816f3bf3251b400c2da437378bf149cb796254184"
+      "size": 55127,
+      "sha256": "7b51fc7814fcc4acef9fd7acd0b97b31d5e2cb12a515f390d47909c725ba88ec"
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
-      "size": 34016,
-      "sha256": "855d296ac88fb78019fffe71da3964ebbb2cd938807215983bfa73d6f9649d57"
+      "size": 34042,
+      "sha256": "7c1b8cfbedefec4c5f08a52a7af688778c6498e78496eef8f11debd4f2f04bf2"
     },
     {
       "path": "v900.html",

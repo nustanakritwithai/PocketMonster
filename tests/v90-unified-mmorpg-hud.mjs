@@ -385,7 +385,7 @@ function bootWorld(hudOptions = {}) {
   });
   hud.mount();
   const banner = documentLike.getElementById('mmorpgBanner');
-  hud.showCommandFailure({ ok: false, reason: 'PRESENCE_NOT_READY', message: 'กำลังเชื่อมต่อโลกโจรสลัด' });
+  hud.showCommandFailure({ ok: false, reason: 'PRESENCE_NOT_READY', message: 'กำลังเชื่อมต่อโลกโจรสลัด' }, { monsterCommand: true });
   assert.equal(banner.textContent, 'กำลังเชื่อมต่อโลกโจรสลัด');
   assert.equal(banner.classList.contains('error'), true);
   windowLike.POCKETMONSTER_POCKET_HUD.banner.push({ revision: 2, kind: '', text: '', expiresAt: 0 });
