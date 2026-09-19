@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=965';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=966';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -106,6 +106,12 @@ function preparePocketRuntime(world) {
   return preparation;
 }
 
+// ฉาก Pirate และ prewarm ต้องใช้ preparation เดียวกัน ป้องกัน game-v800
+// ถูก import ซ้อนจากคนละ query string ขณะผู้เล่นกดกระเป๋าหรือปาเร็วเกินไป
+if (typeof window !== 'undefined') {
+  window.POCKETMONSTER_MANAGED_POCKET_PREPARE = () => preparePocketRuntime(worldById('pocket-monster'));
+}
+
 for (const world of COMBINED_WORLDS) {
   routeController.register(world.id, {
     async mount() {
@@ -132,7 +138,18 @@ async function switchWorldInDocument(id, panelOverride = null) {
   if (!world) return;
   const panelId = allowedPanelForWorld(world.id, panelOverride || currentPanel(world.id));
   if (new URL(location.href).searchParams.get('world') === world.id && document.body.dataset.combinedWorld === world.id) return;
-  if (world.id === 'pocket-monster') await preparePocketRuntime(world);
+  try {
+    if (world.id === 'pocket-monster') await preparePocketRuntime(world);
+  } catch (error) {
+    // Warp ถูกเรียกจาก DOM event โดยไม่ await; แสดงความล้มเหลวใน startupStatus
+    // แทนปล่อย unhandled rejection จนผู้ใช้เห็นว่าปุ่มไม่ทำงานเงียบ ๆ
+    if (startup) {
+      startup.textContent = `เปิด${world.label}ไม่สำเร็จ กรุณาลองใหม่`;
+      startup.className = 'startup-status error';
+    }
+    console.warn('Pocket runtime preparation failed; warp aborted', error);
+    return false;
+  }
   const panel = applyControlPanel(panelId, world.id).id;
   window.POCKETMONSTER_COMBINED_BOOT = Object.freeze({
     worldId: world.id,

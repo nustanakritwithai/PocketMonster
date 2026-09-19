@@ -27,7 +27,7 @@ import {
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=944', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=836&animalControl=pirate-fruit';
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=837&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const pocketPlayerHud = createPocketPlayerHudStore();
@@ -46,15 +46,24 @@ let throwRuntimePromise = null;
 let pirateRuntimeActive = true;
 
 export function ensurePocketAnimalControl() {
-  if (typeof window !== 'undefined' && window.POCKETMONSTER_ANIMAL_CONTROL) {
-    return Promise.resolve(window.POCKETMONSTER_ANIMAL_CONTROL);
-  }
   if (!throwRuntimePromise) {
-    throwRuntimePromise = import('./game-v800.js?v=836&animalControl=pirate-fruit').then(() => {
+    const managedPrepare = typeof window !== 'undefined'
+      ? window.POCKETMONSTER_MANAGED_POCKET_PREPARE
+      : null;
+    const prepare = typeof managedPrepare === 'function'
+      ? Promise.resolve().then(() => managedPrepare())
+      : (typeof window !== 'undefined' && window.POCKETMONSTER_ANIMAL_CONTROL
+        ? Promise.resolve()
+        : import('./game-v800.js?v=837&animalControl=pirate-fruit'));
+    throwRuntimePromise = prepare.then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
       window.dispatchEvent(new Event('resize'));
       return control;
+    }).catch(error => {
+      // ให้การกดครั้งถัดไป retry ได้ หาก prewarm/import ล้มเหลวชั่วคราว
+      throwRuntimePromise = null;
+      throw error;
     });
   }
   return throwRuntimePromise;

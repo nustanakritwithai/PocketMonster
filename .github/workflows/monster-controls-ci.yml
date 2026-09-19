@@ -61,6 +61,7 @@ jobs:
           node tests/v90-npc-online-recovery.mjs
           node tests/pirate-canonical-party-controls.mjs
           node tests/pirate-monster-bag-window.mjs
+          node tests/v90-pirate-paused-bag-preview.mjs
           node tests/v90-pirate-hud-scene-slots.mjs
           node tests/pirate-render-combat-presentation-guard.mjs
           node tests/v90-pirate-throw-failure-visible.mjs
