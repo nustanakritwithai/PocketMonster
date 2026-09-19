@@ -582,6 +582,8 @@ export function createUnifiedMobileControls({
 
   let monsterController = null;
   let unsubscribeMonster = null;
+  let reportedThrowFailure = null;
+  let reportedThrowFailureId = 0;
   const monsterPointers = new Set();
   let suppressThrowClick = false;
   const monsterThrowMode = () => {
@@ -599,25 +601,34 @@ export function createUnifiedMobileControls({
     button.setAttribute?.('aria-disabled', String(pending));
     if (button.style) button.style.backgroundImage = '';
   };
-  const throwMonster = async () => {
-    if (monsterController?.snapshot?.()?.pending) return;
-    const result = await monsterController?.throwHeld?.();
-    if (activeWorldId === 'pirate-fruit' && result?.ok === false) {
-      const message = `ปามอนสเตอร์ไม่สำเร็จ: ${result.reason || result.code || 'SERVER_UNAVAILABLE'}`;
-      const failure = { ...result, message };
+  const reportThrowFailure = result => {
+    const failureResult = result && typeof result === 'object'
+      ? result
+      : { ok: false, reason: 'control-error', code: 'CONTROL_ERROR' };
+    const message = `ปามอนสเตอร์ไม่สำเร็จ: ${failureResult.reason || failureResult.code || 'SERVER_UNAVAILABLE'}`;
+    const failure = { ...failureResult, ok: false, message };
+    if (activeWorldId === 'pirate-fruit') {
       try {
         const parentHud = windowLike?.parent?.POCKETMONSTER_UNIFIED_HUD;
         if (typeof parentHud?.showCommandFailure === 'function') {
           parentHud.showCommandFailure(failure);
-          return;
         }
       } catch {}
-      const localStatus = documentLike.getElementById('actionReason');
-      if (localStatus) localStatus.textContent = `${message}${result.code ? ` (${result.code})` : ''}`;
-      return;
     }
     const status = documentLike.getElementById('actionReason');
-    if (status && result?.ok === false) status.textContent = `ปามอนสเตอร์ไม่สำเร็จ: ${result.reason || result.code || 'SERVER_UNAVAILABLE'}`;
+    if (status) status.textContent = `${message}${failureResult.code ? ` (${failureResult.code})` : ''}`;
+  };
+  const throwMonster = async () => {
+    if (monsterController?.snapshot?.()?.pending) {
+      reportThrowFailure({ ok: false, reason: 'summon-pending', code: 'SUMMON_PENDING' });
+      return;
+    }
+    try {
+      const result = await monsterController?.throwHeld?.();
+      if (!result || result.ok === false) reportThrowFailure(result);
+    } catch (error) {
+      reportThrowFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
+    }
   };
   const monsterSkillPanel = () => monsterController?.snapshot?.()?.controlPanel?.mode === 'monster';
   const paintMonsterSkills = () => {
@@ -771,9 +782,18 @@ export function createUnifiedMobileControls({
     setMonsterController(controller) {
       unsubscribeMonster?.();
       monsterController = controller || null;
-      unsubscribeMonster = monsterController?.subscribe?.(() => {
+      reportedThrowFailure = null;
+      reportedThrowFailureId = 0;
+      unsubscribeMonster = monsterController?.subscribe?.(state => {
         setControlMode(activeWorldId);
         paintMonsterSkills();
+        if (state?.lastFailure && state.lastFailureId !== reportedThrowFailureId) {
+          reportedThrowFailure = state.lastFailure;
+          reportedThrowFailureId = state.lastFailureId;
+          reportThrowFailure(state.lastFailure);
+        } else if (!state?.lastFailure) {
+          reportedThrowFailure = null;
+        }
       }) || null;
       setControlMode(activeWorldId);
       paintMonsterSkills();

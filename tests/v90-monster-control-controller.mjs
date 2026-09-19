@@ -91,4 +91,45 @@ const recalled = await switchController.recallActive();
 assert.equal(recalled.ok, true);
 assert.equal(switchSent[1].kind, 'recall');
 assert.equal(switchController.snapshot().slots.some(slot => slot.active), false);
+
+let raceActors = [];
+let resolveRaceCommand = null;
+const raceCommandIds = [];
+const raceCommands = {
+  summon: command => new Promise(resolve => { raceCommandIds.push(command.commandId); resolveRaceCommand = () => resolve({ ok: true, commandId: command.commandId }); }),
+  skill: async command => ({ ok: true, commandId: command.commandId }),
+};
+const raceController = createMonsterControlController({
+  commands: raceCommands,
+  getParty: () => ({ available: true, slots: [{ slot: 0, available: true, instanceId: 'race-mon' }] }),
+  getZone: () => 'pirate-fruit',
+  getAim: () => ({ x: 1, y: 0, z: 2 }),
+  getConfirmedActors: () => raceActors,
+  pendingTimeoutMs: 10,
+});
+await raceController.activateSlot(0);
+const beforeAck = raceController.throwHeld();
+await Promise.resolve();
+raceActors = [{ instanceId: 'race-mon', zone: 'pirate-fruit', active: true }];
+raceController.sync();
+resolveRaceCommand();
+assert.equal((await beforeAck).reason, 'summon-confirmed', 'snapshot before ACK still confirms the same throw');
+assert.equal(raceController.snapshot().held, null);
+
+raceActors = [];
+await raceController.activateSlot(0);
+const timedOutCommand = raceController.throwHeld();
+await Promise.resolve();
+resolveRaceCommand();
+await timedOutCommand;
+await new Promise(resolve => setTimeout(resolve, 25));
+assert.equal(raceController.snapshot().pending, false);
+assert.equal(raceController.snapshot().lastFailure.code, 'SNAPSHOT_CONFIRMATION_TIMEOUT');
+const retry = raceController.throwHeld();
+await Promise.resolve();
+assert.equal(raceController.snapshot().pending, true);
+assert.equal(raceCommandIds[2], raceCommandIds[1], 'timeout retry reuses the original command id');
+raceController.dispose();
+void timedOutCommand;
+void retry;
 console.log('V9 monster control controller: PASS');

@@ -728,6 +728,8 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   let bannerArmedAt = 0;
   let bannerRemainMs = 0;
   let bannerText = '';
+  let bannerErrorText = '';
+  let lastBannerSnapshot = null;
   let activityTimer = 0;
   let activityIndex = 0;
   let sessionStartedAt = 0;
@@ -748,9 +750,23 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   function showCommandFailure(result) {
     const banner = node('mmorpgBanner');
     if (!banner) return;
-    banner.textContent = result?.message || result?.reason || 'ทำรายการไม่สำเร็จ';
+    bannerErrorText = String(result?.message || result?.reason || 'ทำรายการไม่สำเร็จ');
+    bannerText = bannerErrorText;
+    clearBannerTimer();
+    bannerRemainMs = BANNER_DEFAULT_MS;
+    bannerArmedAt = Date.now();
+    banner.textContent = bannerErrorText;
     banner.classList.remove('hidden');
     banner.classList.add('error');
+    if (documentLike.hidden !== true && documentLike.visibilityState !== 'hidden') {
+      bannerTimer = scheduleTimeout(() => {
+        bannerTimer = 0;
+        bannerRemainMs = 0;
+        bannerErrorText = '';
+        bannerText = '';
+        renderBanner(lastBannerSnapshot);
+      }, BANNER_DEFAULT_MS);
+    }
   }
 
   function clickExisting(id) {
@@ -1003,6 +1019,7 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     clearBannerTimer();
     bannerRemainMs = 0;
     bannerText = '';
+    bannerErrorText = '';
     const banner = node('mmorpgBanner');
     if (!banner) return;
     banner.textContent = '';
@@ -1019,7 +1036,13 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     bannerTimer = scheduleTimeout(() => {
       bannerTimer = 0;
       bannerRemainMs = 0;
-      hideBanner();
+      if (bannerErrorText) {
+        bannerErrorText = '';
+        bannerText = '';
+        renderBanner(lastBannerSnapshot);
+      } else {
+        hideBanner();
+      }
     }, ms);
   }
 
@@ -1039,6 +1062,16 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
   function renderBanner(snapshot) {
     const banner = node('mmorpgBanner');
     if (!banner) return;
+    lastBannerSnapshot = snapshot || { text: '' };
+    if (bannerErrorText) {
+      if (bannerRemainMs > 0) {
+        banner.textContent = bannerErrorText;
+        banner.classList.remove('hidden');
+        banner.classList.add('error');
+        return;
+      }
+      bannerErrorText = '';
+    }
     const text = snapshot?.text || '';
     if (!text) {
       hideBanner();

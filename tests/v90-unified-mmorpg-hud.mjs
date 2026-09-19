@@ -371,6 +371,34 @@ function bootWorld(hudOptions = {}) {
   hud.unmount();
 }
 
+// Command failures must survive a banner adapter render and restore the latest
+// normal banner only after the feedback lifetime expires.
+{
+  const timers = [];
+  const { hud, documentLike, windowLike } = bootWorld({
+    timers: {
+      setInterval() { return 1; },
+      clearInterval() {},
+      setTimeout(fn, ms) { timers.push({ fn, ms }); return timers.length; },
+      clearTimeout() {},
+    },
+  });
+  hud.mount();
+  const banner = documentLike.getElementById('mmorpgBanner');
+  hud.showCommandFailure({ ok: false, reason: 'PRESENCE_NOT_READY', message: 'กำลังเชื่อมต่อโลกโจรสลัด' });
+  assert.equal(banner.textContent, 'กำลังเชื่อมต่อโลกโจรสลัด');
+  assert.equal(banner.classList.contains('error'), true);
+  windowLike.POCKETMONSTER_POCKET_HUD.banner.push({ revision: 2, kind: '', text: '', expiresAt: 0 });
+  assert.equal(banner.textContent, 'กำลังเชื่อมต่อโลกโจรสลัด', 'empty adapter update cannot clear command feedback');
+  windowLike.POCKETMONSTER_POCKET_HUD.banner.push({ revision: 3, kind: '', text: 'สถานะปกติ', expiresAt: Date.now() + 8000 });
+  assert.equal(banner.textContent, 'กำลังเชื่อมต่อโลกโจรสลัด', 'normal updates stay behind active command feedback');
+  assert.equal(timers.length, 1);
+  timers[0].fn();
+  assert.equal(banner.textContent, 'สถานะปกติ', 'latest normal banner restores after command feedback expiry');
+  assert.equal(banner.classList.contains('error'), false);
+  hud.unmount();
+}
+
 // ปุ่มที่ production สร้างเองต้องแสดงและส่งคำสั่งจริงผ่าน controller
 {
   let actors = [{ instanceId: 'mon-a', zone: 'hub', active: true, generation: 22 }];

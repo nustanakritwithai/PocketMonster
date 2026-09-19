@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.5992dd617349",
+  "buildId": "8.4.0.content.cc701fb1c3ab",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-19T12:43:48.107Z",
+  "publishedAtUtc": "2026-09-19T13:31:52.822Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -332,8 +332,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 18383,
-      "sha256": "fcd022774bbfdd9a8510a585ae4dfd3f2ad7d7bb318c417978f89f92d1e963c9"
+      "size": 18377,
+      "sha256": "4ffc2d6075f2195c51e05ff7f1e7707b747067c145e0e7da00f548284ac21839"
     },
     {
       "path": "boss-challenge.mjs",
@@ -477,8 +477,8 @@
     },
     {
       "path": "combined-worlds-v900.mjs",
-      "size": 2704,
-      "sha256": "40084f363fd1ff0c5d92981def81ec62100c61057372f167b91d44fda558eda3"
+      "size": 2698,
+      "sha256": "6a605d09b308b02a8f1247fa02a1fcef50102a2f5f18c9ee0bf6718c0641a75f"
     },
     {
       "path": "content-catalog.mjs",
@@ -507,8 +507,8 @@
     },
     {
       "path": "entry-preload-v900.mjs",
-      "size": 2424,
-      "sha256": "22ebaff1145933a3cfac6894fabc4e3cd80a903e3c4e433aca9236955936d706"
+      "size": 2420,
+      "sha256": "17f1705db1f9ec58034ac3f159dd7e77311cb3be8b39752a0413dec498d97501"
     },
     {
       "path": "equipment.mjs",
@@ -552,8 +552,8 @@
     },
     {
       "path": "index.html",
-      "size": 41174,
-      "sha256": "1e925f89c901707a6b6132e7aa14bb09bb01e62e9a392626358bc61f281c667f"
+      "size": 41168,
+      "sha256": "642f9a55d9e35a35a2602982dc50c750dd2414ba3d4f405561d3977c541acc26"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -607,8 +607,8 @@
     },
     {
       "path": "monster-control-controller-v900.mjs",
-      "size": 11517,
-      "sha256": "48f6a542358cde326068d99d206defb94d2452927358d554a34b2c60f6305f73"
+      "size": 13168,
+      "sha256": "9bc709b598bfc15328dece096d731e392f7ffa5d4d20a98a9535229f0c8b0d19"
     },
     {
       "path": "monster-control-scene-binding-v900.mjs",
@@ -647,8 +647,8 @@
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 28980,
-      "sha256": "99eb23c19dff57e5d15905a5470efa576b4f314fdef558bb0d0b60f3738c617b"
+      "size": 28964,
+      "sha256": "53f5c29aebecc974d951fe84c219fc18335e850b4438965ba630aae94b4d89a3"
     },
     {
       "path": "passive-catalog.mjs",
@@ -847,8 +847,8 @@
     },
     {
       "path": "scene-entry-v900.mjs",
-      "size": 8651,
-      "sha256": "26c7818e990deeebc78b9e310fe320922233ded073a452624f9c5872ffb2e048"
+      "size": 8645,
+      "sha256": "52f24ccf91501d07db0fb666b57577ece651a147f44cd4fd6f12d8b2cb8670ba"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -862,8 +862,8 @@
     },
     {
       "path": "scene-v900.html",
-      "size": 1349,
-      "sha256": "5817bcea00fee5d9b43561fd5a4ee189d4b880706b65601409a307c049f1b649"
+      "size": 1343,
+      "sha256": "c8a5db439796ddc0c63ebacce9a2aae1ec9e8b9ac8090b3b753db80127dca71d"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -1022,18 +1022,18 @@
     },
     {
       "path": "unified-mmorpg-hud-v900.mjs",
-      "size": 53751,
-      "sha256": "f352749d228531fe1de5c9a1b2c841a2c6d5bb2a3376f9094b11fdd5029ccdf3"
+      "size": 54776,
+      "sha256": "63ba7da35ccf59c6ade5e85816f3bf3251b400c2da437378bf149cb796254184"
     },
     {
       "path": "unified-mobile-controls-v900.mjs",
-      "size": 33308,
-      "sha256": "455272348f56aa79062ce459744de01e6381f5e9ae464a0e64f22dd849c2d352"
+      "size": 34016,
+      "sha256": "855d296ac88fb78019fffe71da3964ebbb2cd938807215983bfa73d6f9649d57"
     },
     {
       "path": "v900.html",
-      "size": 41174,
-      "sha256": "1e925f89c901707a6b6132e7aa14bb09bb01e62e9a392626358bc61f281c667f"
+      "size": 41168,
+      "sha256": "642f9a55d9e35a35a2602982dc50c750dd2414ba3d4f405561d3977c541acc26"
     },
     {
       "path": "warp-routes.mjs",
@@ -1062,8 +1062,8 @@
     },
     {
       "path": "worlds-v900.mjs",
-      "size": 9412,
-      "sha256": "f44610ebc5dc7e81ee27bc9aaa832857f29b4ac87a41b3df4a2d6004445db64e"
+      "size": 9402,
+      "sha256": "4373b09baf37c2bc92b97b3d128fc1028d69982e28d7dfc27013db8a711ace95"
     }
   ]
 }
