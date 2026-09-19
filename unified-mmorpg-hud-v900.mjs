@@ -959,12 +959,32 @@ export function createUnifiedMmorpgHud({ windowLike, documentLike, timers, monst
     const pirate = pirateWorldActive();
     let open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
     let owner = windowLike;
+    let sceneWindow = null;
     if (pirate) {
-      let sceneWindow = null;
       try { sceneWindow = sceneDocument()?.defaultView || null; } catch {}
       if (typeof sceneWindow?.POCKETMONSTER_OPEN_MONSTER_BAG === 'function') {
         open = sceneWindow.POCKETMONSTER_OPEN_MONSTER_BAG;
         owner = sceneWindow;
+      }
+    }
+    // Pirate prewarms the Pocket runtime lazily. If the player taps the
+    // utility before that import finishes, use the existing scene runtime
+    // bridge and resolve the bag API again instead of returning unavailable.
+    const ensureRuntime = pirate && typeof sceneWindow?.POCKETMONSTER_ENSURE_THROW_RUNTIME === 'function'
+      ? sceneWindow.POCKETMONSTER_ENSURE_THROW_RUNTIME
+      : windowLike.POCKETMONSTER_ENSURE_THROW_RUNTIME;
+    if (pirate && typeof open !== 'function' && typeof ensureRuntime === 'function') {
+      try {
+        await ensureRuntime.call(sceneWindow || windowLike);
+        if (typeof sceneWindow?.POCKETMONSTER_OPEN_MONSTER_BAG === 'function') {
+          open = sceneWindow.POCKETMONSTER_OPEN_MONSTER_BAG;
+          owner = sceneWindow;
+        } else {
+          open = windowLike.POCKETMONSTER_OPEN_MONSTER_BAG;
+          owner = windowLike;
+        }
+      } catch (error) {
+        return { ok: false, reason: 'failed', message: String(error?.message || error) };
       }
     }
     if (typeof open !== 'function') {

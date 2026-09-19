@@ -34,6 +34,26 @@ assert.deepEqual(await unavailable(), {
   message: 'ยังไม่พร้อมเปิดกระเป๋ามอนสเตอร์',
 });
 
+const prewarmWindow = {};
+const prewarm = makeOpen(prewarmWindow, () => true, () => ({ defaultView: {} }));
+let prewarmCalls = 0;
+prewarmWindow.POCKETMONSTER_ENSURE_THROW_RUNTIME = async () => {
+  prewarmCalls += 1;
+  prewarmWindow.POCKETMONSTER_OPEN_MONSTER_BAG = () => ({ ok: true, reason: 'opened-after-prewarm' });
+};
+assert.deepEqual(await prewarm(), { ok: true, reason: 'opened', message: '' });
+assert.equal(prewarmCalls, 1, 'Pirate retries the existing runtime bridge before reporting unavailable');
+
+const scenePrewarmWindow = {};
+const scenePrewarm = makeOpen({}, () => true, () => ({ defaultView: scenePrewarmWindow }));
+let scenePrewarmCalls = 0;
+scenePrewarmWindow.POCKETMONSTER_ENSURE_THROW_RUNTIME = async function () {
+  scenePrewarmCalls += 1;
+  this.POCKETMONSTER_OPEN_MONSTER_BAG = () => ({ ok: true, reason: 'opened-by-scene-prewarm' });
+};
+assert.deepEqual(await scenePrewarm(), { ok: true, reason: 'opened', message: '' });
+assert.equal(scenePrewarmCalls, 1, 'Pirate prefers the outer scene runtime bridge');
+
 const rejectingScene = { POCKETMONSTER_OPEN_MONSTER_BAG: () => Promise.reject(new Error('scene-not-ready')) };
 const rejected = makeOpen({}, () => true, () => ({ defaultView: rejectingScene }));
 assert.deepEqual(await rejected(), { ok: false, reason: 'failed', message: 'scene-not-ready' });
