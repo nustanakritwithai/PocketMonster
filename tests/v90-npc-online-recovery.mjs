@@ -33,6 +33,7 @@ assert.match(heal, /assertRanchOperation\(\{allowOnline:true\}\)/);
 assert.match(heal, /requestRecoverMonsters\(runtimeConfig,authProfileBridge\.sessionToken,request\.commandId,request\.expectedRevision\)/);
 assert.match(heal, /result\?\.ok!==true\|\|result\?\.success!==true/);
 assert.match(heal, /await monsterBagStateProvider\.refresh\(\)/);
+assert.match(heal, /POCKETMONSTER_MONSTER_STATE_PROVIDER[\s\S]*?refresh\?\.\(\{afterPending:true\}\)/, 'NPC recovery refreshes Pirate control-state after the bag read');
 assert.match(heal, /if\(keeperRecoveryPending\)return/);
 assert.match(heal, /keeperRecoveryRetryRequest\|\|\{commandId:'keeper-heal-'/);
 assert.match(heal, /if\(!snapshot\.available\)/);
@@ -49,6 +50,7 @@ console.log('v90-npc-online-recovery: PASS');
 const source=game.slice(game.indexOf('let keeperRecoveryCommandSequence='),game.indexOf('const ranchVisuals='));
 function fixture(send) {
   const log=[]; const snapshot={available:true,revision:7}; let near=true;
+  globalThis.window={POCKETMONSTER_MONSTER_STATE_PROVIDER:{refresh:async()=>{log.push('control-refresh');return {ok:true};}}};
   const deps={assertRanchOperation:()=>near,hasOnlineMonsterSession:true,serverPlayerDataActive:false,
     monsterBagStateProvider:{snapshot:()=>snapshot,refresh:async()=>{log.push('refresh');return {ok:true};}},
     runtimeConfig:{},authProfileBridge:{sessionToken:'test'},requestRecoverMonsters:send,
@@ -60,7 +62,7 @@ function fixture(send) {
 let finish;const sent=[];
 const f=fixture((...args)=>{sent.push(args);return new Promise(resolve=>{finish=resolve;});});
 const one=f.heal(); await f.heal(); assert.equal(sent.length,1,'double click has one request');
-finish({ok:true,success:true});await one;assert.deepEqual(f.log,['refresh','render']);
+finish({ok:true,success:true});await one;assert.deepEqual(f.log,['refresh','control-refresh','render']);
 f.setNear(false);await f.heal();assert.equal(sent.length,1,'away from NPC does not send');
 const retries=[];let attempt=0;
 const r=fixture(async(...args)=>{retries.push(args);if(++attempt===1)throw new TypeError('network lost');return {ok:true,success:true};});
