@@ -703,7 +703,15 @@ monsterController = createMonsterControlController({
     if (activeWorld === 'pirate-fruit') {
       try {
         const bag = sceneFrame.contentWindow?.POCKETMONSTER_MONSTER_BAG?.snapshot?.();
-        if (bag?.available === true && Array.isArray(bag.slots)) return mergeMonsterPartyControlState(bag, monsterStateProvider.snapshot().party);
+        const control = monsterStateProvider.snapshot();
+        // ระหว่างเปลี่ยนฉาก provider อาจ markUnavailable แต่คง party เก่าที่มี fainted ไว้
+        // ห้ามนำ snapshot เก่านั้นทับกระเป๋าที่ NPC เพิ่งรักษาแล้ว
+        if (bag?.available === true && Array.isArray(bag.slots)) {
+          return control?.available === true
+            ? mergeMonsterPartyControlState(bag, control.party)
+            : bag;
+        }
+        return control?.available === true ? control.party || null : null;
       } catch {}
     }
     return monsterStateProvider.snapshot().party || null;
