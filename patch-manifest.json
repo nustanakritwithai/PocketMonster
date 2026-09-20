@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.af96a706bb98",
+  "buildId": "8.4.0.content.b579e2902549",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T18:16:37.629Z",
+  "publishedAtUtc": "2026-09-20T18:27:58.040Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -87,8 +87,8 @@
     },
     {
       "path": "asset-presentation/pirate-fruit-client-bridge.mjs",
-      "size": 35488,
-      "sha256": "f125ff242ba57c85b2d3bfac154433c20d7a74c9a181f9f209948bbd03d6be4d"
+      "size": 36365,
+      "sha256": "7fa074c321bfc77c724a0cd7a7084fe0e42ab5c2331e1eb2150de057daef9a75"
     },
     {
       "path": "asset-presentation/pirate-fruit-rig-retarget.mjs",
