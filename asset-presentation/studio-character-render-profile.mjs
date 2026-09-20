@@ -6,6 +6,7 @@ export const STUDIO_CHARACTER_RENDER_TEXTURE_SLOTS = Object.freeze([
 const SLOT_SET = new Set(STUDIO_CHARACTER_RENDER_TEXTURE_SLOTS);
 const MAX_TEXTURE_BYTES = 16 * 1024 * 1024;
 const textureCache = new Map(); // Verified bytes only, never mutable GPU textures.
+const textureLoads = new Map(); // Coalesce concurrent bindings for the same verified bytes.
 const TRUSTED_STUDIO_ORIGINS = ['https://nustanakritwithai.github.io'];
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
 let cachedBytes = 0;
@@ -95,10 +96,13 @@ async function verifiedBytes(meta, options) {
   if (!expected) throw new Error('texture requires verified SHA-256');
   const key = cacheKey(meta);
   if (textureCache.has(key)) return textureCache.get(key);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(100, Math.min(15000, options.timeoutMs || 10000)));
-  try {
-    const response = await fetchRef(meta.source, { mode: 'cors', credentials: 'omit', cache: 'force-cache', redirect: 'error', signal: controller.signal });
+  const pending = textureLoads.get(key);
+  if (pending) return pending;
+  const load = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(100, Math.min(15000, options.timeoutMs || 10000)));
+    try {
+      const response = await fetchRef(meta.source, { mode: 'cors', credentials: 'omit', cache: 'force-cache', redirect: 'error', signal: controller.signal });
     if (!response?.ok) throw new Error(`texture fetch failed (${response?.status || 'network'})`);
     const length = Number(response.headers?.get?.('content-length'));
     if (Number.isFinite(length) && length > MAX_TEXTURE_BYTES) throw new Error('texture exceeds byte limit');
@@ -125,8 +129,12 @@ async function verifiedBytes(meta, options) {
     }
     // Another instance may have finished the same request while it was loading.
     if (!textureCache.has(key)) { textureCache.set(key, bytes); cachedBytes += bytes.byteLength; }
-    return bytes;
-  } finally { clearTimeout(timer); }
+      return bytes;
+    } finally { clearTimeout(timer); }
+  })();
+  textureLoads.set(key, load);
+  try { return await load; }
+  finally { if (textureLoads.get(key) === load) textureLoads.delete(key); }
 }
 export async function loadStudioCharacterProfileTexture(meta, options = {}) {
   const bytes = await verifiedBytes(meta, options);
@@ -143,7 +151,7 @@ export async function loadStudioCharacterProfileTexture(meta, options = {}) {
     return texture;
   } finally { image.close?.(); }
 }
-export function resetStudioCharacterProfileTextureCache() { textureCache.clear(); cachedBytes = 0; }
+export function resetStudioCharacterProfileTextureCache() { textureCache.clear(); textureLoads.clear(); cachedBytes = 0; }
 function materialAt(node, index) { return Array.isArray(node?.material) ? node.material[index] : index === 0 ? node?.material : null; }
 export async function applyStudioCharacterRenderProfile(root, profile, options = {}) {
   const validation = validateStudioCharacterRenderProfile(profile);
@@ -154,6 +162,31 @@ export async function applyStudioCharacterRenderProfile(root, profile, options =
   root?.traverse?.(node => { const path = node?.userData?.studioScenePath; if (Array.isArray(path)) nodes.set(path.join('.'), node); });
   diagnostics.state = textureById.size ? 'applied' : 'scalar-only';
   const instanceTextures = new Map(), deadline = Date.now() + Math.min(30000, options.profileTimeoutMs || 20000);
+  // Start each unique verified texture binding together. Sequential fetch/decode
+  // made a multi-material profile consume the whole deadline one map at a time.
+  const textureBindings = new Map();
+  for (const entry of profile.materials || []) {
+    for (const [slot, textureId] of Object.entries(entry.textureSlots || {})) {
+      const meta = textureById.get(textureId);
+      if (!meta || !SLOT_SET.has(slot)) continue;
+      const color = slot === 'map' || slot === 'emissiveMap';
+      const binding = { ...meta, colorSpace: color ? meta.colorSpace || 'srgb' : '' };
+      const variant = JSON.stringify(binding);
+      if (!textureBindings.has(variant)) textureBindings.set(variant, { binding, textureId });
+    }
+  }
+  const loadedTextures = new Map();
+  await Promise.all([...textureBindings].map(async ([variant, { binding, textureId }]) => {
+    try {
+      if (Date.now() > deadline) throw new Error('Studio material profile deadline exceeded');
+      const texture = await loadStudioCharacterProfileTexture(binding, options);
+      if (options.isDisposed?.()) { texture.dispose?.(); throw new Error('Studio visual disposed'); }
+      options.registerTexture?.(texture);
+      loadedTextures.set(variant, texture);
+    } catch (error) {
+      diagnostics.failed.push(`${textureId}:${String(error?.message || error)}`);
+    }
+  }));
   for (const entry of profile.materials || []) {
     const node = nodes.get(entry.nodePath.join('.')), material = materialAt(node, entry.materialIndex);
     if (node?.isMesh && profile.shadow) { node.castShadow = profile.shadow.cast === true; node.receiveShadow = profile.shadow.receive === true; }
@@ -166,12 +199,10 @@ export async function applyStudioCharacterRenderProfile(root, profile, options =
         if (Date.now() > deadline) throw new Error('Studio material profile deadline exceeded');
         const color = slot === 'map' || slot === 'emissiveMap', binding = { ...meta, colorSpace: color ? meta.colorSpace || 'srgb' : '' };
         const variant = JSON.stringify(binding);
-        if (!instanceTextures.has(variant)) {
-          const texture = await loadStudioCharacterProfileTexture(binding, options);
-          if (options.isDisposed?.()) { texture.dispose?.(); throw new Error('Studio visual disposed'); }
-          options.registerTexture?.(texture); instanceTextures.set(variant, texture);
-        }
-        material[slot] = instanceTextures.get(variant); material.needsUpdate = true; diagnostics.assigned += 1;
+        const texture = loadedTextures.get(variant);
+        if (!texture) continue;
+        instanceTextures.set(variant, texture);
+        material[slot] = texture; material.needsUpdate = true; diagnostics.assigned += 1;
       } catch (error) { diagnostics.failed.push(`${textureId}:${String(error?.message || error)}`); }
     }
   }
