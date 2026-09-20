@@ -1,7 +1,7 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "e40f98d79283034c942daa9daa58a7b951fe2d40",
-  "commit": "e40f98d79283034c942daa9daa58a7b951fe2d40",
+  "ref": "e952c03b005ac5b0527ae0f096a80f6211f56e8d",
+  "commit": "e952c03b005ac5b0527ae0f096a80f6211f56e8d",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
@@ -16,7 +16,7 @@
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",
-    "artifact": "pirate-visible-monster-combat-20260920/artifacts/pirate-client-dist",
+    "artifact": "pirate-original-online-20260921/artifacts/native-e952",
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",
@@ -71,6 +71,13 @@
       "messageType": "pocketmonster:world-warp-v1",
       "destination": "living-world",
       "panel": "human"
+    },
+    "originalWorld": {
+      "contract": "pirate-original-world/1",
+      "requiresAuthenticatedParent": true,
+      "requiresServerReady": true,
+      "engine": "original MonsterSimulation/MonsterWorldService",
+      "candidateOnly": true
     }
   },
   "artifactWorkflowRun": 35447326294
