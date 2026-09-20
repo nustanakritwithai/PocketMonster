@@ -69,7 +69,10 @@ export function pirateEntriesFromDocuments(entries, persisted) {
 
 export function createPirateCentralStateClient({ config, getSessionToken, fetchImpl = globalThis.fetch, commandId = () => crypto.randomUUID() }) {
   const baseUrl = `${config.apiBaseUrl.replace(/\/$/, '')}/`;
+  const boundSessionToken = getSessionToken();
   async function request(method, token, body, path = 'api/pirate/state') {
+    // คิวจากตัวละครเดิมห้ามย้ายไปบัญชีใหม่เมื่อ logout/login ระหว่างรอเครือข่าย
+    if (token !== boundSessionToken || getSessionToken() !== boundSessionToken) throw new Error('STALE_SESSION');
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 10000);
     try {
@@ -144,7 +147,8 @@ export function createPirateStateOperationQueue({ client, revision = 0, onPersis
           onPersisted(result.persisted);
           return result;
         } catch (error) {
-          if (error?.status === undefined && !transportRetried) {
+          if (error?.status === undefined && !transportRetried
+            && (error instanceof TypeError || error?.name === 'AbortError')) {
             transportRetried = true;
             continue;
           }

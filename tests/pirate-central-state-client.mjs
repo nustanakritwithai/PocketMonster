@@ -60,4 +60,18 @@ assert.equal(operationCalls.length, 3, 'conflict retry reads current revision be
 assert.equal(JSON.parse(operationCalls[2].init.body).expectedRevision, 12);
 assert.equal(JSON.parse(operationCalls[2].init.body).operation.allocations.vitality, 2);
 assert.notEqual(JSON.parse(operationCalls[0].init.body).commandId, JSON.parse(operationCalls[2].init.body).commandId, 'definite revision conflict gets a fresh request identity');
+let activeSession = 'original-account';
+const retryCalls = [];
+const switchingClient = createPirateCentralStateClient({ config: { apiBaseUrl: 'https://example.invalid/' },
+  getSessionToken: () => activeSession,
+  fetchImpl: async (_url, init) => {
+    retryCalls.push(init);
+    activeSession = 'new-account';
+    throw new TypeError('network interrupted');
+  } });
+const switchingQueue = createPirateStateOperationQueue({ client: switchingClient, revision: 1 });
+await assert.rejects(switchingQueue.enqueue({ type: 'statAllocation', allocations: { combat: 1 } }), /STALE_SESSION/);
+assert.equal(retryCalls.length, 1, 'คำสั่งบัญชีเดิมต้องไม่ retry เข้าบัญชีใหม่');
+await assert.rejects(switchingQueue.enqueue({ type: 'statAllocation', allocations: { combat: 1 } }), /STALE_SESSION/);
+assert.equal(retryCalls.length, 1);
 console.log('PASS canonical bootstrap migration revision, auth isolation, local-data preservation');
