@@ -67,6 +67,7 @@ export function applyPirateSaveMutation(storage, mutation) {
       const nextBytes = encoder.encode(mutation.value).byteLength;
       if (totalBytes - previousBytes + nextBytes > PIRATE_SAVE_MAX_TOTAL_BYTES) return false;
       storage.setItem(mutation.key, mutation.value);
+      storage.recordOperation?.(mutation);
       return true;
     }
     if (mutation.op === 'remove') {
@@ -132,6 +133,20 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
       values.clear();
       totalBytes = 0;
       onMutation(Object.freeze({ op: 'clear' }));
+    },
+    replaceEntries(entries = {}) {
+      values.clear();
+      totalBytes = 0;
+      for (const [key, value] of Object.entries(entries || {})) {
+        if (!isPirateSaveKey(key) || !validValue(value) || values.size >= PIRATE_SAVE_MAX_KEYS) continue;
+        const bytes = encoder.encode(value).byteLength;
+        if (totalBytes + bytes > PIRATE_SAVE_MAX_TOTAL_BYTES) break;
+        values.set(key, value);
+        totalBytes += bytes;
+      }
+    },
+    recordOperation(mutation) {
+      if (mutation?.operation && typeof mutation.operation === 'object') onMutation(Object.freeze({ ...mutation }));
     },
   });
   return storage;

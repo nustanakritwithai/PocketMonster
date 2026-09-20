@@ -1,6 +1,53 @@
 // ข้อมูลบัญชีอยู่ที่ parent เท่านั้น ไม่ส่ง session token เข้า sandbox ของเกม
 const KEYS = Object.freeze({ checkpoint: 'pirate-fruit:save-v1', progression: 'pirate-fruit:progression-v1',
   inventory: 'pirate-fruit:items-v1', boats: 'pirate-fruit:boats-v1', loadout: 'pirate-fruit:loadout-v1', cargo: 'pirate-fruit:cargo-v1' });
+const STAT_IDS = new Set(['combat', 'vitality', 'blade', 'ranged', 'fruitPower', 'mana']);
+const MAX_OPERATION_BYTES = 384 * 1024;
+const MAX_OPERATION_QUEUE = 32;
+
+function operationObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function boundedOperation(operation) {
+  try {
+    return new TextEncoder().encode(JSON.stringify(operation)).byteLength <= MAX_OPERATION_BYTES ? operation : null;
+  } catch { return null; }
+}
+
+export function sanitizePirateStateOperation(value) {
+  const source = operationObject(value);
+  if (!source || typeof source.type !== 'string') return null;
+  if (source.type === 'checkpoint') {
+    if (typeof source.checkpoint !== 'string' || new TextEncoder().encode(source.checkpoint).byteLength > MAX_OPERATION_BYTES) return null;
+    return boundedOperation({ type: 'checkpoint', checkpoint: source.checkpoint });
+  }
+  if (source.type === 'statAllocation') {
+    const allocations = operationObject(source.allocations);
+    if (!allocations) return null;
+    const safe = {};
+    for (const [statId, amount] of Object.entries(allocations)) {
+      if (!STAT_IDS.has(statId) || !Number.isSafeInteger(amount) || amount <= 0) return null;
+      safe[statId] = amount;
+    }
+    return Object.keys(safe).length ? boundedOperation({ type: 'statAllocation', allocations: safe }) : null;
+  }
+  if (source.type === 'loadout') {
+    const inventoryLoadout = operationObject(source.inventoryLoadout);
+    const loadout = operationObject(source.loadout);
+    if (!inventoryLoadout || !loadout || (source.quickslots !== undefined
+      && (!Array.isArray(source.quickslots) || source.quickslots.length > 16))) return null;
+    return boundedOperation({
+      type: 'loadout', inventoryLoadout, loadout,
+      ...(source.quickslots === undefined ? {} : { quickslots: [...source.quickslots] }),
+    });
+  }
+  return null;
+}
+
+export function operationFromPirateSaveMutation(mutation) {
+  return sanitizePirateStateOperation(mutation?.operation);
+}
 
 export function pirateDocumentsFromEntries(entries) {
   const player = { schemaVersion: 1 };
@@ -21,18 +68,23 @@ export function pirateEntriesFromDocuments(entries, persisted) {
 }
 
 export function createPirateCentralStateClient({ config, getSessionToken, fetchImpl = globalThis.fetch, commandId = () => crypto.randomUUID() }) {
-  const url = new URL('api/pirate/state', `${config.apiBaseUrl.replace(/\/$/, '')}/`).href;
-  async function request(method, token, body) {
+  const baseUrl = `${config.apiBaseUrl.replace(/\/$/, '')}/`;
+  async function request(method, token, body, path = 'api/pirate/state') {
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 10000);
     try {
-      const response = await fetchImpl(url, { method, cache: 'no-store', signal: abort.signal,
+      const response = await fetchImpl(new URL(path, baseUrl).href, { method, cache: 'no-store', signal: abort.signal,
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-API-Version': config.apiVersion,
           Authorization: `Bearer ${token}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
       if (getSessionToken() !== token) throw new Error('STALE_SESSION');
-      if (response.status === 404) return { unavailable: true };
-      const payload = await response.json();
-      if (!response.ok || payload?.ok !== true) throw new Error(payload?.code || 'PIRATE_STATE_UNAVAILABLE');
+      if (response.status === 404 && path === 'api/pirate/state') return { unavailable: true };
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        const error = new Error(payload?.errorCode || payload?.code || 'PIRATE_STATE_UNAVAILABLE');
+        error.status = response.status;
+        error.serverRevision = Number.isSafeInteger(payload?.revision) ? payload.revision : undefined;
+        throw error;
+      }
       return payload;
     } finally { clearTimeout(timeout); }
   }
@@ -49,5 +101,57 @@ export function createPirateCentralStateClient({ config, getSessionToken, fetchI
       }
       return { online: true, revision: state.revision, entries: pirateEntriesFromDocuments(entries, state.persisted) };
     },
+    async read() {
+      const token = getSessionToken();
+      if (!token) throw new Error('SESSION_REQUIRED');
+      return request('GET', token);
+    },
+    async commitOperation(expectedRevision, operation, idempotencyKey = commandId()) {
+      const token = getSessionToken();
+      if (!token) throw new Error('SESSION_REQUIRED');
+      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error('REVISION_REQUIRED');
+      const safeOperation = sanitizePirateStateOperation(operation);
+      if (!safeOperation) throw new Error('PIRATE_STATE_OPERATION_INVALID');
+      if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(idempotencyKey)) throw new Error('COMMAND_ID_INVALID');
+      const result = await request('POST', token, {
+        contract: 'pirate-original-state/1', commandId: idempotencyKey, expectedRevision, operation: safeOperation,
+      }, 'api/pirate/state/operation');
+      return { revision: result.revision, persisted: result.persisted };
+    },
   });
+}
+
+export function createPirateStateOperationQueue({ client, revision = 0, onPersisted = () => {}, onError = () => {} }) {
+  let currentRevision = revision;
+  let pending = 0;
+  let chain = Promise.resolve();
+  const enqueue = operation => {
+    const safeOperation = sanitizePirateStateOperation(operation);
+    if (!safeOperation) return Promise.reject(new Error('PIRATE_STATE_OPERATION_INVALID'));
+    if (pending >= MAX_OPERATION_QUEUE) return Promise.reject(new Error('PIRATE_STATE_OPERATION_QUEUE_FULL'));
+    pending += 1;
+    const operationCommandId = globalThis.crypto?.randomUUID?.()
+      || `pirate-op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const run = chain.then(async () => {
+      let conflictRetried = false;
+      while (true) {
+        try {
+          const result = await client.commitOperation(currentRevision, safeOperation, operationCommandId);
+          if (!Number.isSafeInteger(result.revision) || result.revision < currentRevision) throw new Error('PIRATE_STATE_REVISION_INVALID');
+          currentRevision = result.revision;
+          onPersisted(result.persisted);
+          return result;
+        } catch (error) {
+          if (conflictRetried || error?.status !== 409) { onError(error); throw error; }
+          conflictRetried = true;
+          const latest = await client.read();
+          if (latest?.initialized !== true || !Number.isSafeInteger(latest.revision)) throw error;
+          currentRevision = latest.revision;
+        }
+      }
+    }).finally(() => { pending -= 1; });
+    chain = run.catch(() => {});
+    return run;
+  };
+  return Object.freeze({ enqueue, get revision() { return currentRevision; }, get pending() { return pending; } });
 }

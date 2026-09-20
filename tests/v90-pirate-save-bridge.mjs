@@ -96,6 +96,13 @@ memory.setItem('pirate-fruit:boats-v1', '{"boats":[]}');
 memory.removeItem('pirate-fruit:save-v1');
 memory.clear();
 assert.deepEqual(mutations.map(entry => entry.op), ['set', 'remove', 'clear']);
+const operationMutations = [];
+const operationStorage = createPirateSaveMemoryStorage({}, mutation => operationMutations.push(mutation));
+assert.equal(applyPirateSaveMutation(operationStorage, {
+  op: 'set', key: 'pirate-fruit:loadout-v1', value: '{}',
+  operation: { type: 'loadout', inventoryLoadout: {}, loadout: {}, quickslots: [] },
+}), true);
+assert.equal(operationMutations.at(-1).operation.type, 'loadout', 'typed operation metadata survives the host bridge');
 assert.throws(() => memory.setItem('monsterlife.launch.session', 'NO'), /Pirate save key/);
 assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRATE_SAVE_MAX_VALUE_BYTES + 1)), /too large/);
 

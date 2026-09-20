@@ -5,7 +5,12 @@ import {
   createPirateSaveMemoryStorage,
   readPirateSaveSnapshot,
 } from './pirate-save-bridge-v900.mjs?v=1';
-import { createPirateCentralStateClient } from './pirate-central-state-client.mjs?v=1';
+import {
+  createPirateCentralStateClient,
+  createPirateStateOperationQueue,
+  operationFromPirateSaveMutation,
+  pirateEntriesFromDocuments,
+} from './pirate-central-state-client.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=11';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -127,9 +132,32 @@ async function preparePirateSaveStorage() {
   const result = await client.bootstrap(localEntries);
   if (!result.online) return localStorage;
   // เก็บ local backup เดิมไว้ และให้ iframe ใช้สำเนา memory ที่มาจาก server เป็นหลัก
-  return createPirateSaveMemoryStorage(result.entries, mutation => {
+  let operationQueue = null;
+  let memoryStorage = null;
+  const applyServerPersisted = persisted => {
+    if (!persisted || !memoryStorage) return;
+    try {
+      const entries = pirateEntriesFromDocuments(readPirateSaveSnapshot(memoryStorage), persisted);
+      memoryStorage.replaceEntries(entries);
+    } catch (error) {
+      console.warn('Pirate operation response did not contain a valid persisted state', error);
+    }
+  };
+  memoryStorage = createPirateSaveMemoryStorage(result.entries, mutation => {
     applyPirateSaveMutation(localStorage, mutation);
+    const operation = operationFromPirateSaveMutation(mutation);
+    if (operation && operationQueue) {
+      void operationQueue.enqueue(operation).catch(error => {
+        console.warn('Pirate typed save operation failed', error);
+      });
+    }
   });
+  operationQueue = createPirateStateOperationQueue({
+    client,
+    revision: result.revision,
+    onPersisted: response => applyServerPersisted(response),
+  });
+  return memoryStorage;
 }
 
 function assignCombinedWorld(worldId) {
