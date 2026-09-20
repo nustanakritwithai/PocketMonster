@@ -166,6 +166,7 @@ export async function applyStudioCharacterRenderProfile(root, profile, options =
   // made a multi-material profile consume the whole deadline one map at a time.
   const textureBindings = new Map();
   for (const entry of profile.materials || []) {
+    if (!materialAt(nodes.get(entry.nodePath.join('.')), entry.materialIndex)) continue;
     for (const [slot, textureId] of Object.entries(entry.textureSlots || {})) {
       const meta = textureById.get(textureId);
       if (!meta || !SLOT_SET.has(slot)) continue;
@@ -176,7 +177,12 @@ export async function applyStudioCharacterRenderProfile(root, profile, options =
     }
   }
   const loadedTextures = new Map();
-  await Promise.all([...textureBindings].map(async ([variant, { binding, textureId }]) => {
+  const bindingsToLoad = [...textureBindings];
+  let nextBinding = 0;
+  // จำกัดงานพร้อมกันเพื่อไม่ให้ profile ใหญ่สร้าง fetch/decode ทั้งหมดในคราวเดียว
+  await Promise.all(Array.from({ length: Math.min(6, bindingsToLoad.length) }, async () => {
+    while (nextBinding < bindingsToLoad.length) {
+      const [variant, { binding, textureId }] = bindingsToLoad[nextBinding++];
     try {
       if (Date.now() > deadline) throw new Error('Studio material profile deadline exceeded');
       const texture = await loadStudioCharacterProfileTexture(binding, options);
@@ -185,6 +191,7 @@ export async function applyStudioCharacterRenderProfile(root, profile, options =
       loadedTextures.set(variant, texture);
     } catch (error) {
       diagnostics.failed.push(`${textureId}:${String(error?.message || error)}`);
+    }
     }
   }));
   for (const entry of profile.materials || []) {

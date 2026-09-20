@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.2113c84d6835",
+  "buildId": "8.4.0.content.79b107332bb0",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T18:04:13.084Z",
+  "publishedAtUtc": "2026-09-20T18:09:40.541Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -162,8 +162,8 @@
     },
     {
       "path": "asset-presentation/studio-character-render-profile.mjs",
-      "size": 13292,
-      "sha256": "6b28ad4cbb329d7b4d6118919730e1f150afdd1305d9497e963553d7e0928208"
+      "size": 15275,
+      "sha256": "fd905c5749f5d0c9bb576dfbda4b67577045c29543e58bea838846c7621ead90"
     },
     {
       "path": "assets/appearances/keeper-green/appearance.json",
