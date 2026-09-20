@@ -18,6 +18,20 @@ function boundedOperation(operation) {
 export function sanitizePirateStateOperation(value) {
   const source = operationObject(value);
   if (!source || typeof source.type !== 'string') return null;
+  if (source.type === 'vitalsInput') {
+    if (source.contract !== 'pirate-vitals/1' || ['blocking', 'mounted', 'sprinting'].some(key => typeof source[key] !== 'boolean')) return null;
+    return { type: source.type, contract: source.contract, blocking: source.blocking, mounted: source.mounted, sprinting: source.sprinting };
+  }
+  if (['vitalsPotion', 'vitalsBuff', 'vitalsRespawn'].includes(source.type)) {
+    if (typeof source.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
+    const result = { type: source.type, idempotencyKey: source.idempotencyKey };
+    const field = source.type === 'vitalsPotion' ? 'potionId' : source.type === 'vitalsBuff' ? 'skillId' : null;
+    if (field) {
+      if (typeof source[field] !== 'string' || !source[field].length || source[field].length > 128) return null;
+      result[field] = source[field];
+    }
+    return result;
+  }
   if (source.type === 'boatPurchase' || source.type === 'boatUpgrade') {
     if (typeof source.boatId !== 'string' || !source.boatId.length || source.boatId.length > 128
       || typeof source.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
@@ -119,6 +133,12 @@ export function createPirateCentralStateClient({ config, getSessionToken, fetchI
     } finally { clearTimeout(timeout); }
   }
   return Object.freeze({
+    async sendVitalsInput(input) {
+      const safe = sanitizePirateStateOperation(input);
+      if (!safe || safe.type !== 'vitalsInput') throw new Error('PIRATE_VITALS_INPUT_INVALID');
+      const result = await request('POST', getSessionToken(), safe, 'api/pirate/vitals/input');
+      return { revision: Number.isSafeInteger(result.revision) ? result.revision : 0, persisted: null, outcome: result.outcome };
+    },
     async bootstrap(entries) {
       const token = getSessionToken();
       if (!token) throw new Error('SESSION_REQUIRED');

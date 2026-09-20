@@ -75,3 +75,18 @@ assert.equal(retryCalls.length, 1, 'คำสั่งบัญชีเดิ�
 await assert.rejects(switchingQueue.enqueue({ type: 'statAllocation', allocations: { combat: 1 } }), /STALE_SESSION/);
 assert.equal(retryCalls.length, 1);
 console.log('PASS canonical bootstrap migration revision, auth isolation, local-data preservation');
+
+const vitalsCalls = [];
+const inputClient = createPirateCentralStateClient({ config: { apiBaseUrl: 'https://example.invalid' },
+  getSessionToken: () => 'bound-vitals-session', fetchImpl: async (url, init) => {
+    vitalsCalls.push({ url, init });
+    return { status: 200, ok: true, json: async () => ({ ok: true, revision: 0, outcome: { accepted: true } }) };
+  } });
+const inputResult = await inputClient.sendVitalsInput({ type: 'vitalsInput', contract: 'pirate-vitals/1', blocking: true, mounted: false, sprinting: false });
+assert.equal(vitalsCalls[0].url, 'https://example.invalid/api/pirate/vitals/input');
+assert.equal(vitalsCalls[0].init.headers.Authorization, 'Bearer bound-vitals-session');
+assert.equal(inputResult.persisted, null, 'input must not create or replace a canonical save');
+assert.equal(JSON.parse(vitalsCalls[0].init.body).expectedRevision, undefined);
+await assert.rejects(inputClient.sendVitalsInput({ type: 'vitalsInput', contract: 'pirate-vitals/1', blocking: 'true', mounted: false, sprinting: false }));
+assert.equal(vitalsCalls.length, 1);
+console.log('PASS authenticated bounded input endpoint without aggregate writes');

@@ -18,3 +18,15 @@ assert.equal(sanitizePirateOriginalWorld({ ...envelope, messages: [{ type: 'worl
 const relayed = createPirateSnapshotMessage({ zone: 'pirate-fruit', generation: 1, players: [], pirateWorld: copied });
 assert.deepEqual(relayed.payload.pirateWorld, copied, 'ผลจาก engine เดิมต้องถึง iframe โดยไม่สูญหาย');
 console.log('PASS original-world envelope bounds, copy isolation, parent-to-iframe relay');
+
+const vitals = { contract: 'pirate-vitals/1', revision: 15, serverTimeMs: 10000,
+  hp: 60, maxHp: 100, guard: 30, guardMax: 100, guardBroken: false, hitstunUntil: 0,
+  energy: 70, maxEnergy: 100, mp: 45, maxMp: 100, dead: false };
+const withVitals = { ...copied, vitals };
+const vitalsRelay = createPirateSnapshotMessage({ zone: 'pirate-fruit', generation: 1, players: [], pirateWorld: withVitals });
+assert.deepEqual(vitalsRelay.payload.pirateWorld.vitals, vitals, 'canonical vitals must survive the actual parent iframe relay');
+assert.deepEqual(sanitizePirateOriginalWorld(vitalsRelay.payload.pirateWorld).vitals, vitals);
+for (const invalid of [{ hp: 101 }, { revision: 0 }, { guard: NaN }, { dead: 'false' },
+  { respawn: { spawnId: 'starter', islandId: 'starter-island', x: 0, y: 1, z: 0, heading: 0, atRevision: 16 } }])
+  assert.equal(sanitizePirateOriginalWorld({ ...withVitals, vitals: { ...vitals, ...invalid } }), null);
+console.log('PASS vitals survives parent relay with revision, bounds and respawn validation');

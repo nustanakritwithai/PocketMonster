@@ -10,7 +10,7 @@ import {
   createPirateStateOperationQueue,
   operationFromPirateSaveMutation,
   pirateEntriesFromDocuments,
-} from './pirate-central-state-client.mjs?v=3';
+} from './pirate-central-state-client.mjs?v=4';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=11';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -175,8 +175,10 @@ async function preparePirateSaveStorage() {
     revision: result.revision,
     onPersisted: () => {},
   });
-  pirateOperationExecutors.set(memoryStorage, async operation => {
-    const result = await operationQueue.enqueue(operation);
+    pirateOperationExecutors.set(memoryStorage, async operation => {
+      // อินพุต block/วิ่งไม่ใช่การแก้เซฟ และไม่ควรรอคิวซื้อของหรือเพิ่ม revision
+      if (operation?.type === 'vitalsInput') return client.sendVitalsInput(operation);
+      const result = await operationQueue.enqueue(operation);
     applyServerPersisted(result.persisted);
     return result;
   });
