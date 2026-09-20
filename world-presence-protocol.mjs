@@ -618,6 +618,7 @@ export function sanitizeCentralAuthority(value) {
     || value.contentHash !== PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH
     || value.manifestSha256 !== PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256
     || value.vectorsSha256 !== PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256
+    || value.transportZone !== PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE
     || !Number.isSafeInteger(value.generation)
     || value.generation < 1
     || !Array.isArray(value.zones)
@@ -631,6 +632,7 @@ export function sanitizeCentralAuthority(value) {
     contentHash: PIRATE_CENTRAL_AUTHORITY_CONTENT_HASH,
     manifestSha256: PIRATE_CENTRAL_AUTHORITY_MANIFEST_SHA256,
     vectorsSha256: PIRATE_CENTRAL_AUTHORITY_VECTORS_SHA256,
+    transportZone: PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE,
     generation: value.generation,
     zones: Object.freeze([...PIRATE_CENTRAL_AUTHORITY_ZONES]),
   });
