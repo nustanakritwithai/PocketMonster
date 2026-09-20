@@ -618,6 +618,38 @@ export function createUnifiedMobileControls({
     const status = documentLike.getElementById('actionReason');
     if (status) status.textContent = `${message}${failureResult.code ? ` (${failureResult.code})` : ''}`;
   };
+  const reportSkillFailure = result => {
+    if (activeWorldId !== 'pirate-fruit') return;
+    const failureResult = result && typeof result === 'object'
+      ? result
+      : { ok: false, reason: 'control-error', code: 'CONTROL_ERROR' };
+    const message = `ใช้สกิลมอนสเตอร์ไม่สำเร็จ: ${failureResult.reason || failureResult.code || 'SERVER_UNAVAILABLE'}`;
+    const failure = { ...failureResult, ok: false, message };
+    if (activeWorldId === 'pirate-fruit') {
+      try {
+        const parentHud = windowLike?.parent?.POCKETMONSTER_UNIFIED_HUD;
+        if (typeof parentHud?.showCommandFailure === 'function') {
+          parentHud.showCommandFailure(failure, { monsterCommand: true });
+        }
+      } catch {}
+    }
+    const status = documentLike.getElementById('actionReason');
+    if (status) status.textContent = `${message}${failureResult.code ? ` (${failureResult.code})` : ''}`;
+  };
+  const useMonsterSkill = index => {
+    try {
+      return Promise.resolve(monsterController?.useSkill?.(index)).then(result => {
+        if (!result || result.ok === false) reportSkillFailure(result);
+        return result;
+      }, error => {
+        reportSkillFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
+        return { ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' };
+      });
+    } catch (error) {
+      reportSkillFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
+      return Promise.resolve({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
+    }
+  };
   const throwMonster = async () => {
     if (monsterController?.snapshot?.()?.pending) {
       reportThrowFailure({ ok: false, reason: 'summon-pending', code: 'SUMMON_PENDING' });
@@ -681,7 +713,7 @@ export function createUnifiedMobileControls({
         stopMonsterEvent(event);
         if (monsterPointers.has(event.pointerId)) return;
         monsterPointers.add(event.pointerId);
-        void monsterController.useSkill(Number(buttonId[5]) - 1);
+        void useMonsterSkill(Number(buttonId[5]) - 1);
         return;
       }
       const action = actionForButton(buttonId);
@@ -721,7 +753,7 @@ export function createUnifiedMobileControls({
       if (!/^skill[1-4]Btn$/.test(buttonId) || !monsterSkillPanel()) return;
       stopMonsterEvent(event);
       // Keyboard-generated clicks have no preceding pointerdown.
-      if (event.detail === 0) void monsterController.useSkill(Number(buttonId[5]) - 1);
+      if (event.detail === 0) void useMonsterSkill(Number(buttonId[5]) - 1);
     }, { capture: true });
   }
 
