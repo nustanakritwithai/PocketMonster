@@ -1,7 +1,7 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "44b701afdf055c7d457301bba62fe202dc2957bd",
-  "commit": "44b701afdf055c7d457301bba62fe202dc2957bd",
+  "ref": "e40f98d79283034c942daa9daa58a7b951fe2d40",
+  "commit": "e40f98d79283034c942daa9daa58a7b951fe2d40",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
@@ -16,7 +16,7 @@
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",
-    "artifact": "pirate-owned-render-20260919/dist-44b701a",
+    "artifact": "pirate-visible-monster-combat-20260920/artifacts/pirate-client-dist",
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",
