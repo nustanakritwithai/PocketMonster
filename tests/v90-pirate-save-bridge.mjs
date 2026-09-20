@@ -9,6 +9,7 @@ import {
   applyPirateSaveMutation,
   bindPirateSaveHost,
   createPirateSaveMemoryStorage,
+  derivePirateSaveOperation,
   installPirateSaveSandbox,
   isPirateSaveKey,
   readPirateSaveSnapshot,
@@ -96,6 +97,21 @@ memory.setItem('pirate-fruit:boats-v1', '{"boats":[]}');
 memory.removeItem('pirate-fruit:save-v1');
 memory.clear();
 assert.deepEqual(mutations.map(entry => entry.op), ['set', 'remove', 'clear']);
+const producerMutations = [];
+const producerStorage = createPirateSaveMemoryStorage({
+  'pirate-fruit:save-v1': '{"islandId":"starter"}',
+  'pirate-fruit:progression-v1': JSON.stringify({ progression: { player: { statPoints: 3, stats: { combat: 1, vitality: 2, blade: 0, ranged: 0, fruitPower: 0, mana: 0 } } } }),
+  'pirate-fruit:loadout-v1': JSON.stringify({ slots: { style: 'style-1', utility: 'utility-1' }, activeCategory: 'utility' }),
+}, mutation => producerMutations.push(mutation));
+producerStorage.setItem('pirate-fruit:save-v1', '{"islandId":"starter","spawnId":"dock"}');
+assert.equal(producerMutations.at(-1).operation.type, 'checkpoint', 'checkpoint writes produce typed metadata');
+producerStorage.setItem('pirate-fruit:progression-v1', JSON.stringify({ progression: { player: { statPoints: 1, stats: { combat: 1, vitality: 4, blade: 0, ranged: 0, fruitPower: 0, mana: 0 } } } }));
+assert.deepEqual(producerMutations.at(-1).operation, { type: 'statAllocation', allocations: { vitality: 2 } });
+producerStorage.setItem('pirate-fruit:items-v1', JSON.stringify({ loadout: { activeSet: 'primary', equippedWeaponKind: 'sword', equippedSwordId: 'sword-1', fruitAwakened: false }, quickslots: ['skill-1'] }));
+assert.equal(producerMutations.at(-1).operation.type, 'loadout', 'inventory writes produce canonical loadout metadata');
+assert.equal(producerMutations.at(-1).operation.loadout.slots.utility, 'utility-1', 'legacy utility slot is preserved');
+assert.equal(producerMutations.at(-1).operation.loadout.activeCategory, 'utility', 'legacy utility category is preserved');
+assert.equal(derivePirateSaveOperation(producerStorage, 'pirate-fruit:progression-v1', '{}', '{}'), null, 'invalid progression does not fabricate stat operations');
 assert.throws(() => memory.setItem('monsterlife.launch.session', 'NO'), /Pirate save key/);
 assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRATE_SAVE_MAX_VALUE_BYTES + 1)), /too large/);
 
@@ -139,6 +155,31 @@ assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRAT
 }
 
 {
+  const hostWindow = new EventTarget();
+  const replies = [];
+  const frameWindow = { postMessage(message, origin) { replies.push({ message, origin }); } };
+  const storage = new MemoryStorage([['pirate-fruit:save-v1', 'local']]);
+  let resolveSnapshot;
+  const pendingSnapshot = new Promise(resolve => { resolveSnapshot = resolve; });
+  const dispose = bindPirateSaveHost(frameWindow && { contentWindow: frameWindow }, {
+    windowLike: hostWindow,
+    storage,
+    loadSnapshot: () => pendingSnapshot,
+  });
+  dispatchMessage(hostWindow, {
+    source: frameWindow,
+    origin: 'null',
+    data: { type: PIRATE_SAVE_REQUEST_MESSAGE, requestId: 'request-async-1234' },
+  });
+  assert.equal(replies.length, 0, 'async bootstrap keeps the child snapshot pending');
+  resolveSnapshot({ 'pirate-fruit:save-v1': 'server' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].message.entries['pirate-fruit:save-v1'], 'server');
+  dispose();
+}
+
+{
   const childWindow = new EventTarget();
   const parentWindow = {
     postMessage(message, origin) {
@@ -172,4 +213,25 @@ assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRAT
   assert.equal(childWindow.localStorage.getItem('monsterlife.launch.session'), null);
 }
 
+{
+  const host = new EventTarget();
+  const replies = [];
+  const source = { postMessage: message => replies.push(message) };
+  const commands = [];
+  const stop = bindPirateSaveHost({ contentWindow: source }, { windowLike: host, storage: new MemoryStorage(),
+    executeOperation: async operation => { commands.push(operation); return { revision: 12, persisted: {}, outcome: { ok: true } }; } });
+  const data = { type: 'pocketmonster:pirate-operation-request-v1', requestId: 'operation-test-001', operation: { type: 'questState' } };
+  dispatchMessage(host, { source: {}, origin: 'null', data });
+  dispatchMessage(host, { source, origin: 'https://wrong.example', data });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(commands.length, 0, 'รับเฉพาะ iframe ที่ผูกกับ host นี้');
+  dispatchMessage(host, { source, origin: 'null', data });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(commands, [{ type: 'questState' }]);
+  assert.equal(replies[0].type, 'pocketmonster:pirate-operation-reply-v1');
+  assert.equal(replies[0].requestId, data.requestId);
+  assert.equal(replies[0].revision, 12);
+  assert.deepEqual(replies[0].outcome, { ok: true });
+  stop();
+}
 console.log('V9 Pirate opaque sandbox save bridge: PASS');

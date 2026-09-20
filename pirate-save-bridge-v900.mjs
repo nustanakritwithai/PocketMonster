@@ -1,3 +1,5 @@
+import { createPocketOperationClient, PIRATE_OPERATION_REQUEST_MESSAGE, PIRATE_OPERATION_REPLY_MESSAGE } from './pirate-operation-client.mjs';
+
 export const PIRATE_SAVE_PREFIX = 'pirate-fruit:';
 export const PIRATE_SAVE_MAX_KEY_LENGTH = 128;
 export const PIRATE_SAVE_MAX_VALUE_BYTES = 512 * 1024;
@@ -8,6 +10,102 @@ export const PIRATE_SAVE_SNAPSHOT_MESSAGE = 'pocketmonster:pirate-save-snapshot-
 export const PIRATE_SAVE_MUTATION_MESSAGE = 'pocketmonster:pirate-save-mutation-v1';
 
 const encoder = new TextEncoder();
+const STAT_KEYS = Object.freeze(['combat', 'vitality', 'blade', 'ranged', 'fruitPower', 'mana']);
+const CHECKPOINT_KEY = 'pirate-fruit:save-v1';
+const PROGRESSION_KEY = 'pirate-fruit:progression-v1';
+const INVENTORY_KEY = 'pirate-fruit:items-v1';
+const LOADOUT_KEY = 'pirate-fruit:loadout-v1';
+const BOATS_KEY = 'pirate-fruit:boats-v1';
+
+function parseRecord(value) {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+function safeLoadout(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  if (!source) return null;
+  const result = {
+    activeSet: source.activeSet === 'fruit' ? 'fruit' : 'weapon',
+    equippedWeaponKind: ['sword', 'gun', 'fighting-style'].includes(source.equippedWeaponKind)
+      ? source.equippedWeaponKind : 'fighting-style',
+    equippedSwordId: typeof source.equippedSwordId === 'string' ? source.equippedSwordId : null,
+    equippedGunId: typeof source.equippedGunId === 'string' ? source.equippedGunId : null,
+    equippedFightingStyleId: typeof source.equippedFightingStyleId === 'string' ? source.equippedFightingStyleId : 'combat',
+    equippedFruitId: typeof source.equippedFruitId === 'string' ? source.equippedFruitId : null,
+    fruitAwakened: source.fruitAwakened === true,
+  };
+  return result;
+}
+
+function safeLegacyLoadout(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  const rawSlots = source?.slots && typeof source.slots === 'object' ? source.slots : null;
+  if (!rawSlots) return null;
+  const slots = {
+    style: rawSlots.style === null ? null : (typeof rawSlots.style === 'string' ? rawSlots.style : 'basic-brawl'),
+    sword: rawSlots.sword === null ? null : (typeof rawSlots.sword === 'string' ? rawSlots.sword : null),
+    gun: rawSlots.gun === null ? null : (typeof rawSlots.gun === 'string' ? rawSlots.gun : null),
+    fruit: rawSlots.fruit === null ? null : (typeof rawSlots.fruit === 'string' ? rawSlots.fruit : null),
+  };
+  if (Object.prototype.hasOwnProperty.call(rawSlots, 'utility')) {
+    slots.utility = rawSlots.utility === null ? null : (typeof rawSlots.utility === 'string' ? rawSlots.utility : null);
+  }
+  const activeCategory = ['style', 'sword', 'gun', 'fruit', 'utility'].includes(source.activeCategory)
+    && slots[source.activeCategory] ? source.activeCategory : 'style';
+  return { slots, activeCategory };
+}
+
+function deriveStatAllocation(previousValue, nextValue) {
+  const before = parseRecord(previousValue)?.progression?.player;
+  const after = parseRecord(nextValue)?.progression?.player;
+  const beforeStats = before?.stats;
+  const afterStats = after?.stats;
+  if (!before || !after || !beforeStats || !afterStats
+    || !Number.isSafeInteger(before.statPoints) || !Number.isSafeInteger(after.statPoints)) return null;
+  const allocations = {};
+  let total = 0;
+  for (const key of STAT_KEYS) {
+    const previous = beforeStats[key];
+    const next = afterStats[key];
+    if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(next)) return null;
+    const delta = next - previous;
+    if (delta < 0) return null;
+    if (delta > 0) { allocations[key] = delta; total += delta; }
+  }
+  if (!total || before.statPoints - after.statPoints !== total) return null;
+  return { type: 'statAllocation', allocations };
+}
+
+export function derivePirateSaveOperation(storage, key, nextValue, previousValue = storage?.getItem?.(key)) {
+  if (!isPirateSaveKey(key) || typeof nextValue !== 'string') return null;
+  if (key === CHECKPOINT_KEY) return { type: 'checkpoint', checkpoint: nextValue };
+  if (key === PROGRESSION_KEY) return deriveStatAllocation(previousValue, nextValue);
+  if (key === BOATS_KEY) {
+    const before = parseRecord(previousValue);
+    const after = parseRecord(nextValue);
+    const id = after?.selectedBoatId;
+    // ส่งเฉพาะการเลือกเรือเดิม การซื้อและอัปเกรดต้องให้บริการเศรษฐกิจตัดสิน
+    if (typeof id !== 'string' || !id.length || id.length > 128
+      || before?.selectedBoatId === id || !before?.ownedBoatIds?.includes(id)) return null;
+    return { type: 'boatSelection', selectedBoatId: id };
+  }
+  if (key !== INVENTORY_KEY && key !== LOADOUT_KEY) return null;
+  const inventory = parseRecord(key === INVENTORY_KEY ? nextValue : storage?.getItem?.(INVENTORY_KEY));
+  const inventoryLoadout = safeLoadout(inventory?.loadout);
+  const legacy = parseRecord(key === LOADOUT_KEY ? nextValue : storage?.getItem?.(LOADOUT_KEY));
+  const loadout = safeLegacyLoadout(legacy);
+  if (!inventoryLoadout || !loadout) return null;
+  return {
+    type: 'loadout', inventoryLoadout, loadout,
+    quickslots: Array.isArray(inventory.quickslots)
+      ? [...inventory.quickslots.slice(0, 2), null, null].slice(0, 2)
+      : [null, null],
+  };
+}
 
 export function isPirateSaveKey(key) {
   return typeof key === 'string'
@@ -117,7 +215,8 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
       }
       values.set(normalizedKey, normalizedValue);
       totalBytes = totalBytes - previousBytes + nextBytes;
-      onMutation(Object.freeze({ op: 'set', key: normalizedKey, value: normalizedValue }));
+      const operation = derivePirateSaveOperation(storage, normalizedKey, normalizedValue, previous ?? null);
+      onMutation(Object.freeze({ op: 'set', key: normalizedKey, value: normalizedValue, ...(operation ? { operation } : {}) }));
     },
     removeItem(key) {
       const normalized = String(key);
@@ -133,6 +232,17 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
       totalBytes = 0;
       onMutation(Object.freeze({ op: 'clear' }));
     },
+    replaceEntries(entries = {}) {
+      values.clear();
+      totalBytes = 0;
+      for (const [key, value] of Object.entries(entries || {})) {
+        if (!isPirateSaveKey(key) || !validValue(value) || values.size >= PIRATE_SAVE_MAX_KEYS) continue;
+        const bytes = encoder.encode(value).byteLength;
+        if (totalBytes + bytes > PIRATE_SAVE_MAX_TOTAL_BYTES) break;
+        values.set(key, value);
+        totalBytes += bytes;
+      }
+    },
   });
   return storage;
 }
@@ -140,17 +250,43 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
 export function bindPirateSaveHost(frame, {
   windowLike = globalThis.window,
   storage = globalThis.localStorage,
+  loadSnapshot,
+  executeOperation,
 } = {}) {
   if (!windowLike?.addEventListener || !frame) return () => {};
+  let snapshotPromise = null;
+  const sendSnapshot = (source, requestId, entries) => {
+    source?.postMessage?.(Object.freeze({
+      type: PIRATE_SAVE_SNAPSHOT_MESSAGE,
+      requestId,
+      entries: entries && typeof entries === 'object' ? entries : readPirateSaveSnapshot(storage),
+      serverOperations: typeof executeOperation === 'function',
+    }), '*');
+  };
   const onMessage = event => {
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
+    if (message?.type === PIRATE_OPERATION_REQUEST_MESSAGE && validRequestId(message.requestId)) {
+      const source = event.source;
+      Promise.resolve().then(() => {
+        if (typeof executeOperation !== 'function') throw new Error('PIRATE_OPERATION_UNAVAILABLE');
+        return executeOperation(message.operation);
+      }).then(result => source?.postMessage?.({ type: PIRATE_OPERATION_REPLY_MESSAGE,
+        requestId: message.requestId, ok: true, revision: result.revision,
+        persisted: result.persisted, outcome: result.outcome }, '*'))
+        .catch(error => source?.postMessage?.({ type: PIRATE_OPERATION_REPLY_MESSAGE,
+          requestId: message.requestId, ok: false, errorCode: error?.code || error?.message || 'PIRATE_OPERATION_REJECTED',
+          errorMessage: 'ทำรายการ Pirate ไม่สำเร็จ กรุณาลองใหม่' }, '*'));
+      return;
+    }
     if (message?.type === PIRATE_SAVE_REQUEST_MESSAGE && validRequestId(message.requestId)) {
-      event.source?.postMessage?.(Object.freeze({
-        type: PIRATE_SAVE_SNAPSHOT_MESSAGE,
-        requestId: message.requestId,
-        entries: readPirateSaveSnapshot(storage),
-      }), '*');
+      if (typeof loadSnapshot !== 'function') {
+        sendSnapshot(event.source, message.requestId, readPirateSaveSnapshot(storage));
+      } else {
+        snapshotPromise ||= Promise.resolve().then(() => loadSnapshot())
+          .finally(() => { snapshotPromise = null; });
+        snapshotPromise.then(entries => sendSnapshot(event.source, message.requestId, entries)).catch(() => {});
+      }
       return;
     }
     if (message?.type !== PIRATE_SAVE_MUTATION_MESSAGE) return;
@@ -176,6 +312,7 @@ export async function installPirateSaveSandbox({
   if (!windowLike?.addEventListener || !windowLike.parent || windowLike.parent === windowLike) return false;
   if (typeof parentOrigin !== 'string' || !/^https?:\/\/[^/]+(?::\d+)?$/.test(parentOrigin)) return false;
   const requestId = sandboxRequestId(windowLike);
+  let serverOperations = false;
   const entries = await new Promise(resolve => {
     let settled = false;
     const finish = snapshot => {
@@ -189,6 +326,7 @@ export async function installPirateSaveSandbox({
       if (event.source !== windowLike.parent || event.origin !== parentOrigin) return;
       const message = event.data;
       if (message?.type !== PIRATE_SAVE_SNAPSHOT_MESSAGE || message.requestId !== requestId) return;
+      serverOperations = message.serverOperations === true;
       finish(message.entries && typeof message.entries === 'object' ? message.entries : {});
     };
     const timer = setTimeout(() => finish({}), Math.max(50, Math.min(Number(timeoutMs) || 3000, 10000)));
@@ -208,5 +346,8 @@ export async function installPirateSaveSandbox({
   } catch {
     return false;
   }
+  if (serverOperations) Object.defineProperty(windowLike, 'POCKETMONSTER_PIRATE_OPERATIONS', {
+    value: createPocketOperationClient({ parentOrigin, windowLike }), configurable: false, writable: false,
+  });
   return true;
 }

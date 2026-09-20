@@ -5,7 +5,7 @@ import {
   currentSelfPresenceId,
   isRemoteWorldPlayer,
   sanitizeOnlineWorldSnapshot,
-} from './world-presence-protocol.mjs?v=6';
+} from './world-presence-protocol.mjs?v=7';
 
 const DEFAULT_REMOTE_ANIMATION = Object.freeze({
   combatState: 'idle',

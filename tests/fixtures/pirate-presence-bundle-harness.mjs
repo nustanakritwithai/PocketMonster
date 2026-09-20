@@ -85,25 +85,11 @@ function compilePresenceRuntime(bundle, classes) {
   if (!block) throw new Error('Pirate bundle fixture could not locate the presence publisher/receiver');
 
   const messageIndex = bundle.lastIndexOf('pocketmonster:pirate-presence-v1', block.start);
-  // The current afcd701 bundle keeps the shared presentation sanitizers
-  // (`yd`/`bd`) in the same protocol prelude, anchored by `const mn=`;
-  // older bundles used `const Ei=`.  Starting at the prelude preserves the
-  // real helper dependencies instead of evaluating an incomplete publisher.
-  const protocolAnchors = [
-    bundle.lastIndexOf('const Ei=', messageIndex),
-    bundle.lastIndexOf('const mn=', messageIndex),
-    bundle.lastIndexOf('const Ri=', messageIndex),
-    // The merged central-transport bundle starts the shared sanitizer prelude
-    // at Oi; this keeps Cd and its real helper dependencies executable.
-    bundle.lastIndexOf('const Oi=', messageIndex),
-    bundle.lastIndexOf('const Ln=', messageIndex),
-  ].filter(index => index >= 0);
-  const protocolHelperStart = protocolAnchors.length > 0 ? Math.min(...protocolAnchors) : -1;
-  const declarationsStart = protocolHelperStart >= 0 ? protocolHelperStart : Math.max(
-    bundle.lastIndexOf('const ', messageIndex),
-    bundle.lastIndexOf('let ', messageIndex),
-    bundle.lastIndexOf('var ', messageIndex),
-  );
+  // อ้างขอบเขตจากค่าของ protocol แทนชื่อตัวแปรที่ minifier เปลี่ยนทุก build
+  // ชื่อ Ri ของ artifact ใหม่เป็น economy config ซึ่งดึงทั้ง app เข้ามาใน fixture
+  const visualKindsMarker = bundle.lastIndexOf('new Set(["slash","blade-trail","gun-shot"', messageIndex);
+  const precedingClass = classes.filter(candidate => candidate.end <= visualKindsMarker).at(-1);
+  const declarationsStart = precedingClass?.end ?? -1;
   if (messageIndex < 0 || declarationsStart < 0) {
     throw new Error('Pirate bundle fixture could not locate presence message declarations');
   }
@@ -153,7 +139,16 @@ function compilePresenceRuntime(bundle, classes) {
     throw new Error('Pirate bundle fixture could not locate boat catalog namespace');
   }
   const boatSource = `${bundle.slice(boatDeclarationStart, boatObjectEnd + 1)};`;
-  const executable = `${placementSource}\n${saveKeySource}\n${boatSource}\n${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
+  // ราคาเรืออ้าง shared catalog ในรุ่นใหม่ ต้องโหลดค่าจริงที่ bundle ใช้ด้วย
+  const sharedBoatName = boatSource.match(/price:([A-Za-z_$][\w$]*)\["training-dinghy"\]\.price/)?.[1];
+  let sharedBoatSource = '';
+  if (sharedBoatName) {
+    const declaration = bundle.lastIndexOf(`${sharedBoatName}={`, boatDeclarationStart);
+    if (declaration < 0) throw new Error('Pirate fixture could not locate shared boat progression catalog');
+    const start = bundle.indexOf('{', declaration);
+    sharedBoatSource = `const ${sharedBoatName}=${bundle.slice(start, matchingBrace(bundle, start) + 1)};`;
+  }
+  const executable = `${placementSource}\n${saveKeySource}\n${sharedBoatSource}\n${boatSource}\n${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
   return new Function(fieldHelper, executable)(defineClassField);
 }
 

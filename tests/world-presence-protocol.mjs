@@ -300,7 +300,7 @@ assert.equal(intentPose.monsterIntents[0].forwardX, .6, 'monster intent directio
 assert.equal(sanitizeOnlineWorldPose({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0, monsterIntents: [] }), null, 'monster intents require explicit outbound opt-in');
 const root = new URL('..', import.meta.url);
 const chat = fs.readFileSync(new URL('chat-runtime.mjs', root), 'utf8');
-assert.match(chat, /createPresenceRouteDiagnostics.*world-presence-protocol\.mjs\?v=6/, 'chat runtime owns local route diagnostics');
+assert.match(chat, /createPresenceRouteDiagnostics.*world-presence-protocol\.mjs\?v=7/, 'chat runtime owns local route diagnostics');
 assert.match(chat, /const snapshot = window\.POCKETMONSTER_WORLD_STATE\?\.\(\);\s*const frame = buildWorldPosFrame\(snapshot\);/, 'outbound frames are validated before the socket');
 assert.match(chat, /filterRemotePlayers\(payload\.players, currentSelfPresenceId\(\)\)/, 'inbound snapshots drop self at the ingress');
 const presence = fs.readFileSync(new URL('world-presence-v800.mjs', root), 'utf8');
@@ -308,7 +308,7 @@ assert.match(presence, /if \(!isRemoteWorldPlayer\(item, selfId\)\) continue;/, 
 assert.match(presence, /locomotion: pos\?\.locomotion/, 'published world state forwards locomotion');
 assert.match(presence, /animation: pos\?\.animation/, 'published world state forwards animation');
 const bridge = fs.readFileSync(new URL('online-world-bridge-v900.mjs', root), 'utf8');
-assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=6'/, 'online bridge imports the shared protocol');
+assert.match(bridge, /from '\.\/world-presence-protocol\.mjs\?v=7'/, 'online bridge imports the shared protocol');
 assert.doesNotMatch(bridge, /LOCOMOTION_VALUES = new Set/, 'online bridge does not declare a second locomotion vocabulary');
 assert.doesNotMatch(bridge, /COMBAT_STATE_VALUES = new Set/, 'online bridge does not declare a second combat vocabulary');
 const bootstrap = fs.readFileSync(new URL('scripts/build-github-pages.mjs', root), 'utf8');

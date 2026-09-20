@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=970';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=974';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -9,7 +9,7 @@ import {
 import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
-} from './online-world-bridge-v900.mjs?v=9';
+} from './online-world-bridge-v900.mjs?v=10';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -158,7 +158,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '89');
+  url.searchParams.set('shellRevision', '93');
   return url.href;
 }
 
@@ -673,7 +673,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-central-hp-1');
+await import('./chat-runtime.mjs?v=8.4.0-original-world-1');
 monsterStateProvider = createMonsterHttpProvider({
   config: window.POCKETMONSTER_RUNTIME_CONFIG,
   sessionToken: window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',

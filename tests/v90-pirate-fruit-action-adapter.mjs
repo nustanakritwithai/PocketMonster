@@ -22,6 +22,11 @@ assert.equal(
   'ordinary W speed walks',
 );
 assert.equal(
+  locomotion.sample(host(), 101.5, { distanceSq: PIRATE_FRUIT_WALK_DISTANCE_SQ * 2, speed: 0 }).locomotion,
+  'walk',
+  'visible host movement keeps Studio walking while controller speed is temporarily stale',
+);
+assert.equal(
   locomotion.sample(host(), 102, { distanceSq: PIRATE_FRUIT_WALK_DISTANCE_SQ * 2, speed: PIRATE_FRUIT_RUN_SPEED }).locomotion,
   'walk',
   'movement at the run threshold still walks',

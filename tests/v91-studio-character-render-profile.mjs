@@ -58,6 +58,11 @@ assert.equal(material.normalMap.colorSpace, ''); assert.equal(fetches, 1, 'verif
 assert.equal(material.map.colorSpace, 'srgb-host'); assert.deepEqual(material.map.repeatValue, [2, 3]);
 assert.equal(material.needsUpdate, true); assert.equal(root.children[0].castShadow, true); assert.equal(root.children[0].receiveShadow, true);
 assert.equal(owned.length, 2, 'decoded textures are owned by the visual handle');
+resetStudioCharacterProfileTextureCache();
+const beforeMissingNode = fetches;
+const missingNode = await applyStudioCharacterRenderProfile(new Node([]), profile, options);
+assert.equal(missingNode.assigned, 0);
+assert.equal(fetches, beforeMissingNode, 'ไม่โหลด texture ของ material ที่ไม่มีในโมเดล');
 const failedHash = structuredClone(profile); failedHash.textures[0].integrity = '0'.repeat(64);
 const fallbackMaterial = { map: 'scalar-fallback' }, fallbackRoot = new Node([]);
 fallbackRoot.children.push(new Node([0], fallbackMaterial));

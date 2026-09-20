@@ -2,6 +2,8 @@
 // Bridges and renderers may add structural guards, but must not declare a second
 // locomotion/combat enum or drop validated action fields.
 
+import { sanitizePirateOriginalWorld } from './pirate-original-world-contract.mjs?v=1';
+
 export const WORLD_PRESENCE_PROTOCOL_VERSION = 'world-presence-protocol/v2';
 export const PIRATE_CENTRAL_AUTHORITY_CONTRACT = 'pirate-central-spatial/1';
 export const PIRATE_CENTRAL_AUTHORITY_SCHEMA_VERSION = 1;
@@ -678,12 +680,15 @@ export function sanitizeOnlineWorldSnapshot(payload, expectedZone) {
     if (!actors) return null;
   }
   const centralAuthority = sanitizeCentralAuthority(payload.centralAuthority);
+  const pirateWorld = zone === PIRATE_CENTRAL_AUTHORITY_TRANSPORT_ZONE
+    ? sanitizePirateOriginalWorld(payload.pirateWorld) : null;
   return Object.freeze({
     zone,
     ...(generation === undefined ? {} : { generation }),
     players: Object.freeze(players),
     ...(payload.actors === undefined ? {} : { actors }),
     ...(centralAuthority ? { centralAuthority } : {}),
+    ...(pirateWorld ? { pirateWorld } : {}),
   });
 }
 

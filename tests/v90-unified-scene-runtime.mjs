@@ -16,6 +16,7 @@ const actualSources = new Map([
   ['/scene-route-controller-v900.mjs', read('scene-route-controller-v900.mjs')],
   ['/online-world-bridge-v900.mjs', read('online-world-bridge-v900.mjs')],
   ['/world-presence-protocol.mjs', read('world-presence-protocol.mjs')],
+  ['/pirate-original-world-contract.mjs', read('pirate-original-world-contract.mjs')],
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
   ['/unified-mobile-controls-v900.mjs', read('unified-mobile-controls-v900.mjs')],
   ['/mobile-dual-pointer-input-v900.mjs', read('mobile-dual-pointer-input-v900.mjs')],
@@ -26,7 +27,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=970',
+    runtime: './boot-pirate-fruit-v900.mjs?v=974',
   }),
   Object.freeze({
     world: 'pocket-monster',
