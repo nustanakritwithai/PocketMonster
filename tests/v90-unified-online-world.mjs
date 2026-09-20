@@ -49,7 +49,7 @@ for (const file of [
 }
 
 assert.equal(indexHtml, v900Html, 'active and versioned V9 entries stay byte-identical');
-assert.match(indexHtml, /entry\-preload\-v900\.mjs\?v=1004/, 'active HTML cache-busts the unified ship-control entry');
+assert.match(indexHtml, /entry\-preload\-v900\.mjs\?v=1005/, 'active HTML cache-busts the unified ship-control entry');
 assert.match(indexHtml, /style\-v900\.css\?v=982/, 'active HTML cache-busts the helm placement beside chat');
 assert.match(sceneHtml, /style\-v900\.css\?v=982/, 'hosted scene cache-busts the same V9 stylesheet');
 assert.doesNotMatch(sceneHtml, /style\-v900\.css\?v=981/, 'hosted scene cannot mix a stale stylesheet');
@@ -60,7 +60,7 @@ assert.match(minimapOwner, /pocketmonster:persistent-minimap-owner-v2/, 'product
 assert.match(minimapOwner, /MAP_RASTER_SIZE = 160/, 'production minimap owner restores the legacy 160px terrain raster');
 assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_NEAR_PADDING = 18/, 'production minimap owner restores legacy near-range padding');
 assert.match(minimapOwner, /PIRATE_FRUIT_MINIMAP_LOCAL_SCALE = 1\.3/, 'production minimap owner restores legacy local island scale');
-assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online\-world\-shell\-v900\.mjs\?v=95'\)/, 'top-level authenticates once before starting the cache-busted shell');
+assert.match(entry, /await prepareLaunch\(config\)[\s\S]*await import\('\.\/online\-world\-shell\-v900\.mjs\?v=96'\)/, 'top-level authenticates once before starting the cache-busted shell');
 assert.match(entry, /config\.manifestValid !== true \|\| config\.featureFlags\?\.launchTicket !== true[\s\S]*ONLINE_CONFIG_REQUIRED/, 'V9 entry fails closed before shell boot when online launch configuration is unavailable');
 assert.match(entry, /requireActiveOnlineLaunchSession\(config, launch\.session\)/, 'V9 entry verifies the redeemed session before patching or scene boot');
 assert.match(entry, /healthVersionGate/, 'persistent parent owns the one Server health/version gate');
@@ -138,10 +138,10 @@ assert.match(sceneEntry, /endParentSession\('scene-session-ended'\)/, 'child log
 assert.match(sceneEntry, /requireActiveOnlineLaunchSession\(config, launchSession\)/, 'hosted scene rejects missing, malformed, or expired sessions');
 assert.match(sceneEntry, /POCKETMONSTER_SCENE_EMBEDDED = true/, 'hosted scene explicitly disables standalone transport boot');
 assert.match(sceneEntry, /if \(!isHostedOnlineWorldScene\(window\)\)[\s\S]*throw new Error/, 'scene boot fails closed unless the exact-origin parent shell is present');
-assert.match(shell, /combined-worlds-v900\.mjs\?v=974/, 'persistent shell cache-busts the changed world catalog');
+assert.match(shell, /combined-worlds-v900\.mjs\?v=975/, 'persistent shell cache-busts the changed world catalog');
 assert.match(shell, /searchParams\.set\('shellRevision', '93'\)/, 'persistent shell cache-busts the changed scene HTML');
-assert.match(worlds, /combined-worlds-v900\.mjs\?v=974/, 'scene router cache-busts the changed world catalog');
-assert.match(sceneEntry, /worlds-v900\.mjs\?v=978/, 'hosted scene cache-busts the three-world router');
+assert.match(worlds, /combined-worlds-v900\.mjs\?v=975/, 'scene router cache-busts the changed world catalog');
+assert.match(sceneEntry, /worlds-v900\.mjs\?v=979/, 'hosted scene cache-busts the three-world router');
 assert.match(worlds, /const worldPresenceBindings = new Map\(\)/, 'scene router owns each runtime presence binding');
 assert.match(worlds, /const activePresenceBindings = capturePresenceBindings\(\)[\s\S]*await import\(world\.runtime\)[\s\S]*worldPresenceBindings\.set\(world\.id, capturePresenceBindings\(\)\)[\s\S]*lifecycle\.unmount\?\.\(\)[\s\S]*applyPresenceBindings\(activePresenceBindings\)/, 'Pocket prewarm restores the active Pirate presence provider after import');
 assert.match(worlds, /runtimeLifecycles\.get\(world\.id\)\?\.mount\?\.\(\)[\s\S]*applyPresenceBindings\(worldPresenceBindings\.get\(world\.id\)\)/, 'mount activates the selected world presence provider');

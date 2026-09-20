@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.5384e487c6b8",
+  "buildId": "8.4.0.content.587a17e77e24",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T21:30:07.809Z",
+  "publishedAtUtc": "2026-09-20T21:58:47.988Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "pirate-central-state-client.mjs",
-      "size": 12139,
-      "sha256": "bc8898aaf8d6df62946995eef6451eb85d7f868b0b5c5cc7ec518cec28b81fcc"
+      "size": 13920,
+      "sha256": "a99bbf8898c4411ee19a7ff906c688c58115761ed80019f54e71c848a1d1ba0a"
     },
     {
       "path": "pirate-fruit-control-hud-v900.mjs",

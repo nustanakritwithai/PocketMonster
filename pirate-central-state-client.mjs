@@ -18,14 +18,32 @@ function boundedOperation(operation) {
 export function sanitizePirateStateOperation(value) {
   const source = operationObject(value);
   if (!source || typeof source.type !== 'string') return null;
+  if (source.type === 'tradeQuote') {
+    if (source.schemaVersion !== 1 || !['buy', 'sell'].includes(source.action)
+      || !Number.isSafeInteger(source.quantity) || source.quantity < 1 || source.quantity > 999
+      || !['islandId', 'commodityId'].every(key => typeof source[key] === 'string' && source[key].length > 0 && source[key].length <= 128)) return null;
+    return { type: source.type, schemaVersion: 1, action: source.action, quantity: source.quantity,
+      islandId: source.islandId, commodityId: source.commodityId };
+  }
+  if (source.type === 'trade') {
+    if (source.schemaVersion !== 1 || !['buy', 'sell'].includes(source.action)
+      || !Number.isSafeInteger(source.quantity) || source.quantity < 1 || source.quantity > 999
+      || !['islandId', 'commodityId', 'idempotencyKey'].every(key => typeof source[key] === 'string' && source[key].length > 0 && source[key].length <= 128)
+      || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
+    if (source.expectedUnitPrice !== undefined && (!Number.isSafeInteger(source.expectedUnitPrice)
+      || source.expectedUnitPrice < 1 || source.expectedUnitPrice > 1e9)) return null;
+    return { type: 'trade', schemaVersion: 1, action: source.action, quantity: source.quantity,
+      islandId: source.islandId, commodityId: source.commodityId, idempotencyKey: source.idempotencyKey,
+      ...(source.expectedUnitPrice === undefined ? {} : { expectedUnitPrice: source.expectedUnitPrice }) };
+  }
   if (source.type === 'vitalsInput') {
     if (source.contract !== 'pirate-vitals/1' || ['blocking', 'mounted', 'sprinting'].some(key => typeof source[key] !== 'boolean')) return null;
     return { type: source.type, contract: source.contract, blocking: source.blocking, mounted: source.mounted, sprinting: source.sprinting };
   }
-  if (['vitalsPotion', 'vitalsBuff', 'vitalsRespawn'].includes(source.type)) {
+  if (['vitalsPotion', 'vitalsBuff', 'vitalsRespawn', 'vitalsSkill'].includes(source.type)) {
     if (typeof source.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
     const result = { type: source.type, idempotencyKey: source.idempotencyKey };
-    const field = source.type === 'vitalsPotion' ? 'potionId' : source.type === 'vitalsBuff' ? 'skillId' : null;
+    const field = source.type === 'vitalsPotion' ? 'potionId' : ['vitalsBuff', 'vitalsSkill'].includes(source.type) ? 'skillId' : null;
     if (field) {
       if (typeof source[field] !== 'string' || !source[field].length || source[field].length > 128) return null;
       result[field] = source[field];
@@ -190,7 +208,7 @@ export function createPirateStateOperationQueue({ client, revision = 0, onPersis
           const result = await client.commitOperation(currentRevision, safeOperation, operationCommandId);
           if (!Number.isSafeInteger(result.revision) || result.revision < currentRevision) throw new Error('PIRATE_STATE_REVISION_INVALID');
           currentRevision = result.revision;
-          onPersisted(result.persisted);
+          if (result.persisted != null) onPersisted(result.persisted);
           return result;
         } catch (error) {
           if (error?.status === undefined && !transportRetried
