@@ -445,6 +445,10 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       lastAction: null, lastPresentation: null,
       sampleController: kind === 'player' ? createStudioControllerSampler() : null,
       motionReady: false, motionPosition: new kit.Vector3(),
+      // The controller can lag behind the visible host for a frame while the
+      // world movement step is applied. Keep both samples so Studio locomotion
+      // follows the object the player actually sees during that handoff.
+      lastHostX: host.position.x, lastHostZ: host.position.z,
       lastX: host.position.x, lastZ: host.position.z, source: 'pirate-fruit' };
     visuals.push(item);
     if (kind === 'player') ownedMonsterCarry.setPlayerHost(handle.root);
@@ -610,12 +614,19 @@ export async function installPirateFruitPocketPresentation({ THREE, vendor } = {
       // The visible host is a stationary child. Sample the moving controller or
       // world position; local host coordinates previously kept Studio on idle.
       const controller = item.kind === 'player' ? globalThis.__combat?.controller : null;
-      const point = controller?.position && Number.isFinite(controller.position.x) && Number.isFinite(controller.position.z)
-        ? controller.position : item.host.getWorldPosition(item.motionPosition);
-      const dx = item.motionReady ? point.x - item.lastX : 0, dz = item.motionReady ? point.z - item.lastZ : 0;
-      const distanceSq = dx * dx + dz * dz, moving = distanceSq > 0.00002;
+      const hostPoint = item.host.getWorldPosition(item.motionPosition);
+      const controllerPoint = controller?.position && Number.isFinite(controller.position.x) && Number.isFinite(controller.position.z)
+        ? controller.position : null;
+      const hostDx = item.motionReady ? hostPoint.x - item.lastHostX : 0;
+      const hostDz = item.motionReady ? hostPoint.z - item.lastHostZ : 0;
+      const controllerDx = controllerPoint && item.motionReady ? controllerPoint.x - item.lastX : 0;
+      const controllerDz = controllerPoint && item.motionReady ? controllerPoint.z - item.lastZ : 0;
+      const hostDistanceSq = hostDx * hostDx + hostDz * hostDz;
+      const controllerDistanceSq = controllerDx * controllerDx + controllerDz * controllerDz;
+      const distanceSq = Math.max(hostDistanceSq, controllerDistanceSq), moving = distanceSq > 0.00002;
       item.motionReady = true;
-      item.lastX = point.x; item.lastZ = point.z;
+      item.lastHostX = hostPoint.x; item.lastHostZ = hostPoint.z;
+      item.lastX = controllerPoint?.x ?? hostPoint.x; item.lastZ = controllerPoint?.z ?? hostPoint.z;
       if (item.sourcePoseDriven) {
         item.handle.update?.(dt, { moving, locomotion: item.kind === 'remote' ? remoteLocomotionFor(item.host, moving) : undefined });
         item.rigRetargeter?.update();
