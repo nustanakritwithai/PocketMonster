@@ -18,6 +18,11 @@ function boundedOperation(operation) {
 export function sanitizePirateStateOperation(value) {
   const source = operationObject(value);
   if (!source || typeof source.type !== 'string') return null;
+  if (source.type === 'boatSelection') {
+    const id = source.selectedBoatId;
+    return typeof id === 'string' && id.length > 0 && id.length <= 128
+      ? { type: 'boatSelection', selectedBoatId: id } : null;
+  }
   if (source.type === 'checkpoint') {
     if (typeof source.checkpoint !== 'string' || new TextEncoder().encode(source.checkpoint).byteLength > MAX_OPERATION_BYTES) return null;
     return boundedOperation({ type: 'checkpoint', checkpoint: source.checkpoint });

@@ -20,6 +20,9 @@ on:
       - 'online-world-shell-v900.mjs'
       - 'pirate-fruit-offline/**'
       - 'patch-manifest.json'
+      - 'pirate-central-state-client.mjs'
+      - 'pirate-save-bridge-v900.mjs'
+      - 'tests/pirate-boat-selection-operation.mjs'
       - 'tests/*monster*control*.mjs'
       - 'tests/monster-command-adapter.mjs'
       - '.github/workflows/monster-controls-ci.yml'
@@ -72,6 +75,11 @@ jobs:
           node tests/v90-pirate-presence-readonly.mjs
       - name: ตรวจระบบ Client ที่เกี่ยวข้อง
         run: npm run check
+      - name: ตรวจการบันทึกคำสั่ง Pirate เดิมผ่านระบบกลาง
+        run: |
+          node tests/pirate-central-state-client.mjs
+          node tests/pirate-boat-selection-operation.mjs
+          node tests/v90-pirate-save-bridge.mjs
       - name: ตรวจ artifact ทุกโลก
         run: node tests/v90-unified-pages-artifact.mjs
       - name: เก็บแพตช์สำหรับตรวจและติดตั้ง

@@ -20,7 +20,8 @@ ENTRY_MODULE = ROOT / 'studio-browser-entry.mjs'
 template = re.sub(r'<script\b[^>]*>[\s\S]*?</script>', '', (ROOT / 'v900.html').read_text(), flags=re.I)
 # Isolated fixture has no online auth handler. Production code is unchanged.
 template = template.replace('class="account-gate"', 'class="account-gate hidden"')
-template = template.replace('<body>', '<body data-control-panel="human" data-combined-world="pirate-fruit">')
+# fixture ไม่เรียก entry-preload/auth จึงต้องเริ่มหลัง boot gate เหมือนเกมที่เข้าแล้ว
+template = re.sub(r'<body\b[^>]*>', '<body data-control-panel="human" data-combined-world="pirate-fruit">', template, count=1)
 ENTRY_MODULE.write_text("import './boot-pirate-fruit-v900.mjs';\nwindow.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS.activate('pirate-fruit');\n")
 ENTRY.write_text(template.replace('</body>', '<script type="module" src="./studio-browser-entry.mjs"></script></body>'))
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -113,6 +114,7 @@ try:
         before = snapshot()
         zone = page.locator('#joystick').bounding_box()
         assert zone, 'Actual mobile joystick zone missing'
+        assert page.locator('#joystick').is_visible(), 'Joystick must be visible after fixture bootstrap'
         x, y = zone['x'] + zone['width'] * .3, zone['y'] + zone['height'] * .6
         page.mouse.move(x, y)
         page.mouse.down()

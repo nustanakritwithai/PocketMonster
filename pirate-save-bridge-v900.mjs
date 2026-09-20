@@ -13,6 +13,7 @@ const CHECKPOINT_KEY = 'pirate-fruit:save-v1';
 const PROGRESSION_KEY = 'pirate-fruit:progression-v1';
 const INVENTORY_KEY = 'pirate-fruit:items-v1';
 const LOADOUT_KEY = 'pirate-fruit:loadout-v1';
+const BOATS_KEY = 'pirate-fruit:boats-v1';
 
 function parseRecord(value) {
   if (typeof value !== 'string') return null;
@@ -81,6 +82,15 @@ export function derivePirateSaveOperation(storage, key, nextValue, previousValue
   if (!isPirateSaveKey(key) || typeof nextValue !== 'string') return null;
   if (key === CHECKPOINT_KEY) return { type: 'checkpoint', checkpoint: nextValue };
   if (key === PROGRESSION_KEY) return deriveStatAllocation(previousValue, nextValue);
+  if (key === BOATS_KEY) {
+    const before = parseRecord(previousValue);
+    const after = parseRecord(nextValue);
+    const id = after?.selectedBoatId;
+    // ส่งเฉพาะการเลือกเรือเดิม การซื้อและอัปเกรดต้องให้บริการเศรษฐกิจตัดสิน
+    if (typeof id !== 'string' || !id.length || id.length > 128
+      || before?.selectedBoatId === id || !before?.ownedBoatIds?.includes(id)) return null;
+    return { type: 'boatSelection', selectedBoatId: id };
+  }
   if (key !== INVENTORY_KEY && key !== LOADOUT_KEY) return null;
   const inventory = parseRecord(key === INVENTORY_KEY ? nextValue : storage?.getItem?.(INVENTORY_KEY));
   const inventoryLoadout = safeLoadout(inventory?.loadout);

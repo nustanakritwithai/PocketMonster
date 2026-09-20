@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.b579e2902549",
+  "buildId": "8.4.0.content.6adc8ec91153",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T18:27:58.040Z",
+  "publishedAtUtc": "2026-09-20T18:37:24.458Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "pirate-central-state-client.mjs",
-      "size": 8834,
-      "sha256": "0404fb234f1f8c9658a0542ca016a11b2887732db1563423ce0e1184202a593a"
+      "size": 9050,
+      "sha256": "a526d3ff23df59ee745fd2aeb0567314be799b749b20ed11e89d3a27c7f2847c"
     },
     {
       "path": "pirate-fruit-control-hud-v900.mjs",
@@ -797,8 +797,8 @@
     },
     {
       "path": "pirate-save-bridge-v900.mjs",
-      "size": 13938,
-      "sha256": "1f186f717debe3b4fa33b7f563020ceb0aa0f755032bcefbbf585f2d721f6381"
+      "size": 14566,
+      "sha256": "1bda3db1c389df6424661e9b8ef2c03deb9fb23bae4e802ecf3015724bf986c1"
     },
     {
       "path": "pocket-hud-view-model.mjs",
