@@ -2,7 +2,7 @@
 const KEYS = Object.freeze({ checkpoint: 'pirate-fruit:save-v1', progression: 'pirate-fruit:progression-v1',
   inventory: 'pirate-fruit:items-v1', boats: 'pirate-fruit:boats-v1', loadout: 'pirate-fruit:loadout-v1', cargo: 'pirate-fruit:cargo-v1' });
 const STAT_IDS = new Set(['combat', 'vitality', 'blade', 'ranged', 'fruitPower', 'mana']);
-const MAX_OPERATION_BYTES = 384 * 1024;
+const MAX_OPERATION_BYTES = 64 * 1024;
 const MAX_OPERATION_QUEUE = 32;
 
 function operationObject(value) {
@@ -82,6 +82,7 @@ export function createPirateCentralStateClient({ config, getSessionToken, fetchI
       if (!response.ok || payload?.ok !== true) {
         const error = new Error(payload?.errorCode || payload?.code || 'PIRATE_STATE_UNAVAILABLE');
         error.status = response.status;
+        error.code = payload?.errorCode || payload?.code;
         error.serverRevision = Number.isSafeInteger(payload?.revision) ? payload.revision : undefined;
         throw error;
       }
@@ -112,7 +113,7 @@ export function createPirateCentralStateClient({ config, getSessionToken, fetchI
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error('REVISION_REQUIRED');
       const safeOperation = sanitizePirateStateOperation(operation);
       if (!safeOperation) throw new Error('PIRATE_STATE_OPERATION_INVALID');
-      if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(idempotencyKey)) throw new Error('COMMAND_ID_INVALID');
+      if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(idempotencyKey)) throw new Error('COMMAND_ID_INVALID');
       const result = await request('POST', token, {
         contract: 'pirate-original-state/1', commandId: idempotencyKey, expectedRevision, operation: safeOperation,
       }, 'api/pirate/state/operation');
@@ -130,10 +131,11 @@ export function createPirateStateOperationQueue({ client, revision = 0, onPersis
     if (!safeOperation) return Promise.reject(new Error('PIRATE_STATE_OPERATION_INVALID'));
     if (pending >= MAX_OPERATION_QUEUE) return Promise.reject(new Error('PIRATE_STATE_OPERATION_QUEUE_FULL'));
     pending += 1;
-    const operationCommandId = globalThis.crypto?.randomUUID?.()
-      || `pirate-op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const run = chain.then(async () => {
       let conflictRetried = false;
+      let transportRetried = false;
+      let operationCommandId = globalThis.crypto?.randomUUID?.()
+        || `pirate-op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       while (true) {
         try {
           const result = await client.commitOperation(currentRevision, safeOperation, operationCommandId);
@@ -142,11 +144,17 @@ export function createPirateStateOperationQueue({ client, revision = 0, onPersis
           onPersisted(result.persisted);
           return result;
         } catch (error) {
-          if (conflictRetried || error?.status !== 409) { onError(error); throw error; }
+          if (error?.status === undefined && !transportRetried) {
+            transportRetried = true;
+            continue;
+          }
+          if (conflictRetried || error?.status !== 409 || error?.code !== 'STATE_CONFLICT') { onError(error); throw error; }
           conflictRetried = true;
           const latest = await client.read();
           if (latest?.initialized !== true || !Number.isSafeInteger(latest.revision)) throw error;
           currentRevision = latest.revision;
+          operationCommandId = globalThis.crypto?.randomUUID?.()
+            || `pirate-op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
         }
       }
     }).finally(() => { pending -= 1; });

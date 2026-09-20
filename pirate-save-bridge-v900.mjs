@@ -8,6 +8,89 @@ export const PIRATE_SAVE_SNAPSHOT_MESSAGE = 'pocketmonster:pirate-save-snapshot-
 export const PIRATE_SAVE_MUTATION_MESSAGE = 'pocketmonster:pirate-save-mutation-v1';
 
 const encoder = new TextEncoder();
+const STAT_KEYS = Object.freeze(['combat', 'vitality', 'blade', 'ranged', 'fruitPower', 'mana']);
+const CHECKPOINT_KEY = 'pirate-fruit:save-v1';
+const PROGRESSION_KEY = 'pirate-fruit:progression-v1';
+const INVENTORY_KEY = 'pirate-fruit:items-v1';
+const LOADOUT_KEY = 'pirate-fruit:loadout-v1';
+
+function parseRecord(value) {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+function safeLoadout(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  if (!source) return null;
+  const result = {
+    activeSet: source.activeSet === 'fruit' ? 'fruit' : 'weapon',
+    equippedWeaponKind: ['sword', 'gun', 'fighting-style'].includes(source.equippedWeaponKind)
+      ? source.equippedWeaponKind : 'fighting-style',
+    equippedSwordId: typeof source.equippedSwordId === 'string' ? source.equippedSwordId : null,
+    equippedGunId: typeof source.equippedGunId === 'string' ? source.equippedGunId : null,
+    equippedFightingStyleId: typeof source.equippedFightingStyleId === 'string' ? source.equippedFightingStyleId : 'combat',
+    equippedFruitId: typeof source.equippedFruitId === 'string' ? source.equippedFruitId : null,
+    fruitAwakened: source.fruitAwakened === true,
+  };
+  return result;
+}
+
+function safeLegacyLoadout(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  const rawSlots = source?.slots && typeof source.slots === 'object' ? source.slots : null;
+  if (!rawSlots) return null;
+  const slots = {
+    style: rawSlots.style === null ? null : (typeof rawSlots.style === 'string' ? rawSlots.style : 'basic-brawl'),
+    sword: rawSlots.sword === null ? null : (typeof rawSlots.sword === 'string' ? rawSlots.sword : null),
+    gun: rawSlots.gun === null ? null : (typeof rawSlots.gun === 'string' ? rawSlots.gun : null),
+    fruit: rawSlots.fruit === null ? null : (typeof rawSlots.fruit === 'string' ? rawSlots.fruit : null),
+  };
+  const activeCategory = ['style', 'sword', 'gun', 'fruit'].includes(source.activeCategory)
+    && slots[source.activeCategory] ? source.activeCategory : 'style';
+  return { slots, activeCategory };
+}
+
+function deriveStatAllocation(previousValue, nextValue) {
+  const before = parseRecord(previousValue)?.progression?.player;
+  const after = parseRecord(nextValue)?.progression?.player;
+  const beforeStats = before?.stats;
+  const afterStats = after?.stats;
+  if (!before || !after || !beforeStats || !afterStats
+    || !Number.isSafeInteger(before.statPoints) || !Number.isSafeInteger(after.statPoints)) return null;
+  const allocations = {};
+  let total = 0;
+  for (const key of STAT_KEYS) {
+    const previous = beforeStats[key];
+    const next = afterStats[key];
+    if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(next)) return null;
+    const delta = next - previous;
+    if (delta < 0) return null;
+    if (delta > 0) { allocations[key] = delta; total += delta; }
+  }
+  if (!total || before.statPoints - after.statPoints !== total) return null;
+  return { type: 'statAllocation', allocations };
+}
+
+export function derivePirateSaveOperation(storage, key, nextValue, previousValue = storage?.getItem?.(key)) {
+  if (!isPirateSaveKey(key) || typeof nextValue !== 'string') return null;
+  if (key === CHECKPOINT_KEY) return { type: 'checkpoint', checkpoint: nextValue };
+  if (key === PROGRESSION_KEY) return deriveStatAllocation(previousValue, nextValue);
+  if (key !== INVENTORY_KEY && key !== LOADOUT_KEY) return null;
+  const inventory = parseRecord(key === INVENTORY_KEY ? nextValue : storage?.getItem?.(INVENTORY_KEY));
+  const inventoryLoadout = safeLoadout(inventory?.loadout);
+  const legacy = parseRecord(key === LOADOUT_KEY ? nextValue : storage?.getItem?.(LOADOUT_KEY));
+  const loadout = safeLegacyLoadout(legacy);
+  if (!inventoryLoadout || !loadout) return null;
+  return {
+    type: 'loadout', inventoryLoadout, loadout,
+    quickslots: Array.isArray(inventory.quickslots)
+      ? [...inventory.quickslots.slice(0, 2), null, null].slice(0, 2)
+      : [null, null],
+  };
+}
 
 export function isPirateSaveKey(key) {
   return typeof key === 'string'
@@ -67,7 +150,6 @@ export function applyPirateSaveMutation(storage, mutation) {
       const nextBytes = encoder.encode(mutation.value).byteLength;
       if (totalBytes - previousBytes + nextBytes > PIRATE_SAVE_MAX_TOTAL_BYTES) return false;
       storage.setItem(mutation.key, mutation.value);
-      storage.recordOperation?.(mutation);
       return true;
     }
     if (mutation.op === 'remove') {
@@ -118,7 +200,8 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
       }
       values.set(normalizedKey, normalizedValue);
       totalBytes = totalBytes - previousBytes + nextBytes;
-      onMutation(Object.freeze({ op: 'set', key: normalizedKey, value: normalizedValue }));
+      const operation = derivePirateSaveOperation(storage, normalizedKey, normalizedValue, previous ?? null);
+      onMutation(Object.freeze({ op: 'set', key: normalizedKey, value: normalizedValue, ...(operation ? { operation } : {}) }));
     },
     removeItem(key) {
       const normalized = String(key);
@@ -144,9 +227,6 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
         values.set(key, value);
         totalBytes += bytes;
       }
-    },
-    recordOperation(mutation) {
-      if (mutation?.operation && typeof mutation.operation === 'object') onMutation(Object.freeze({ ...mutation }));
     },
   });
   return storage;

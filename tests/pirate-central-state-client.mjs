@@ -59,5 +59,5 @@ assert.equal(operationResult.revision, 13);
 assert.equal(operationCalls.length, 3, 'conflict retry reads current revision before retrying');
 assert.equal(JSON.parse(operationCalls[2].init.body).expectedRevision, 12);
 assert.equal(JSON.parse(operationCalls[2].init.body).operation.allocations.vitality, 2);
-assert.equal(JSON.parse(operationCalls[0].init.body).commandId, JSON.parse(operationCalls[2].init.body).commandId, 'conflict retry keeps idempotency key');
+assert.notEqual(JSON.parse(operationCalls[0].init.body).commandId, JSON.parse(operationCalls[2].init.body).commandId, 'definite revision conflict gets a fresh request identity');
 console.log('PASS canonical bootstrap migration revision, auth isolation, local-data preservation');

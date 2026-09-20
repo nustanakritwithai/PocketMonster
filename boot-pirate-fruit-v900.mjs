@@ -134,11 +134,18 @@ async function preparePirateSaveStorage() {
   // เก็บ local backup เดิมไว้ และให้ iframe ใช้สำเนา memory ที่มาจาก server เป็นหลัก
   let operationQueue = null;
   let memoryStorage = null;
+  let confirmedEntries = { ...result.entries };
+  const pendingMutations = new Set();
   const applyServerPersisted = persisted => {
     if (!persisted || !memoryStorage) return;
     try {
-      const entries = pirateEntriesFromDocuments(readPirateSaveSnapshot(memoryStorage), persisted);
-      memoryStorage.replaceEntries(entries);
+      confirmedEntries = pirateEntriesFromDocuments(confirmedEntries, persisted);
+      const mergedEntries = { ...confirmedEntries };
+      for (const pending of pendingMutations) {
+        if (pending.mutation.op === 'set') mergedEntries[pending.mutation.key] = pending.mutation.value;
+        else if (pending.mutation.op === 'remove') delete mergedEntries[pending.mutation.key];
+      }
+      memoryStorage.replaceEntries(mergedEntries);
     } catch (error) {
       console.warn('Pirate operation response did not contain a valid persisted state', error);
     }
@@ -147,7 +154,12 @@ async function preparePirateSaveStorage() {
     applyPirateSaveMutation(localStorage, mutation);
     const operation = operationFromPirateSaveMutation(mutation);
     if (operation && operationQueue) {
-      void operationQueue.enqueue(operation).catch(error => {
+      const pending = { mutation, operation };
+      pendingMutations.add(pending);
+      void operationQueue.enqueue(operation).then(result => {
+        pendingMutations.delete(pending);
+        applyServerPersisted(result.persisted);
+      }).catch(error => {
         console.warn('Pirate typed save operation failed', error);
       });
     }
@@ -155,7 +167,7 @@ async function preparePirateSaveStorage() {
   operationQueue = createPirateStateOperationQueue({
     client,
     revision: result.revision,
-    onPersisted: response => applyServerPersisted(response),
+    onPersisted: () => {},
   });
   return memoryStorage;
 }
