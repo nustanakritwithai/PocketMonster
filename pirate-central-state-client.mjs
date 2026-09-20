@@ -18,6 +18,13 @@ function boundedOperation(operation) {
 export function sanitizePirateStateOperation(value) {
   const source = operationObject(value);
   if (!source || typeof source.type !== 'string') return null;
+  if (source.type === 'boatPurchase' || source.type === 'boatUpgrade') {
+    if (typeof source.boatId !== 'string' || !source.boatId.length || source.boatId.length > 128
+      || typeof source.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
+    if (source.type === 'boatUpgrade' && !['hull', 'cannon', 'sail'].includes(source.kind)) return null;
+    return { type: source.type, boatId: source.boatId, idempotencyKey: source.idempotencyKey,
+      ...(source.type === 'boatUpgrade' ? { kind: source.kind } : {}) };
+  }
   if (['questState', 'questAbandon', 'questProgress'].includes(source.type)) return { type: source.type };
   if (source.type === 'questAccept' || source.type === 'questClaim') {
     if (typeof source.questId !== 'string' || !source.questId.length || source.questId.length > 128) return null;

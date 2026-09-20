@@ -4,13 +4,13 @@ import {
   bindPirateSaveHost,
   createPirateSaveMemoryStorage,
   readPirateSaveSnapshot,
-} from './pirate-save-bridge-v900.mjs?v=2';
+} from './pirate-save-bridge-v900.mjs?v=3';
 import {
   createPirateCentralStateClient,
   createPirateStateOperationQueue,
   operationFromPirateSaveMutation,
   pirateEntriesFromDocuments,
-} from './pirate-central-state-client.mjs?v=2';
+} from './pirate-central-state-client.mjs?v=3';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=11';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -37,7 +37,7 @@ import {
   PIRATE_STUDIO_CHARACTER_PACKAGE,
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
-export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=947', import.meta.url).href;
+export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=948', import.meta.url).href;
 export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=839&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 

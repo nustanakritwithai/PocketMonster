@@ -139,7 +139,16 @@ function compilePresenceRuntime(bundle, classes) {
     throw new Error('Pirate bundle fixture could not locate boat catalog namespace');
   }
   const boatSource = `${bundle.slice(boatDeclarationStart, boatObjectEnd + 1)};`;
-  const executable = `${placementSource}\n${saveKeySource}\n${boatSource}\n${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
+  // ราคาเรืออ้าง shared catalog ในรุ่นใหม่ ต้องโหลดค่าจริงที่ bundle ใช้ด้วย
+  const sharedBoatName = boatSource.match(/price:([A-Za-z_$][\w$]*)\["training-dinghy"\]\.price/)?.[1];
+  let sharedBoatSource = '';
+  if (sharedBoatName) {
+    const declaration = bundle.lastIndexOf(`${sharedBoatName}={`, boatDeclarationStart);
+    if (declaration < 0) throw new Error('Pirate fixture could not locate shared boat progression catalog');
+    const start = bundle.indexOf('{', declaration);
+    sharedBoatSource = `const ${sharedBoatName}=${bundle.slice(start, matchingBrace(bundle, start) + 1)};`;
+  }
+  const executable = `${placementSource}\n${saveKeySource}\n${sharedBoatSource}\n${boatSource}\n${bundle.slice(declarationsStart, block.end)}; return ${block.name};`;
   return new Function(fieldHelper, executable)(defineClassField);
 }
 

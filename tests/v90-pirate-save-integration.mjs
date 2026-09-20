@@ -13,17 +13,17 @@ const pirateHud = read('pirate-fruit-control-hud-v900.mjs');
 const build = read('scripts/build-github-pages.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
-assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=9"/, 'offline HTML loads the save-aware bootstrap');
+assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=10"/, 'offline HTML loads the save-aware bootstrap');
 assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
 const bundleMatch = bootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
 assert.ok(bundleMatch, 'save-aware bootstrap declares the compiled Pirate entry');
 const bundleIndex = bootstrap.indexOf(bundleMatch[0]);
 assert.ok(hydrateIndex >= 0 && bundleIndex > hydrateIndex, 'sandbox storage installs before the real Pirate bundle executes');
-assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=2/, 'bootstrap cache-busts the save bridge');
+assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=3/, 'bootstrap cache-busts the save bridge');
 
 assert.match(boot, /bindPirateSaveHost/, 'parent owns the isolated Pirate save persistence host');
-assert.match(boot, /pirate-save-bridge-v900\.mjs\?v=2/, 'parent cache-busts the save bridge');
+assert.match(boot, /pirate-save-bridge-v900\.mjs\?v=3/, 'parent cache-busts the save bridge');
 assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cache-busts the child HUD retirement contract');
 const bindIndex = boot.indexOf('bindPirateSaveHost(frame,');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
@@ -32,9 +32,9 @@ assert.match(boot, /await preparePirateSaveStorage\(\)/, 'parent boot hydrates s
 assert.match(boot, /createPirateCentralStateClient/, 'parent uses the central state bootstrap helper');
 assert.match(boot, /Pirate save bootstrap failed; iframe was not started/, 'bootstrap failure is visible and blocks iframe startup');
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
-assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=972/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=93/, 'top-level entry cache-busts the unified ship-control shell');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=78/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
+assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=973/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=94/, 'top-level entry cache-busts the unified ship-control shell');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=79/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
 assert.match(sceneHtml, /style\-v900\.css\?v=982/, 'scene HTML cache-busts the helm placement beside chat');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'offline HTML cache-busts presentation integration with a positive revision');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=[1-9]\d*'/, 'presentation cache-busts static-batch classification');
