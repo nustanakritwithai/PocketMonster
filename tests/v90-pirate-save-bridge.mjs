@@ -139,6 +139,31 @@ assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRAT
 }
 
 {
+  const hostWindow = new EventTarget();
+  const replies = [];
+  const frameWindow = { postMessage(message, origin) { replies.push({ message, origin }); } };
+  const storage = new MemoryStorage([['pirate-fruit:save-v1', 'local']]);
+  let resolveSnapshot;
+  const pendingSnapshot = new Promise(resolve => { resolveSnapshot = resolve; });
+  const dispose = bindPirateSaveHost(frameWindow && { contentWindow: frameWindow }, {
+    windowLike: hostWindow,
+    storage,
+    loadSnapshot: () => pendingSnapshot,
+  });
+  dispatchMessage(hostWindow, {
+    source: frameWindow,
+    origin: 'null',
+    data: { type: PIRATE_SAVE_REQUEST_MESSAGE, requestId: 'request-async-1234' },
+  });
+  assert.equal(replies.length, 0, 'async bootstrap keeps the child snapshot pending');
+  resolveSnapshot({ 'pirate-fruit:save-v1': 'server' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].message.entries['pirate-fruit:save-v1'], 'server');
+  dispose();
+}
+
+{
   const childWindow = new EventTarget();
   const parentWindow = {
     postMessage(message, origin) {

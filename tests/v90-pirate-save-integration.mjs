@@ -25,9 +25,12 @@ assert.match(bootstrap, /pirate-save-bridge-v900\.mjs\?v=1/, 'bootstrap cache-bu
 assert.match(boot, /bindPirateSaveHost/, 'parent owns the isolated Pirate save persistence host');
 assert.match(boot, /pirate-save-bridge-v900\.mjs\?v=1/, 'parent cache-busts the save bridge');
 assert.match(boot, /pirate-fruit-control-hud-v900\.mjs\?v=11/, 'parent boot cache-busts the child HUD retirement contract');
-const bindIndex = boot.indexOf('bindPirateSaveHost(frame)');
+const bindIndex = boot.indexOf('bindPirateSaveHost(frame,');
 const frameSrcIndex = boot.indexOf('frame.src = frameUrl.href');
 assert.ok(bindIndex >= 0 && frameSrcIndex > bindIndex, 'parent save listener binds before the opaque child can request hydration');
+assert.match(boot, /await preparePirateSaveStorage\(\)/, 'parent boot hydrates server state before creating the Pirate iframe');
+assert.match(boot, /createPirateCentralStateClient/, 'parent uses the central state bootstrap helper');
+assert.match(boot, /Pirate save bootstrap failed; iframe was not started/, 'bootstrap failure is visible and blocks iframe startup');
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
 assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=970/, 'world catalog keeps the current Pirate boot module revision');
 assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=91/, 'top-level entry cache-busts the unified ship-control shell');

@@ -1,5 +1,11 @@
 import { combinedLocationQuery, defaultPanelForWorld } from './control-panels-v900.mjs';
-import { bindPirateSaveHost } from './pirate-save-bridge-v900.mjs?v=1';
+import {
+  applyPirateSaveMutation,
+  bindPirateSaveHost,
+  createPirateSaveMemoryStorage,
+  readPirateSaveSnapshot,
+} from './pirate-save-bridge-v900.mjs?v=1';
+import { createPirateCentralStateClient } from './pirate-central-state-client.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=11';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -69,7 +75,7 @@ export function ensurePocketAnimalControl() {
   return throwRuntimePromise;
 }
 
-function mountPirateOnline() {
+function mountPirateOnline(saveStorage) {
   game.replaceChildren();
   const frame = document.createElement('iframe');
   frame.id = 'pirateFruitFrame';
@@ -83,9 +89,47 @@ function mountPirateOnline() {
   frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock allow-fullscreen');
   frame.setAttribute('allow', 'fullscreen');
   game.appendChild(frame);
-  bindPirateSaveHost(frame);
+  bindPirateSaveHost(frame, {
+    storage: saveStorage,
+    // เตรียม snapshot จาก memory ที่ผ่าน server bootstrap แล้วก่อน child จะขอข้อมูล
+    loadSnapshot: async () => readPirateSaveSnapshot(saveStorage),
+  });
   frame.src = frameUrl.href;
   return frame;
+}
+
+function showPirateStartupError(error) {
+  if (startup) {
+    startup.textContent = 'ไม่สามารถโหลดข้อมูล Pirate จาก Server ได้ กรุณาลองใหม่';
+    startup.className = 'startup-status error';
+  }
+  console.error('Pirate save bootstrap failed; iframe was not started', error);
+}
+
+function pirateCentralStateConfig() {
+  const config = window.POCKETMONSTER_RUNTIME_CONFIG;
+  const token = window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken;
+  const apiBaseUrl = typeof config?.apiBaseUrl === 'string' ? config.apiBaseUrl.trim() : '';
+  return apiBaseUrl && typeof token === 'string' && token.length > 0
+    ? { config, token }
+    : null;
+}
+
+async function preparePirateSaveStorage() {
+  const localStorage = window.localStorage;
+  const localEntries = readPirateSaveSnapshot(localStorage);
+  const configured = pirateCentralStateConfig();
+  if (!configured) return localStorage;
+  const client = createPirateCentralStateClient({
+    config: configured.config,
+    getSessionToken: () => window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',
+  });
+  const result = await client.bootstrap(localEntries);
+  if (!result.online) return localStorage;
+  // เก็บ local backup เดิมไว้ และให้ iframe ใช้สำเนา memory ที่มาจาก server เป็นหลัก
+  return createPirateSaveMemoryStorage(result.entries, mutation => {
+    applyPirateSaveMutation(localStorage, mutation);
+  });
 }
 
 function assignCombinedWorld(worldId) {
@@ -391,7 +435,14 @@ if (startup) {
   startup.className = 'startup-status';
 }
 
-const pirateFrame = mountPirateOnline();
+let pirateSaveStorage;
+try {
+  pirateSaveStorage = await preparePirateSaveStorage();
+} catch (error) {
+  showPirateStartupError(error);
+  throw error;
+}
+const pirateFrame = mountPirateOnline(pirateSaveStorage);
 let heldMonsterIntent = null;
 const forwardHeldMonster = held => {
   heldMonsterIntent = pirateRuntimeActive && held?.instanceId ? { instanceId: held.instanceId } : null;

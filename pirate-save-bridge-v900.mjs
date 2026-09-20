@@ -140,17 +140,28 @@ export function createPirateSaveMemoryStorage(initialEntries = {}, onMutation = 
 export function bindPirateSaveHost(frame, {
   windowLike = globalThis.window,
   storage = globalThis.localStorage,
+  loadSnapshot,
 } = {}) {
   if (!windowLike?.addEventListener || !frame) return () => {};
+  let snapshotPromise = null;
+  const sendSnapshot = (source, requestId, entries) => {
+    source?.postMessage?.(Object.freeze({
+      type: PIRATE_SAVE_SNAPSHOT_MESSAGE,
+      requestId,
+      entries: entries && typeof entries === 'object' ? entries : readPirateSaveSnapshot(storage),
+    }), '*');
+  };
   const onMessage = event => {
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
     if (message?.type === PIRATE_SAVE_REQUEST_MESSAGE && validRequestId(message.requestId)) {
-      event.source?.postMessage?.(Object.freeze({
-        type: PIRATE_SAVE_SNAPSHOT_MESSAGE,
-        requestId: message.requestId,
-        entries: readPirateSaveSnapshot(storage),
-      }), '*');
+      if (typeof loadSnapshot !== 'function') {
+        sendSnapshot(event.source, message.requestId, readPirateSaveSnapshot(storage));
+      } else {
+        snapshotPromise ||= Promise.resolve().then(() => loadSnapshot())
+          .finally(() => { snapshotPromise = null; });
+        snapshotPromise.then(entries => sendSnapshot(event.source, message.requestId, entries)).catch(() => {});
+      }
       return;
     }
     if (message?.type !== PIRATE_SAVE_MUTATION_MESSAGE) return;
