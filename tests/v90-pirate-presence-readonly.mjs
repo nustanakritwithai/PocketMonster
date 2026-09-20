@@ -30,7 +30,7 @@ assert.match(pirateBundle, /getMonsterActors/, 'compiled Pirate adapter exposes 
 assert.match(pirateBundle, /generation/, 'compiled Pirate adapter carries lifecycle generation validation');
 
 const centralAuthority = {
-  contract: 'pirate-central-spatial/1', schemaVersion: 1,
+  contract: 'pirate-central-spatial/1', schemaVersion: 1, transportZone: 'pirate-fruit',
   generation: 1,
   contentRevision: 'pirate-monster-catalog-2026-09-07-ai-v2-transport-v2', contentHash: 'fnv1a-236acf41',
   manifestSha256: '7D0B9E054B4D9F7669EC0EB34E4F93EE3ADF46E655E4FC7D30EFBBE8C4DD83A0',
@@ -157,6 +157,20 @@ assert.equal(createPirateSnapshotMessage(actualPirateSnapshot).payload.actors[0]
 const capabilitySnapshot = sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority, players: [] });
 assert.equal(capabilitySnapshot.centralAuthority.contentRevision, centralAuthority.contentRevision, 'valid capability crosses the parent snapshot sanitizer');
 assert.equal(capabilitySnapshot.centralAuthority.generation, 1, 'central capability generation crosses the parent snapshot sanitizer');
+
+assert.equal(capabilitySnapshot.centralAuthority.transportZone, 'pirate-fruit', 'native Pirate receiver requires the transport zone after parent sanitization');
+for (const transportZone of [undefined, 'starter-island', 'living-world']) {
+  assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, transportZone }, players: [] }).centralAuthority, undefined, 'missing or wrong transport must not activate central enemy authority');
+}
+// ข้อมูลต้องคงครบผ่าน sanitizer หลายชั้น ก่อนส่งเข้า native iframe
+for (const hp of [100, 40]) {
+  let forwarded = { ...actualWireFixture.payload, centralAuthority, actors: actualWireFixture.payload.actors.map(actor => ({ ...actor, stateSequence: 101 - hp, authority: { ...actor.authority, hp: { current: hp, max: 100, revision: 101 - hp } } })) };
+  for (let layer = 0; layer < 3; layer++) forwarded = sanitizePirateWorldSnapshot(forwarded);
+  const message = createPirateSnapshotMessage(forwarded);
+  assert.equal(message.payload.centralAuthority.transportZone, 'pirate-fruit', 'central authority must stay enabled through all parent bridge layers');
+  assert.equal(message.payload.actors[0].authority.hp.current, hp, 'same server enemy HP reaches native iframe');
+}
+
 assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, manifestSha256: 'bad' }, players: [] }).centralAuthority, undefined, 'mismatched capability is omitted');
 assert.equal(sanitizePirateWorldSnapshot({ zone: 'pirate-fruit', centralAuthority: { ...centralAuthority, generation: 0 }, players: [] }).centralAuthority, undefined, 'invalid central capability generation is omitted');
 const authoritySnapshot = sanitizePirateWorldSnapshot({
