@@ -18,6 +18,20 @@ function boundedOperation(operation) {
 export function sanitizePirateStateOperation(value) {
   const source = operationObject(value);
   if (!source || typeof source.type !== 'string') return null;
+  if (['questState', 'questAbandon', 'questProgress'].includes(source.type)) return { type: source.type };
+  if (source.type === 'questAccept' || source.type === 'questClaim') {
+    if (typeof source.questId !== 'string' || !source.questId.length || source.questId.length > 128) return null;
+    if (source.type === 'questAccept') return { type: source.type, questId: source.questId, replaceActive: source.replaceActive === true };
+    if (typeof source.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
+    return { type: source.type, questId: source.questId, idempotencyKey: source.idempotencyKey };
+  }
+  if (source.type === 'shopPurchase') {
+    if (!['draw', 'potion'].includes(source.action) || typeof source.idempotencyKey !== 'string'
+      || !/^[A-Za-z0-9:_-]{8,128}$/.test(source.idempotencyKey)) return null;
+    if (source.action === 'potion' && !['potion-hp', 'potion-mp'].includes(source.potionId)) return null;
+    return { type: source.type, action: source.action, idempotencyKey: source.idempotencyKey,
+      ...(source.action === 'potion' ? { potionId: source.potionId } : {}) };
+  }
   if (source.type === 'boatSelection') {
     const id = source.selectedBoatId;
     return typeof id === 'string' && id.length > 0 && id.length <= 128
@@ -125,7 +139,7 @@ export function createPirateCentralStateClient({ config, getSessionToken, fetchI
       const result = await request('POST', token, {
         contract: 'pirate-original-state/1', commandId: idempotencyKey, expectedRevision, operation: safeOperation,
       }, 'api/pirate/state/operation');
-      return { revision: result.revision, persisted: result.persisted };
+      return { revision: result.revision, persisted: result.persisted, outcome: result.outcome };
     },
   });
 }

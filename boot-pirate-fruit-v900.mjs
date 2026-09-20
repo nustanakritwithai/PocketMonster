@@ -96,6 +96,7 @@ function mountPirateOnline(saveStorage) {
   game.appendChild(frame);
   bindPirateSaveHost(frame, {
     storage: saveStorage,
+    executeOperation: pirateOperationExecutors.get(saveStorage),
     // เตรียม snapshot จาก memory ที่ผ่าน server bootstrap แล้วก่อน child จะขอข้อมูล
     loadSnapshot: async () => readPirateSaveSnapshot(saveStorage),
   });
@@ -119,6 +120,8 @@ function pirateCentralStateConfig() {
     ? { config, token }
     : null;
 }
+
+const pirateOperationExecutors = new WeakMap();
 
 async function preparePirateSaveStorage() {
   const localStorage = window.localStorage;
@@ -171,6 +174,11 @@ async function preparePirateSaveStorage() {
     client,
     revision: result.revision,
     onPersisted: () => {},
+  });
+  pirateOperationExecutors.set(memoryStorage, async operation => {
+    const result = await operationQueue.enqueue(operation);
+    applyServerPersisted(result.persisted);
+    return result;
   });
   return memoryStorage;
 }

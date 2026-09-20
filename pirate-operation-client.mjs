@@ -23,12 +23,11 @@ function containsSecret(value) {
 }
 
 export function sanitizePirateOperation(operation) {
-  if (!plainObject(operation) || containsSecret(operation)) return null;
   try {
     const encoded = JSON.stringify(operation);
     if (typeof encoded !== 'string' || new TextEncoder().encode(encoded).byteLength > MAX_OPERATION_BYTES) return null;
     const copy = JSON.parse(encoded);
-    return plainObject(copy) ? Object.freeze(copy) : null;
+    return plainObject(copy) && !containsSecret(copy) ? Object.freeze(copy) : null;
   } catch { return null; }
 }
 

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.6adc8ec91153",
+  "buildId": "8.4.0.content.b4a0880262de",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T18:37:24.458Z",
+  "publishedAtUtc": "2026-09-20T18:52:21.940Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -332,8 +332,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 22288,
-      "sha256": "042eac6b23e9263386322f8ee9fdaea7d5dc00a70a7b1663dc68295e2cbbfe81"
+      "size": 22598,
+      "sha256": "5270ee3e6a086b52be37b06dfd2a823aae25700925fd85382100f20c80eacd03"
     },
     {
       "path": "boss-challenge.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "pirate-central-state-client.mjs",
-      "size": 9050,
-      "sha256": "a526d3ff23df59ee745fd2aeb0567314be799b749b20ed11e89d3a27c7f2847c"
+      "size": 10228,
+      "sha256": "eaf1450103ed840a7abd40835aec9730d69923fec86ddddcc5a30cd4b0419b4c"
     },
     {
       "path": "pirate-fruit-control-hud-v900.mjs",
@@ -781,6 +781,11 @@
       "sha256": "7df1438bd2690769519e42b6e35844afc010631adfba0cb417facdfbb4c5bdbf"
     },
     {
+      "path": "pirate-operation-client.mjs",
+      "size": 4788,
+      "sha256": "c1f78f2894f1f3282c631289642ce4522f8ae02d4b96e506e2369c25dc7bda97"
+    },
+    {
       "path": "pirate-original-world-contract.mjs",
       "size": 1497,
       "sha256": "3e0061fa61e3f03576b7484725a4ffbf3f21a8629e40c06e3d4f29915bd1632b"
@@ -797,8 +802,8 @@
     },
     {
       "path": "pirate-save-bridge-v900.mjs",
-      "size": 14566,
-      "sha256": "1bda3db1c389df6424661e9b8ef2c03deb9fb23bae4e802ecf3015724bf986c1"
+      "size": 16013,
+      "sha256": "7a0d3afec999814ec8ffa940c843d29867a2c215d68691180aa66365ba0037ca"
     },
     {
       "path": "pocket-hud-view-model.mjs",

@@ -1,3 +1,5 @@
+import { createPocketOperationClient, PIRATE_OPERATION_REQUEST_MESSAGE, PIRATE_OPERATION_REPLY_MESSAGE } from './pirate-operation-client.mjs';
+
 export const PIRATE_SAVE_PREFIX = 'pirate-fruit:';
 export const PIRATE_SAVE_MAX_KEY_LENGTH = 128;
 export const PIRATE_SAVE_MAX_VALUE_BYTES = 512 * 1024;
@@ -249,6 +251,7 @@ export function bindPirateSaveHost(frame, {
   windowLike = globalThis.window,
   storage = globalThis.localStorage,
   loadSnapshot,
+  executeOperation,
 } = {}) {
   if (!windowLike?.addEventListener || !frame) return () => {};
   let snapshotPromise = null;
@@ -257,11 +260,25 @@ export function bindPirateSaveHost(frame, {
       type: PIRATE_SAVE_SNAPSHOT_MESSAGE,
       requestId,
       entries: entries && typeof entries === 'object' ? entries : readPirateSaveSnapshot(storage),
+      serverOperations: typeof executeOperation === 'function',
     }), '*');
   };
   const onMessage = event => {
     if (event.source !== frame.contentWindow || event.origin !== 'null') return;
     const message = event.data;
+    if (message?.type === PIRATE_OPERATION_REQUEST_MESSAGE && validRequestId(message.requestId)) {
+      const source = event.source;
+      Promise.resolve().then(() => {
+        if (typeof executeOperation !== 'function') throw new Error('PIRATE_OPERATION_UNAVAILABLE');
+        return executeOperation(message.operation);
+      }).then(result => source?.postMessage?.({ type: PIRATE_OPERATION_REPLY_MESSAGE,
+        requestId: message.requestId, ok: true, revision: result.revision,
+        persisted: result.persisted, outcome: result.outcome }, '*'))
+        .catch(error => source?.postMessage?.({ type: PIRATE_OPERATION_REPLY_MESSAGE,
+          requestId: message.requestId, ok: false, errorCode: error?.code || error?.message || 'PIRATE_OPERATION_REJECTED',
+          errorMessage: 'ทำรายการ Pirate ไม่สำเร็จ กรุณาลองใหม่' }, '*'));
+      return;
+    }
     if (message?.type === PIRATE_SAVE_REQUEST_MESSAGE && validRequestId(message.requestId)) {
       if (typeof loadSnapshot !== 'function') {
         sendSnapshot(event.source, message.requestId, readPirateSaveSnapshot(storage));
@@ -295,6 +312,7 @@ export async function installPirateSaveSandbox({
   if (!windowLike?.addEventListener || !windowLike.parent || windowLike.parent === windowLike) return false;
   if (typeof parentOrigin !== 'string' || !/^https?:\/\/[^/]+(?::\d+)?$/.test(parentOrigin)) return false;
   const requestId = sandboxRequestId(windowLike);
+  let serverOperations = false;
   const entries = await new Promise(resolve => {
     let settled = false;
     const finish = snapshot => {
@@ -308,6 +326,7 @@ export async function installPirateSaveSandbox({
       if (event.source !== windowLike.parent || event.origin !== parentOrigin) return;
       const message = event.data;
       if (message?.type !== PIRATE_SAVE_SNAPSHOT_MESSAGE || message.requestId !== requestId) return;
+      serverOperations = message.serverOperations === true;
       finish(message.entries && typeof message.entries === 'object' ? message.entries : {});
     };
     const timer = setTimeout(() => finish({}), Math.max(50, Math.min(Number(timeoutMs) || 3000, 10000)));
@@ -327,5 +346,8 @@ export async function installPirateSaveSandbox({
   } catch {
     return false;
   }
+  if (serverOperations) Object.defineProperty(windowLike, 'POCKETMONSTER_PIRATE_OPERATIONS', {
+    value: createPocketOperationClient({ parentOrigin, windowLike }), configurable: false, writable: false,
+  });
   return true;
 }

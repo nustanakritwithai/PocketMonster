@@ -213,4 +213,25 @@ assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRAT
   assert.equal(childWindow.localStorage.getItem('monsterlife.launch.session'), null);
 }
 
+{
+  const host = new EventTarget();
+  const replies = [];
+  const source = { postMessage: message => replies.push(message) };
+  const commands = [];
+  const stop = bindPirateSaveHost({ contentWindow: source }, { windowLike: host, storage: new MemoryStorage(),
+    executeOperation: async operation => { commands.push(operation); return { revision: 12, persisted: {}, outcome: { ok: true } }; } });
+  const data = { type: 'pocketmonster:pirate-operation-request-v1', requestId: 'operation-test-001', operation: { type: 'questState' } };
+  dispatchMessage(host, { source: {}, origin: 'null', data });
+  dispatchMessage(host, { source, origin: 'https://wrong.example', data });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(commands.length, 0, 'รับเฉพาะ iframe ที่ผูกกับ host นี้');
+  dispatchMessage(host, { source, origin: 'null', data });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(commands, [{ type: 'questState' }]);
+  assert.equal(replies[0].type, 'pocketmonster:pirate-operation-reply-v1');
+  assert.equal(replies[0].requestId, data.requestId);
+  assert.equal(replies[0].revision, 12);
+  assert.deepEqual(replies[0].outcome, { ok: true });
+  stop();
+}
 console.log('V9 Pirate opaque sandbox save bridge: PASS');
