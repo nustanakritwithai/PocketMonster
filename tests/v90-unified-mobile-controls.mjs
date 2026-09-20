@@ -315,7 +315,7 @@ assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/,
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
 assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=17/, 'world shell cache-busts analog handoff controls');
 assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=17/, 'Pirate boot cache-busts analog handoff controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=77/, 'online scene cache-busts analog handoff graph');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=78/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 

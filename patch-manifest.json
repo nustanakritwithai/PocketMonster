@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.79b107332bb0",
+  "buildId": "8.4.0.content.af96a706bb98",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T18:09:40.541Z",
+  "publishedAtUtc": "2026-09-20T18:16:37.629Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -333,7 +333,7 @@
     {
       "path": "boot-pirate-fruit-v900.mjs",
       "size": 22288,
-      "sha256": "5935dd91891b4bf93319f961bcefc4a11ce809edc55d7877c4b8e882f9f7e94d"
+      "sha256": "042eac6b23e9263386322f8ee9fdaea7d5dc00a70a7b1663dc68295e2cbbfe81"
     },
     {
       "path": "boss-challenge.mjs",
@@ -478,7 +478,7 @@
     {
       "path": "combined-worlds-v900.mjs",
       "size": 2629,
-      "sha256": "957b6e805dd2042851f66c36ddcc64e5544ab02a59014e287043abc21a672f14"
+      "sha256": "216fe14d832979d27b4c546672725e0209adbdffd67702839acfce213deb764f"
     },
     {
       "path": "content-catalog.mjs",
@@ -508,7 +508,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2376,
-      "sha256": "e3e95cf15a243a58cdd8befdb393d69e8bf2cf0f6ac757f41b383aafe9345c68"
+      "sha256": "639700dd78c734e2fd1666dbc68484f12ebac22474065dba35ea3174662b77fc"
     },
     {
       "path": "equipment.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "index.html",
       "size": 40735,
-      "sha256": "9ab5c7775665e097d5cb41ddbf083c91036727d805bd24f190ab2ced2acf1e3e"
+      "sha256": "d3b9caf87c41a0c30e13b5dc5026ebcbd36ad2a22ff832952943de222a081748"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -648,7 +648,7 @@
     {
       "path": "online-world-shell-v900.mjs",
       "size": 28764,
-      "sha256": "727683e34c6f8dc2200344c7ed7315db5f1002f6539b25cba73045f985de62f8"
+      "sha256": "e77f824552b41dde03e998d21b8e1928366597a59746f6dc1d40de5da4271546"
     },
     {
       "path": "passive-catalog.mjs",
@@ -696,34 +696,34 @@
       "sha256": "96e0345b5362893acaf3a8dad46cdc0781563c14dd9b5d4bf45441b961707a74"
     },
     {
-      "path": "pirate-fruit-offline/assets/AzureFrostIsland-CWtnbcj4.js",
+      "path": "pirate-fruit-offline/assets/AzureFrostIsland-DBcpgMrj.js",
       "size": 5201,
-      "sha256": "d9663723cb742ab640e4720b033e60ab95d79bb6d9bff979463c16fcbe419f77"
+      "sha256": "25d51bad16b78ad38c2a077793e1932583236f133e3c45fc7a5dcf5d1491f64e"
     },
     {
-      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-DrepV_1E.js",
+      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-mkUmcqVZ.js",
       "size": 6479,
-      "sha256": "0ea66444acbf5418a5ceb66a046551f950d82ae1ab7a9b563fea9728e97015d9"
+      "sha256": "66f778d3bc72314a016a10f521d42e6a59e9a7b377f92e1ac8e50b9f53df43d8"
     },
     {
-      "path": "pirate-fruit-offline/assets/MistJungleIsland-B_VCuzdr.js",
+      "path": "pirate-fruit-offline/assets/MistJungleIsland-DPlScJ1x.js",
       "size": 6126,
-      "sha256": "f64bb204a129177ee2dd8101aa132a12cb45e69b81c35c712060bf66ffc7ad15"
+      "sha256": "5913dae1395158db2741f7f56b798794fab45564442220d777db27e5219e8d81"
     },
     {
-      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-rXqnhcxw.js",
+      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-DGWUGPTc.js",
       "size": 6375,
-      "sha256": "51a1a76694216022f64fa4ad6773e6d228deff4b0e8e96fa2aab5a4db11033cb"
+      "sha256": "19dfabfc2a14d6a484645619f4398b869dfeb30fa45d8abb3a3978d2f0cb1282"
     },
     {
-      "path": "pirate-fruit-offline/assets/TempestSkyIsland-uF-mm9Kb.js",
+      "path": "pirate-fruit-offline/assets/TempestSkyIsland-Y1LYvSki.js",
       "size": 5411,
-      "sha256": "9be039960c0964e86e6b34215cb76ab5af4692410bc48a11a42052e5b1d23aca"
+      "sha256": "03623c20eae67ad0d41bf8ab8ef770a5b23e9756ff3cc6d002837c668a6cbf37"
     },
     {
-      "path": "pirate-fruit-offline/assets/index-DhkQluXj.js",
-      "size": 1180509,
-      "sha256": "927cd7ef64c7667b81effe12e03102ec3db88751196d88335d09fbdb87b47759"
+      "path": "pirate-fruit-offline/assets/index-CGR1YIZx.js",
+      "size": 1180571,
+      "sha256": "ba3d123a9de72dc27f0b2a34b5fb686f63756f60eec020ef4f1e1f88496fa77b"
     },
     {
       "path": "pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js",
@@ -733,7 +733,7 @@
     {
       "path": "pirate-fruit-offline/index.html",
       "size": 1321,
-      "sha256": "f091bc620a570ece862d51fe68470529747e2d48ecb75efe424a30c034427864"
+      "sha256": "9f90b124d26f9bf37576a8eb1a6a06c9252b32125208b967d0a139ff5daf62ce"
     },
     {
       "path": "pirate-fruit-offline/pirate-owned-monster-carry.mjs",
@@ -743,7 +743,7 @@
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
       "size": 158,
-      "sha256": "a0ac70cd3bd7f5e2f75ddfa73f2917868ea7fad52befbd8e1ac23ac62c4734b7"
+      "sha256": "ec83161bc9fb549bdc190272378c577750b379c75679618459e4d2a0387adcab"
     },
     {
       "path": "pirate-fruit-offline/pocket-presentation.mjs",
@@ -858,7 +858,7 @@
     {
       "path": "scene-entry-v900.mjs",
       "size": 8435,
-      "sha256": "4fb381d45208b8606bc482036d63a595c4889fa44d1ecb04478a0674ec2502e7"
+      "sha256": "ce3b10b0be3629ce00e99b6f4c0d9915e0f5ffb60d2664f8d33c9f7aff2e6c65"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -873,7 +873,7 @@
     {
       "path": "scene-v900.html",
       "size": 1332,
-      "sha256": "8d9ba0763077ea3ee16c771f18fd89c88a0fa28e213bacdb64d34eb07c8d7793"
+      "sha256": "8fd6c19bb25b7a812cc644dd336b31d44de76747895dd43d05cc431b790cbe5d"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -1043,7 +1043,7 @@
     {
       "path": "v900.html",
       "size": 40735,
-      "sha256": "9ab5c7775665e097d5cb41ddbf083c91036727d805bd24f190ab2ced2acf1e3e"
+      "sha256": "d3b9caf87c41a0c30e13b5dc5026ebcbd36ad2a22ff832952943de222a081748"
     },
     {
       "path": "warp-routes.mjs",
@@ -1073,7 +1073,7 @@
     {
       "path": "worlds-v900.mjs",
       "size": 10276,
-      "sha256": "5198bffb346722a9e2c18cd3877a939992c03d5bc776613b4e68aab0c27832e3"
+      "sha256": "c9c63663f04f3d3e70f30117f08983ff6051a3ab93c9719d7c05748f8b9912a6"
     }
   ]
 }

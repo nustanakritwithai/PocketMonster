@@ -1,7 +1,7 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "e952c03b005ac5b0527ae0f096a80f6211f56e8d",
-  "commit": "e952c03b005ac5b0527ae0f096a80f6211f56e8d",
+  "ref": "c36b0cb429128acfe3d5142c3dc928b4af40c1be",
+  "commit": "c36b0cb429128acfe3d5142c3dc928b4af40c1be",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
@@ -16,7 +16,7 @@
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",
-    "artifact": "pirate-original-online-20260921/artifacts/native-e952",
+    "artifact": "pirate-original-online-20260921/artifacts/native-c36",
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",

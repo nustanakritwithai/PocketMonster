@@ -13,7 +13,7 @@ const pirateHud = read('pirate-fruit-control-hud-v900.mjs');
 const build = read('scripts/build-github-pages.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
-assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=8"/, 'offline HTML loads the save-aware bootstrap');
+assert.match(offlineHtml, /src="\.\/pocket-bootstrap\.mjs\?v=9"/, 'offline HTML loads the save-aware bootstrap');
 assert.doesNotMatch(offlineHtml, /<script[^>]+src="\.\/assets\/index-YxSDH_bK\.js"/, 'vendored bundle is never started before save hydration');
 const hydrateIndex = bootstrap.indexOf('await installPirateSaveSandbox');
 const bundleMatch = bootstrap.match(/await import\('\.\/assets\/([^']+\.js)'\)/);
@@ -32,9 +32,9 @@ assert.match(boot, /await preparePirateSaveStorage\(\)/, 'parent boot hydrates s
 assert.match(boot, /createPirateCentralStateClient/, 'parent uses the central state bootstrap helper');
 assert.match(boot, /Pirate save bootstrap failed; iframe was not started/, 'bootstrap failure is visible and blocks iframe startup');
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
-assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=971/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=92/, 'top-level entry cache-busts the unified ship-control shell');
-assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=77/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
+assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=972/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=93/, 'top-level entry cache-busts the unified ship-control shell');
+assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=78/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
 assert.match(sceneHtml, /style\-v900\.css\?v=982/, 'scene HTML cache-busts the helm placement beside chat');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'offline HTML cache-busts presentation integration with a positive revision');
 assert.match(presentation, /pirate-fruit-client-bridge\.mjs\?v=[1-9]\d*'/, 'presentation cache-busts static-batch classification');
