@@ -16,6 +16,7 @@ const actualSources = new Map([
   ['/scene-route-controller-v900.mjs', read('scene-route-controller-v900.mjs')],
   ['/online-world-bridge-v900.mjs', read('online-world-bridge-v900.mjs')],
   ['/world-presence-protocol.mjs', read('world-presence-protocol.mjs')],
+  ['/pirate-original-world-contract.mjs', read('pirate-original-world-contract.mjs')],
   ['/combined-worlds-v900.mjs', read('combined-worlds-v900.mjs')],
   ['/unified-mobile-controls-v900.mjs', read('unified-mobile-controls-v900.mjs')],
   ['/mobile-dual-pointer-input-v900.mjs', read('mobile-dual-pointer-input-v900.mjs')],
