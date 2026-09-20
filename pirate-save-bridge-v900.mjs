@@ -48,7 +48,10 @@ function safeLegacyLoadout(value) {
     gun: rawSlots.gun === null ? null : (typeof rawSlots.gun === 'string' ? rawSlots.gun : null),
     fruit: rawSlots.fruit === null ? null : (typeof rawSlots.fruit === 'string' ? rawSlots.fruit : null),
   };
-  const activeCategory = ['style', 'sword', 'gun', 'fruit'].includes(source.activeCategory)
+  if (Object.prototype.hasOwnProperty.call(rawSlots, 'utility')) {
+    slots.utility = rawSlots.utility === null ? null : (typeof rawSlots.utility === 'string' ? rawSlots.utility : null);
+  }
+  const activeCategory = ['style', 'sword', 'gun', 'fruit', 'utility'].includes(source.activeCategory)
     && slots[source.activeCategory] ? source.activeCategory : 'style';
   return { slots, activeCategory };
 }

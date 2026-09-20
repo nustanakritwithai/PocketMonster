@@ -101,7 +101,7 @@ const producerMutations = [];
 const producerStorage = createPirateSaveMemoryStorage({
   'pirate-fruit:save-v1': '{"islandId":"starter"}',
   'pirate-fruit:progression-v1': JSON.stringify({ progression: { player: { statPoints: 3, stats: { combat: 1, vitality: 2, blade: 0, ranged: 0, fruitPower: 0, mana: 0 } } } }),
-  'pirate-fruit:loadout-v1': JSON.stringify({ slots: { style: 'style-1' }, activeCategory: 'style' }),
+  'pirate-fruit:loadout-v1': JSON.stringify({ slots: { style: 'style-1', utility: 'utility-1' }, activeCategory: 'utility' }),
 }, mutation => producerMutations.push(mutation));
 producerStorage.setItem('pirate-fruit:save-v1', '{"islandId":"starter","spawnId":"dock"}');
 assert.equal(producerMutations.at(-1).operation.type, 'checkpoint', 'checkpoint writes produce typed metadata');
@@ -109,6 +109,8 @@ producerStorage.setItem('pirate-fruit:progression-v1', JSON.stringify({ progress
 assert.deepEqual(producerMutations.at(-1).operation, { type: 'statAllocation', allocations: { vitality: 2 } });
 producerStorage.setItem('pirate-fruit:items-v1', JSON.stringify({ loadout: { activeSet: 'primary', equippedWeaponKind: 'sword', equippedSwordId: 'sword-1', fruitAwakened: false }, quickslots: ['skill-1'] }));
 assert.equal(producerMutations.at(-1).operation.type, 'loadout', 'inventory writes produce canonical loadout metadata');
+assert.equal(producerMutations.at(-1).operation.loadout.slots.utility, 'utility-1', 'legacy utility slot is preserved');
+assert.equal(producerMutations.at(-1).operation.loadout.activeCategory, 'utility', 'legacy utility category is preserved');
 assert.equal(derivePirateSaveOperation(producerStorage, 'pirate-fruit:progression-v1', '{}', '{}'), null, 'invalid progression does not fabricate stat operations');
 assert.throws(() => memory.setItem('monsterlife.launch.session', 'NO'), /Pirate save key/);
 assert.throws(() => memory.setItem('pirate-fruit:oversized-v1', 'x'.repeat(PIRATE_SAVE_MAX_VALUE_BYTES + 1)), /too large/);

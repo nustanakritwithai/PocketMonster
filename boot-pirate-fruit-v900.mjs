@@ -160,7 +160,10 @@ async function preparePirateSaveStorage() {
         pendingMutations.delete(pending);
         applyServerPersisted(result.persisted);
       }).catch(error => {
+        pendingMutations.delete(pending);
         console.warn('Pirate typed save operation failed', error);
+        startup?.classList.add('error');
+        if (startup) startup.textContent = 'บันทึกข้อมูล Pirate ไม่สำเร็จ กรุณาลองใหม่';
       });
     }
   });
