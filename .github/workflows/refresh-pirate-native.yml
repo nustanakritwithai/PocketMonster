@@ -1,0 +1,72 @@
+name: Refresh reviewed Pirate native dependency
+on:
+  push:
+    branches: [codex/pirate-vitals-economy-client-20260921]
+    paths:
+      - '.github/workflows/refresh-pirate-native.yml'
+      - 'scripts/refresh-pirate-native.mjs'
+permissions:
+  contents: read
+jobs:
+  refresh:
+    if: github.repository == 'nustanakritwithai/PocketMonster'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Refuse to write over a concurrent branch update
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/checkout@v4
+        with:
+          repository: nustanakritwithai/Pirate-fruit-
+          ref: c8c725e8a12e6723a8015e74566965ae18218ff2
+          path: .qa/pirate
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build reviewed nested dependency with existing authority flags
+        working-directory: .qa/pirate
+        env:
+          VITE_USE_REMOTE_SERVER: 'false'
+          VITE_ENABLE_REMOTE_SESSION: 'false'
+          VITE_ENABLE_ECONOMY_SERVER: 'false'
+          VITE_ENABLE_TRADE_SERVER: 'false'
+          VITE_ENABLE_QUEST_SERVER: 'false'
+          VITE_ENABLE_MONSTER_SERVER: 'false'
+          VITE_ENABLE_PROGRESSION_SERVER: 'false'
+          VITE_ENABLE_CHARACTER_SELECT: 'false'
+          VITE_ENABLE_ONBOARDING: 'false'
+          VITE_ENABLE_REALTIME: 'true'
+          VITE_ENABLE_MULTIPLAYER: 'true'
+          VITE_ENABLE_SHARED_WORLD_MONSTERS: 'true'
+          VITE_ENABLE_PVP: 'false'
+          VITE_ENABLE_BOAT_WORLD: 'false'
+        run: |
+          npm ci --include=dev
+          npm run build:shared
+          cd client
+          npx tsc --noEmit
+          npx vite build --base=./
+          node scripts/verify-procedural-budget.mjs
+      - name: Refresh only generated native files and verify composed artifact
+        run: |
+          node scripts/refresh-pirate-native.mjs .qa/pirate
+          git add pirate-fruit-offline
+          node scripts/build-github-pages.mjs --write-root-manifest
+          node tests/pirate-original-world-contract.mjs
+          node tests/v90-unified-pages-artifact.mjs
+          npm run test:v90:pirate-player
+          git add patch-manifest.json
+      - name: Commit generated dependency to the draft branch only
+        run: |
+          test "$GITHUB_REF" = 'refs/heads/codex/pirate-vitals-economy-client-20260921'
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build: refresh reviewed Pirate vitals native dependency c8c725e8'
+          git push origin HEAD:codex/pirate-vitals-economy-client-20260921
