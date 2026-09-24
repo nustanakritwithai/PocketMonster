@@ -6,19 +6,20 @@ const MESSAGE_TYPES = new Set([
 ]);
 
 export function sanitizePirateVitals(value) {
-  if (!value || value.contract !== 'pirate-vitals/1' || !Number.isSafeInteger(value.revision)
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.contract !== 'pirate-vitals/1' || !Number.isSafeInteger(value.revision)
     || value.revision < 1 || !Number.isFinite(value.serverTimeMs) || value.serverTimeMs < 0) return null;
   for (const field of ['hp', 'maxHp', 'guard', 'guardMax', 'energy', 'maxEnergy', 'mp', 'maxMp', 'hitstunUntil']) {
     if (!Number.isFinite(value[field]) || value[field] < 0 || value[field] > 1e15) return null;
   }
-  if (value.hp > value.maxHp || value.guard > value.guardMax || value.energy > value.maxEnergy
+  if (value.maxHp <= 0 || value.dead !== (value.hp <= 0) || value.hp > value.maxHp || value.guard > value.guardMax || value.energy > value.maxEnergy
     || value.mp > value.maxMp || typeof value.guardBroken !== 'boolean' || typeof value.dead !== 'boolean') return null;
   const result = Object.fromEntries(['contract', 'revision', 'serverTimeMs', 'hp', 'maxHp', 'guard', 'guardMax',
     'guardBroken', 'hitstunUntil', 'energy', 'maxEnergy', 'mp', 'maxMp', 'dead'].map(key => [key, value[key]]));
-  if (value.respawn) {
+  if (value.respawn !== undefined) {
     const respawn = value.respawn;
-    if (typeof respawn.spawnId !== 'string' || respawn.spawnId.length > 128
-      || typeof respawn.islandId !== 'string' || respawn.islandId.length > 128
+    if (!respawn || typeof respawn !== 'object' || Array.isArray(respawn)) return null;
+    if (typeof respawn.spawnId !== 'string' || respawn.spawnId.length < 1 || respawn.spawnId.length > 128
+      || typeof respawn.islandId !== 'string' || respawn.islandId.length < 1 || respawn.islandId.length > 128
       || !Number.isSafeInteger(respawn.atRevision) || respawn.atRevision < 1 || respawn.atRevision > value.revision
       || ['x', 'y', 'z', 'heading'].some(key => !Number.isFinite(respawn[key]) || Math.abs(respawn[key]) > 1e6)) return null;
     result.respawn = Object.fromEntries(['spawnId', 'islandId', 'x', 'y', 'z', 'heading', 'atRevision'].map(key => [key, respawn[key]]));

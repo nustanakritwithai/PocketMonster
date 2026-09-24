@@ -30,3 +30,12 @@ for (const invalid of [{ hp: 101 }, { revision: 0 }, { guard: NaN }, { dead: 'fa
   { respawn: { spawnId: 'starter', islandId: 'starter-island', x: 0, y: 1, z: 0, heading: 0, atRevision: 16 } }])
   assert.equal(sanitizePirateOriginalWorld({ ...withVitals, vitals: { ...vitals, ...invalid } }), null);
 console.log('PASS vitals survives parent relay with revision, bounds and respawn validation');
+
+// Producer -> relay -> native receiver must agree on death/cap/respawn meaning.
+for (const invalid of [
+  { dead: true }, { hp: 0, dead: false }, { hp: 0, maxHp: 0, dead: true },
+  { respawn: null }, { respawn: false }, { respawn: [] },
+  { respawn: { spawnId: '', islandId: 'starter-island', x: 0, y: 1, z: 0, heading: 0, atRevision: 15 } },
+  { respawn: { spawnId: 'starter', islandId: '', x: 0, y: 1, z: 0, heading: 0, atRevision: 15 } },
+]) assert.equal(sanitizePirateOriginalWorld({ ...withVitals, vitals: { ...vitals, ...invalid } }), null);
+console.log('PASS vitals death/cap/respawn invariants are rejected at the parent ingress');
