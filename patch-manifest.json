@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.587a17e77e24",
+  "buildId": "8.4.0.content.721a9b0f55cb",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-09-20T21:58:47.988Z",
+  "publishedAtUtc": "2026-09-24T23:15:33.448Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -332,8 +332,8 @@
     },
     {
       "path": "boot-pirate-fruit-v900.mjs",
-      "size": 23428,
-      "sha256": "84057eb1ca34878ed921e40db2c01ab5e958d19244c68536d97e8ed7983fd706"
+      "size": 22881,
+      "sha256": "5ee2879acdce81917b5d39b11a0d599dbb43276eddc450c64f7546ef4ba3bb40"
     },
     {
       "path": "boss-challenge.mjs",
@@ -362,8 +362,8 @@
     },
     {
       "path": "chat-runtime.mjs",
-      "size": 30992,
-      "sha256": "e5e211d52e345f3e49f1c951695dc7efe2ce51a2cb2508c3f950e2825e5563df"
+      "size": 30274,
+      "sha256": "907d593ff0485e5af919a1aa0314626b1f3e2697edb546c0695e45f6a646c646"
     },
     {
       "path": "combat-rating.mjs",
@@ -477,8 +477,8 @@
     },
     {
       "path": "combined-worlds-v900.mjs",
-      "size": 2705,
-      "sha256": "04f64972467f0d281354613628edc441cc6396cbd2adaa56298c0a2a811ec734"
+      "size": 2629,
+      "sha256": "f18e6c416f468d5dc31ca901f5daca3138ce71fe8a84cd0dbb53a06724f7cce9"
     },
     {
       "path": "content-catalog.mjs",
@@ -507,8 +507,8 @@
     },
     {
       "path": "entry-preload-v900.mjs",
-      "size": 2425,
-      "sha256": "6abe32d5dcc5ce24ef3ed09d40ed91b8ad1d8e2f9aac08c05cc104ddad24a916"
+      "size": 2376,
+      "sha256": "8b824342e0ee50b3512b8760df539ce548c50f177675f17c3c2b0ed1e252e154"
     },
     {
       "path": "equipment.mjs",
@@ -552,8 +552,8 @@
     },
     {
       "path": "index.html",
-      "size": 41176,
-      "sha256": "661cc0c8b124b33ca928e91d11cbc8c5f52c30d2932dd64b52215927a780faeb"
+      "size": 40735,
+      "sha256": "4926b37828563612c20e06f034bb8e918521f75ab0ab646922adbf77aababebf"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -602,8 +602,8 @@
     },
     {
       "path": "monster-command-http-provider-v900.mjs",
-      "size": 14536,
-      "sha256": "ca90af10d2f75f8d4c4070c44fa09b743eb8caf9b3b3e0210f56befdf785afd6"
+      "size": 14342,
+      "sha256": "e1ca44cbb53f848e91c5ab88065e321242bf0f50d4c4510a36d838c6f2fba74b"
     },
     {
       "path": "monster-control-controller-v900.mjs",
@@ -642,13 +642,13 @@
     },
     {
       "path": "online-world-bridge-v900.mjs",
-      "size": 6898,
-      "sha256": "1cd0d6f59277d41db695d4652b853745b31acb1a16eaca844f30ae942c413e66"
+      "size": 6715,
+      "sha256": "95858ee759ebf9221bda6ccc9abdbb6c29931b6d987a82adc3d9cc243dd3d7ac"
     },
     {
       "path": "online-world-shell-v900.mjs",
-      "size": 29507,
-      "sha256": "e1ae48ff9df849483b298c36a032a4e87e7ef0ec7b6bf594cdfbb405dd1c6b50"
+      "size": 28764,
+      "sha256": "410b94a042289ef32df3b4dc996f63872f41403f2dd1219c954cbccfc1e708e8"
     },
     {
       "path": "passive-catalog.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "pirate-central-state-client.mjs",
-      "size": 13920,
-      "sha256": "a99bbf8898c4411ee19a7ff906c688c58115761ed80019f54e71c848a1d1ba0a"
+      "size": 13687,
+      "sha256": "49d7ab3916fb5105e92cd6d43b2141ac369a4cfeb99cce19adf1c7e045e0e116"
     },
     {
       "path": "pirate-fruit-control-hud-v900.mjs",
@@ -696,34 +696,34 @@
       "sha256": "96e0345b5362893acaf3a8dad46cdc0781563c14dd9b5d4bf45441b961707a74"
     },
     {
-      "path": "pirate-fruit-offline/assets/AzureFrostIsland-DC_yT95G.js",
+      "path": "pirate-fruit-offline/assets/AzureFrostIsland-BzLlGuUC.js",
       "size": 5201,
-      "sha256": "a153c25981bdc2656f9e70cfd394d236f3e53f49cd5821903d576017fa33ef83"
+      "sha256": "5e1978190e36012ab284fd3815e0b73ddf5a951474f71cfa6caadf6309de100a"
     },
     {
-      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-_cAwvJAM.js",
+      "path": "pirate-fruit-offline/assets/EmberVolcanoIsland-D9btx7ZN.js",
       "size": 6479,
-      "sha256": "b05ea8ed9df1e49f773cb3879dbe508465a6f6fbb48b225ccf8f2f7f617103e4"
+      "sha256": "49fbd06c7a24391256d31c90f065dc99a63652971d974fb3ef05395bb946511a"
     },
     {
-      "path": "pirate-fruit-offline/assets/MistJungleIsland-DJDtibBR.js",
+      "path": "pirate-fruit-offline/assets/MistJungleIsland-i9wcx5pQ.js",
       "size": 6126,
-      "sha256": "33083c9d78871e129586dd21c658ebf5e4ee4e4c49c878b71c736c66257946ce"
+      "sha256": "4197e17a56e8705bd52e3dfaff0535f86cf2546fe26122f59244484c14040447"
     },
     {
-      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-BdE7vW3h.js",
+      "path": "pirate-fruit-offline/assets/SunscarDesertIsland-Dd87MDaN.js",
       "size": 6375,
-      "sha256": "8f47995ab37074b5d958cf3532d3614a9f18cec7c48209a3c9b74f3da8c3385e"
+      "sha256": "1a82ff8497c7a71dade04de8d5e44ce0e788da25c2d54aca09adaa012e8e27f9"
     },
     {
-      "path": "pirate-fruit-offline/assets/TempestSkyIsland-U_fBcc4N.js",
+      "path": "pirate-fruit-offline/assets/TempestSkyIsland-Bkq5rx1i.js",
       "size": 5411,
-      "sha256": "5a0ee61314ae45b3113b7875f1e746dd4feb4f3996de185d5d5644511c29aa18"
+      "sha256": "5b7f634962222402eabb8737afd18fcf8f6185cfbeb1e29b36647a774acd9274"
     },
     {
-      "path": "pirate-fruit-offline/assets/index-C0el93GC.js",
-      "size": 1185867,
-      "sha256": "a37927836d73efa6fa4f678241d82679d7890e4bab42be958097cea8ae9cf8c1"
+      "path": "pirate-fruit-offline/assets/index-D3UrpAn_.js",
+      "size": 1244637,
+      "sha256": "1e79f3e0dae4c2b8865aae6393e30f43517ffe5982dd125d77beb4f2a9703f4e"
     },
     {
       "path": "pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js",
@@ -743,7 +743,7 @@
     {
       "path": "pirate-fruit-offline/pocket-bootstrap.mjs",
       "size": 158,
-      "sha256": "55c8be3a800215f443e8156ccd57ec2d39f0482886a45958b0cda4f2e47cc87d"
+      "sha256": "c2be3733f7ab651d32f2187f5e71c271582564f2c105c460ac15f1313068af0d"
     },
     {
       "path": "pirate-fruit-offline/pocket-presentation.mjs",
@@ -787,8 +787,8 @@
     },
     {
       "path": "pirate-original-world-contract.mjs",
-      "size": 3209,
-      "sha256": "d5b2ebadf696106d0f54efe617178cc0bca62d86c743332b117813b926023d65"
+      "size": 3479,
+      "sha256": "9e028188e6528bed372d027279c370181ae66e611b29169f280c5045231c3265"
     },
     {
       "path": "pirate-player-server.mjs",
@@ -797,8 +797,8 @@
     },
     {
       "path": "pirate-presence-bridge-v900.mjs",
-      "size": 5300,
-      "sha256": "be7ec3118f9d7b0d824913897de37026c13cee18d63b1b8b0ace308ed3677938"
+      "size": 5182,
+      "sha256": "bd571e86960ffbdad13b31c6365afa5c7995db8716007a6d62cab45ba3a606fa"
     },
     {
       "path": "pirate-save-bridge-v900.mjs",
@@ -862,8 +862,8 @@
     },
     {
       "path": "scene-entry-v900.mjs",
-      "size": 8653,
-      "sha256": "068ce6eaf078de663723d597d29c0784f7cb3f2fa3a0435e76bdc7f705229cc2"
+      "size": 8435,
+      "sha256": "f8d1f12cd77892314c469cbf37781b21e7cff9371fddac971f8ff2090b50bbfb"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -1047,8 +1047,8 @@
     },
     {
       "path": "v900.html",
-      "size": 41176,
-      "sha256": "661cc0c8b124b33ca928e91d11cbc8c5f52c30d2932dd64b52215927a780faeb"
+      "size": 40735,
+      "sha256": "4926b37828563612c20e06f034bb8e918521f75ab0ab646922adbf77aababebf"
     },
     {
       "path": "warp-routes.mjs",
@@ -1067,18 +1067,18 @@
     },
     {
       "path": "world-presence-protocol.mjs",
-      "size": 44957,
-      "sha256": "c6e44d413313930f2699350a6f931592530442c454592bdf58b177cd2c3d296c"
+      "size": 44113,
+      "sha256": "09d77722eb955620336f17e2de7c4ee7df3d6d8e02d75eb66289bfe3c92c291b"
     },
     {
       "path": "world-presence-v800.mjs",
-      "size": 25514,
-      "sha256": "afdbf01ad8bf094fcbc618f90ec3daa9eedf4dfd0b8909cfff3c34c50a36e68c"
+      "size": 24934,
+      "sha256": "3e804fb51e8adcfb01ccac9d56d8bd1c36d185fd5eaec699e5c6a5f443496d11"
     },
     {
       "path": "worlds-v900.mjs",
-      "size": 10503,
-      "sha256": "fb62413e7c13df769b9f69572ab4a53fd263b01d779baf0acc342274c40bae68"
+      "size": 10276,
+      "sha256": "752beef405846b4c8f8871f49e88399f2d36dcb0fb2224a44e4a09fdc2d7d4de"
     }
   ]
 }
