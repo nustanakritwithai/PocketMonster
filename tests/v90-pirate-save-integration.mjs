@@ -32,8 +32,8 @@ assert.match(boot, /await preparePirateSaveStorage\(\)/, 'parent boot hydrates s
 assert.match(boot, /createPirateCentralStateClient/, 'parent uses the central state bootstrap helper');
 assert.match(boot, /Pirate save bootstrap failed; iframe was not started/, 'bootstrap failure is visible and blocks iframe startup');
 assert.match(boot, /PIRATE_FRUIT_OFFLINE_ENTRY/, 'parent loads the canonical local Pirate client');
-assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=974/, 'world catalog keeps the current Pirate boot module revision');
-assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=95/, 'top-level entry cache-busts the unified ship-control shell');
+assert.match(combined, /boot-pirate-fruit-v900.mjs\?v=975/, 'world catalog keeps the current Pirate boot module revision');
+assert.match(entry, /online\-world\-shell\-v900\.mjs\?v=96/, 'top-level entry cache-busts the unified ship-control shell');
 assert.match(sceneHtml, /scene-entry-v900\.mjs\?v=80/, 'scene HTML cache-busts the unified Pirate ship-control bridge');
 assert.match(sceneHtml, /style\-v900\.css\?v=982/, 'scene HTML cache-busts the helm placement beside chat');
 assert.match(offlineHtml, /pocket-presentation\.mjs\?v=[1-9]\d*"/, 'offline HTML cache-busts presentation integration with a positive revision');

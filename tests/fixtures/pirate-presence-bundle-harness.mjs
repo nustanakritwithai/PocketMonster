@@ -101,15 +101,12 @@ function compilePresenceRuntime(bundle, classes) {
   // New Pirate builds may place island placement helpers before the protocol
   // prelude (c5dbb9c uses Pe/Cs). Extract this tiny dependency explicitly so
   // the fixture does not depend on minifier names or evaluate the whole app.
-  const placementReturn = bundle.indexOf('return{x:e+o.x,z:t+o.z}');
-  const placementStart = bundle.lastIndexOf('function ', placementReturn);
-  const placement = placementReturn >= 0 && placementStart >= 0
-    ? bundle.slice(placementStart, bundle.indexOf('}', placementReturn) + 1).match(
-      /function ([A-Za-z_$][\w$]*)\(i,e,t\)\{const o=([A-Za-z_$][\w$]*)\[i\];/,
-    )
-    : null;
+  // Capture the projection's identifiers, not one minifier's i/e/t/o names.
+  // The entire x/z addition expression and table lookup remain mandatory.
+  const placement = bundle.match(/function (?<fn>[A-Za-z_$][\w$]*)\((?<island>[A-Za-z_$][\w$]*),(?<x>[A-Za-z_$][\w$]*),(?<z>[A-Za-z_$][\w$]*)\)\{const (?<offset>[A-Za-z_$][\w$]*)=(?<table>[A-Za-z_$][\w$]*)\[\k<island>\];return\{x:\k<x>\+\k<offset>\.x,z:\k<z>\+\k<offset>\.z\}\}/);
   if (!placement) throw new Error('Pirate bundle fixture could not locate island placement helper');
-  const placementData = placement[2];
+  const placementStart = placement.index;
+  const placementData = placement.groups.table;
   const placementDataStart = bundle.lastIndexOf(`${placementData}=`, placementStart);
   const placementObjectStart = bundle.indexOf('{', placementDataStart);
   const placementObjectEnd = placementObjectStart >= 0 ? matchingBrace(bundle, placementObjectStart) : -1;

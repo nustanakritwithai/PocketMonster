@@ -7,7 +7,7 @@ import {
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
   centralAuthorityOwnsTransportZone,
-} from './world-presence-protocol.mjs?v=7';
+} from './world-presence-protocol.mjs?v=8';
 
 export const PIRATE_PRESENCE_ZONE = 'pirate-fruit';
 export const PIRATE_LOCAL_PRESENCE_MESSAGE = 'pocketmonster:pirate-presence-v1';

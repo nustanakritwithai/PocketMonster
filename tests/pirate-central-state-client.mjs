@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  sanitizePirateStateOperation,
   createPirateCentralStateClient,
   createPirateStateOperationQueue,
   operationFromPirateSaveMutation,
@@ -75,3 +76,33 @@ assert.equal(retryCalls.length, 1, 'คำสั่งบัญชีเดิ�
 await assert.rejects(switchingQueue.enqueue({ type: 'statAllocation', allocations: { combat: 1 } }), /STALE_SESSION/);
 assert.equal(retryCalls.length, 1);
 console.log('PASS canonical bootstrap migration revision, auth isolation, local-data preservation');
+
+const vitalsCalls = [];
+const inputClient = createPirateCentralStateClient({ config: { apiBaseUrl: 'https://example.invalid' },
+  getSessionToken: () => 'bound-vitals-session', fetchImpl: async (url, init) => {
+    vitalsCalls.push({ url, init });
+    return { status: 200, ok: true, json: async () => ({ ok: true, revision: 0, outcome: { accepted: true } }) };
+  } });
+const inputResult = await inputClient.sendVitalsInput({ type: 'vitalsInput', contract: 'pirate-vitals/1', blocking: true, mounted: false, sprinting: false });
+assert.equal(vitalsCalls[0].url, 'https://example.invalid/api/pirate/vitals/input');
+assert.equal(vitalsCalls[0].init.headers.Authorization, 'Bearer bound-vitals-session');
+assert.equal(inputResult.persisted, null, 'input must not create or replace a canonical save');
+assert.equal(JSON.parse(vitalsCalls[0].init.body).expectedRevision, undefined);
+await assert.rejects(inputClient.sendVitalsInput({ type: 'vitalsInput', contract: 'pirate-vitals/1', blocking: 'true', mounted: false, sprinting: false }));
+assert.equal(vitalsCalls.length, 1);
+console.log('PASS authenticated bounded input endpoint without aggregate writes');
+
+const quoteOperation = { type: 'tradeQuote', schemaVersion: 1, action: 'buy', islandId: 'starter', commodityId: 'wood', quantity: 2 };
+assert.deepEqual(sanitizePirateStateOperation(quoteOperation), quoteOperation);
+assert.equal(sanitizePirateStateOperation({ ...quoteOperation, quantity: -1 }), null);
+const skillOperation = { type: 'vitalsSkill', skillId: 'combat-z', idempotencyKey: 'skill-fixture-001' };
+assert.deepEqual(sanitizePirateStateOperation(skillOperation), skillOperation);
+assert.equal(sanitizePirateStateOperation({ ...skillOperation, skillId: '' }), null);
+let persistedCallbacks = 0;
+const quoteQueue = createPirateStateOperationQueue({ revision: 4,
+  client: { commitOperation: async () => ({ revision: 4, persisted: null, outcome: { quote: { unitPrice: 12 } } }) },
+  onPersisted: () => { persistedCallbacks += 1; } });
+assert.equal((await quoteQueue.enqueue(quoteOperation)).outcome.quote.unitPrice, 12);
+assert.equal(persistedCallbacks, 0, 'read-only quote must not replace player state');
+assert.equal(quoteQueue.revision, 4);
+console.log('PASS quote and skill operation contracts, read-only quote preserves player state');
