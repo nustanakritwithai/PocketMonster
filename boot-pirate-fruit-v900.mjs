@@ -38,7 +38,7 @@ import {
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=949', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=840&animalControl=pirate-fruit';
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=841&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const pocketPlayerHud = createPocketPlayerHudStore();
@@ -65,7 +65,7 @@ export function ensurePocketAnimalControl() {
       ? Promise.resolve().then(() => managedPrepare())
       : (typeof window !== 'undefined' && window.POCKETMONSTER_ANIMAL_CONTROL
         ? Promise.resolve()
-        : import('./game-v800.js?v=840&animalControl=pirate-fruit'));
+        : import('./game-v800.js?v=841&animalControl=pirate-fruit'));
     throwRuntimePromise = prepare.then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
