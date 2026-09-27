@@ -5922,6 +5922,10 @@ async function healAll(){
           throw Object.assign(new Error('RECOVERY_CONTROL_READBACK_FAILED'),{phase:'readback',code:controlReadback?.code||'CONTROL_STATE_READBACK_FAILED'});
         const partyInstanceIds=new Set(controlParty.slots.map(slot=>slot?.instanceId).filter(Boolean));
         const liveActors=Array.isArray(controlReadback.state?.actors)?controlReadback.state.actors:[];
+        // ไม่มี HP ไม่ใช่หลักฐานว่ารักษาสำเร็จ โดยเฉพาะ read-back หลังข้ามแมพมาที่ hub
+        if(controlParty.slots.some(slot=>slot?.instanceId&&!Number.isFinite(slot.hp))
+          ||liveActors.some(actor=>partyInstanceIds.has(actor?.instanceId)&&!Number.isFinite(actor.hp)))
+          throw Object.assign(new Error('RECOVERY_CONTROL_VITALS_UNAVAILABLE'),{phase:'readback',code:'CONTROL_STATE_VITALS_UNAVAILABLE'});
         if(controlParty.slots.some(slot=>slot?.instanceId&&(slot.fainted===true||(Number.isFinite(slot.hp)&&slot.hp<=0)))
           ||liveActors.some(actor=>partyInstanceIds.has(actor?.instanceId)&&(actor.fainted===true||(Number.isFinite(actor.hp)&&actor.hp<=0))))
           throw Object.assign(new Error('RECOVERY_CONTROL_STATE_STILL_DEAD'),{phase:'readback',code:'CONTROL_STATE_STILL_DEAD'});
