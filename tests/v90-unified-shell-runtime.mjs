@@ -229,8 +229,9 @@ const combatController = onlineShell.combat;
 const shellStatusNode = body.children[0].children.find(node => node.id === 'onlineWorldShellStatus');
 let readyEvents = 0;
 let errorEvents = 0;
+let errorEventDetail = null;
 window.addEventListener('pocketmonster:online-scene-ready', () => { readyEvents += 1; });
-window.addEventListener('pocketmonster:online-scene-error', () => { errorEvents += 1; });
+window.addEventListener('pocketmonster:online-scene-error', event => { errorEvents += 1; errorEventDetail = event.detail; });
 assert.equal(frameNode, sceneFrame);
 assert.ok(combatHostNode, 'persistent parent shell owns one Combat V9.1 host');
 assert.equal(body.children[0].children.filter(node => node.id === 'combatV91Shell').length, 1);
@@ -405,9 +406,14 @@ assert.equal(onlineShell.reportSceneBoot(sceneWindow, errorLease, {
   status: 'error',
   code: 'ONLINE_SCENE_BOOT_FAILED',
   stage: 'runtime',
+  diagnostic: { stage: 'pirate-save-bootstrap', code: 'STATE_CONFLICT', httpStatus: 409 },
 }), true);
 assert.equal(shellStatusNode.classList.contains('hidden'), false);
 assert.equal(shellStatusNode.classList.contains('error'), true);
+assert.match(shellStatusNode.textContent, /pirate-save-bootstrap · STATE_CONFLICT · HTTP 409/);
+assert.equal(errorEventDetail.diagnosticStage, 'pirate-save-bootstrap');
+assert.equal(errorEventDetail.diagnosticCode, 'STATE_CONFLICT');
+assert.equal(errorEventDetail.httpStatus, 409);
 assert.equal(onlineShell.diagnostics().sceneReadyCount, readyCountBeforeError);
 assert.equal(errorEvents, 1);
 assert.equal(onlineShell.reportSceneBoot(sceneWindow, errorLease, { status: 'ready' }), false, 'an errored lease cannot later become ready');

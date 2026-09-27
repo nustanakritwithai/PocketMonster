@@ -11,6 +11,7 @@ import {
   operationFromPirateSaveMutation,
   pirateEntriesFromDocuments,
 } from './pirate-central-state-client.mjs?v=4';
+import { pirateSaveBootstrapError } from './scene-boot-diagnostics-v900.mjs?v=1';
 import { syncPirateFruitControlHud } from './pirate-fruit-control-hud-v900.mjs?v=11';
 import { readPirateOnboardingState } from './pirate-onboarding-overlay-v900.mjs?v=1';
 import {
@@ -492,8 +493,9 @@ let pirateSaveStorage;
 try {
   pirateSaveStorage = await preparePirateSaveStorage();
 } catch (error) {
-  showPirateStartupError(error);
-  throw error;
+  const safeError = pirateSaveBootstrapError(error);
+  showPirateStartupError(safeError);
+  throw safeError;
 }
 const pirateFrame = mountPirateOnline(pirateSaveStorage);
 let heldMonsterIntent = null;

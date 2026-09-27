@@ -11,6 +11,7 @@ assert.equal(
 const read = relative => fs.readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8');
 const actualSources = new Map([
   ['/scene-entry-v900.mjs', read('scene-entry-v900.mjs')],
+  ['/scene-boot-diagnostics-v900.mjs', read('scene-boot-diagnostics-v900.mjs')],
   ['/persistent-fullscreen-v900.mjs', read('persistent-fullscreen-v900.mjs')],
   ['/worlds-v900.mjs', read('worlds-v900.mjs')],
   ['/scene-route-controller-v900.mjs', read('scene-route-controller-v900.mjs')],
@@ -381,8 +382,13 @@ function createHarness({ world = 'pirate-fruit', panel = 'human', hostMode = 'ho
     if (worldRuntimePaths.has(pathname)) {
       metrics.runtimeImports.push(resolvedUrl);
       metrics.timeline.push(`module:runtime:${pathname}`);
-      if (failureStage === 'runtime') {
+      if (failureStage === 'runtime' || failureStage === 'pirate-save-bootstrap') {
         return new vm.SyntheticModule([], function rejectRuntimeBoot() {
+          if (failureStage === 'pirate-save-bootstrap') {
+            throw Object.assign(new Error('raw token=https://secret.invalid/?token=private save=private'), {
+              sceneBootDiagnostic: { stage: 'pirate-save-bootstrap', code: 'PIRATE_ORIGINAL_NOT_READY', httpStatus: 503 },
+            });
+          }
           throw new Error('simulated world runtime failure');
         }, { context, identifier: resolvedUrl });
       }
@@ -560,16 +566,21 @@ for (const gateMode of ['missing', 'unhealthy']) {
   assert.equal(harness.metrics.webSocketConstructs, 0);
 }
 
-for (const failureStage of ['template', 'runtime']) {
+for (const failureStage of ['template', 'runtime', 'pirate-save-bootstrap']) {
   const harness = createHarness({ failureStage });
   await assert.rejects(harness.evaluate());
   assert.equal(harness.metrics.sceneBootRegistrations.length, 1);
   assert.equal(harness.metrics.sceneBootReports.length, 1);
-  assert.deepEqual({ ...harness.metrics.sceneBootReports[0] }, {
+  const report = harness.metrics.sceneBootReports[0];
+  assert.deepEqual({ ...report, diagnostic: { ...report.diagnostic } }, {
     status: 'error',
     code: 'ONLINE_SCENE_BOOT_FAILED',
-    stage: failureStage,
+    stage: 'runtime' === failureStage || 'pirate-save-bootstrap' === failureStage ? 'runtime' : failureStage,
+    diagnostic: failureStage === 'pirate-save-bootstrap'
+      ? { stage: 'pirate-save-bootstrap', code: 'PIRATE_ORIGINAL_NOT_READY', httpStatus: 503 }
+      : { stage: failureStage, code: 'SCENE_BOOT_FAILED', httpStatus: null },
   });
+  assert.equal(JSON.stringify(report).includes('secret'), false, 'raw exception details never cross to the shell report');
   assert.equal(harness.metrics.parentEndReasons.length, 0, `${failureStage} failure does not revoke the valid parent session`);
   assert.deepEqual(harness.body.children, []);
   assert.equal('POCKETMONSTER_LAUNCH_SESSION' in harness.childWindow, false);

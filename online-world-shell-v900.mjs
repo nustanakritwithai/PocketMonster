@@ -10,6 +10,7 @@ import {
   ONLINE_WORLD_SHELL_KIND,
   createOnlineScenePresenceBridge,
 } from './online-world-bridge-v900.mjs?v=11';
+import { sanitizeSceneBootDiagnostic } from './scene-boot-diagnostics-v900.mjs?v=1';
 import {
   createCombatV91BaseProfile,
   createCombatV91Shell,
@@ -535,6 +536,7 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
   if (outcome?.status === 'error'
     && outcome.code === 'ONLINE_SCENE_BOOT_FAILED'
     && ONLINE_SCENE_ERROR_STAGES.has(outcome.stage)) {
+    const diagnostic = sanitizeSceneBootDiagnostic(outcome.diagnostic, outcome.stage);
     closeCombatSession();
     sceneBootState = 'error';
     sceneErrorCount += 1;
@@ -542,13 +544,16 @@ function reportSceneBoot(sceneWindow, lease, outcome) {
     presenceBridge.reset();
     shellStatus.classList.remove('hidden');
     shellStatus.classList.add('error');
-    shellStatus.textContent = 'เปิดฉากออนไลน์ไม่สำเร็จ กรุณาลองเปลี่ยนฉากหรือโหลดใหม่';
+    shellStatus.textContent = `เปิดฉากออนไลน์ไม่สำเร็จ กรุณาลองเปลี่ยนฉากหรือโหลดใหม่ (${diagnostic.stage} · ${diagnostic.code} · HTTP ${diagnostic.httpStatus ?? '—'})`;
     window.dispatchEvent(new CustomEvent('pocketmonster:online-scene-error', {
       detail: Object.freeze({
         worldId: activeWorld,
         panel: activePanel,
         code: 'ONLINE_SCENE_BOOT_FAILED',
         stage: outcome.stage,
+        diagnosticStage: diagnostic.stage,
+        diagnosticCode: diagnostic.code,
+        httpStatus: diagnostic.httpStatus,
         sceneErrorCount,
         sceneBootGeneration: lease.generation,
       }),
