@@ -312,6 +312,9 @@ async def main():
                         pass
                 await asyncio.sleep(0.5)
             reloaded = state_reads[before_reads:]
+            # รออ่าน ACK ที่ได้รับแล้วให้จบก่อนเทียบ ห้ามละทิ้ง gameplay fields เพื่อให้ผ่าน
+            if response_tasks:
+                await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
             # รวม autosave ที่ ACK แล้วก่อน reload GET; ไม่ตัด worldTime/HP หรือ gameplay fields ทิ้ง
             persisted = False
             for s in reloaded:
@@ -326,6 +329,7 @@ async def main():
             initialized_again = len(initializations) != before_initializations
             EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again,
                                       'readCount': len(reloaded), 'savedRevision': saved['revision'],
+                                      'ackRevisions': [a['revision'] for a in state_acks],
                                       'readRevisions': [s['revision'] for s in reloaded]}
             if not persisted or initialized_again:
                 GATES['save-reload'] = 'VIOL'
@@ -434,6 +438,12 @@ async def main():
                 raise RuntimeError('farm-scene-unavailable')
             EVIDENCE['stage'] = 'walk-to-keeper'
             await walk_to({'x': 4, 'z': 3}, 2.7, 25)
+            keeper_pose = await pose()
+            EVIDENCE['keeperPose'] = {
+                'heightPresent': isinstance(keeper_pose.get('y'), (int, float)),
+                'heightAllowed': isinstance(keeper_pose.get('y'), (int, float)) and abs(keeper_pose['y']) <= 2,
+                'nearKeeper': math.hypot(keeper_pose['x']-4, keeper_pose['z']-3) < 3.4,
+            }
             EVIDENCE['stage'] = 'npc-heal-ui'
             await scene.locator('#npcBtn').wait_for(state='visible', timeout=15000)
             EVIDENCE['npcHitTest'] = await scene.evaluate("""() => {

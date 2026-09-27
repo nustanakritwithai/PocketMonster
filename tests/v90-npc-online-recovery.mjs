@@ -5,6 +5,14 @@ import { recoverMonsters } from '../server-sync.mjs';
 const game = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 'utf8');
 const sync = fs.readFileSync(new URL('../server-sync.mjs', import.meta.url), 'utf8');
 
+// หลังข้ามจาก Pirate เซิร์ฟเวอร์ห้ามคงความสูงเก่าเพราะ Pocket ไม่ส่ง y
+const poseSource = game.match(/window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{[^\n]+\}\);/)?.[0];
+assert.ok(poseSource, 'ต้องพบตัวส่งพิกัด Pocket จริง');
+const poseWindow = {};
+new Function('window', 'state', 'player', poseSource)(poseWindow,
+  {currentZone:'hub'}, {position:{x:4,y:0,z:3},rotation:{y:1}});
+assert.equal(poseWindow.POCKETMONSTER_WORLD_STATE().y, 0, 'Pocket ต้องส่งความสูงจริงแทนการปล่อยให้ Server ใช้ความสูง Pirate เก่า');
+
 assert.match(sync, /export async function recoverMonsters/);
 assert.match(sync, /'\/api\/monsters\/recover'/);
 assert.match(sync, /commandId, expectedRevision/);

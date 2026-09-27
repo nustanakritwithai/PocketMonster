@@ -2603,7 +2603,7 @@ function clearTransientEffects(){
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
-window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
+window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,y:player.position.y,z:player.position.z,dir:player.rotation.y});
 const worldPresence=createWorldPresenceController({THREE,scene,getCamera:()=>camera,getZone:()=>state.currentZone,
   createActor:actor=>getAssetDef(actor.monsterType)?assets.spawn(actor.monsterType,{role:actor.actorId.startsWith('owned:')?'owned':'wild'}):null,
 });
