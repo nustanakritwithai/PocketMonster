@@ -26,7 +26,7 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
   pirateCentralAuthorityOwnsZone,
-} from './pirate-presence-bridge-v900.mjs?v=8';
+} from './pirate-presence-bridge-v900.mjs?v=9';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-fruit-offline/pirate-owned-monster-carry.mjs';
 import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=18';
