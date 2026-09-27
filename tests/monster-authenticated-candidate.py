@@ -17,7 +17,8 @@ GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'damaged-monster-recovery': 'UNKNOWN'}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
-            'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None}
+            'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
+            'stage': 'start', 'networkFailures': []}
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
@@ -63,10 +64,22 @@ async def main():
                 if path.endswith('/redeem') and response.status == 200:
                     GATES['launch-redeem'] = 'SAT'
         context.on('response', response_seen)
+        def failed_request(request):
+            host = urlsplit(request.url).hostname
+            if host in {'157.85.96.139', 'www.gstatic.com', 'identitytoolkit.googleapis.com', 'pocketmonster-game.web.app'}:
+                item = {'host': host, 'failure': request.failure}
+                if item not in EVIDENCE['networkFailures']:
+                    EVIDENCE['networkFailures'].append(item)
+        context.on('requestfailed', failed_request)
         page = await context.new_page()
         try:
+            EVIDENCE['stage'] = 'firebase-page'
             await page.goto('https://pocketmonster-game.web.app/', wait_until='domcontentloaded', timeout=45000)
+            EVIDENCE['stage'] = 'firebase-listeners-ready'
+            await page.wait_for_function('window.POCKETMONSTER_LOGIN_REQUIRED === true', timeout=45000)
+            EVIDENCE['stage'] = 'guest-click'
             await page.locator('#guestLoginBtn').click(timeout=30000)
+            EVIDENCE['stage'] = 'launch-navigation'
             game = None
             for _ in range(90):
                 for candidate_page in context.pages:
@@ -78,6 +91,7 @@ async def main():
                 await asyncio.sleep(1)
             if not game:
                 raise RuntimeError('candidate-game-navigation-missing')
+            EVIDENCE['stage'] = 'scene-controller'
             # รอ scene จาก boot จริง ไม่ใส่ token/localStorage หรือเรียกฟังก์ชันข้าม gate
             scene = None
             for _ in range(90):
@@ -94,6 +108,7 @@ async def main():
             if not scene:
                 raise RuntimeError('candidate-scene-controller-missing')
             GATES['candidate-scene'] = 'SAT'
+            EVIDENCE['stage'] = 'scene-ready'
             # เก็บเฉพาะชื่อ element ที่กำหนด ไม่เก็บ DOM/account/session/URL ทั้งก้อน
             for selector in ['#monsterSlot1Btn', '#monsterThrowBtn', '#npcBtn', '#healAllBtn',
                              '[data-ranch-service="heal"]', '#mmorpgMonsterBagButton']:
