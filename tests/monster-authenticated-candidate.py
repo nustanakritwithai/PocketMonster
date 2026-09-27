@@ -76,6 +76,16 @@ async def main():
         response_tasks = set()
         async def read_state_metadata(response):
             path = urlsplit(response.url).path
+            if path in SAFE_PATHS and response.status >= 400:
+                try:
+                    failure = await response.json()
+                    code = failure.get('errorCode') or failure.get('code')
+                    if isinstance(code, str) and re.fullmatch(r'[A-Z0-9_]{1,64}', code):
+                        item = {'path': path, 'status': response.status, 'code': code}
+                        if item not in EVIDENCE.setdefault('apiErrors', []):
+                            EVIDENCE['apiErrors'].append(item)
+                except Exception:
+                    pass
             if path not in {'/api/pirate/state', '/api/pirate/state/operation'} or response.status != 200:
                 return
             try:
