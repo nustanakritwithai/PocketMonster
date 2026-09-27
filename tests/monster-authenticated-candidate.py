@@ -62,6 +62,8 @@ async def main():
                     EVIDENCE['http'].append(item)
                 if path == '/api/auth/firebase/login' and response.status == 200:
                     GATES['firebase-login'] = 'SAT'
+                if path == '/api/pirate/state' and response.status >= 500:
+                    GATES['candidate-scene'] = 'VIOL'
                 if path.endswith('/redeem') and response.status == 200:
                     GATES['launch-redeem'] = 'SAT'
         context.on('response', response_seen)
@@ -99,16 +101,21 @@ async def main():
             for _ in range(90):
                 for frame in game.frames:
                     try:
-                        if await frame.evaluate("Boolean(window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER)"):
+                        if await frame.evaluate("document.body?.dataset?.combinedWorld === 'pirate-fruit' && Boolean(window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER)"):
                             scene = frame
                             break
                     except Exception:
                         pass
-                if scene:
+                if scene or GATES['candidate-scene'] == 'VIOL':
                     break
                 await asyncio.sleep(1)
             if not scene:
                 raise RuntimeError('candidate-scene-controller-missing')
+            if GATES['candidate-scene'] == 'VIOL':
+                raise RuntimeError('pirate-state-server-unavailable')
+            # controller อย่างเดียวไม่ยืนยัน worker; ต้องมี authenticated state success ด้วย
+            if not any(item['path'] == '/api/pirate/state' and item['status'] == 200 for item in EVIDENCE['http']):
+                raise RuntimeError('pirate-state-success-not-observed')
             GATES['candidate-scene'] = 'SAT'
             EVIDENCE['stage'] = 'scene-ready'
             # เก็บเฉพาะชื่อ element ที่กำหนด ไม่เก็บ DOM/account/session/URL ทั้งก้อน
