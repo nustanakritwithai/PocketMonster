@@ -443,7 +443,6 @@ export function createUnifiedMobileControls({
       const pocketId = POCKET_ACTION_IDS[action];
       paintActionButton(button, byId.get(pocketId) || byId.get(action) || null);
     }
-    paintMonsterThrow();
   };
 
   const bindActionVisuals = () => {
@@ -498,7 +497,6 @@ export function createUnifiedMobileControls({
     else restorePiratePlayerButtons();
     applyPirateHelmButton();
     bindActionVisuals();
-    paintMonsterThrow();
     return mode;
   };
 
@@ -585,22 +583,6 @@ export function createUnifiedMobileControls({
   let reportedThrowFailure = null;
   let reportedThrowFailureId = 0;
   const monsterPointers = new Set();
-  let suppressThrowClick = false;
-  const monsterThrowMode = () => {
-    const snapshot = monsterController?.snapshot?.();
-    return Boolean(snapshot?.held || ['summon', 'switch'].includes(snapshot?.pendingKind));
-  };
-  const paintMonsterThrow = () => {
-    if (!monsterThrowMode()) return;
-    const button = documentLike.getElementById('captureBtn');
-    if (!button) return;
-    const pending = monsterController.snapshot().pending === true;
-    button.disabled = false;
-    button.setAttribute?.('data-pirate-icon', pending ? '…' : 'ปา');
-    button.setAttribute?.('aria-label', pending ? 'กำลังเรียกมอนสเตอร์' : 'ปามอนสเตอร์');
-    button.setAttribute?.('aria-disabled', String(pending));
-    if (button.style) button.style.backgroundImage = '';
-  };
   const reportThrowFailure = result => {
     const failureResult = result && typeof result === 'object'
       ? result
@@ -650,18 +632,6 @@ export function createUnifiedMobileControls({
       return Promise.resolve({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
     }
   };
-  const throwMonster = async () => {
-    if (monsterController?.snapshot?.()?.pending) {
-      reportThrowFailure({ ok: false, reason: 'summon-pending', code: 'SUMMON_PENDING' });
-      return;
-    }
-    try {
-      const result = await monsterController?.throwHeld?.();
-      if (!result || result.ok === false) reportThrowFailure(result);
-    } catch (error) {
-      reportThrowFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
-    }
-  };
   const monsterSkillPanel = () => monsterController?.snapshot?.()?.controlPanel?.mode === 'monster';
   const paintMonsterSkills = () => {
     if (!monsterSkillPanel()) return;
@@ -697,18 +667,6 @@ export function createUnifiedMobileControls({
     const button = documentLike.getElementById(buttonId);
     if (!button) continue;
     button.addEventListener('pointerdown', event => {
-      if (buttonId === 'captureBtn') {
-        suppressThrowClick = false;
-        if (monsterThrowMode()) {
-          stopMonsterEvent(event);
-          if (monsterPointers.has(event.pointerId)) return;
-          monsterPointers.add(event.pointerId);
-          suppressThrowClick = true;
-          try { button.setPointerCapture?.(event.pointerId); } catch {}
-          void throwMonster();
-          return;
-        }
-      }
       if (/^skill[1-4]Btn$/.test(buttonId) && monsterSkillPanel()) {
         stopMonsterEvent(event);
         if (monsterPointers.has(event.pointerId)) return;
@@ -743,13 +701,6 @@ export function createUnifiedMobileControls({
     button.addEventListener('pointercancel', finish, { capture: true, passive: false });
     button.addEventListener('lostpointercapture', finish, { capture: true, passive: false });
     button.addEventListener('click', event => {
-      if (buttonId === 'captureBtn' && (suppressThrowClick || monsterThrowMode())) {
-        stopMonsterEvent(event);
-        const pointerHandled = suppressThrowClick;
-        suppressThrowClick = false;
-        if (!pointerHandled) void throwMonster();
-        return;
-      }
       if (!/^skill[1-4]Btn$/.test(buttonId) || !monsterSkillPanel()) return;
       stopMonsterEvent(event);
       // Keyboard-generated clicks have no preceding pointerdown.

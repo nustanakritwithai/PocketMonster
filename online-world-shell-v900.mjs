@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=977';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=978';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -20,8 +20,8 @@ import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v
 import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=4';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=961';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=7';
-import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
+import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=8';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=4';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
@@ -164,7 +164,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '94');
+  url.searchParams.set('shellRevision', '95');
   return url.href;
 }
 
@@ -452,6 +452,7 @@ window.POCKETMONSTER_WORLD_PRESENCE = payload => {
   const wasReady = presenceBridge.isReady(payload?.zone);
   const accepted = presenceBridge.acceptSnapshot(payload);
   if (accepted && !wasReady) void monsterStateProvider?.refresh?.({ afterPending: true });
+  else if (accepted) monsterStateProvider?.observeWorldSnapshot?.(payload);
   return accepted;
 };
 window.addEventListener('pocketmonster:world-socket-status', event => {
@@ -695,7 +696,7 @@ monsterStateProvider = createMonsterHttpProvider({
     }
     return readiness;
   },
-  pollMs: 2000,
+  pollMs: 200,
 });
 window.POCKETMONSTER_MONSTER_STATE_PROVIDER = monsterStateProvider;
 const monsterCommands = createMonsterCommandAdapter({

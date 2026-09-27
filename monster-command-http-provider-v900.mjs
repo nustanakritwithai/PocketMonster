@@ -90,7 +90,7 @@ function stateFromPlayerPayload(payload) {
  * The provider remains unavailable while the gate is closed and retries only
  * after that callback (or the normal poll) reports readiness.
  */
-export function createMonsterHttpProvider({ config, sessionToken, getSessionToken = null, isSessionActive = () => true, getZone = () => '', isPresenceReady = null, subscribeReadiness = null, fetchImpl = globalThis.fetch, pollMs = 0 } = {}) {
+export function createMonsterHttpProvider({ config, sessionToken, getSessionToken = null, isSessionActive = () => true, getZone = () => '', isPresenceReady = null, subscribeReadiness = null, fetchImpl = globalThis.fetch, pollMs = 0, now = () => performance.now() } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Monster HTTP provider requires fetch');
   if (typeof sessionToken !== 'string' || !sessionToken) throw new TypeError('Monster HTTP provider requires session sessionToken');
   let current = Object.freeze({ party: null, actors: [], skills: {}, capabilities: {}, revision: 0, available: false });
@@ -98,6 +98,7 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
   let generation = 0;
   let disposed = false;
   let pendingRefresh = null;
+  let lastStateReadAt = -Infinity;
   const requests = new Set();
   const listeners = new Set();
   const notify = () => { for (const listener of listeners) { try { listener(current); } catch {} } return current; };
@@ -139,11 +140,15 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       if (!readiness.ready) { markUnavailable(); return Object.freeze({ ok: false, code: readiness.reason, message: readiness.reason }); }
       const url = new URL(endpoint(config, 'api/monsters/control-state'));
       url.searchParams.set('zone', zone);
+      lastStateReadAt = now();
       const { response, payload } = await fetchBounded(url.href, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` } });
       if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'STALE_SCENE' }); }
       if (!response.ok || !payload?.ok || !Array.isArray(payload?.monsterControl?.party)) { clearState(); return Object.freeze({ ok: false, code: payload?.errorCode || payload?.code || 'STATE_UNAVAILABLE' }); }
-      current = stateFromPlayerPayload(payload);
-      notify();
+      const next = stateFromPlayerPayload(payload);
+      const changed = JSON.stringify(next) !== JSON.stringify(current);
+      current = next;
+      // อ่านถี่ขึ้นได้โดยไม่รื้อ HUD ซ้ำเมื่อข้อมูลจากเซิร์ฟเวอร์ไม่เปลี่ยน
+      if (changed) notify();
       return Object.freeze({ ok: true, state: current });
     } catch (error) {
       if (!stale(requestGeneration)) clearState();
@@ -203,7 +208,29 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       return Object.freeze({ ...payload, commandId: payload.commandId || command?.commandId });
     } catch { return Object.freeze({ ok: false, code: 'TRANSPORT_ERROR', commandId: command?.commandId }); }
   };
-  const start = () => { if (disposed || pollTimer || !(pollMs > 0)) return false; pollTimer = setInterval(() => { void refresh(); }, Math.max(1000, pollMs)); return true; };
+  // poll กับ WS ใช้ช่วงขั้นต่ำเดียวกัน; read-back หลังคำสั่งยังอ่านทันทีได้
+  const refreshBackground = () => {
+    if (disposed || pendingRefresh || now() - lastStateReadAt < 200) return false;
+    void refresh();
+    return true;
+  };
+  const start = () => { if (disposed || pollTimer || !(pollMs > 0)) return false; pollTimer = setInterval(refreshBackground, Math.max(200, pollMs)); return true; };
+  // WS เป็นสัญญาณให้ GET ข้อมูลใหม่ ไม่เขียน HP/active จากภาพหรือ ACK ลง provider
+  // ทำเฉพาะ actor ของเราที่รู้จัก generation ตรงกัน และไม่เกินห้าครั้ง/วินาที
+  const observeWorldSnapshot = payload => {
+    const zone = getZone();
+    if (disposed || !sessionReady(tokenForRequest()) || current.available !== true
+      || payload?.zone !== zone || !readinessForZone(zone) || !Array.isArray(payload.actors)) return false;
+    const changed = current.actors.some(known => {
+      if (!known?.actorId || !Number.isSafeInteger(known.generation)) return false;
+      const live = payload.actors.find(actor => actor?.actorId === known.actorId && actor.zone === zone
+        && actor.generation === known.generation && actor.authority?.generation === known.generation);
+      const hp = live?.authority?.hp;
+      return Number.isFinite(hp?.current) && Number.isFinite(hp?.max)
+        && (hp.current !== known.hp || hp.max !== known.maxHp);
+    });
+    return changed && refreshBackground();
+  };
   const stop = () => { if (!pollTimer) return false; clearInterval(pollTimer); pollTimer = null; return true; };
   let unsubscribeReadiness = null;
   if (typeof subscribeReadiness === 'function') {
@@ -214,9 +241,9 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       if (typeof unsubscribe === 'function') unsubscribeReadiness = unsubscribe;
     } catch {}
   }
-  return Object.freeze({ kind: MONSTER_STATE_PROVIDER_KIND, snapshot: () => current, refresh, send,
+  return Object.freeze({ kind: MONSTER_STATE_PROVIDER_KIND, snapshot: () => current, refresh, send, observeWorldSnapshot,
     subscribe(listener) { if (typeof listener !== 'function') return () => {}; listeners.add(listener); listener(current); return () => listeners.delete(listener); },
-    start, stop, reset() { generation += 1; stop(); for (const request of requests) request.abort(); pendingRefresh = null; clearState(); },
+    start, stop, reset() { generation += 1; lastStateReadAt = -Infinity; stop(); for (const request of requests) request.abort(); pendingRefresh = null; clearState(); },
     reconnect: refresh, dispose() { disposed = true; generation += 1; stop(); try { unsubscribeReadiness?.(); } catch {} unsubscribeReadiness = null; for (const request of requests) request.abort(); pendingRefresh = null; listeners.clear(); },
   });
 }
