@@ -425,7 +425,24 @@ async def main():
             EVIDENCE['stage'] = 'walk-to-keeper'
             await walk_to({'x': 4, 'z': 3}, 2.7, 25)
             EVIDENCE['stage'] = 'npc-heal-ui'
-            await scene.locator('#npcBtn').click(timeout=15000)
+            await scene.locator('#npcBtn').wait_for(state='visible', timeout=15000)
+            EVIDENCE['npcHitTest'] = await scene.evaluate("""() => {
+                const b=document.querySelector('#npcBtn'), r=b.getBoundingClientRect();
+                const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                return {buttonHit:Boolean(hit?.closest('#npcBtn')),topId:hit?.id||null,
+                        pointerEvents:getComputedStyle(b).pointerEvents,
+                        parentPointerEvents:getComputedStyle(b.parentElement).pointerEvents};
+            }""")
+            box = await scene.locator('#npcBtn').bounding_box()
+            if not box:
+                raise RuntimeError('npc-button-not-visible')
+            point = {'x': box['x']+box['width']/2, 'y': box['y']+box['height']/2}
+            EVIDENCE['npcParentHit'] = await game.evaluate("p=>document.elementFromPoint(p.x,p.y)?.id||null", point)
+            if not EVIDENCE['npcHitTest']['buttonHit'] or EVIDENCE['npcParentHit'] != 'onlineWorldSceneFrame':
+                raise RuntimeError('npc-button-pointer-intercepted')
+            # ปุ่มติดตามกล้องเคลื่อนได้; คลิกพิกัดจริงเมื่อ hit-test ยืนยัน ไม่ force/dispatch click
+            await game.mouse.click(point['x'], point['y'])
+            EVIDENCE['stage'] = 'npc-recovery-click'
             await scene.locator('[data-ranch-service="heal"]').click(timeout=15000)
             if not await confirm("""(() => {
                 const provider = window.POCKETMONSTER_MONSTER_STATE_PROVIDER || window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
@@ -498,6 +515,7 @@ async def main():
         except Exception as error:
             # ไม่เขียน Playwright exception string ซึ่งอาจมี launch URL/token
             EVIDENCE['errorType'] = type(error).__name__
+            EVIDENCE['actionability'] = {key: key in str(error) for key in ('not stable', 'intercepts pointer events', 'not visible', 'not enabled')}
             brief = str(error).split('\n')[0]
             brief = re.sub(r'https?://\S+', '[url]', brief)
             brief = re.sub(r'[A-Za-z0-9_\-]{24,}', '[redacted]', brief)
