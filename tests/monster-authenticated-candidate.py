@@ -70,19 +70,24 @@ async def main():
                     GATES['launch-redeem'] = 'SAT'
         context.on('response', response_seen)
         state_reads = []
+        state_acks = []
         initializations = []
         response_tasks = set()
         async def read_state_metadata(response):
-            if urlsplit(response.url).path != '/api/pirate/state' or response.status != 200:
+            path = urlsplit(response.url).path
+            if path not in {'/api/pirate/state', '/api/pirate/state/operation'} or response.status != 200:
                 return
             try:
                 data = await response.json()
-                if response.request.method == 'POST':
+                if response.request.method == 'POST' and path == '/api/pirate/state':
                     initializations.append(True)
+                checkpoint = (data.get('persisted') or {}).get('player', {}).get('checkpoint')
+                metadata = {'revision': data.get('revision'), 'initialized': data.get('initialized'),
+                            'hash': hashlib.sha256(checkpoint.encode()).hexdigest() if isinstance(checkpoint, str) else None}
                 if response.request.method == 'GET':
-                    checkpoint = (data.get('persisted') or {}).get('player', {}).get('checkpoint')
-                    state_reads.append({'revision': data.get('revision'), 'initialized': data.get('initialized'),
-                                        'hash': hashlib.sha256(checkpoint.encode()).hexdigest() if isinstance(checkpoint, str) else None})
+                    state_reads.append(metadata)
+                elif path == '/api/pirate/state/operation' and data.get('ok') is True:
+                    state_acks.append(metadata)
             except Exception:
                 pass
         def queue_state_metadata(response):
@@ -260,10 +265,21 @@ async def main():
                         pass
                 await asyncio.sleep(0.5)
             reloaded = state_reads[before_reads:]
-            persisted = any(s['initialized'] is True and isinstance(s['revision'], int)
-                            and s['revision'] >= saved['revision'] and s['hash'] == saved['hash'] for s in reloaded)
+            # รวม autosave ที่ ACK แล้วก่อน reload GET; ไม่ตัด worldTime/HP หรือ gameplay fields ทิ้ง
+            persisted = False
+            for s in reloaded:
+                if s['initialized'] is not True or not isinstance(s['revision'], int) or s['revision'] < saved['revision']:
+                    continue
+                eligible = [a for a in state_acks if isinstance(a['revision'], int)
+                            and saved['revision'] <= a['revision'] <= s['revision'] and a['hash']]
+                expected = max(eligible, key=lambda a: a['revision']) if eligible else saved
+                if s['hash'] == expected['hash']:
+                    persisted = True
+                    break
             initialized_again = len(initializations) != before_initializations
-            EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again}
+            EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again,
+                                      'readCount': len(reloaded), 'savedRevision': saved['revision'],
+                                      'readRevisions': [s['revision'] for s in reloaded]}
             if not persisted or initialized_again:
                 GATES['save-reload'] = 'VIOL'
                 raise RuntimeError('saved-checkpoint-not-preserved-on-reload')
@@ -317,6 +333,13 @@ async def main():
                                        'distance': round(math.hypot(target['x']-current['x'], target['z']-current['z']), 1)}
             await walk_to(target, 2.5)
             EVIDENCE['stage'] = 'natural-monster-damage'
+            baseline = await game.evaluate("""(() => {
+                const s = window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.snapshot();
+                const p = s?.party?.slots?.[0];
+                return s?.available && p && Number.isFinite(p.hp) ? {id:p.instanceId, hp:p.hp} : null;
+            })()""")
+            if not baseline or baseline['hp'] <= 0:
+                raise RuntimeError('damage-baseline-unavailable')
             await scene.locator('#monsterSlot1Btn').click()
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
                 raise RuntimeError('damage-setup-throw-not-ready')
@@ -324,12 +347,13 @@ async def main():
             damaged = False
             dead = False
             for _ in range(150):
-                vitals = await scene.evaluate("""(() => {
-                    const slot = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0];
-                    return slot ? {hp:slot.hp, maxHp:slot.maxHp, fainted:slot.fainted} : null;
-                })()""")
+                vitals = await game.evaluate("""id => {
+                    const state = window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.snapshot();
+                    const slot = state?.party?.slots?.find(p=>p?.instanceId===id);
+                    return state?.available && slot ? {hp:slot.hp, maxHp:slot.maxHp, fainted:slot.fainted} : null;
+                }""", baseline['id'])
                 if vitals and isinstance(vitals.get('hp'), (int, float)):
-                    damaged = damaged or vitals['hp'] < vitals.get('maxHp', 0)
+                    damaged = damaged or vitals['hp'] < baseline['hp']
                     dead = vitals['hp'] == 0 and vitals.get('fainted') is True
                     if dead:
                         break
@@ -342,16 +366,19 @@ async def main():
             EVIDENCE['stage'] = 'farm-route'
             # เรียก route เดียวกับ portal; ไม่รับรองการเดินชน portal จากขั้นนี้
             await game.evaluate("window.POCKETMONSTER_ONLINE_SHELL.navigate('pocket-monster', 'throw')")
+            farm_ready = False
             for _ in range(90):
                 scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
                 if scene:
                     try:
-                        if await scene.evaluate("document.body?.dataset.combinedWorld === 'pocket-monster' && Boolean(window.POCKETMONSTER_MONSTER_BAG)"):
+                        if (await scene.evaluate("document.body?.dataset.combinedWorld === 'pocket-monster' && Boolean(window.POCKETMONSTER_MONSTER_BAG)")
+                                and (await pose() or {}).get('zone') == 'hub'):
+                            farm_ready = True
                             break
                     except Exception:
                         pass
                 await asyncio.sleep(0.5)
-            if not scene:
+            if not farm_ready:
                 raise RuntimeError('farm-scene-unavailable')
             EVIDENCE['stage'] = 'walk-to-keeper'
             await walk_to({'x': 4, 'z': 3}, 2.7, 25)
@@ -384,6 +411,8 @@ async def main():
             brief = re.sub(r'https?://\S+', '[url]', brief)
             brief = re.sub(r'[A-Za-z0-9_\-]{24,}', '[redacted]', brief)
             EVIDENCE['errorSummary'] = brief[:240]
+            if type(error) is RuntimeError and re.fullmatch(r'[a-z]+(?:-[a-z]+){1,14}', str(error)):
+                EVIDENCE['errorCode'] = str(error)
         finally:
             if game and not game.is_closed():
                 try:
