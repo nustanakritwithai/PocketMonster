@@ -4,6 +4,7 @@ import {
   ONLINE_WORLD_SCENE_KIND,
   isHostedOnlineWorldScene,
 } from './online-world-bridge-v900.mjs?v=11';
+import { sceneBootDiagnosticForError } from './scene-boot-diagnostics-v900.mjs?v=1';
 
 export const ONLINE_WORLD_SCENE_TEARDOWN_EVENT = 'pocketmonster:online-scene-teardown';
 
@@ -206,6 +207,7 @@ try {
       status: 'error',
       code: 'ONLINE_SCENE_BOOT_FAILED',
       stage: bootStage,
+      diagnostic: sceneBootDiagnosticForError(error, bootStage),
     }));
     if (reported) sceneLease = null;
     const terminalSessionFailure = bootStage === 'session'
