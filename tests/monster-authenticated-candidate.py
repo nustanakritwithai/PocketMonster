@@ -4,6 +4,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
@@ -125,6 +126,10 @@ async def main():
         except Exception as error:
             # ไม่เขียน Playwright exception string ซึ่งอาจมี launch URL/token
             EVIDENCE['errorType'] = type(error).__name__
+            brief = str(error).split('\n')[0]
+            brief = re.sub(r'https?://\S+', '[url]', brief)
+            brief = re.sub(r'[A-Za-z0-9_\-]{24,}', '[redacted]', brief)
+            EVIDENCE['errorSummary'] = brief[:240]
         finally:
             await context.close()
             await browser.close()
