@@ -4,6 +4,7 @@ import {
   sanitizePresentation,
   sanitizeVisual,
   sanitizeLocomotion,
+  sanitizeMonsterIntents,
   sanitizeOnlineWorldPose,
   sanitizeOnlineWorldSnapshot,
   centralAuthorityOwnsTransportZone,
@@ -51,9 +52,11 @@ export function sanitizePirateLocalPresence(message) {
     if (actorPose?.actors !== undefined) pose.actors = actorPose.actors;
   }
   if (message.monsterIntents !== undefined) {
-    const intentPose = sanitizeOnlineWorldPose({ ...message, zone: PIRATE_PRESENCE_ZONE }, { allowMonsterIntents: true });
-    if (!intentPose || intentPose.monsterIntents === undefined) return null;
-    pose.monsterIntents = intentPose.monsterIntents;
+    // actor ส่วนภาพที่ถูกข้ามด้านบนต้องไม่ทำให้ pose หายตอนตรวจ intents ซ้ำ
+    // ใช้ validator เดิมของ protocol โดยไม่ลดความเข้มงวดของคำสั่งต่อสู้
+    const intents = sanitizeMonsterIntents(message.monsterIntents);
+    if (!intents) return null;
+    pose.monsterIntents = intents;
   }
   return Object.freeze(pose);
 }

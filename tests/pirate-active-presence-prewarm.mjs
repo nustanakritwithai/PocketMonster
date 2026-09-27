@@ -8,18 +8,18 @@ const captureStart = worldsSource.indexOf('function capturePresenceBindings()');
 const prepareStart = worldsSource.indexOf('function preparePocketRuntime(world)');
 const prepareEnd = worldsSource.indexOf('\nfor (const world of COMBINED_WORLDS)', prepareStart);
 assert.ok(captureStart >= 0 && prepareStart > captureStart && prepareEnd > prepareStart);
-assert.match(worldsSource, /POCKETMONSTER_MANAGED_POCKET_PREPARE\s*=\s*\(\)\s*=>\s*preparePocketRuntime/,
+assert.match(worldsSource, /POCKETMONSTER_MANAGED_POCKET_PREPARE\s*=\s*\(\)\s*=>\s*initialWorldBootReady\.then\([\s\S]*?preparePocketRuntime/,
   'managed worlds expose the shared Pocket preparation promise');
 assert.match(pirateBootSource, /managedPrepare[\s\S]*?managedPrepare\(\)/,
   'Pirate ensure awaits the managed preparation before reading the control API');
-assert.match(pirateBootSource, /managedPrepare[\s\S]*?import\('\.\/game-v800\.js\?v=841&animalControl=pirate-fruit'\)/,
+assert.match(pirateBootSource, /managedPrepare[\s\S]*?import\('\.\/game-v800\.js\?v=842&animalControl=pirate-fruit'\)/,
   'legacy direct import remains only as the fallback path');
 const ensureStart = pirateBootSource.indexOf('export function ensurePocketAnimalControl()');
 const ensureEnd = pirateBootSource.indexOf('\n}\n\nfunction mountPirateOnline', ensureStart);
 assert.ok(ensureStart >= 0 && ensureEnd > ensureStart, 'extracts the production ensure function');
 const ensureSource = pirateBootSource.slice(ensureStart, ensureEnd + 2)
   .replace('export function ensurePocketAnimalControl()', 'function ensurePocketAnimalControl()')
-  .replace("import('./game-v800.js?v=841&animalControl=pirate-fruit')", 'fallbackImport()');
+  .replace("import('./game-v800.js?v=842&animalControl=pirate-fruit')", 'fallbackImport()');
 let managedPrepareCalls = 0;
 let fallbackImportCalls = 0;
 let releaseManagedPrepare;

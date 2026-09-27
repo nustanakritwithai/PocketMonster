@@ -1,5 +1,5 @@
 import { loadRuntimeConfig } from './runtime-config.mjs';
-import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=977';
+import { COMBINED_VERSION, COMBINED_WORLDS, DEFAULT_COMBINED_WORLD, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=978';
 import {
   allowedPanelForWorld,
   applyControlPanel,
@@ -7,7 +7,7 @@ import {
   panelIdFromLocation,
 } from './control-panels-v900.mjs';
 import { createSceneRouteController } from './scene-route-controller-v900.mjs';
-import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=17';
+import { unifiedMobileControls } from './unified-mobile-controls-v900.mjs?v=18';
 
 const runtimeConfig = window.POCKETMONSTER_RUNTIME_CONFIG || await loadRuntimeConfig();
 if (typeof window !== 'undefined') {
@@ -49,6 +49,14 @@ const runtimeLifecycles = new Map();
 const runtimePreparations = new Map();
 const worldPresenceBindings = new Map();
 let activeRuntimeId = null;
+let completeInitialWorldBoot;
+let failInitialWorldBoot;
+const initialWorldBootReady = new Promise((resolve, reject) => {
+  completeInitialWorldBoot = resolve;
+  failInitialWorldBoot = reject;
+});
+// ไม่มีผู้เรียกกระเป๋าก็ต้องไม่เกิด unhandled rejection เพิ่มจาก boot error เดิม
+initialWorldBootReady.catch(() => {});
 
 // prewarm เขียน globals ของฉากอื่นได้ระหว่าง await; online transport อ่านเฉพาะ binding ของโลกที่เล่นอยู่
 window.POCKETMONSTER_SCENE_PRESENCE = Object.freeze({
@@ -109,7 +117,9 @@ function preparePocketRuntime(world) {
 // ฉาก Pirate และ prewarm ต้องใช้ preparation เดียวกัน ป้องกัน game-v800
 // ถูก import ซ้อนจากคนละ query string ขณะผู้เล่นกดกระเป๋าหรือปาเร็วเกินไป
 if (typeof window !== 'undefined') {
-  window.POCKETMONSTER_MANAGED_POCKET_PREPARE = () => preparePocketRuntime(worldById('pocket-monster'));
+  window.POCKETMONSTER_MANAGED_POCKET_PREPARE = () => initialWorldBootReady.then(
+    () => preparePocketRuntime(worldById('pocket-monster')),
+  );
 }
 
 for (const world of COMBINED_WORLDS) {
@@ -213,7 +223,18 @@ async function bootWorld(id) {
   activeRuntimeId = world.id;
 }
 
-await bootWorld(resolveCombinedWorld());
+try {
+  await bootWorld(resolveCombinedWorld());
+  // ต้องจับ active bindings ก่อนเปิดทางให้ lazy bag import เขียน globals
+  completeInitialWorldBoot();
+} catch (error) {
+  failInitialWorldBoot(error);
+  throw error;
+}
+
+if (document.body.dataset.combinedWorld === 'pirate-fruit' && document.body.dataset.controlPanel === 'throw') {
+  await window.POCKETMONSTER_ENSURE_THROW_RUNTIME?.();
+}
 
 if (document.body.dataset.combinedWorld === 'pirate-fruit') {
   const prewarm = () => {

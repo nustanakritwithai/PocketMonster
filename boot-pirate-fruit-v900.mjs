@@ -26,10 +26,10 @@ import {
   sanitizePirateLocalPresence,
   sanitizePirateWorldSnapshot,
   pirateCentralAuthorityOwnsZone,
-} from './pirate-presence-bridge-v900.mjs?v=8';
+} from './pirate-presence-bridge-v900.mjs?v=9';
 import { createPocketPlayerHudStore } from './pocket-hud-view-model.mjs?v=2';
 import { PIRATE_OWNED_MONSTER_CARRY_MESSAGE } from './pirate-fruit-offline/pirate-owned-monster-carry.mjs';
-import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=17';
+import { createPirateIframeInputTransport } from './unified-mobile-controls-v900.mjs?v=18';
 import { loadStudioCharacterFromEngine } from './asset-presentation/studio-character-live-bridge.mjs?v=2';
 import {
   PIRATE_STUDIO_CHARACTER_ACCEPTED,
@@ -38,7 +38,7 @@ import {
   PIRATE_STUDIO_CHARACTER_READY,
 } from './asset-presentation/studio-character-pirate-channel.mjs?v=1';
 export const PIRATE_FRUIT_OFFLINE_ENTRY = new URL('./pirate-fruit-offline/index.html?v=949', import.meta.url).href;
-export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=841&animalControl=pirate-fruit';
+export const POCKET_ANIMAL_CONTROL_RUNTIME = './game-v800.js?v=842&animalControl=pirate-fruit';
 export const PIRATE_UNIFIED_INPUT_MESSAGE = 'pocketmonster:unified-mobile-input-v1';
 
 const pocketPlayerHud = createPocketPlayerHudStore();
@@ -65,7 +65,7 @@ export function ensurePocketAnimalControl() {
       ? Promise.resolve().then(() => managedPrepare())
       : (typeof window !== 'undefined' && window.POCKETMONSTER_ANIMAL_CONTROL
         ? Promise.resolve()
-        : import('./game-v800.js?v=841&animalControl=pirate-fruit'));
+        : import('./game-v800.js?v=842&animalControl=pirate-fruit'));
     throwRuntimePromise = prepare.then(() => {
       const control = window.POCKETMONSTER_ANIMAL_CONTROL;
       if (!control) throw new Error('Pocket animal control did not register');
@@ -542,6 +542,8 @@ if (startup) {
   startup.className = 'startup-status ok';
 }
 
-if (document.body?.dataset?.controlPanel === 'throw') {
+// managed world เตรียมแผงหลังลงทะเบียน active runtime; await ตรงนี้จะรอ boot ตัวเอง
+if (document.body?.dataset?.controlPanel === 'throw'
+  && typeof window.POCKETMONSTER_MANAGED_POCKET_PREPARE !== 'function') {
   await ensurePocketAnimalControl();
 }

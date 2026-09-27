@@ -2603,7 +2603,7 @@ function clearTransientEffects(){
 const state={collection:[],party:[null,null,null],storage:[],ranchActive:[],selectedSlot:0,exp:0,lifeLastAt:Date.now(),wallet:{gold:300},inventory:{...DEFAULT_INVENTORY,stash:[...DEFAULT_INVENTORY.stash]},merchantPurchaseCommandIds:[],merchantPurchaseHistory:[],eggs:[],breedingSkillMemoryRequestByEggId:{},breeding:{parentA:null,parentB:null},skillItemUseCommandIds:[],evolutionCandidate:null,crCandidate:null,trainingSelectedId:null,skillsSelectedId:null,equipSelectedId:null,currentZone:'hub',starterJourney:{version:1,grassMeadow:{entered:false,battled:false,recalled:false,captured:false}},rareCollection:{found:{},captured:{}},eliteProgress:{found:{},defeated:{},captured:{}},bossProgress:{found:{},defeated:{}},stageProgress:createStageProgress(),saveVersion:SAVE_SCHEMA_VERSION};
 let updateRemoteWorldMarkers=()=>{};
 if(!pirateThrowWorld){
-window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,z:player.position.z,dir:player.rotation.y});
+window.POCKETMONSTER_WORLD_STATE=()=>({zone:state.currentZone,x:player.position.x,y:player.position.y,z:player.position.z,dir:player.rotation.y});
 const worldPresence=createWorldPresenceController({THREE,scene,getCamera:()=>camera,getZone:()=>state.currentZone,
   createActor:actor=>getAssetDef(actor.monsterType)?assets.spawn(actor.monsterType,{role:actor.actorId.startsWith('owned:')?'owned':'wild'}):null,
 });
@@ -5902,21 +5902,29 @@ async function healAll(){
     const work=(async()=>{
       const request=keeperRecoveryRetryRequest||{commandId:'keeper-heal-'+Date.now()+'-'+(++keeperRecoveryCommandSequence),expectedRevision:null};
       try{
-        let snapshot=monsterBagStateProvider.snapshot();
-        if(!snapshot.available){const loaded=await monsterBagStateProvider.refresh();if(!loaded.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์ก่อนรักษาไม่สำเร็จ'),{code:loaded.code||'RECOVERY_REFRESH_FAILED'});snapshot=monsterBagStateProvider.snapshot();}
-        if(request.expectedRevision===null)request.expectedRevision=snapshot.revision;
+        // Pirate operation เพิ่ม aggregate revision ได้แม้กระเป๋ายัง available
+        // อ่าน revision ใหม่ก่อนคำสั่งใหม่; retry ที่ไม่ทราบผลต้องเก็บ command/revision เดิม
+        if(request.expectedRevision===null){
+          const loaded=await monsterBagStateProvider.refresh({afterPending:true});
+          if(!loaded?.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์ก่อนรักษาไม่สำเร็จ'),{code:loaded?.code||'RECOVERY_REFRESH_FAILED'});
+          const snapshot=monsterBagStateProvider.snapshot();
+          if(!snapshot.available||!Number.isSafeInteger(snapshot.revision))throw Object.assign(new Error('ข้อมูล revision ไม่พร้อม'),{code:'RECOVERY_REFRESH_FAILED'});
+          request.expectedRevision=snapshot.revision;
+        }
         let result;
         try{result=await requestRecoverMonsters(runtimeConfig,authProfileBridge.sessionToken,request.commandId,request.expectedRevision);}
         catch(error){throw Object.assign(new Error('RECOVERY_COMMAND_FAILED'),{phase:'command',code:error?.code||'RECOVERY_COMMAND_FAILED',status:error?.status});}
         if(result?.ok!==true||result?.success!==true)throw Object.assign(new Error('RECOVERY_COMMAND_REJECTED'),{phase:'command',code:result?.code||'RECOVERY_REJECTED',status:result?.status??200});
         request.acknowledged=true;
-        const refreshed=await monsterBagStateProvider.refresh({afterPending:true});
-        if(!refreshed?.ok)throw Object.assign(new Error('RECOVERY_READBACK_FAILED'),{phase:'readback',code:refreshed?.code||'INVENTORY_READBACK_FAILED'});
         // NPC Recovery แก้สถานะต่อสู้บนเซิร์ฟเวอร์ด้วย อาจไม่เปลี่ยน revision ของกระเป๋า
         // จึงสั่งอ่าน control-state โดยตรงเพื่อเคลียร์ fainted/active ที่ค้างในแผง Pirate
         const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;
-        let controlReadback;
-        try{controlReadback=await provider?.refresh?.({afterPending:true});}catch{}
+        // ทั้งสอง GET เริ่มหลัง ACK และอ่านพร้อมกัน ลดเวลารอโดยไม่คาดเดา HP
+        const [refreshed,controlReadback]=await Promise.all([
+          monsterBagStateProvider.refresh({afterPending:true}),
+          Promise.resolve().then(()=>provider?.refresh?.({afterPending:true})).catch(()=>null),
+        ]);
+        if(!refreshed?.ok)throw Object.assign(new Error('RECOVERY_READBACK_FAILED'),{phase:'readback',code:refreshed?.code||'INVENTORY_READBACK_FAILED'});
         const controlParty=controlReadback?.state?.party;
         if(controlReadback?.ok!==true||controlParty?.available!==true||!Array.isArray(controlParty.slots))
           throw Object.assign(new Error('RECOVERY_CONTROL_READBACK_FAILED'),{phase:'readback',code:controlReadback?.code||'CONTROL_STATE_READBACK_FAILED'});
@@ -7762,7 +7770,7 @@ el('breedingSalonIncubator')?.addEventListener('click',e=>{
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
 bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
 installPirateMonsterBagButton();
-const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs');
+const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs?v=2');
 mountDirectMonsterControls({windowLike:window,config:runtimeConfig,sessionToken:authProfileBridge.sessionToken});
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:hasOnlineMonsterSession});});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});

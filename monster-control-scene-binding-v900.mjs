@@ -8,6 +8,54 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   mobile?.setMonsterController?.(controller);
   controlWindow.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = controller;
   const buttons = [];
+  let throwActionInFlight = false;
+  const isPiratePlayerMode = () => isPirate()
+    && mobile?.diagnostics?.().pirateControlMode !== 'boat';
+  const activeCanonicalSlot = snapshot => Array.isArray(snapshot?.slots)
+    ? snapshot.slots.find(slot => slot?.available === true && slot?.active === true
+      && typeof slot.instanceId === 'string' && slot.instanceId.length > 0) || null
+    : null;
+  const pirateThrowButtonState = snapshot => {
+    if (snapshot?.pending === true) {
+      const pendingLabel = snapshot.pendingKind === 'recall' ? 'กำลังเก็บมอนสเตอร์'
+        : snapshot.pendingKind === 'switch' ? 'กำลังสลับมอนสเตอร์'
+          : 'กำลังเรียกมอนสเตอร์';
+      return { hidden: false, disabled: true, action: null, icon: '…', label: pendingLabel };
+    }
+    const active = activeCanonicalSlot(snapshot);
+    if (snapshot?.held) {
+      if (active && snapshot.capabilities?.switch !== true) {
+        return { hidden: false, disabled: true, action: null, icon: '⛔', label: 'ยังสลับมอนสเตอร์ไม่ได้' };
+      }
+      return { hidden: false, disabled: false, action: 'throw', icon: 'ปา',
+        label: active ? 'ปาสลับมอนสเตอร์' : 'ปามอนสเตอร์' };
+    }
+    if (active && snapshot?.capabilities?.recall === true && typeof controller.recallActive === 'function') {
+      return { hidden: false, disabled: false, action: 'recall', icon: 'Recall', label: `Recall ${active.name || 'มอนสเตอร์'}` };
+    }
+    return { hidden: true, disabled: true, action: null, icon: '🎯', label: 'ปามอนสเตอร์' };
+  };
+  const paintPirateThrowButton = (button, snapshot) => {
+    const state = pirateThrowButtonState(snapshot);
+    button.hidden = state.hidden;
+    button.disabled = state.disabled;
+    button.dataset.pirateIcon = state.icon;
+    button.setAttribute?.('data-pirate-icon', state.icon);
+    button.setAttribute?.('aria-label', state.label);
+    button.setAttribute?.('aria-disabled', String(state.disabled));
+    button.title = state.label;
+  };
+  const refreshThrowButtonForControlMode = () => {
+    if (!isPirate()) return;
+    const button = documentLike.getElementById('monsterThrowBtn');
+    if (!button) return;
+    const snapshot = controller.snapshot?.();
+    if (isPiratePlayerMode()) paintPirateThrowButton(button, snapshot);
+    else {
+      button.hidden = true;
+      button.disabled = true;
+    }
+  };
   for (let slot = 0; slot < 3; slot += 1) {
     const button = documentLike.getElementById(`monsterSlot${slot + 1}Btn`);
     if (!button) continue;
@@ -49,8 +97,15 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
     } catch {}
     const throwButton = documentLike.getElementById('monsterThrowBtn');
     if (throwButton) {
-      throwButton.hidden = isPirate() || snapshot.held === null || snapshot.pending === true;
-      throwButton.disabled = isPirate() || snapshot.held === null || snapshot.pending === true;
+      if (isPiratePlayerMode()) paintPirateThrowButton(throwButton, snapshot);
+      else if (isPirate()) {
+        throwButton.hidden = true;
+        throwButton.disabled = true;
+      }
+      else {
+        throwButton.hidden = snapshot.held === null || snapshot.pending === true;
+        throwButton.disabled = snapshot.held === null || snapshot.pending === true;
+      }
     }
     for (const { button, slot } of buttons) {
       if (!Number.isInteger(slot)) continue;
@@ -82,17 +137,52 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   });
   const throwButton = documentLike.getElementById('monsterThrowBtn');
   if (throwButton) {
-    const click = event => {
+    const reportFailure = (actionName, result = {}) => {
+      const rawReason = typeof result.reason === 'string' ? result.reason : '';
+      const reason = /^[a-z0-9_-]{1,80}$/i.test(rawReason) ? rawReason : 'control-error';
+      const rawCode = typeof result.code === 'string' ? result.code : '';
+      const code = /^[A-Z0-9_]{1,80}$/.test(rawCode)
+        ? rawCode
+        : reason.toUpperCase().replace(/-/g, '_');
+      const message = actionName === 'recall'
+        ? `เก็บมอนสเตอร์ไม่สำเร็จ: ${reason}`
+        : `ปามอนสเตอร์ไม่สำเร็จ: ${reason}`;
+      const failure = { ok: false, reason, code, message };
+      try {
+        const hud = controlWindow.POCKETMONSTER_UNIFIED_HUD
+          || controlWindow.parent?.POCKETMONSTER_UNIFIED_HUD;
+        hud?.showCommandFailure?.(failure, { monsterCommand: true });
+      } catch {}
+      const status = documentLike.getElementById('actionReason');
+      if (status) status.textContent = `${message} (${code})`;
+    };
+    const click = async event => {
       event.preventDefault?.();
       event.stopImmediatePropagation?.();
-      void Promise.resolve(controller.throwHeld?.()).then(result => {
-        const status = documentLike.getElementById('actionReason');
-        if (status && result?.ok === false) status.textContent = 'ยังปามอนสเตอร์ไม่ได้ กรุณาเตรียมมอนสเตอร์ก่อน';
-      });
+      if (throwActionInFlight) return;
+      const snapshot = controller.snapshot?.();
+      if (isPirate()) {
+        if (!isPiratePlayerMode()) return;
+        const state = pirateThrowButtonState(snapshot);
+        if (state.hidden || state.disabled || !state.action) return;
+      } else if (snapshot?.pending === true || !snapshot?.held) return;
+      throwActionInFlight = true;
+      const action = isPirate() && !snapshot?.held ? controller.recallActive : controller.throwHeld;
+      const actionName = action === controller.recallActive ? 'recall' : 'throw';
+      try {
+        const result = await Promise.resolve(action?.call(controller));
+        if (result?.ok === false) reportFailure(actionName, result);
+      } catch (error) {
+        reportFailure(actionName, { reason: error?.code || 'control-error', code: error?.code });
+      } finally {
+        throwActionInFlight = false;
+      }
     };
     throwButton.addEventListener('click', click, true);
     buttons.push({ button: throwButton, click });
   }
+  const onPirateControlModeChange = () => refreshThrowButtonForControlMode();
+  controlWindow.addEventListener?.('pocketmonster:pirate-control-mode-v1', onPirateControlModeChange);
   for (const id of ['monsterRecallBtn', 'monsterReleaseBtn', 'monsterStoreBtn']) {
     const button = documentLike.getElementById(id);
     if (!button) continue;
@@ -109,6 +199,7 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   }
   return () => {
     unsubscribe?.();
+    controlWindow.removeEventListener?.('pocketmonster:pirate-control-mode-v1', onPirateControlModeChange);
     if (!isPirate()) controlWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(null);
     for (const { button, pointerdown, click } of buttons) {
       pointerdown && button.removeEventListener('pointerdown', pointerdown, true);
