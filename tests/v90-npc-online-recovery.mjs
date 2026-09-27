@@ -88,4 +88,8 @@ assert.equal(stillDead.log.includes('render'),false,'bag HP cannot override a ca
 const deadActor=fixture(async()=>({ok:true,success:true}),{controlResult:{ok:true,state:{party:{available:true,slots:[{instanceId:'owned:a',hp:100,fainted:false}]},actors:[{instanceId:'owned:a',hp:0,fainted:true}]}}});
 await deadActor.heal();assert.match(deadActor.messages[0],/CONTROL_STATE_STILL_DEAD/);
 assert.equal(deadActor.log.includes('render'),false,'dead canonical actor cannot be hidden by a full party/save projection');
+const missingVitals=fixture(async()=>({ok:true,success:true}),{controlResult:{ok:true,state:{party:{available:true,slots:[{instanceId:'owned:a'}]},actors:[]}}});
+await missingVitals.heal();
+assert.equal(missingVitals.log.includes('render'),false,'hub readback without authoritative HP must not claim recovery success');
+assert.match(missingVitals.messages[0],/CONTROL_STATE_VITALS_UNAVAILABLE/);
 console.log('Actual NPC heal flow: PASS, general player writes remain disabled');
