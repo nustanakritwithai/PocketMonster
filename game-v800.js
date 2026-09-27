@@ -55,7 +55,7 @@ import { mountServerEconomy } from './server-economy.mjs';
 import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, recoverMonsters as requestRecoverMonsters, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs?v=1';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
-import { createMonsterBagStateProvider } from './monster-bag-state-provider-v900.mjs';
+import { createMonsterBagStateProvider } from './monster-bag-state-provider-v900.mjs?v=1';
 import { overlayPiratePartyVitals } from './pirate-monster-bag-vitals-v900.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
 import { createWorldPresenceController } from './world-presence-v800.mjs?v=6';
