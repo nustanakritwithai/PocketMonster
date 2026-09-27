@@ -17,6 +17,7 @@ PREFIX = '/PocketMonster/'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
+         'healed-bag-ui': 'UNKNOWN', 'revived-summon': 'UNKNOWN',
          'damaged-monster-recovery': 'UNKNOWN'}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
@@ -168,6 +169,12 @@ async def main():
             if not any(item['path'] == '/api/pirate/state' and item['status'] == 200 for item in EVIDENCE['http']):
                 raise RuntimeError('pirate-state-success-not-observed')
             GATES['candidate-scene'] = 'SAT'
+            await scene.evaluate("""() => {
+                window.__qaPresenceCount = 0;
+                window.addEventListener('message', event => {
+                    if(event.data?.type === 'pocketmonster:pirate-presence-v1') window.__qaPresenceCount++;
+                });
+            }""")
             EVIDENCE['stage'] = 'scene-ready'
             # เก็บเฉพาะชื่อ element ที่กำหนด ไม่เก็บ DOM/account/session/URL ทั้งก้อน
             for selector in ['#monsterSlot1Btn', '#monsterThrowBtn', '#npcBtn', '#healAllBtn',
@@ -282,8 +289,9 @@ async def main():
                                       'readRevisions': [s['revision'] for s in reloaded]}
             if not persisted or initialized_again:
                 GATES['save-reload'] = 'VIOL'
-                raise RuntimeError('saved-checkpoint-not-preserved-on-reload')
-            GATES['save-reload'] = 'SAT'
+            else:
+                GATES['save-reload'] = 'SAT'
+            # Save ไม่ผ่านยังคง VIOL/exit1 แต่ไม่กันการเก็บหลักฐาน NPC ที่เป็นงานหลัก
             EVIDENCE['stage'] = 'walk-to-live-wild-monster'
 
             async def pose():
@@ -396,7 +404,53 @@ async def main():
             if not any(i['path'] == '/api/monsters/recover' and i['status'] == 200 for i in EVIDENCE['http']):
                 raise RuntimeError('npc-heal-ack-not-observed')
             GATES['damaged-monster-recovery'] = 'SAT'
-            EVIDENCE['stage'] = 'npc-heal-confirmed-render-reload-pending'
+            EVIDENCE['stage'] = 'healed-bag-ui'
+            await scene.locator('[data-ranch-service="storage"]').click(timeout=15000)
+            await scene.locator('#monsterFieldBag').wait_for(state='visible', timeout=15000)
+            if not await confirm("""(() => {
+                const provider = window.POCKETMONSTER_MONSTER_STATE_PROVIDER || window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
+                const slot = provider?.snapshot()?.party?.slots?.[0];
+                const text = document.querySelector('#monsterFieldBagMeta')?.textContent || '';
+                const match = text.replaceAll(',', '').match(/HP\\s+([0-9.]+)\\/([0-9.]+)/);
+                return slot && match && Number(match[1])===slot.hp && Number(match[2])===slot.maxHp
+                    && slot.hp>0 && slot.hp===slot.maxHp
+                    && document.querySelector('#monsterFieldBagHpFill')?.style.width === '100%';
+            })()"""):
+                GATES['healed-bag-ui'] = 'VIOL'
+                raise RuntimeError('healed-bag-ui-not-matching-authority')
+            GATES['healed-bag-ui'] = 'SAT'
+            await game.screenshot(path=str(OUT / 'healed-bag.png'))
+            await scene.locator('#monsterFieldBagClose').click()
+            EVIDENCE['stage'] = 'return-pirate-revive'
+            await game.evaluate("window.POCKETMONSTER_ONLINE_SHELL.navigate('pirate-fruit', 'throw')")
+            pirate_ready = False
+            for _ in range(90):
+                scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
+                if scene:
+                    try:
+                        if ((await pose() or {}).get('zone') == 'pirate-fruit'
+                                and await scene.evaluate('window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER?.snapshot().slots[0]?.available === true')):
+                            pirate_ready = True
+                            break
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.5)
+            if not pirate_ready:
+                raise RuntimeError('revived-pirate-slot-not-ready')
+            await scene.locator('#monsterSlot1Btn').click()
+            await scene.locator('#monsterThrowBtn').click()
+            if not await confirm("""(() => {
+                const state = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                return !state.pending && state.slots[0]?.active && state.slots[0].hp > 0
+                    && document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon==='Recall';
+            })()"""):
+                GATES['revived-summon'] = 'VIOL'
+                raise RuntimeError('revived-monster-not-active')
+            GATES['revived-summon'] = 'SAT'
+            await asyncio.sleep(2)
+            await game.screenshot(path=str(OUT / 'revived-renderer-review.png'))
+            EVIDENCE['rendererReview'] = 'UNKNOWN-requires-screenshot-inspection'
+            EVIDENCE['stage'] = 'npc-recovery-and-resummon-confirmed'
             # ภาพใช้ตัดสิน layout; ปิดข้อความทั้งหมดเพื่อไม่เผยชื่อ Guest หรือข้อมูลผู้เล่น
             for frame in game.frames:
                 try:
@@ -417,6 +471,25 @@ async def main():
             if game and not game.is_closed():
                 try:
                     EVIDENCE['finalWorld'] = await game.evaluate("window.POCKETMONSTER_WORLD_STATE?.()?.zone || null")
+                    EVIDENCE['presenceDiagnostics'] = await game.evaluate("""() => {
+                        const d=window.POCKETMONSTER_ONLINE_SHELL?.diagnostics?.();
+                        const s=window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.snapshot();
+                        const c=window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER?.snapshot();
+                        const code=c?.lastFailure?.code;
+                        return {ready:d?.scenePresenceReady,reason:d?.readinessReason,zone:d?.activeZone,
+                            bootState:d?.sceneBootState,controlAvailable:s?.available,pending:c?.pending,
+                            failure:/^[A-Z0-9_]{1,64}$/.test(code||'')?code:null};
+                    }""")
+                    for final_frame in game.frames:
+                        if urlsplit(final_frame.url).path == PREFIX+'scene-v900.html':
+                            EVIDENCE['scenePresenceDiagnostics'] = await final_frame.evaluate("""() => ({
+                                activePose:Boolean(window.POCKETMONSTER_SCENE_PRESENCE?.state()),
+                                rawPose:Boolean(window.POCKETMONSTER_WORLD_STATE?.()),
+                                lifecycleActive:window.POCKETMONSTER_SCENE_LIFECYCLE?.diagnostics?.()?.active,
+                                nativeMessages:window.__qaPresenceCount??null,
+                                nativeReady:window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS?.()?.frameReady??null,
+                                prewarming:window.POCKETMONSTER_SCENE_PREWARM===true
+                            })""")
                     # เฉพาะ Guest ทดสอบ; ไม่เก็บ DOM, token, URL หรือข้อความ network
                     await game.screenshot(path=str(OUT / 'candidate-final.png'))
                 except Exception:
