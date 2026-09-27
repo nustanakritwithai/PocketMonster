@@ -8,7 +8,7 @@ const captureStart = worldsSource.indexOf('function capturePresenceBindings()');
 const prepareStart = worldsSource.indexOf('function preparePocketRuntime(world)');
 const prepareEnd = worldsSource.indexOf('\nfor (const world of COMBINED_WORLDS)', prepareStart);
 assert.ok(captureStart >= 0 && prepareStart > captureStart && prepareEnd > prepareStart);
-assert.match(worldsSource, /POCKETMONSTER_MANAGED_POCKET_PREPARE\s*=\s*\(\)\s*=>\s*preparePocketRuntime/,
+assert.match(worldsSource, /POCKETMONSTER_MANAGED_POCKET_PREPARE\s*=\s*\(\)\s*=>\s*initialWorldBootReady\.then\([\s\S]*?preparePocketRuntime/,
   'managed worlds expose the shared Pocket preparation promise');
 assert.match(pirateBootSource, /managedPrepare[\s\S]*?managedPrepare\(\)/,
   'Pirate ensure awaits the managed preparation before reading the control API');

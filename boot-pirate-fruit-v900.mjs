@@ -542,6 +542,8 @@ if (startup) {
   startup.className = 'startup-status ok';
 }
 
-if (document.body?.dataset?.controlPanel === 'throw') {
+// managed world เตรียมแผงหลังลงทะเบียน active runtime; await ตรงนี้จะรอ boot ตัวเอง
+if (document.body?.dataset?.controlPanel === 'throw'
+  && typeof window.POCKETMONSTER_MANAGED_POCKET_PREPARE !== 'function') {
   await ensurePocketAnimalControl();
 }
