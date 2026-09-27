@@ -169,10 +169,22 @@ async def main():
             if not any(item['path'] == '/api/pirate/state' and item['status'] == 200 for item in EVIDENCE['http']):
                 raise RuntimeError('pirate-state-success-not-observed')
             GATES['candidate-scene'] = 'SAT'
-            await scene.evaluate("""() => {
+            await scene.evaluate("""async () => {
+                const {sanitizePirateLocalPresence} = await import('./pirate-presence-bridge-v900.mjs?v=8');
                 window.__qaPresenceCount = 0;
                 window.addEventListener('message', event => {
-                    if(event.data?.type === 'pocketmonster:pirate-presence-v1') window.__qaPresenceCount++;
+                    if(event.data?.type !== 'pocketmonster:pirate-presence-v1') return;
+                    window.__qaPresenceCount++;
+                    const m=event.data;
+                    const {actors,...noActors}=m;
+                    const {monsterIntents,...noIntents}=m;
+                    window.__qaLastPresence = {accepted:Boolean(sanitizePirateLocalPresence(m)),
+                        withoutActors:Boolean(sanitizePirateLocalPresence(noActors)),
+                        withoutIntents:Boolean(sanitizePirateLocalPresence(noIntents)),
+                        actorCount:Array.isArray(actors)?actors.length:null,
+                        intentCount:Array.isArray(monsterIntents)?monsterIntents.length:null,
+                        originNull:event.origin==='null',
+                        sourceMatches:event.source===document.querySelector('#pirateFruitFrame')?.contentWindow};
                 });
             }""")
             EVIDENCE['stage'] = 'scene-ready'
@@ -336,7 +348,11 @@ async def main():
             current = await pose()
             if not current or not wild:
                 raise RuntimeError('live-world-pose-unavailable')
-            target = max(wild, key=lambda a: (a['maxHp'], -math.hypot(a['x'] - current['x'], a['z'] - current['z'])))
+            # spawn ID จาก shared/src/world/monsters.ts ของ worker eeec6e6:
+            # อยู่เกาะเริ่มต้นนอก safe zone; ห้ามเลือก maxHP ทั้งโลกซึ่งอยู่อีกเกาะ
+            target = next((a for a in wild if a['id'] == 'monster:starter-boss-north'), None)
+            if not target:
+                raise RuntimeError('starter-combat-target-unavailable')
             EVIDENCE['damageSetup'] = {'wildCount': len(wild), 'targetMaxHp': target['maxHp'],
                                        'distance': round(math.hypot(target['x']-current['x'], target['z']-current['z']), 1)}
             await walk_to(target, 2.5)
@@ -485,8 +501,10 @@ async def main():
                             EVIDENCE['scenePresenceDiagnostics'] = await final_frame.evaluate("""() => ({
                                 activePose:Boolean(window.POCKETMONSTER_SCENE_PRESENCE?.state()),
                                 rawPose:Boolean(window.POCKETMONSTER_WORLD_STATE?.()),
+                                rawStateType:typeof window.POCKETMONSTER_WORLD_STATE,
                                 lifecycleActive:window.POCKETMONSTER_SCENE_LIFECYCLE?.diagnostics?.()?.active,
                                 nativeMessages:window.__qaPresenceCount??null,
+                                lastNativeMessage:window.__qaLastPresence??null,
                                 nativeReady:window.POCKETMONSTER_PIRATE_PRESENCE_QUEUE_DIAGNOSTICS?.()?.frameReady??null,
                                 prewarming:window.POCKETMONSTER_SCENE_PREWARM===true
                             })""")
