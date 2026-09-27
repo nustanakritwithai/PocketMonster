@@ -49,7 +49,7 @@ assert.match(chat, /POCKETMONSTER_WORLD_STATE/, 'chat reads the local world snap
 assert.match(chat, /POCKETMONSTER_WORLD_PRESENCE/, 'chat forwards presence to the overlay');
 assert.match(liveJs, /if\(!pirateThrowWorld\)\{/, 'animal-control overlay does not steal world presence from the real pirate world');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'Pocket-block pirate island stage file is gone');
-assert.match(liveJs, /window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{zone:state\.currentZone,x:player\.position\.x,z:player\.position\.z,dir:player\.rotation\.y\}\)/, 'Pocket Monster publishes zone position');
+assert.match(liveJs, /window\.POCKETMONSTER_WORLD_STATE=\(\)=>\(\{zone:state\.currentZone,x:player\.position\.x,y:player\.position\.y,z:player\.position\.z,dir:player\.rotation\.y\}\)/, 'Pocket Monster ส่งพิกัดครบรวมความสูงหลังข้ามโลก');
 assert.match(liveJs, /updateRemoteWorldMarkers/, 'Pocket Monster projects remote players on the existing HUD tick');
 assert.doesNotMatch(liveJs, /setInterval\(\(\)=>\{for\(const marker of remoteWorldPlayers/, 'live presence must not add a wall-clock interval to the capture loop');
 assert.match(liveJs, /if\(titleEl\)setTextIfChanged\(titleEl,'เริ่มการผจญภัย'\)/, 'Ranch Hub keeps the quest tracker visible');
