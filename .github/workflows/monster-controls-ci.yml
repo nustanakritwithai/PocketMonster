@@ -27,11 +27,44 @@ on:
       - 'tests/monster-command-adapter.mjs'
       - '.github/workflows/monster-controls-ci.yml'
   workflow_dispatch:
+    inputs:
+      authenticated_guest:
+        description: 'ทดสอบ Guest จริงบน candidate ใน runner (ไม่ deploy)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  authenticated-guest:
+    if: github.event_name == 'workflow_dispatch' && inputs.authenticated_guest
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: monster-controls-client-candidate
+          path: candidate-artifact
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: เตรียม browser เฉพาะ runner
+        run: |
+          pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: ตรวจ Guest และฉากจาก candidate จริง
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: python tests/monster-authenticated-candidate.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authenticated-candidate-evidence
+          path: authenticated-candidate-evidence/
+          retention-days: 3
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
