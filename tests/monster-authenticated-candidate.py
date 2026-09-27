@@ -77,7 +77,8 @@ async def main():
             EVIDENCE['stage'] = 'firebase-page'
             await page.goto('https://pocketmonster-game.web.app/', wait_until='domcontentloaded', timeout=45000)
             EVIDENCE['stage'] = 'firebase-listeners-ready'
-            await page.wait_for_function('window.POCKETMONSTER_LOGIN_REQUIRED === true', timeout=45000)
+            # รอ module/network โดยไม่ใช้ wait_for_function ซึ่ง compile ด้วย eval ขัด CSP
+            await page.wait_for_load_state('networkidle', timeout=45000)
             EVIDENCE['stage'] = 'guest-click'
             await page.locator('#guestLoginBtn').click(timeout=30000)
             EVIDENCE['stage'] = 'launch-navigation'
