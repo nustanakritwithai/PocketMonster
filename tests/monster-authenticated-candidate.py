@@ -126,22 +126,33 @@ async def main():
                 if await scene.locator(selector).count() and await scene.locator(selector).first.is_visible():
                     EVIDENCE['visibleControls'].append(selector)
             EVIDENCE['world'] = await scene.evaluate("document.body.dataset.combinedWorld || null")
+            EVIDENCE['stage'] = 'monster-bag-ui-open'
+            await game.locator('[data-utility="monster-bag"]').click(timeout=15000)
+            # การเปิดกระเป๋าจริงจะโหลด Pocket inventory runtime แบบ lazy
+            for _ in range(90):
+                if await scene.evaluate('Boolean(window.POCKETMONSTER_MONSTER_BAG)'):
+                    break
+                await asyncio.sleep(0.2)
             EVIDENCE['stage'] = 'guest-starter-setup'
             # เตรียม Guest ผ่านคำสั่งปกติของ server ไม่สร้าง HP/inventory ใน client
             # ขั้นนี้เป็น API setup ไม่ใช่การรับรอง onboarding UI
             setup = await scene.evaluate("""async () => {
                 const bag = window.POCKETMONSTER_MONSTER_BAG;
-                if (!bag) return false;
+                if (!bag) return { ok: false, code: 'BAG_RUNTIME_MISSING' };
                 const claimed = await bag.claimStarter();
-                if (!claimed.ok) return false;
+                if (!claimed.ok) return { ok: false, code: claimed.code };
                 const owned = bag.snapshot().envelope?.state?.collection?.[0];
-                if (!owned) return false;
+                if (!owned) return { ok: false, code: 'STARTER_READBACK_MISSING' };
                 const placed = await bag.assignToSlot(owned.instanceId, 0);
-                return placed.ok === true;
+                return { ok: placed.ok === true, code: placed.code || 'OK' };
             }""")
-            EVIDENCE['guestSetup'] = 'server-starter-and-party-slot' if setup else 'unavailable'
-            if not setup:
+            EVIDENCE['guestSetup'] = 'server-starter-and-party-slot' if setup.get('ok') else 'unavailable'
+            EVIDENCE['guestSetupCode'] = setup.get('code') if re.fullmatch(r'[A-Z0-9_]{1,64}', str(setup.get('code'))) else 'UNKNOWN'
+            if not setup.get('ok'):
                 raise RuntimeError('guest-starter-setup-unavailable')
+            close_bag = scene.locator('#monsterFieldBagClose')
+            if await close_bag.count() and await close_bag.is_visible():
+                await close_bag.click()
 
             async def confirm(expression):
                 for _ in range(60):
