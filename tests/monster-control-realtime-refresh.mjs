@@ -59,3 +59,29 @@ try {
   polling.dispose();globalThis.setInterval=realSetInterval;globalThis.clearInterval=realClearInterval;
 }
 console.log('200ms single-flight polling and unchanged-HUD suppression: PASS');
+
+// จำลอง response ที่อ่าน body เสร็จช้า แม้ transport ได้รับ abort ตอนเปลี่ยนฉากแล้ว
+for (const oldOk of [true, false]) {
+  let finishOld, count=0, notifications=0;
+  const race=createMonsterHttpProvider({config:{apiBaseUrl:'https://fixture.invalid'},sessionToken:'fixture',
+    getZone:()=> 'hub',fetchImpl:async()=>{
+      if (++count===1) return {ok:oldOk,json:()=>new Promise(resolve=>{finishOld=resolve;})};
+      return {ok:true,json:async()=>({ok:true,monsterControl:{party:[{instanceId:'healed',hp:100,maxHp:100}],
+        actors:[],capabilities:{recall:true},revision:22}})};
+    }});
+  try {
+    race.subscribe(()=>notifications++);
+    const oldRead=race.refresh();
+    await Promise.resolve();
+    assert.equal(typeof finishOld,'function');
+    race.reset();
+    assert.equal((await race.refresh()).ok,true);
+    const fresh=race.snapshot(), afterFresh=notifications;
+    finishOld({ok:oldOk,monsterControl:{party:[],actors:[],revision:1}});
+    assert.equal((await oldRead).code,'STALE_SCENE');
+    assert.strictEqual(race.snapshot(),fresh,'response ก่อน reset ห้ามล้าง state ใหม่');
+    assert.equal(notifications,afterFresh,'response เก่าห้ามทำให้ HUD กะพริบ unavailable');
+    assert.equal(race.snapshot().party.slots[0].hp,100);
+  } finally { race.dispose(); }
+}
+console.log('Stale response after reset preserves fresh canonical state: PASS');

@@ -142,7 +142,9 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
       url.searchParams.set('zone', zone);
       lastStateReadAt = now();
       const { response, payload } = await fetchBounded(url.href, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json', 'X-API-Version': config.apiVersion, Authorization: `Bearer ${requestToken}` } });
-      if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'STALE_SCENE' }); }
+      // response ก่อน reset/dispose ไม่มีสิทธิ์ล้างข้อมูลของฉากรุ่นใหม่
+      if (stale(requestGeneration)) return Object.freeze({ ok: false, code: 'STALE_SCENE' });
+      if (tokenForRequest() !== requestToken || !sessionReady(requestToken) || getZone() !== zone || !readinessForZone(zone)) { markUnavailable(); return Object.freeze({ ok: false, code: 'STALE_SCENE' }); }
       if (!response.ok || !payload?.ok || !Array.isArray(payload?.monsterControl?.party)) { clearState(); return Object.freeze({ ok: false, code: payload?.errorCode || payload?.code || 'STATE_UNAVAILABLE' }); }
       const next = stateFromPlayerPayload(payload);
       const changed = JSON.stringify(next) !== JSON.stringify(current);
