@@ -16,6 +16,7 @@ ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
+         'save-reload': 'UNKNOWN',
          'damaged-monster-recovery': 'UNKNOWN'}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
@@ -68,6 +69,27 @@ async def main():
                 if path.endswith('/redeem') and response.status == 200:
                     GATES['launch-redeem'] = 'SAT'
         context.on('response', response_seen)
+        state_reads = []
+        initializations = []
+        response_tasks = set()
+        async def read_state_metadata(response):
+            if urlsplit(response.url).path != '/api/pirate/state' or response.status != 200:
+                return
+            try:
+                data = await response.json()
+                if response.request.method == 'POST':
+                    initializations.append(True)
+                if response.request.method == 'GET':
+                    checkpoint = (data.get('persisted') or {}).get('player', {}).get('checkpoint')
+                    state_reads.append({'revision': data.get('revision'), 'initialized': data.get('initialized'),
+                                        'hash': hashlib.sha256(checkpoint.encode()).hexdigest() if isinstance(checkpoint, str) else None})
+            except Exception:
+                pass
+        def queue_state_metadata(response):
+            task = asyncio.create_task(read_state_metadata(response))
+            response_tasks.add(task)
+            task.add_done_callback(response_tasks.discard)
+        context.on('response', queue_state_metadata)
         def failed_request(request):
             host = urlsplit(request.url).hostname
             if host in {'157.85.96.139', 'www.gstatic.com', 'identitytoolkit.googleapis.com', 'pocketmonster-game.web.app'}:
@@ -84,7 +106,7 @@ async def main():
                         packet = json.loads(payload)
                         world = packet.get('payload', {})
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
-                            wild = [{'x': a['pose']['x'], 'z': a['pose']['z'],
+                            wild = [{'id': a['actorId'], 'x': a['pose']['x'], 'z': a['pose']['z'],
                                      'maxHp': a['authority']['hp']['max']}
                                     for a in world.get('actors', [])
                                     if a.get('kind') == 'monster' and a.get('actorId', '').startswith('monster:')
@@ -208,6 +230,44 @@ async def main():
                 GATES['throw-recall'] = 'VIOL'
                 raise RuntimeError('recall-not-confirmed')
             GATES['throw-recall'] = 'SAT'
+            EVIDENCE['stage'] = 'save-operation'
+            native = next((f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')), None)
+            if not native:
+                raise RuntimeError('native-save-frame-missing')
+            saved = await native.evaluate("""async () => {
+                const checkpoint = window.localStorage.getItem('pirate-fruit:save-v1');
+                const api = window.POCKETMONSTER_PIRATE_OPERATIONS;
+                if (typeof checkpoint !== 'string' || !api?.request) return {ok:false};
+                const result = await api.request({type:'checkpoint', checkpoint});
+                const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(checkpoint));
+                return {ok:Number.isSafeInteger(result?.revision) && result.persisted?.player?.checkpoint === checkpoint,
+                        revision:result?.revision,
+                        hash:Array.from(new Uint8Array(digest), n=>n.toString(16).padStart(2,'0')).join('')};
+            }""")
+            if not saved.get('ok'):
+                GATES['save-reload'] = 'VIOL'
+                raise RuntimeError('normal-save-operation-not-confirmed')
+            EVIDENCE['stage'] = 'reload-same-session'
+            before_reads, before_initializations = len(state_reads), len(initializations)
+            await game.reload(wait_until='domcontentloaded', timeout=45000)
+            for _ in range(90):
+                scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
+                if scene and len(state_reads) > before_reads:
+                    try:
+                        if await scene.evaluate('Boolean(window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER?.snapshot().available)'):
+                            break
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.5)
+            reloaded = state_reads[before_reads:]
+            persisted = any(s['initialized'] is True and isinstance(s['revision'], int)
+                            and s['revision'] >= saved['revision'] and s['hash'] == saved['hash'] for s in reloaded)
+            initialized_again = len(initializations) != before_initializations
+            EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again}
+            if not persisted or initialized_again:
+                GATES['save-reload'] = 'VIOL'
+                raise RuntimeError('saved-checkpoint-not-preserved-on-reload')
+            GATES['save-reload'] = 'SAT'
             EVIDENCE['stage'] = 'walk-to-live-wild-monster'
 
             async def pose():
@@ -226,7 +286,7 @@ async def main():
                 finally:
                     await game.mouse.up()
 
-            async def walk_to(target, radius, attempts=70):
+            async def walk_to(target, radius, attempts=120):
                 # วัดแกนกล้องจาก input จริง ไม่เขียนตำแหน่ง/HP/presence ข้ามเกม
                 before = await pose()
                 await drag_move(1, 0, 0.5)
@@ -237,6 +297,8 @@ async def main():
                     raise RuntimeError('joystick-movement-not-observed')
                 rx, rz = dx / length, dz / length
                 for _ in range(attempts):
+                    if target.get('id'):
+                        target = next((a for a in wild if a['id'] == target['id']), target)
                     current = await pose()
                     dx, dz = target['x'] - current['x'], target['z'] - current['z']
                     distance = math.hypot(dx, dz)
@@ -250,7 +312,9 @@ async def main():
             current = await pose()
             if not current or not wild:
                 raise RuntimeError('live-world-pose-unavailable')
-            target = min(wild, key=lambda a: math.hypot(a['x'] - current['x'], a['z'] - current['z']))
+            target = max(wild, key=lambda a: (a['maxHp'], -math.hypot(a['x'] - current['x'], a['z'] - current['z'])))
+            EVIDENCE['damageSetup'] = {'wildCount': len(wild), 'targetMaxHp': target['maxHp'],
+                                       'distance': round(math.hypot(target['x']-current['x'], target['z']-current['z']), 1)}
             await walk_to(target, 2.5)
             EVIDENCE['stage'] = 'natural-monster-damage'
             await scene.locator('#monsterSlot1Btn').click()
@@ -272,6 +336,7 @@ async def main():
                 await asyncio.sleep(0.2)
             EVIDENCE['naturalDamageObserved'] = damaged
             EVIDENCE['naturalDeathObserved'] = dead
+            EVIDENCE['finalMonsterVitals'] = vitals
             if not damaged:
                 raise RuntimeError('natural-damage-not-observed')
             EVIDENCE['stage'] = 'farm-route'
