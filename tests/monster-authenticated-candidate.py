@@ -388,8 +388,8 @@ async def main():
             if not damaged:
                 raise RuntimeError('natural-damage-not-observed')
             EVIDENCE['stage'] = 'farm-route'
-            # เรียก route เดียวกับ portal; ไม่รับรองการเดินชน portal จากขั้นนี้
-            await game.evaluate("window.POCKETMONSTER_ONLINE_SHELL.navigate('pocket-monster', 'throw')")
+            # ใช้ scene warp event เดียวกับ portal; ไม่รับรองการเดินชน portal จากขั้นนี้
+            await scene.evaluate("window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {detail:{type:'pocketmonster:world-warp-v1',world:'pocket-monster',panel:'throw',source:'pirate-fruit-portal'}}))")
             farm_ready = False
             for _ in range(90):
                 scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
@@ -438,7 +438,7 @@ async def main():
             await game.screenshot(path=str(OUT / 'healed-bag.png'))
             await scene.locator('#monsterFieldBagClose').click()
             EVIDENCE['stage'] = 'return-pirate-revive'
-            await game.evaluate("window.POCKETMONSTER_ONLINE_SHELL.navigate('pirate-fruit', 'throw')")
+            await scene.evaluate("window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {detail:{type:'pocketmonster:world-warp-v1',world:'pirate-fruit',panel:'human',source:'pocket-monster-ranch-portal'}}))")
             pirate_ready = False
             for _ in range(90):
                 scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
