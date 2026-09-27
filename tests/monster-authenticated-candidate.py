@@ -72,10 +72,26 @@ async def main():
         context.on('response', response_seen)
         state_reads = []
         state_acks = []
+        checkpoint_requests = []
+        def checkpoint_sent(request):
+            if urlsplit(request.url).path != '/api/pirate/state/operation' or request.method != 'POST':
+                return
+            try:
+                body = request.post_data_json
+                operation = body.get('operation') or {}
+                checkpoint = operation.get('checkpoint')
+                if operation.get('type') == 'checkpoint' and isinstance(checkpoint, str):
+                    checkpoint_requests.append({'revision': body.get('expectedRevision'),
+                        'hash': hashlib.sha256(checkpoint.encode()).hexdigest(),
+                        'time': asyncio.get_running_loop().time()})
+            except Exception:
+                pass
+        context.on('request', checkpoint_sent)
         initializations = []
         response_tasks = set()
         async def read_state_metadata(response):
             path = urlsplit(response.url).path
+            received_at = asyncio.get_running_loop().time()
             if path in SAFE_PATHS and response.status >= 400:
                 try:
                     failure = await response.json()
@@ -94,6 +110,7 @@ async def main():
                     initializations.append(True)
                 checkpoint = (data.get('persisted') or {}).get('player', {}).get('checkpoint')
                 metadata = {'revision': data.get('revision'), 'initialized': data.get('initialized'),
+                            'time': received_at,
                             'hash': hashlib.sha256(checkpoint.encode()).hexdigest() if isinstance(checkpoint, str) else None}
                 if response.request.method == 'GET':
                     state_reads.append(metadata)
@@ -327,7 +344,14 @@ async def main():
                     persisted = True
                     break
             initialized_again = len(initializations) != before_initializations
+            # เก็บหลักฐานเท่านั้น ยังไม่เปลี่ยนคำตัดสินเมื่อ ACK ของ autosave ขาด
+            unload_readback = any(
+                s['revision'] > saved['revision'] and r['revision'] == s['revision'] - 1
+                and r['time'] < s['time'] and r['hash'] == s['hash']
+                for s in reloaded if isinstance(s['revision'], int)
+                for r in checkpoint_requests if isinstance(r['revision'], int))
             EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again,
+                                      'preReadCheckpointRequestMatches': unload_readback,
                                       'readCount': len(reloaded), 'savedRevision': saved['revision'],
                                       'ackRevisions': [a['revision'] for a in state_acks],
                                       'readRevisions': [s['revision'] for s in reloaded]}
@@ -521,6 +545,9 @@ async def main():
                 GATES['revived-summon'] = 'VIOL'
                 raise RuntimeError('revived-monster-not-active')
             GATES['revived-summon'] = 'SAT'
+            # เดินพ้นป้าย NPC ด้วยอินพุตจริงเพื่อให้ภาพมอนที่ฟื้นตรวจได้ ไม่แก้พิกัดตรง
+            await drag_move(1, 0, 0.5)
+            await drag_move(1, 0, 0.5)
             await asyncio.sleep(2)
             await game.screenshot(path=str(OUT / 'revived-renderer-review.png'))
             EVIDENCE['rendererReview'] = 'UNKNOWN-requires-screenshot-inspection'
