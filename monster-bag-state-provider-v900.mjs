@@ -44,11 +44,17 @@ export function createMonsterBagStateProvider({ config, sessionToken, getSession
     return value;
   };
   const stale = (requestToken, requestEpoch) => disposed || epoch !== requestEpoch || token() !== requestToken;
-  const refresh = () => {
+  const refresh = ({ afterPending = false } = {}) => {
     const requestToken = bindSession();
-    if (disposed || !requestToken) { current = empty('SESSION_UNAVAILABLE'); return Promise.resolve({ ok: false, code: current.code }); }
-    if (pendingRead) return pendingRead;
     const requestEpoch = epoch;
+    if (disposed || !requestToken) { current = empty('SESSION_UNAVAILABLE'); return Promise.resolve({ ok: false, code: current.code }); }
+    // คำอ่านหลัง mutation ต้องไม่ใช้ GET ที่เริ่มก่อน mutation ตอบรับ
+    if (afterPending && pendingRead) return pendingRead.then(() => {
+      const latestToken = bindSession();
+      if (stale(requestToken, requestEpoch) || latestToken !== requestToken) return { ok: false, code: 'STALE_SESSION' };
+      return refresh();
+    });
+    if (pendingRead) return pendingRead;
     const work = (async () => {
       try {
         const loaded = await loadInventory(config, requestToken);

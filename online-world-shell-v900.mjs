@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=975';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=976';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -17,10 +17,10 @@ import {
   createPirateSkillDynamicsDefinition,
 } from './combat-v91-entry.mjs?v=3';
 import { createCombatV91ProductionTransport } from './combat-v91-transport.mjs?v=1';
-import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=3';
+import { createMonsterControlController } from './monster-control-controller-v900.mjs?v=4';
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=961';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
-import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=6';
+import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=7';
 import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=3';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
@@ -101,7 +101,13 @@ function bindSceneHudAdapters(sceneWindow) {
   unbindMonsterScene?.();
   if (monsterController) {
     unsubscribeMonsterParty = window.POCKETMONSTER_PARTY_HUD?.subscribe?.(() => monsterController.sync()) || null;
-    unsubscribeMonsterState = monsterStateProvider?.subscribe?.(() => monsterController.sync()) || null;
+    unsubscribeMonsterState = monsterStateProvider?.subscribe?.(() => {
+      monsterController.sync();
+      try {
+        const EventCtor = sceneWindow?.CustomEvent || CustomEvent;
+        sceneWindow?.dispatchEvent?.(new EventCtor('pocketmonster:monster-control-state-v1'));
+      } catch {}
+    }) || null;
     void monsterStateProvider?.refresh?.();
     monsterStateProvider?.start?.();
     unbindMonsterScene = bindMonsterControlScene({ sceneWindow, controller: monsterController });
@@ -698,6 +704,7 @@ const monsterCommands = createMonsterCommandAdapter({
 });
 monsterController = createMonsterControlController({
   commands: monsterCommands,
+  refreshControlState: options => monsterStateProvider.refresh(options),
   getParty: () => {
     // ช่องมอนใช้กระเป๋าที่ server ยืนยันแล้ว แม้กำลังรอเข้าร่วมฉากต่อสู้
     if (activeWorld === 'pirate-fruit') {

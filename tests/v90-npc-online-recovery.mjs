@@ -32,8 +32,11 @@ const heal = game.match(/async function healAll\(\)\{[\s\S]*?\n\}/)?.[0] || '';
 assert.match(heal, /assertRanchOperation\(\{allowOnline:true\}\)/);
 assert.match(heal, /requestRecoverMonsters\(runtimeConfig,authProfileBridge\.sessionToken,request\.commandId,request\.expectedRevision\)/);
 assert.match(heal, /result\?\.ok!==true\|\|result\?\.success!==true/);
-assert.match(heal, /await monsterBagStateProvider\.refresh\(\)/);
-assert.match(heal, /POCKETMONSTER_MONSTER_STATE_PROVIDER[\s\S]*?refresh\?\.\(\{afterPending:true\}\)/, 'NPC recovery refreshes Pirate control-state after the bag read');
+assert.match(heal, /monsterBagStateProvider\.refresh\(\{afterPending:true\}\)/, 'post-ACK bag read must follow any pre-mutation GET');
+assert.match(heal, /controlReadback=await provider\?\.refresh\?\.\(\{afterPending:true\}\)/, 'NPC recovery awaits canonical Pirate control-state');
+assert.match(heal, /RECOVERY_CONTROL_READBACK_FAILED/);
+assert.match(heal, /CONTROL_STATE_STILL_DEAD/);
+assert.match(heal, /error\?\.phase==='readback'/, 'server rejection and accepted-but-unverified recovery have separate messages');
 assert.match(heal, /if\(keeperRecoveryPending\)return/);
 assert.match(heal, /keeperRecoveryRetryRequest\|\|\{commandId:'keeper-heal-'/);
 assert.match(heal, /if\(!snapshot\.available\)/);
@@ -48,16 +51,16 @@ console.log('v90-npc-online-recovery: PASS');
 
 // เรียกฟังก์ชัน NPC ตัวจริงด้วย dependency จำลอง ไม่แก้พลัง local ในทางออนไลน์
 const source=game.slice(game.indexOf('let keeperRecoveryCommandSequence='),game.indexOf('const ranchVisuals='));
-function fixture(send) {
-  const log=[]; const snapshot={available:true,revision:7}; let near=true;
-  globalThis.window={POCKETMONSTER_MONSTER_STATE_PROVIDER:{refresh:async()=>{log.push('control-refresh');return {ok:true};}}};
+function fixture(send, options={}) {
+  const log=[]; const messages=[]; const snapshot={available:true,revision:7}; let near=true;
+  globalThis.window={POCKETMONSTER_MONSTER_STATE_PROVIDER:{refresh:async()=>{log.push('control-refresh');return options.controlResult||{ok:true,state:{party:{available:true,slots:[{instanceId:'owned:a',hp:100,fainted:false}]}}};}}};
   const deps={assertRanchOperation:()=>near,hasOnlineMonsterSession:true,serverPlayerDataActive:false,
-    monsterBagStateProvider:{snapshot:()=>snapshot,refresh:async()=>{log.push('refresh');return {ok:true};}},
+    monsterBagStateProvider:{snapshot:()=>snapshot,refresh:async()=>{log.push('refresh');return options.bagResult||{ok:true};}},
     runtimeConfig:{},authProfileBridge:{sessionToken:'test'},requestRecoverMonsters:send,
-    msg:()=>{},playSFX:()=>{},renderAll:()=>log.push('render'),renderManager:()=>{},
+    msg:value=>messages.push(value),playSFX:()=>{},renderAll:()=>log.push('render'),renderManager:()=>{},
     saveGame:()=>{throw new Error('online recovery must not save local HP');}};
   const heal=new Function(...Object.keys(deps),source+';return healAll;')(...Object.values(deps));
-  return {heal,log,snapshot,setNear:value=>{near=value;}};
+  return {heal,log,messages,snapshot,setNear:value=>{near=value;}};
 }
 let finish;const sent=[];
 const f=fixture((...args)=>{sent.push(args);return new Promise(resolve=>{finish=resolve;});});
@@ -70,4 +73,19 @@ await r.heal();r.snapshot.revision=9;await r.heal();
 assert.equal(retries[0][2],retries[1][2]);assert.equal(retries[1][3],7,'retry preserves original revision');
 const rejected=fixture(async()=>{throw Object.assign(new Error('NPC_REQUIRED'),{status:409,code:'NPC_REQUIRED'});});
 await rejected.heal();assert.deepEqual(rejected.log,[],'rejection changes no local state');
+assert.match(rejected.messages[0],/NPC Recovery ไม่สำเร็จ • NPC_REQUIRED/);
+const declined=fixture(async()=>({ok:false,success:false,code:'NPC_TOO_FAR'}));
+await declined.heal();assert.match(declined.messages[0],/NPC Recovery ไม่สำเร็จ • NPC_TOO_FAR/);
+assert.equal(declined.log.includes('refresh'),false,'a server rejection does not proceed to readback or heal UI');
+const failedReadback=fixture(async()=>({ok:true,success:true}),{bagResult:{ok:false,code:'INVENTORY_UNAVAILABLE'}});
+await failedReadback.heal();assert.deepEqual(failedReadback.log,['refresh']);
+assert.match(failedReadback.messages[0],/รับการรักษาแล้ว แต่ยืนยันสถานะล่าสุดไม่ได้ • INVENTORY_UNAVAILABLE/);
+assert.equal(failedReadback.log.includes('render'),false,'accepted mutation with failed readback must not show healed success');
+const stillDead=fixture(async()=>({ok:true,success:true}),{controlResult:{ok:true,state:{party:{available:true,slots:[{instanceId:'owned:a',hp:0,fainted:true}]}}}});
+await stillDead.heal();assert.deepEqual(stillDead.log,['refresh','control-refresh']);
+assert.match(stillDead.messages[0],/CONTROL_STATE_STILL_DEAD/);
+assert.equal(stillDead.log.includes('render'),false,'bag HP cannot override a canonical dead slot');
+const deadActor=fixture(async()=>({ok:true,success:true}),{controlResult:{ok:true,state:{party:{available:true,slots:[{instanceId:'owned:a',hp:100,fainted:false}]},actors:[{instanceId:'owned:a',hp:0,fainted:true}]}}});
+await deadActor.heal();assert.match(deadActor.messages[0],/CONTROL_STATE_STILL_DEAD/);
+assert.equal(deadActor.log.includes('render'),false,'dead canonical actor cannot be hidden by a full party/save projection');
 console.log('Actual NPC heal flow: PASS, general player writes remain disabled');

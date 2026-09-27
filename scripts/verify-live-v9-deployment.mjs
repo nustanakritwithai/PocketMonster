@@ -7,8 +7,8 @@ import { healthVersionGate } from '../server-sync.mjs';
 const PRODUCTION_PAGES_URL = 'https://nustanakritwithai.github.io/PocketMonster/';
 const PRODUCTION_FIREBASE_URL = 'https://pocketmonster-game.web.app/';
 const PRODUCTION_API_URL = 'https://157.85.96.139';
-export const EXPECTED_PIRATE_SOURCE_COMMIT = 'c8c725e8a12e6723a8015e74566965ae18218ff2';
-export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '1e79f3e0dae4c2b8865aae6393e30f43517ffe5982dd125d77beb4f2a9703f4e';
+export const EXPECTED_PIRATE_SOURCE_COMMIT = '09afc8e796c3005fdf9dd6fdf2976bb3eba073b7';
+export const EXPECTED_PIRATE_ARTIFACT_SHA256 = '84413261a813fb31987f4092233457650a593afe5c091541e923eed2e83a447a';
 const SAFE_FALSE_FLAGS = Object.freeze([
   'vpsWrites',
   'playerDataWrites',
@@ -44,7 +44,7 @@ export const PAGES_LIVE_SMOKE_FILES = Object.freeze([
   'pirate-fruit-offline/index.html',
   'pirate-fruit-offline/pocket-bootstrap.mjs',
   'pirate-save-bridge-v900.mjs',
-  'pirate-fruit-offline/assets/index-C0el93GC.js',
+  'pirate-fruit-offline/assets/index-BaNBvM2a.js',
   'pirate-fruit-offline/assets/AzureFrostIsland-DC_yT95G.js',
   'pirate-fruit-offline/assets/EmberVolcanoIsland-_cAwvJAM.js',
   'pirate-fruit-offline/assets/MistJungleIsland-DJDtibBR.js',
@@ -245,7 +245,7 @@ async function verifyPages(options, runtimeConfig) {
     || !/\bcreateCombatV91Shell\b/.test(parentShell)) {
     throw new Error('online-world-shell-v900.mjs must import and install combat-v91-entry.mjs in the parent shell');
   }
-  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=11')) {
+  if (!bodies.get('pirate-fruit-offline/index.html').includes('pocket-bootstrap.mjs?v=12')) {
     throw new Error('Pirate Fruit entry must boot its isolated save bootstrap');
   }
   const pirateBootstrap = bodies.get(bootstrapRelative);

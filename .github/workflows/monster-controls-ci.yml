@@ -48,6 +48,7 @@ jobs:
         run: |
           node tests/monster-command-adapter.mjs
           node tests/monster-bag-state-provider.mjs
+          node tests/pirate-monster-bag-vitals.mjs
       - name: ตรวจการเชื่อมแผงควบคุม
         run: |
           node tests/v90-monster-control-controller.mjs
