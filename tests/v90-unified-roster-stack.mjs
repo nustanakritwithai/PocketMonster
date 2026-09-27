@@ -137,6 +137,8 @@ function boot({ party, target, commands = {} } = {}) {
 const css = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
 assert.match(css, /\.mmorpg-roster-row\{[^}]*height:34px/, 'roster rows stay 30-36px');
 assert.match(css, /\.mmorpg-roster-row\.placeholder\{[^}]*visibility:hidden/, 'empty Pirate rows keep geometry');
+assert.match(css, /\.mmorpg-hud \.mmorpg-roster\{pointer-events:none\}/, 'พื้นที่ว่างของ roster ต้องไม่บัง NPC ใน iframe');
+assert.match(css, /\.mmorpg-roster-row\{[^}]*pointer-events:auto/, 'รายการที่มองเห็นยังรับการกดได้');
 assert.match(css, /\.mmorpg-companion\.selected\{/, 'selected companion ring is distinct');
 assert.match(css, /\.mmorpg-companion\.active\{/, 'active/summoned companion ring is distinct');
 assert.match(css, /\.mmorpg-companion\.fainted\{/, 'fainted companion ring is distinct');
