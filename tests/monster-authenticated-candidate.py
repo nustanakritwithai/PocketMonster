@@ -14,6 +14,7 @@ ROOT = Path('candidate-artifact/dist-pages').resolve()
 OUT = Path('authenticated-candidate-evidence')
 ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
+PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
@@ -33,6 +34,11 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
 async def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('โปรแกรมนี้อนุญาตเฉพาะ GitHub runner ไม่ใช่ VPS')
+    if PRODUCTION_LIVE:
+        if os.environ.get('GITHUB_REF') != 'refs/heads/main':
+            raise SystemExit('ตรวจ production ได้จาก main เท่านั้น')
+        EVIDENCE['scope'] = 'production-live-assets-live-guest-no-interception'
+        GATES['production-assets'] = 'UNKNOWN'
     OUT.mkdir(exist_ok=True)
     if not (ROOT / 'index.html').is_file():
         raise SystemExit('candidate artifact ขาด index.html')
@@ -54,7 +60,8 @@ async def main():
             await route.fulfill(status=200, body=body, content_type=mime or 'application/octet-stream',
                                 headers={'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*'})
         # เปลี่ยนเฉพาะ asset ภายใน browser นี้ ไม่ intercept คำตอบ API หรือ WebSocket
-        await context.route(ORIGIN + PREFIX + '**', candidate)
+        if not PRODUCTION_LIVE:
+            await context.route(ORIGIN + PREFIX + '**', candidate)
         def response_seen(response):
             path = urlsplit(response.url).path
             if urlsplit(response.url).hostname == 'identitytoolkit.googleapis.com' and path.endswith('/accounts:signUp') and response.status == 200:
@@ -73,7 +80,10 @@ async def main():
         state_reads = []
         state_acks = []
         checkpoint_requests = []
+        state_request_times = {}
         def checkpoint_sent(request):
+            if urlsplit(request.url).path == '/api/pirate/state' and request.method == 'GET':
+                state_request_times[request] = asyncio.get_running_loop().time()
             if urlsplit(request.url).path != '/api/pirate/state/operation' or request.method != 'POST':
                 return
             try:
@@ -92,12 +102,23 @@ async def main():
         async def read_state_metadata(response):
             path = urlsplit(response.url).path
             received_at = asyncio.get_running_loop().time()
+            if PRODUCTION_LIVE and response.url.startswith(ORIGIN + PREFIX):
+                relative = unquote(path[len(PREFIX):]) or 'index.html'
+                if relative in CRITICAL and response.status == 200:
+                    try:
+                        EVIDENCE['assets'][relative] = hashlib.sha256(await response.body()).hexdigest()
+                    except Exception:
+                        pass
             if path in SAFE_PATHS and response.status >= 400:
                 try:
                     failure = await response.json()
                     code = failure.get('errorCode') or failure.get('code')
                     if isinstance(code, str) and re.fullmatch(r'[A-Z0-9_]{1,64}', code):
                         item = {'path': path, 'status': response.status, 'code': code}
+                        if path == '/api/pirate/state/operation':
+                            operation_type = (response.request.post_data_json.get('operation') or {}).get('type')
+                            if isinstance(operation_type, str) and re.fullmatch(r'[a-zA-Z]{1,32}', operation_type):
+                                item['operation'] = operation_type
                         if item not in EVIDENCE.setdefault('apiErrors', []):
                             EVIDENCE['apiErrors'].append(item)
                 except Exception:
@@ -110,7 +131,7 @@ async def main():
                     initializations.append(True)
                 checkpoint = (data.get('persisted') or {}).get('player', {}).get('checkpoint')
                 metadata = {'revision': data.get('revision'), 'initialized': data.get('initialized'),
-                            'time': received_at,
+                            'time': received_at, 'requestTime': state_request_times.get(response.request, 0),
                             'hash': hashlib.sha256(checkpoint.encode()).hexdigest() if isinstance(checkpoint, str) else None}
                 if response.request.method == 'GET':
                     state_reads.append(metadata)
@@ -344,10 +365,11 @@ async def main():
                     persisted = True
                     break
             initialized_again = len(initializations) != before_initializations
-            # เก็บหลักฐานเท่านั้น ยังไม่เปลี่ยนคำตัดสินเมื่อ ACK ของ autosave ขาด
+            # ACK อาจหายตอน unload แต่ readback ต้องตรงทุกไบต์กับ checkpoint ที่ส่งก่อน GET
             unload_readback = any(
-                s['revision'] > saved['revision'] and r['revision'] == s['revision'] - 1
-                and r['time'] < s['time'] and r['hash'] == s['hash']
+                s['initialized'] is True and s['revision'] > saved['revision']
+                and r['revision'] == s['revision'] - 1
+                and r['time'] < s['requestTime'] and r['hash'] == s['hash']
                 for s in reloaded if isinstance(s['revision'], int)
                 for r in checkpoint_requests if isinstance(r['revision'], int))
             EVIDENCE['saveReload'] = {'persistedMatch': persisted, 'initializedAgain': initialized_again,
@@ -355,7 +377,7 @@ async def main():
                                       'readCount': len(reloaded), 'savedRevision': saved['revision'],
                                       'ackRevisions': [a['revision'] for a in state_acks],
                                       'readRevisions': [s['revision'] for s in reloaded]}
-            if not persisted or initialized_again:
+            if not (persisted or unload_readback) or initialized_again:
                 GATES['save-reload'] = 'VIOL'
             else:
                 GATES['save-reload'] = 'SAT'
@@ -570,6 +592,12 @@ async def main():
             if type(error) is RuntimeError and re.fullmatch(r'[a-z]+(?:-[a-z]+){1,14}', str(error)):
                 EVIDENCE['errorCode'] = str(error)
         finally:
+            if response_tasks:
+                await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
+            if PRODUCTION_LIVE:
+                GATES['production-assets'] = 'SAT' if all(
+                    EVIDENCE['assets'].get(name) == hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+                    for name in CRITICAL) else 'VIOL'
             if game and not game.is_closed():
                 try:
                     EVIDENCE['finalWorld'] = await game.evaluate("window.POCKETMONSTER_WORLD_STATE?.()?.zone || null")
