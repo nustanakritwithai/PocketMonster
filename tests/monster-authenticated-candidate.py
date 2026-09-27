@@ -100,6 +100,8 @@ async def main():
             scene = None
             for _ in range(90):
                 for frame in game.frames:
+                    if urlsplit(frame.url).path != PREFIX + 'scene-v900.html':
+                        continue
                     try:
                         if await frame.evaluate("document.body?.dataset?.combinedWorld === 'pirate-fruit' && Boolean(window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER)"):
                             scene = frame
@@ -124,6 +126,53 @@ async def main():
                 if await scene.locator(selector).count() and await scene.locator(selector).first.is_visible():
                     EVIDENCE['visibleControls'].append(selector)
             EVIDENCE['world'] = await scene.evaluate("document.body.dataset.combinedWorld || null")
+            EVIDENCE['stage'] = 'guest-starter-setup'
+            # เตรียม Guest ผ่านคำสั่งปกติของ server ไม่สร้าง HP/inventory ใน client
+            # ขั้นนี้เป็น API setup ไม่ใช่การรับรอง onboarding UI
+            setup = await scene.evaluate("""async () => {
+                const bag = window.POCKETMONSTER_MONSTER_BAG;
+                if (!bag) return false;
+                const claimed = await bag.claimStarter();
+                if (!claimed.ok) return false;
+                const owned = bag.snapshot().envelope?.state?.collection?.[0];
+                if (!owned) return false;
+                const placed = await bag.assignToSlot(owned.instanceId, 0);
+                return placed.ok === true;
+            }""")
+            EVIDENCE['guestSetup'] = 'server-starter-and-party-slot' if setup else 'unavailable'
+            if not setup:
+                raise RuntimeError('guest-starter-setup-unavailable')
+
+            async def confirm(expression):
+                for _ in range(60):
+                    if await scene.evaluate(expression):
+                        return True
+                    await asyncio.sleep(0.2)
+                return False
+
+            EVIDENCE['stage'] = 'throw-ui'
+            await scene.locator('#monsterSlot1Btn').click(timeout=15000)
+            if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
+                raise RuntimeError('throw-button-not-ready')
+            await scene.locator('#monsterThrowBtn').click(timeout=15000)
+            if not await confirm("""(() => {
+                const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                return !s.pending && s.slots.some(slot => slot?.active)
+                    && document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'Recall';
+            })()"""):
+                GATES['throw-recall'] = 'VIOL'
+                raise RuntimeError('summon-did-not-show-recall')
+            EVIDENCE['stage'] = 'recall-ui'
+            await scene.locator('#monsterThrowBtn').click(timeout=15000)
+            if not await confirm("""(() => {
+                const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                return !s.pending && !s.slots.some(slot => slot?.active)
+                    && document.querySelector('#monsterThrowBtn')?.hidden === true;
+            })()"""):
+                GATES['throw-recall'] = 'VIOL'
+                raise RuntimeError('recall-not-confirmed')
+            GATES['throw-recall'] = 'SAT'
+            EVIDENCE['stage'] = 'recall-confirmed-recovery-pending'
             # ภาพใช้ตัดสิน layout; ปิดข้อความทั้งหมดเพื่อไม่เผยชื่อ Guest หรือข้อมูลผู้เล่น
             for frame in game.frames:
                 try:
@@ -144,7 +193,7 @@ async def main():
             (OUT / 'result.json').write_text(json.dumps(EVIDENCE, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps({'gates': GATES, 'errorType': EVIDENCE['errorType']}, ensure_ascii=False))
     # bootstrap probe ยังไม่รับรอง Recall/Recovery: UNKNOWN ห้ามนับ PASS
-    return 0 if all(GATES[k] == 'SAT' for k in ('firebase-login', 'launch-redeem', 'candidate-scene')) else 1
+    return 0 if all(GATES[k] == 'SAT' for k in ('firebase-login', 'launch-redeem', 'candidate-scene', 'throw-recall')) else 1
 
 if __name__ == '__main__':
     raise SystemExit(asyncio.run(main()))
