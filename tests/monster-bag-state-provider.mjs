@@ -82,6 +82,42 @@ assert.equal((await central.refresh()).code, 'INVENTORY_UNAVAILABLE');
 assert.equal(central.snapshot().available, false);
 assert.equal(changes.at(-1), false, 'ทุกหน้าต้องเห็นข้อมูลไม่พร้อมพร้อมกัน');
 unsubscribe(); central.dispose();
+
+// post-mutation read waits for any older GET, then starts a new canonical GET
+let pendingReadCount = 0;
+let finishOldRead;
+const ordered = createMonsterBagStateProvider({ config, sessionToken: 'fixture-session', load: () => {
+  pendingReadCount += 1;
+  if (pendingReadCount === 1) return new Promise(resolve => { finishOldRead = resolve; });
+  return Promise.resolve({ revision: 9, envelope: { state: original.envelope.state } });
+} });
+const oldRead = ordered.refresh();
+const readAfterPending = ordered.refresh({ afterPending: true });
+await Promise.resolve();
+assert.equal(pendingReadCount, 1, 'fresh read must wait while the old GET is unresolved');
+finishOldRead({ revision: 8, envelope: { state: original.envelope.state } });
+await oldRead;
+assert.equal((await readAfterPending).state.revision, 9, 'fresh read must not reuse the pre-mutation snapshot');
+assert.equal(pendingReadCount, 2);
+ordered.dispose();
+
+// session switch while waiting must not let the old caller launch a GET in the new session
+let currentSession = 'session-before';
+let releaseBeforeSessionChange;
+let sessionReadCount = 0;
+const sessionBound = createMonsterBagStateProvider({ config, getSessionToken: () => currentSession, load: () => {
+  sessionReadCount += 1;
+  return new Promise(resolve => { releaseBeforeSessionChange = resolve; });
+} });
+const sessionOldRead = sessionBound.refresh();
+const sessionAfterPending = sessionBound.refresh({ afterPending: true });
+currentSession = 'session-after';
+releaseBeforeSessionChange({ revision: 12, envelope: { state: original.envelope.state } });
+assert.equal((await sessionOldRead).code, 'STALE_SESSION');
+assert.equal((await sessionAfterPending).code, 'STALE_SESSION');
+assert.equal(sessionReadCount, 1, 'a pre-switch action cannot start an authenticated GET for the new session');
+sessionBound.dispose();
+
 let starterState = { collection: [], party: [null,null,null], storage: [], ranchActive: [] };
 const starterCommands = [];
 const fresh = createMonsterBagStateProvider({ config, sessionToken: 'fixture-session', fetchImpl: async (url, init) => {

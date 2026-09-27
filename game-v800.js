@@ -56,6 +56,7 @@ import { presentAuthProfileBridge } from './account-link-ui.mjs';
 import { applyMonsterAction as requestMonsterAction, consumeInventory as requestConsumeInventory, healthVersionGate, learnMonsterSkill as requestLearnMonsterSkill, learnMonsterSkillFromItem as requestLearnMonsterSkillFromItem, publishServerGateTelemetry, redeemItemCode as requestRedeemItemCode, recoverMonsters as requestRecoverMonsters, setMonsterEquipment as requestSetMonsterEquipment } from './server-sync.mjs?v=1';
 import { canUseServerPlayerData, changeServerPassword, loadServerSave, readPlayerState, saveCharacterProfile, saveServerSave, syncPlayerData } from './server-player-data.mjs';
 import { createMonsterBagStateProvider } from './monster-bag-state-provider-v900.mjs';
+import { overlayPiratePartyVitals } from './pirate-monster-bag-vitals-v900.mjs';
 import { publishPlayerCharacterBinding, savePirateHostedCharacter } from './pirate-player-server.mjs';
 import { createWorldPresenceController } from './world-presence-v800.mjs?v=6';
 import { catalogMutationVersion, loadServerCatalog } from './server-catalog.mjs';
@@ -5904,19 +5905,34 @@ async function healAll(){
         let snapshot=monsterBagStateProvider.snapshot();
         if(!snapshot.available){const loaded=await monsterBagStateProvider.refresh();if(!loaded.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์ก่อนรักษาไม่สำเร็จ'),{code:loaded.code||'RECOVERY_REFRESH_FAILED'});snapshot=monsterBagStateProvider.snapshot();}
         if(request.expectedRevision===null)request.expectedRevision=snapshot.revision;
-        const result=await requestRecoverMonsters(runtimeConfig,authProfileBridge.sessionToken,request.commandId,request.expectedRevision);
-        if(result?.ok!==true||result?.success!==true)throw Object.assign(new Error(result?.message||'NPC Recovery ไม่สำเร็จ'),{code:result?.code||'RECOVERY_REJECTED'});
+        let result;
+        try{result=await requestRecoverMonsters(runtimeConfig,authProfileBridge.sessionToken,request.commandId,request.expectedRevision);}
+        catch(error){throw Object.assign(new Error('RECOVERY_COMMAND_FAILED'),{phase:'command',code:error?.code||'RECOVERY_COMMAND_FAILED',status:error?.status});}
+        if(result?.ok!==true||result?.success!==true)throw Object.assign(new Error('RECOVERY_COMMAND_REJECTED'),{phase:'command',code:result?.code||'RECOVERY_REJECTED',status:result?.status??200});
         request.acknowledged=true;
-        const refreshed=await monsterBagStateProvider.refresh();
-        if(!refreshed.ok)throw Object.assign(new Error('โหลดข้อมูลมอนสเตอร์หลังรักษาไม่สำเร็จ'),{code:refreshed.code||'RECOVERY_REFRESH_FAILED'});
+        const refreshed=await monsterBagStateProvider.refresh({afterPending:true});
+        if(!refreshed?.ok)throw Object.assign(new Error('RECOVERY_READBACK_FAILED'),{phase:'readback',code:refreshed?.code||'INVENTORY_READBACK_FAILED'});
         // NPC Recovery แก้สถานะต่อสู้บนเซิร์ฟเวอร์ด้วย อาจไม่เปลี่ยน revision ของกระเป๋า
         // จึงสั่งอ่าน control-state โดยตรงเพื่อเคลียร์ fainted/active ที่ค้างในแผง Pirate
-        try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;await provider?.refresh?.({afterPending:true});}catch{}
+        const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;
+        let controlReadback;
+        try{controlReadback=await provider?.refresh?.({afterPending:true});}catch{}
+        const controlParty=controlReadback?.state?.party;
+        if(controlReadback?.ok!==true||controlParty?.available!==true||!Array.isArray(controlParty.slots))
+          throw Object.assign(new Error('RECOVERY_CONTROL_READBACK_FAILED'),{phase:'readback',code:controlReadback?.code||'CONTROL_STATE_READBACK_FAILED'});
+        const partyInstanceIds=new Set(controlParty.slots.map(slot=>slot?.instanceId).filter(Boolean));
+        const liveActors=Array.isArray(controlReadback.state?.actors)?controlReadback.state.actors:[];
+        if(controlParty.slots.some(slot=>slot?.instanceId&&(slot.fainted===true||(Number.isFinite(slot.hp)&&slot.hp<=0)))
+          ||liveActors.some(actor=>partyInstanceIds.has(actor?.instanceId)&&(actor.fainted===true||(Number.isFinite(actor.hp)&&actor.hp<=0))))
+          throw Object.assign(new Error('RECOVERY_CONTROL_STATE_STILL_DEAD'),{phase:'readback',code:'CONTROL_STATE_STILL_DEAD'});
         keeperRecoveryRetryRequest=null;
-        playSFX('sfx_heal');msg(result.message||'NPC Heal ฟรี • มอนทั้งหมดฟื้น HP และ Uses เต็ม');renderAll();renderManager();
+        playSFX('sfx_heal');msg('NPC Heal ฟรี • ยืนยันสถานะมอนจากเซิร์ฟเวอร์แล้ว');renderAll();renderManager();
       }catch(error){
         if(!error?.status&&!request.acknowledged)keeperRecoveryRetryRequest=request;else keeperRecoveryRetryRequest=null;
-        msg(`Keeper Recovery ไม่สำเร็จ • ${error.code||error.message}`);
+        const code=/^[A-Z0-9_]{1,64}$/.test(error?.code||'')?error.code:'RECOVERY_FAILED';
+        msg(error?.phase==='readback'
+          ? `เซิร์ฟเวอร์รับการรักษาแล้ว แต่ยืนยันสถานะล่าสุดไม่ได้ • ${code}`
+          : `NPC Recovery ไม่สำเร็จ • ${code}`);
       }
     })();
     keeperRecoveryPending=work;await work;keeperRecoveryPending=null;
@@ -6364,6 +6380,11 @@ function installPirateMonsterBagButton(){
 }
 
 let fieldBagFocusId=null;
+window.addEventListener('pocketmonster:monster-control-state-v1',()=>{
+  if(!remoteBagOpen)return;
+  renderMonsterFieldBag();
+  renderRanchStoragePage();
+});
 function syncFieldBagPreview(inst){
   if(!fieldBagPreviewScene&&!fieldBagPreviewRenderer)initFieldBagPreview3D();
   const species=inst?spById[inst.speciesId]:null;
@@ -6386,10 +6407,10 @@ function syncFieldBagPreview(inst){
   el('monsterFieldBagStage')?.classList.toggle('monster-field-bag-empty-stage',!inst);
   el('monsterFieldBagStageArt')?.classList.toggle('has-3d',Boolean(fieldBagPreviewMesh));
   setTextIfChanged(el('monsterFieldBagName'),inst?displayName(inst):'เลือกมอนสเตอร์');
-  setTextIfChanged(el('monsterFieldBagMeta'),inst?`Lv.${inst.level} • HP ${fmt(inst.hp)}/${fmt(inst.maxHp)}`:'พกได้ 6 ตัว · ใช้ทีละ 3');
-  const hpPct=inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
+  setTextIfChanged(el('monsterFieldBagMeta'),inst?`Lv.${inst.level} • HP ${inst.combatVitalsUnavailable?'—/—':`${fmt(inst.hp)}/${fmt(inst.maxHp)}`}`:'พกได้ 6 ตัว · ใช้ทีละ 3');
+  const hpPct=inst?.combatVitalsUnavailable?0:inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
   const hpBar=el('monsterFieldBagHp'),hpFill=el('monsterFieldBagHpFill');
-  hpBar?.classList.toggle('hidden',!inst);
+  hpBar?.classList.toggle('hidden',!inst||inst.combatVitalsUnavailable===true);
   if(hpFill)hpFill.style.width=`${hpPct}%`;
   const typesBox=el('monsterFieldBagTypes');
   if(typesBox)typesBox.innerHTML=inst?monsterTypes(inst).map(typeBadge).join(''):'';
@@ -6438,8 +6459,12 @@ function renderMonsterFieldBag(){
   }
   const remoteState=remoteBagOpen?remoteBagSnapshot?.envelope?.state:null;
   const remoteById=new Map((remoteState?.collection||[]).map(mapServerMonsterToRuntimeModel).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
-  const monsterForId=id=>remoteState?remoteById.get(id):getInst(id);
   const partyIds=(remoteState?.party||state.party).filter(Boolean).slice(0,FIELD_BAG_ACTIVE_MAX);
+  const liveControlState=(()=>{try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;return provider?.snapshot?.()||null;}catch{return null;}})();
+  const monsterForId=id=>{
+    const monster=remoteState?remoteById.get(id):getInst(id);
+    return remoteState?overlayPiratePartyVitals(monster,{partyIds,controlState:liveControlState}):monster;
+  };
   const storageIds=(remoteState?.storage||state.storage).filter(Boolean);
   // Carry pool: active party (usable) + reserve from storage up to 6 total
   const reserveIds=[];
@@ -6472,7 +6497,7 @@ function renderMonsterFieldBag(){
     }
     const inst=monsterForId(id);
     if(!inst){pool.appendChild(card);continue;}
-    const faint=inst.fainted||inst.hp<=0;
+    const faint=!inst.combatVitalsUnavailable&&(inst.fainted||inst.hp<=0);
     card.innerHTML=`<span class="monster-field-bag-avatar" style="background:${tint(inst)}">${displayName(inst).slice(0,1)}</span><span class="monster-field-bag-slot-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="monster-field-bag-chip${isActive?'':' reserve'}">${isActive?'ใช้':'สำรอง'}</span>`;
     card.onclick=()=>{fieldBagFocusId=id;renderMonsterFieldBag();window.dispatchEvent(new CustomEvent('pocketmonster:monster-selected',{detail:{monsterId:id,source:'monster-field-bag'}}));if(typeof window.POCKETMONSTER_SELECT_MONSTER==='function')window.POCKETMONSTER_SELECT_MONSTER(id);};
     pool.appendChild(card);
@@ -6495,7 +6520,7 @@ function renderMonsterFieldBag(){
   const remoteSlots=monsterBagStateProvider.snapshot().slots||[];
   const statusText=inParty?'อยู่ในช่องใช้งาน (ใช้ต่อสู้ได้)':'อยู่ในช่องสำรอง · ใส่ช่องใช้งาน 1–3 เพื่อใช้ต่อสู้';
   const slotActions=remoteBagOpen?`<div class="storage-actions remote-party-slots" aria-label="จัดช่องใช้งาน">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่องใช้ '+(index+1)}</button>`).join('')}</div><div class="storage-actions remote-placement">${inParty?'<button type="button" data-remote-move="storage">ย้ายเป็นสำรอง</button>':''}</div>`:'<div class="storage-actions">'+(inParty?'':'<button type="button" data-storage-withdraw>ใส่ช่องใช้งาน</button>')+(inParty?'<button type="button" data-storage-deposit>ย้ายเป็นสำรอง</button>':'')+'</div>';
-  details.innerHTML=`<div class="monster-field-bag-status">${statusText}</div><div class="monster-field-bag-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${inParty?'ใช้งาน':'สำรอง'}</b>สถานะ</span></div>${slotActions}`;
+  details.innerHTML=`<div class="monster-field-bag-status">${statusText}</div><div class="monster-field-bag-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${focused.combatVitalsUnavailable?'—/—':`${fmt(focused.hp)}/${fmt(focused.maxHp)}`}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${inParty?'ใช้งาน':'สำรอง'}</b>สถานะ</span></div>${slotActions}`;
   details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
     details.querySelectorAll('[data-remote-party-slot]').forEach(item=>{item.disabled=true;});
     const result=await monsterBagStateProvider.assignToSlot(focused.instanceId,Number(button.dataset.remotePartySlot));
@@ -6943,10 +6968,10 @@ function syncRanchClubPreview(inst){
   el('ranchClubStage')?.classList.toggle('ranch-club-empty-stage',!inst);
   el('ranchClubStageArt')?.classList.toggle('has-3d',Boolean(ranchClubPreviewMesh));
   setTextIfChanged(el('ranchClubPreviewName'),inst?displayName(inst):'Monster Club');
-  setTextIfChanged(el('ranchClubPreviewMeta'),inst?`Lv.${inst.level} • HP ${fmt(inst.hp)}/${fmt(inst.maxHp)}`:'ฝากมอนจาก Party เพื่อเข้าคลับ');
-  const hpPct=inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
+  setTextIfChanged(el('ranchClubPreviewMeta'),inst?`Lv.${inst.level} • HP ${inst.combatVitalsUnavailable?'—/—':`${fmt(inst.hp)}/${fmt(inst.maxHp)}`}`:'ฝากมอนจาก Party เพื่อเข้าคลับ');
+  const hpPct=inst?.combatVitalsUnavailable?0:inst?.maxHp?Math.max(0,Math.min(100,Math.round(100*inst.hp/inst.maxHp))):0;
   const hpBar=el('ranchClubPreviewHp'),hpFill=el('ranchClubPreviewHpFill');
-  hpBar?.classList.toggle('hidden',!inst);
+  hpBar?.classList.toggle('hidden',!inst||inst.combatVitalsUnavailable===true);
   if(hpFill)hpFill.style.width=`${hpPct}%`;
   const typesBox=el('ranchClubPreviewTypes');
   if(typesBox)typesBox.innerHTML=inst?monsterTypes(inst).map(typeBadge).join(''):'';
@@ -6965,16 +6990,20 @@ function renderRanchStoragePage(){
   const remoteState=remoteBagOpen?remoteBagSnapshot.envelope.state:null;
   const ranchIds=remoteState?.ranchActive||state.ranchActive;
   const remoteById=new Map((remoteState?.collection||[]).map(mapServerMonsterToRuntimeModel).filter(monster=>monster?.instanceId).map(monster=>[monster.instanceId,monster]));
-  const monsterForId=id=>remoteState?remoteById.get(id):getInst(id);
   const ids=(remoteState?.storage||state.storage).filter(Boolean);
   const partyIds=(remoteState?.party||state.party).filter(Boolean);
+  const liveControlState=(()=>{try{const provider=window.POCKETMONSTER_MONSTER_STATE_PROVIDER||window.parent?.POCKETMONSTER_MONSTER_STATE_PROVIDER;return provider?.snapshot?.()||null;}catch{return null;}})();
+  const monsterForId=id=>{
+    const monster=remoteState?remoteById.get(id):getInst(id);
+    return remoteState?overlayPiratePartyVitals(monster,{partyIds,controlState:liveControlState}):monster;
+  };
   const selectableIds=[...partyIds,...ids];
   el('ranchStorageCount').textContent=`Storage ${ids.length}`;
   el('ranchActiveCount').textContent=`Ranch Active ${ranchIds.length}/${RANCH_ACTIVE_MAX}`;
   const clubTint=(inst)=>{const sp=inst&&spById[inst.speciesId];return sp?`#${sp.color.toString(16).padStart(6,'0')}`:'#166534';};
   const clubCardHTML=(inst,kind)=>{
     const ranch=ranchIds.includes(inst.instanceId);
-    const faint=inst.fainted||inst.hp<=0;
+    const faint=!inst.combatVitalsUnavailable&&(inst.fainted||inst.hp<=0);
     const chip=kind==='party'?'พกอยู่':ranch?'Ranch':'คลัง';
     return `<span class="ranch-club-avatar" style="background:${clubTint(inst)}">${displayName(inst).slice(0,1)}</span><span class="ranch-club-card-copy"><b>${displayName(inst)}</b><small>Lv.${inst.level}${faint?' • FAINT':''}</small></span><span class="ranch-club-chip">${chip}</span>`;
   };
@@ -7040,7 +7069,7 @@ function renderRanchStoragePage(){
     ? `<div class="storage-actions remote-party-slots" aria-label="จัดช่องเรียกบนเซิร์ฟเวอร์">${remoteSlots.map((slot,index)=>`<button type="button" data-remote-party-slot="${index}" ${slot.instanceId===focused.instanceId?'disabled':''}>${slot.instanceId===focused.instanceId?'อยู่ช่อง '+(index+1):'ใส่ช่อง '+(index+1)}</button>`).join('')}</div><div class="storage-actions remote-placement" aria-label="จัดตำแหน่งบนเซิร์ฟเวอร์">${inParty?'<button type="button" data-remote-move="storage">ฝากเข้าคลัง</button>':`<button type="button" data-remote-move="${ranchOn?'storage':'ranch'}">${ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active'}</button>`}</div>`
     : '<div class="manager-empty remote-party-status">กำลังโหลดข้อมูล Party จากเซิร์ฟเวอร์…</div>';
   const localActions=remoteState?'':'<div class="storage-actions">'+(inParty?'<button type="button" data-storage-deposit>ฝากเข้าคลัง</button>':'<button type="button" data-storage-withdraw>รับเข้า Party</button><button type="button" data-storage-ranch>'+ (ranchOn?'เก็บจาก Ranch':'ปล่อย Ranch Active')+'</button>')+'</div>';
-  details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${fmt(focused.hp)}/${fmt(focused.maxHp)}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'} </b>Ranch</span></div>${remoteStatus}${localActions}`;
+  details.innerHTML=`<div class="manager-empty ranch-club-status">${inParty?'อยู่ Party • ฝากเข้าคลังได้':'อยู่ Storage • รับเข้า Party ได้เมื่อมีช่องว่าง'}</div><div class="ranch-club-dossier"><span><b>Lv.${focused.level}</b>ระดับ</span><span><b>${focused.combatVitalsUnavailable?'—/—':`${fmt(focused.hp)}/${fmt(focused.maxHp)}`}</b>HP</span><span><b>${monsterCrValue(focused)??'—'}</b>CR</span><span><b>${fmt(focused.bond)}</b>Bond</span><span><b>${GENDER_TH[focused.gender]||focused.gender||'—'}</b>เพศ</span><span><b>${focused.personality||'—'}</b>นิสัย</span><span><b>${focused.lifeStage||'—'}</b>ช่วงชีวิต</span><span><b>${ranchOn?'ในลาน':'พักคลับ'} </b>Ranch</span></div>${remoteStatus}${localActions}`;
    details.querySelectorAll('[data-remote-party-slot]').forEach(button=>button.addEventListener('click',async()=>{
     details.querySelectorAll('[data-remote-party-slot]').forEach(item=>{item.disabled=true;});
     const result=await monsterBagStateProvider.assignToSlot(focused.instanceId,Number(button.dataset.remotePartySlot));

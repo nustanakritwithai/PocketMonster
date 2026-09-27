@@ -149,4 +149,47 @@ realController.sync();
 assert.match(originalButtons[0].getAttribute('data-pirate-icon'),/Beta/,'เปลี่ยนมอนแล้วปุ่มเดิมอัปเดตทันที');
 assert.equal(realSceneDoc.getElementById('monsterSlot1Btn'),originalButtons[0]);
 realHud.unmount(); unbind();
+
+// ปุ่ม Party เปลี่ยนจาก “ปามอนสเตอร์” เป็น active action เฉพาะหลัง ACK + canonical actor snapshot
+{
+  const doc = { body: new Node('body'), createElement: tag => new Node(tag), getElementById(id) { return this.body.byId(id); }, querySelector() { return null; }, addEventListener() {}, removeEventListener() {} };
+  const sceneDoc = { ...doc, body: new Node('body') };
+  sceneDoc.body.dataset.combinedWorld = 'pirate-fruit';
+  const sceneWindow = { document: sceneDoc };
+  sceneDoc.defaultView = sceneWindow;
+  const frame = new Node('iframe', 'onlineWorldSceneFrame'); frame.contentWindow = sceneWindow; doc.body.append(frame);
+  const slotButton = new Node('button', 'monsterSlot1Btn'); sceneDoc.body.append(slotButton);
+  const partySlots = [{ slot: 0, instanceId: 'owned:recall-check', name: 'Testmon', available: true }];
+  let actors = [];
+  let resolveSummon;
+  const controller = createMonsterControlController({
+    commands: { summon: () => new Promise(resolve => { resolveSummon = resolve; }), skill: async () => ({ ok: true }) },
+    getParty: () => ({ available: true, slots: partySlots }), getZone: () => 'pirate-fruit',
+    getAim: () => ({ x: 0, y: 0, z: 2 }), getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }),
+  });
+  const unbindScene = bindMonsterControlScene({ sceneWindow, controller });
+  const windowLike = new EventTarget();
+  windowLike.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER = controller;
+  windowLike.POCKETMONSTER_CHAT_RUNTIME = { chat: feature({ revision: 1, channels: ['WORLD'], rows: [], status: 'connected', unread: 0, canSend: false }) };
+  windowLike.POCKETMONSTER_QUEST_HUD = feature({ revision: 1, available: false, steps: [] });
+  windowLike.POCKETMONSTER_POCKET_HUD = { resetAll() {}, player: feature({ revision: 1 }), target: feature({ revision: 1, available: false }), actions: feature({ revision: 1, items: [] }), utilities: feature({ revision: 1, items: [] }), banner: feature({ revision: 1 }) };
+  const hud = createUnifiedMmorpgHud({ windowLike, documentLike: doc, monsterController: controller });
+  hud.mount();
+  const recallButton = doc.getElementById('monsterRecallBtn');
+  assert.equal(recallButton.hidden, true, 'Recall is hidden until an active actor is canonical');
+  assert.match(slotButton.getAttribute('aria-label'), /ปามอนสเตอร์/);
+  await controller.activateSlot(0);
+  const request = controller.throwHeld();
+  await Promise.resolve();
+  resolveSummon({ ok: true });
+  await request;
+  assert.match(slotButton.getAttribute('aria-label'), /ปามอนสเตอร์/, 'ACK without actor snapshot must not optimistically change the label');
+  actors = [{ instanceId: 'owned:recall-check', zone: 'pirate-fruit', active: true, generation: 4 }];
+  controller.sync();
+  assert.match(slotButton.getAttribute('aria-label'), /เปิดสกิลมอนสเตอร์/, 'canonical active snapshot changes the HUD slot action');
+  assert.equal(recallButton.hidden, false, 'accepted throw plus canonical active snapshot exposes Recall');
+  assert.equal(recallButton.textContent, 'เก็บมอนสเตอร์');
+  hud.unmount(); unbindScene(); controller.dispose();
+}
 console.log('Exported Pirate HUD + real scene controller: PASS (original slots, immediate refresh, no duplicate views)');

@@ -97,6 +97,52 @@ assert.equal(slotRefresh.snapshot().party.slots[2].instanceId, 'assigned');
 assert.equal(slotRefresh.snapshot().party.slots[0].occupied, false);
 slotRefresh.dispose();
 
+// afterPending must not launch a read for a new zone after its queued read belongs to the old scene.
+let guardedZone = 'pirate-fruit';
+let releaseZoneRead;
+let zoneReads = 0;
+const zoneGuard = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' }, sessionToken: 'fixture',
+  getZone: () => guardedZone,
+  fetchImpl: async () => {
+    zoneReads += 1;
+    await new Promise(resolve => { releaseZoneRead = resolve; });
+    return { ok: true, json: async () => ({ ok: true, monsterControl: { party: [], revision: 1 } }) };
+  },
+});
+const oldZoneRead = zoneGuard.refresh();
+await Promise.resolve();
+const queuedZoneRead = zoneGuard.refresh({ afterPending: true });
+guardedZone = 'hub';
+releaseZoneRead();
+await oldZoneRead;
+assert.equal((await queuedZoneRead).code, 'STALE_SCENE');
+assert.equal(zoneReads, 1, 'afterPending must not read the next zone using an old-scene action');
+zoneGuard.dispose();
+
+// The same guard applies when the active account/session changes while waiting.
+let guardedToken = 'account-a';
+let releaseSessionRead;
+let sessionReads = 0;
+const sessionGuard = createMonsterHttpProvider({
+  config: { apiBaseUrl: 'https://server.example/', apiVersion: '1.1' }, sessionToken: guardedToken,
+  getSessionToken: () => guardedToken, getZone: () => 'pirate-fruit',
+  fetchImpl: async () => {
+    sessionReads += 1;
+    await new Promise(resolve => { releaseSessionRead = resolve; });
+    return { ok: true, json: async () => ({ ok: true, monsterControl: { party: [], revision: 1 } }) };
+  },
+});
+const oldSessionRead = sessionGuard.refresh();
+await Promise.resolve();
+const queuedSessionRead = sessionGuard.refresh({ afterPending: true });
+guardedToken = 'account-b';
+releaseSessionRead();
+await oldSessionRead;
+assert.equal((await queuedSessionRead).code, 'STALE_SESSION');
+assert.equal(sessionReads, 1, 'afterPending must not carry old-session work into the new account');
+sessionGuard.dispose();
+
 let presenceAccepted = false;
 let notifyPresence;
 let gatedCalls = 0;

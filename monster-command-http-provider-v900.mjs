@@ -152,7 +152,21 @@ export function createMonsterHttpProvider({ config, sessionToken, getSessionToke
   };
   const refresh = ({ afterPending = false } = {}) => {
     // หลังจัดช่องต้องอ่านใหม่หลังคำขอก่อนหน้า เพื่อไม่รับรายการก่อนบันทึกกลับมา
-    if (afterPending && pendingRefresh) return pendingRefresh.then(() => refresh());
+    if (afterPending && pendingRefresh) {
+      const pending = pendingRefresh;
+      const requestGeneration = generation;
+      const requestToken = tokenForRequest();
+      const requestZone = getZone();
+      return pending.then(() => {
+        if (stale(requestGeneration) || tokenForRequest() !== requestToken || !sessionReady(requestToken)) {
+          return Object.freeze({ ok: false, code: 'STALE_SESSION' });
+        }
+        if (getZone() !== requestZone || !readinessForZone(requestZone)) {
+          return Object.freeze({ ok: false, code: 'STALE_SCENE' });
+        }
+        return refresh();
+      });
+    }
     if (pendingRefresh) return pendingRefresh;
     const request = requestState();
     pendingRefresh = request;

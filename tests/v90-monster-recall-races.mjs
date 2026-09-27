@@ -8,12 +8,19 @@ const deferred = () => {
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 };
+async function waitFor(predicate, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error('Timed out waiting for deterministic controller condition');
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
 async function throwSlot(controller, slot) {
   const prepared = await controller.activateSlot(slot);
   if (!prepared.ok) return prepared;
   return controller.throwHeld();
 }
-function fixture(overrides = {}) {
+function fixture(overrides = {}, options = {}) {
   let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
   const calls = [];
   const pending = deferred();
@@ -23,6 +30,8 @@ function fixture(overrides = {}) {
     getParty: () => ({ available: true, slots: ['a', 'b', 'c'].map(instanceId => ({ instanceId, available: true })) }),
     getConfirmedActors: () => actors,
     getCapabilities: () => ({ recall: true, switch: true }),
+    refreshControlState: options.refreshControlState,
+    pendingTimeoutMs: options.pendingTimeoutMs ?? 12000,
     commands: {
       summon: async command => { calls.push({ ...command, kind: 'summon' }); return { ok: true }; },
       skill: async () => ({ ok: true }),
@@ -32,6 +41,156 @@ function fixture(overrides = {}) {
     },
   });
   return { controller, calls, pending, setActors: value => { actors = value; } };
+}
+
+// ACK ต้องตามด้วย canonical control-state read; เปลี่ยน active เฉพาะเมื่อ snapshot ยืนยัน
+{
+  let controller;
+  let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
+  let refreshCount = 0;
+  controller = createMonsterControlController({
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }), recall: async () => ({ ok: true }) },
+    getParty: () => ({ available: true, slots: [{ instanceId: 'a', available: true }] }),
+    getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }),
+    getZone: () => 'hub',
+    refreshControlState: async options => {
+      assert.equal(options.afterPending, true);
+      refreshCount += 1;
+      actors = [];
+      controller.sync();
+      return { ok: true, state: { actors } };
+    },
+  });
+  assert.equal(controller.snapshot().slots[0].active, true);
+  assert.equal((await controller.recall()).reason, 'recall-confirmed');
+  assert.equal(refreshCount, 1);
+  assert.equal(controller.snapshot().slots[0].active, false, 'Recall UI leaves active only after authoritative snapshot');
+  assert.equal(controller.snapshot().pending, false);
+  controller.dispose();
+}
+
+// ผล resync ที่เริ่มใน epoch เดิมห้าม emit/ล้างสถานะหลัง reset เปลี่ยนฉาก
+{
+  let controller;
+  let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
+  let resolveTimedOutResync;
+  let refreshCount = 0;
+  controller = createMonsterControlController({
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }), recall: async () => ({ ok: true }) },
+    getParty: () => ({ available: true, slots: [{ instanceId: 'a', available: true }] }),
+    getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }), getZone: () => 'hub', pendingTimeoutMs: 20,
+    refreshControlState: () => {
+      refreshCount += 1;
+      return refreshCount === 1 ? Promise.resolve({ ok: true }) : new Promise(resolve => { resolveTimedOutResync = resolve; });
+    },
+  });
+  await controller.recall();
+  await waitFor(() => refreshCount === 2);
+  assert.equal(refreshCount, 2, 'timeout started a delayed resync');
+  controller.reset();
+  const afterResetRevision = controller.snapshot().revision;
+  resolveTimedOutResync({ ok: true });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(controller.snapshot().revision, afterResetRevision, 'stale prior-epoch resync cannot mutate new scene state');
+  assert.equal(controller.snapshot().lastFailure, null);
+  controller.dispose();
+}
+
+// reject คง actor จริงไว้; ไม่ทำ local recall/switch
+{
+  let refreshCount = 0;
+  const f = fixture({ recall: async () => ({ ok: false, code: 'RECALL_REJECTED' }) }, {
+    refreshControlState: async () => { refreshCount += 1; return { ok: true }; },
+  });
+  assert.equal((await f.controller.recall()).ok, false);
+  assert.equal(f.controller.snapshot().slots[0].active, true);
+  assert.equal(f.controller.snapshot().pending, false);
+  assert.equal(refreshCount, 0, 'rejected command cannot imply a local state transition');
+  f.controller.dispose();
+}
+
+// snapshot ที่เริ่ม/มาถึงก่อน ACK ห้ามยืนยัน Recall; ต้องมี readback หลัง ACK เท่านั้น
+{
+  let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
+  let resolveCommand;
+  let refreshCount = 0;
+  const controller = createMonsterControlController({
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }), recall: () => new Promise(resolve => { resolveCommand = resolve; }) },
+    getParty: () => ({ available: true, slots: [{ instanceId: 'a', available: true }] }),
+    getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }), getZone: () => 'hub',
+    refreshControlState: async () => { refreshCount += 1; return { ok: true }; },
+  });
+  const request = controller.recall();
+  actors = [];
+  controller.sync();
+  assert.equal(controller.snapshot().pending, true, 'pre-ACK snapshot cannot clear recall guard');
+  resolveCommand({ ok: true });
+  assert.equal((await request).reason, 'recall-confirmed');
+  assert.equal(refreshCount, 1, 'successful command performs an explicit post-ACK canonical read');
+  assert.equal(controller.snapshot().pending, false);
+  controller.dispose();
+}
+
+// ACK + missing snapshot times out, releases duplicate guard, and resync confirms state without local toggle
+{
+  let controller;
+  let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
+  let refreshCount = 0;
+  controller = createMonsterControlController({
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }), recall: async () => ({ ok: true }) },
+    getParty: () => ({ available: true, slots: [{ instanceId: 'a', available: true }] }),
+    getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }), getZone: () => 'hub', pendingTimeoutMs: 20,
+    refreshControlState: async () => {
+      refreshCount += 1;
+      if (refreshCount > 1) { actors = []; controller.sync(); }
+      return { ok: true, state: { actors } };
+    },
+  });
+  assert.equal((await controller.recall()).reason, 'awaiting-snapshot');
+  assert.equal(controller.snapshot().pending, true);
+  assert.equal(controller.snapshot().slots[0].active, true);
+  await waitFor(() => controller.snapshot().pending === false);
+  assert.ok(refreshCount >= 2, 'timeout triggers a canonical resync');
+  assert.equal(controller.snapshot().pending, false);
+  assert.equal(controller.snapshot().slots[0].active, false, 'only resync-confirmed state changes the Recall UI');
+  assert.equal(controller.snapshot().lastFailure, null);
+  controller.dispose();
+}
+
+// แม้ canonical readback ค้าง ACK ก็มี deadline; resync เก่าห้ามล้าง failure/state หลังข้าม epoch
+{
+  let controller;
+  let actors = [{ instanceId: 'a', zone: 'hub', active: true, generation: 10 }];
+  let resolveFirstRead;
+  let refreshCount = 0;
+  controller = createMonsterControlController({
+    commands: { summon: async () => ({ ok: true }), skill: async () => ({ ok: true }), recall: async () => ({ ok: true }) },
+    getParty: () => ({ available: true, slots: [{ instanceId: 'a', available: true }] }),
+    getConfirmedActors: () => actors,
+    getCapabilities: () => ({ recall: true }), getZone: () => 'hub', pendingTimeoutMs: 20,
+    refreshControlState: () => {
+      refreshCount += 1;
+      if (refreshCount === 1) return new Promise(resolve => { resolveFirstRead = resolve; });
+      actors = [];
+      controller.sync();
+      return Promise.resolve({ ok: true, state: { actors } });
+    },
+  });
+  const pendingRecall = controller.recall();
+  await waitFor(() => refreshCount >= 2);
+  assert.ok(refreshCount >= 2, 'timeout triggers a second resync while first readback is unresolved');
+  assert.equal(controller.snapshot().pending, false, 'unresolved readback cannot keep the button locked indefinitely');
+  assert.equal(controller.snapshot().slots[0].active, false, 'only the timeout resync snapshot changes active UI');
+  const beforeStaleRead = controller.snapshot();
+  resolveFirstRead({ ok: false, code: 'STALE_SCENE' });
+  assert.equal((await pendingRecall).reason, 'recall-confirmed');
+  assert.equal(controller.snapshot().revision >= beforeStaleRead.revision, true);
+  assert.equal(controller.snapshot().lastFailure, null, 'late old read cannot restore or clear newer confirmation state');
+  controller.dispose();
 }
 
 // ใช้รูปแบบ party จริงจาก C# ซึ่งไม่มี available ในแต่ละช่อง
@@ -91,7 +250,7 @@ function fixture(overrides = {}) {
 
 // ACK เก็บกลับมาก่อน snapshot ต้องคง pending และไม่ส่ง switch ซ้อน
 {
-  const f = fixture();
+  const f = fixture({}, { refreshControlState: async () => ({ ok: true }) });
   const request = f.controller.recall();
   f.controller.sync();
   assert.equal(f.controller.snapshot().slots[0].pending, true, 'active snapshot เดิมไม่ใช่ผลยืนยัน recall');

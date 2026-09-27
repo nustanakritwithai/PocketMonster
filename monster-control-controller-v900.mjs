@@ -6,6 +6,7 @@ const pointOf = value => value && ['x', 'y', 'z'].every(key => Number.isFinite(v
 
 export function createMonsterControlController({ commands, getParty = () => null, getZone = () => '',
   getAim = () => null, getSkills = () => [], getConfirmedActors = () => [], getCapabilities = () => null,
+  refreshControlState = null,
   pendingTimeoutMs = 12000 } = {}) {
   if (!commands?.summon || !commands?.skill) throw new TypeError('summon and skill commands are required');
   let panel = emptyPanel();
@@ -60,19 +61,33 @@ export function createMonsterControlController({ commands, getParty = () => null
     clearWaitingTimer();
     waitingTimer = setTimeout(() => {
       waitingTimer = null;
-      if (waiting !== request) return;
+      if (waiting !== request || epoch !== request.epoch || zone() !== request.command.zone) return;
       waiting = null;
       retryable.set(request.retryKey, request.command);
       lastFailure = { ok: false, reason: 'snapshot-confirmation-timeout', code: 'SNAPSHOT_CONFIRMATION_TIMEOUT' };
       lastFailureId += 1;
       emit();
+      if (request.kind !== 'recall') return;
+      // timeout ปลด guard แต่ไม่สลับตัวเอง; ขอ authoritative readback อีกครั้ง
+      void Promise.resolve().then(() => refreshControlState?.({ afterPending: true })).then(result => {
+        if (disposed || epoch !== request.epoch || zone() !== request.command.zone
+          || waiting !== null || retryable.get(request.retryKey) !== request.command || !result?.ok) return;
+        const confirmedGone = !actors().some(actor => actor?.active === true && actor.zone === request.command.zone
+          && actor.instanceId === request.instanceId && actor.generation === request.command.expectedActiveGeneration);
+        if (confirmedGone) {
+          retryable.delete(request.retryKey);
+          lastFailure = null;
+        }
+        sync();
+      }).catch(() => {});
     }, Math.max(1, pendingTimeoutMs));
     waitingTimer?.unref?.();
   };
   const sync = () => {
     if (disposed) return snapshot();
     if (waiting && getParty()?.available === true && (waiting.kind === 'recall'
-      ? !actors().some(actor => actor.active === true && actor.zone === zone() && actor.instanceId === waiting.instanceId && actor.generation === waiting.command.expectedActiveGeneration)
+      ? waiting.acknowledged === true && waiting.readbackConfirmed === true
+        && !actors().some(actor => actor.active === true && actor.zone === zone() && actor.instanceId === waiting.instanceId && actor.generation === waiting.command.expectedActiveGeneration)
       : isActive(waiting.instanceId))) {
       retryable.delete(waiting.retryKey); clearWaitingTimer(); waiting = null;
       lastFailure = null;
@@ -204,27 +219,44 @@ export function createMonsterControlController({ commands, getParty = () => null
     if (!Number.isSafeInteger(current.generation) || current.generation < 1) return { ok: false, reason: 'generation-unavailable' };
     const retryKey = `recall:${current.instanceId}`;
     const command = retryable.get(retryKey) || { commandId: globalThis.crypto.randomUUID(), instanceId: current.instanceId, zone: zone(), expectedActiveGeneration: current.generation };
-    setWaiting({ instanceId: current.instanceId, command, retryKey, kind: 'recall', epoch: requestEpoch });
+    const request = { instanceId: current.instanceId, command, retryKey, kind: 'recall', epoch: requestEpoch };
+    setWaiting(request);
     emit();
     try {
       const result = await commands.recall({ ...command, contract: MONSTER_COMMAND_CONTRACT, kind: 'recall' });
       if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
       if (!result?.ok) {
-        if (waiting?.command === command) waiting = null;
+        if (waiting === request) { clearWaitingTimer(); waiting = null; }
         if (['TRANSPORT_ERROR', 'TRANSPORT_TIMEOUT'].includes(result?.code)) retryable.set(retryKey, command);
         else retryable.delete(retryKey);
         emit(); return { ok: false, reason: result?.code || 'recall-rejected' };
       }
-      if (!isActive(current.instanceId)) {
-        if (waiting?.command === command) waiting = null;
+      request.acknowledged = true;
+      if (waiting === request) armWaitingTimeout(request);
+      let readback = null;
+      try { readback = await refreshControlState?.({ afterPending: true }); } catch {}
+      if (disposed || epoch !== requestEpoch || zone() !== command.zone) return { ok: false, reason: 'stale-scene' };
+      if (readback?.ok === true) {
+        request.readbackConfirmed = true;
+        sync();
+      }
+      if (waiting !== request) {
+        return !isActive(current.instanceId)
+          ? { ok: true, reason: 'recall-confirmed' }
+          : { ok: true, reason: 'awaiting-snapshot' };
+      }
+      if (readback?.ok === true && !isActive(current.instanceId)) {
+        if (waiting === request) { clearWaitingTimer(); waiting = null; }
         retryable.delete(retryKey);
         panel = emptyPanel();
+        lastFailure = null;
         emit();
-        return result;
+        return { ok: true, reason: 'recall-confirmed' };
       }
+      if (waiting === request) armWaitingTimeout(request);
       emit();
-      return { ok: true, reason: 'awaiting-snapshot' };
-    } catch { if (waiting?.command === command) waiting = null; emit(); return { ok: false, reason: 'control-error' }; }
+      return { ok: true, reason: 'awaiting-snapshot', ...(readback?.ok === false ? { readbackCode: readback.code || 'STATE_UNAVAILABLE' } : {}) };
+    } catch { if (waiting === request) { clearWaitingTimer(); waiting = null; } emit(); return { ok: false, reason: 'control-error' }; }
   };
   const skills = () => Object.freeze((panel.instanceId ? getSkills(panel.instanceId) || [] : [])
     .map(skill => Object.freeze({ ...skill })));
