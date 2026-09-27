@@ -173,8 +173,9 @@ async def main():
             if not setup.get('ok'):
                 raise RuntimeError('guest-starter-setup-unavailable')
             close_bag = scene.locator('#monsterFieldBagClose')
-            if await close_bag.count() and await close_bag.is_visible():
-                await close_bag.click()
+            # lazy runtime อาจพร้อมก่อน overlay เปิดเสร็จ ต้องรอปุ่มปิดจริง
+            await close_bag.click(timeout=20000)
+            await scene.locator('#monsterFieldBag').wait_for(state='hidden', timeout=10000)
 
             async def confirm(expression):
                 for _ in range(60):
@@ -184,6 +185,8 @@ async def main():
                 return False
 
             EVIDENCE['stage'] = 'throw-ui'
+            if not await confirm('window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0]?.available === true'):
+                raise RuntimeError('party-not-ready-after-bag-close')
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
                 raise RuntimeError('throw-button-not-ready')
