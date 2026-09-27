@@ -104,14 +104,23 @@ async def main():
                     EVIDENCE['networkFailures'].append(item)
         context.on('requestfailed', failed_request)
         wild = []
+        wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
+                def sent(payload):
+                    try:
+                        if json.loads(payload).get('type') == 'world-pos':
+                            wire_counts['worldPoseSends'] += 1
+                    except (ValueError, TypeError):
+                        pass
+                socket.on('framesent', sent)
                 def received(payload):
                     nonlocal wild
                     try:
                         packet = json.loads(payload)
                         world = packet.get('payload', {})
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
+                            wire_counts['worldSnapshots'] += 1
                             wild = [{'id': a['actorId'], 'x': a['pose']['x'], 'z': a['pose']['z'],
                                      'maxHp': a['authority']['hp']['max']}
                                     for a in world.get('actors', [])
@@ -231,6 +240,15 @@ async def main():
                 return False
 
             EVIDENCE['stage'] = 'throw-ui'
+            # bag fallback ทำให้ช่องพร้อมได้ก่อน canonical control-state; setup ต้องรอเซิร์ฟเวอร์จริง
+            canonical_ready = False
+            for _ in range(100):
+                if await game.evaluate('window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.snapshot().available === true'):
+                    canonical_ready = True
+                    break
+                await asyncio.sleep(0.2)
+            if not canonical_ready:
+                raise RuntimeError('canonical-controls-not-ready-after-bag')
             if not await confirm('window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0]?.available === true'):
                 raise RuntimeError('party-not-ready-after-bag-close')
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
@@ -420,23 +438,7 @@ async def main():
             if not any(i['path'] == '/api/monsters/recover' and i['status'] == 200 for i in EVIDENCE['http']):
                 raise RuntimeError('npc-heal-ack-not-observed')
             GATES['damaged-monster-recovery'] = 'SAT'
-            EVIDENCE['stage'] = 'healed-bag-ui'
-            await scene.locator('[data-ranch-service="storage"]').click(timeout=15000)
-            await scene.locator('#monsterFieldBag').wait_for(state='visible', timeout=15000)
-            if not await confirm("""(() => {
-                const provider = window.POCKETMONSTER_MONSTER_STATE_PROVIDER || window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
-                const slot = provider?.snapshot()?.party?.slots?.[0];
-                const text = document.querySelector('#monsterFieldBagMeta')?.textContent || '';
-                const match = text.replaceAll(',', '').match(/HP\\s+([0-9.]+)\\/([0-9.]+)/);
-                return slot && match && Number(match[1])===slot.hp && Number(match[2])===slot.maxHp
-                    && slot.hp>0 && slot.hp===slot.maxHp
-                    && document.querySelector('#monsterFieldBagHpFill')?.style.width === '100%';
-            })()"""):
-                GATES['healed-bag-ui'] = 'VIOL'
-                raise RuntimeError('healed-bag-ui-not-matching-authority')
-            GATES['healed-bag-ui'] = 'SAT'
-            await game.screenshot(path=str(OUT / 'healed-bag.png'))
-            await scene.locator('#monsterFieldBagClose').click()
+            await scene.locator('[data-ranch-close]').click()
             EVIDENCE['stage'] = 'return-pirate-revive'
             await scene.evaluate("window.dispatchEvent(new CustomEvent('pocketmonster:world-warp-v1', {detail:{type:'pocketmonster:world-warp-v1',world:'pirate-fruit',panel:'human',source:'pocket-monster-ranch-portal'}}))")
             pirate_ready = False
@@ -453,6 +455,25 @@ async def main():
                 await asyncio.sleep(0.5)
             if not pirate_ready:
                 raise RuntimeError('revived-pirate-slot-not-ready')
+            EVIDENCE['stage'] = 'healed-bag-ui'
+            # กระเป๋าใต้ minimap เป็น UI ของ Pirate; storage ของ NPC เป็นคนละหน้าต่าง
+            await game.locator('[data-utility="monster-bag"]').click(timeout=15000)
+            await scene.locator('#monsterFieldBag').wait_for(state='visible', timeout=15000)
+            if not await confirm("""(() => {
+                const provider = window.POCKETMONSTER_MONSTER_STATE_PROVIDER || window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
+                const slot = provider?.snapshot()?.party?.slots?.[0];
+                const text = document.querySelector('#monsterFieldBagMeta')?.textContent || '';
+                const match = text.replaceAll(',', '').match(/HP\\s+([0-9.]+)\\/([0-9.]+)/);
+                return slot && match && Number(match[1])===slot.hp && Number(match[2])===slot.maxHp
+                    && slot.hp>0 && slot.hp===slot.maxHp
+                    && document.querySelector('#monsterFieldBagHpFill')?.style.width === '100%';
+            })()"""):
+                GATES['healed-bag-ui'] = 'VIOL'
+                raise RuntimeError('healed-bag-ui-not-matching-authority')
+            GATES['healed-bag-ui'] = 'SAT'
+            await game.screenshot(path=str(OUT / 'healed-bag.png'))
+            await scene.locator('#monsterFieldBagClose').click()
+            EVIDENCE['stage'] = 'revived-summon-ui'
             await scene.locator('#monsterSlot1Btn').click()
             await scene.locator('#monsterThrowBtn').click()
             if not await confirm("""(() => {
@@ -492,7 +513,11 @@ async def main():
                         const s=window.POCKETMONSTER_MONSTER_STATE_PROVIDER?.snapshot();
                         const c=window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER?.snapshot();
                         const code=c?.lastFailure?.code;
+                        const chat=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
                         return {ready:d?.scenePresenceReady,reason:d?.readinessReason,zone:d?.activeZone,
+                            acceptedSnapshots:d?.acceptedSnapshots,
+                            socketReadyState:chat?.socketReadyState,worldPulseActive:chat?.worldPulseActive,
+                            chatPaused:chat?.paused,chatStopped:chat?.stopped,
                             bootState:d?.sceneBootState,controlAvailable:s?.available,pending:c?.pending,
                             failure:/^[A-Z0-9_]{1,64}$/.test(code||'')?code:null};
                     }""")
@@ -514,6 +539,7 @@ async def main():
                     pass
             await context.close()
             await browser.close()
+            EVIDENCE['wireCounts'] = wire_counts
             (OUT / 'result.json').write_text(json.dumps(EVIDENCE, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps({'gates': GATES, 'errorType': EVIDENCE['errorType']}, ensure_ascii=False))
     # bootstrap probe ยังไม่รับรอง Recall/Recovery: UNKNOWN ห้ามนับ PASS
