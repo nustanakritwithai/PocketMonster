@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import json
+import math
 import mimetypes
 import os
 import re
@@ -23,7 +24,7 @@ EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
-              '/api/monsters/npc-recovery'}
+              '/api/monsters/recover', '/api/pirate/state/operation'}
 CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900.mjs',
             'unified-mobile-controls-v900.mjs', 'game-v800.js'}
 
@@ -74,7 +75,28 @@ async def main():
                 if item not in EVIDENCE['networkFailures']:
                     EVIDENCE['networkFailures'].append(item)
         context.on('requestfailed', failed_request)
+        wild = []
+        def observe_page(opened_page):
+            def observe_socket(socket):
+                def received(payload):
+                    nonlocal wild
+                    try:
+                        packet = json.loads(payload)
+                        world = packet.get('payload', {})
+                        if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
+                            wild = [{'x': a['pose']['x'], 'z': a['pose']['z'],
+                                     'maxHp': a['authority']['hp']['max']}
+                                    for a in world.get('actors', [])
+                                    if a.get('kind') == 'monster' and a.get('actorId', '').startswith('monster:')
+                                    and a.get('authority', {}).get('hp', {}).get('current', 0) > 0]
+                    except (ValueError, KeyError, TypeError):
+                        pass
+                socket.on('framereceived', received)
+            opened_page.on('websocket', observe_socket)
+        # อ่าน socket ของเกมเท่านั้น ไม่เปิด socket/presence writer อีกตัว
+        context.on('page', observe_page)
         page = await context.new_page()
+        game = None
         try:
             EVIDENCE['stage'] = 'firebase-page'
             await page.goto('https://pocketmonster-game.web.app/', wait_until='domcontentloaded', timeout=45000)
@@ -183,7 +205,103 @@ async def main():
                 GATES['throw-recall'] = 'VIOL'
                 raise RuntimeError('recall-not-confirmed')
             GATES['throw-recall'] = 'SAT'
-            EVIDENCE['stage'] = 'recall-confirmed-recovery-pending'
+            EVIDENCE['stage'] = 'walk-to-live-wild-monster'
+
+            async def pose():
+                return await game.evaluate('window.POCKETMONSTER_WORLD_STATE?.() || null')
+
+            async def drag_move(x, z, duration):
+                box = await scene.locator('#joystick').bounding_box()
+                if not box:
+                    raise RuntimeError('joystick-not-visible')
+                px, py = box['x'] + 65, box['y'] + box['height'] - 65
+                await game.mouse.move(px, py)
+                await game.mouse.down()
+                try:
+                    await game.mouse.move(px + x * 42, py + z * 42)
+                    await asyncio.sleep(duration)
+                finally:
+                    await game.mouse.up()
+
+            async def walk_to(target, radius, attempts=70):
+                # วัดแกนกล้องจาก input จริง ไม่เขียนตำแหน่ง/HP/presence ข้ามเกม
+                before = await pose()
+                await drag_move(1, 0, 0.5)
+                after = await pose()
+                dx, dz = after['x'] - before['x'], after['z'] - before['z']
+                length = math.hypot(dx, dz)
+                if length < 0.03:
+                    raise RuntimeError('joystick-movement-not-observed')
+                rx, rz = dx / length, dz / length
+                for _ in range(attempts):
+                    current = await pose()
+                    dx, dz = target['x'] - current['x'], target['z'] - current['z']
+                    distance = math.hypot(dx, dz)
+                    if distance < radius:
+                        return
+                    await drag_move((dx * rx + dz * rz) / distance,
+                                    (-dx * rz + dz * rx) / distance,
+                                    min(0.5, max(0.12, distance / 8)))
+                raise RuntimeError('movement-target-not-reached')
+
+            current = await pose()
+            if not current or not wild:
+                raise RuntimeError('live-world-pose-unavailable')
+            target = min(wild, key=lambda a: math.hypot(a['x'] - current['x'], a['z'] - current['z']))
+            await walk_to(target, 2.5)
+            EVIDENCE['stage'] = 'natural-monster-damage'
+            await scene.locator('#monsterSlot1Btn').click()
+            if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
+                raise RuntimeError('damage-setup-throw-not-ready')
+            await scene.locator('#monsterThrowBtn').click()
+            damaged = False
+            dead = False
+            for _ in range(150):
+                vitals = await scene.evaluate("""(() => {
+                    const slot = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0];
+                    return slot ? {hp:slot.hp, maxHp:slot.maxHp, fainted:slot.fainted} : null;
+                })()""")
+                if vitals and isinstance(vitals.get('hp'), (int, float)):
+                    damaged = damaged or vitals['hp'] < vitals.get('maxHp', 0)
+                    dead = vitals['hp'] == 0 and vitals.get('fainted') is True
+                    if dead:
+                        break
+                await asyncio.sleep(0.2)
+            EVIDENCE['naturalDamageObserved'] = damaged
+            EVIDENCE['naturalDeathObserved'] = dead
+            if not damaged:
+                raise RuntimeError('natural-damage-not-observed')
+            EVIDENCE['stage'] = 'farm-route'
+            # เรียก route เดียวกับ portal; ไม่รับรองการเดินชน portal จากขั้นนี้
+            await game.evaluate("window.POCKETMONSTER_ONLINE_SHELL.navigate('pocket-monster', 'throw')")
+            for _ in range(90):
+                scene = next((f for f in game.frames if urlsplit(f.url).path == PREFIX + 'scene-v900.html'), None)
+                if scene:
+                    try:
+                        if await scene.evaluate("document.body?.dataset.combinedWorld === 'pocket-monster' && Boolean(window.POCKETMONSTER_MONSTER_BAG)"):
+                            break
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.5)
+            if not scene:
+                raise RuntimeError('farm-scene-unavailable')
+            EVIDENCE['stage'] = 'walk-to-keeper'
+            await walk_to({'x': 4, 'z': 3}, 2.7, 25)
+            EVIDENCE['stage'] = 'npc-heal-ui'
+            await scene.locator('#npcBtn').click(timeout=15000)
+            await scene.locator('[data-ranch-service="heal"]').click(timeout=15000)
+            if not await confirm("""(() => {
+                const provider = window.POCKETMONSTER_MONSTER_STATE_PROVIDER || window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
+                const s = provider?.snapshot();
+                const slot = s?.party?.slots?.[0];
+                return slot && Number.isFinite(slot.hp) && slot.hp > 0 && slot.hp === slot.maxHp && slot.fainted === false;
+            })()"""):
+                GATES['damaged-monster-recovery'] = 'VIOL'
+                raise RuntimeError('npc-heal-control-readback-not-healthy')
+            if not any(i['path'] == '/api/monsters/recover' and i['status'] == 200 for i in EVIDENCE['http']):
+                raise RuntimeError('npc-heal-ack-not-observed')
+            GATES['damaged-monster-recovery'] = 'SAT'
+            EVIDENCE['stage'] = 'npc-heal-confirmed-render-reload-pending'
             # ภาพใช้ตัดสิน layout; ปิดข้อความทั้งหมดเพื่อไม่เผยชื่อ Guest หรือข้อมูลผู้เล่น
             for frame in game.frames:
                 try:
@@ -199,12 +317,19 @@ async def main():
             brief = re.sub(r'[A-Za-z0-9_\-]{24,}', '[redacted]', brief)
             EVIDENCE['errorSummary'] = brief[:240]
         finally:
+            if game and not game.is_closed():
+                try:
+                    EVIDENCE['finalWorld'] = await game.evaluate("window.POCKETMONSTER_WORLD_STATE?.()?.zone || null")
+                    # เฉพาะ Guest ทดสอบ; ไม่เก็บ DOM, token, URL หรือข้อความ network
+                    await game.screenshot(path=str(OUT / 'candidate-final.png'))
+                except Exception:
+                    pass
             await context.close()
             await browser.close()
             (OUT / 'result.json').write_text(json.dumps(EVIDENCE, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps({'gates': GATES, 'errorType': EVIDENCE['errorType']}, ensure_ascii=False))
     # bootstrap probe ยังไม่รับรอง Recall/Recovery: UNKNOWN ห้ามนับ PASS
-    return 0 if all(GATES[k] == 'SAT' for k in ('firebase-login', 'launch-redeem', 'candidate-scene', 'throw-recall')) else 1
+    return 0 if all(value == 'SAT' for value in GATES.values()) else 1
 
 if __name__ == '__main__':
     raise SystemExit(asyncio.run(main()))
