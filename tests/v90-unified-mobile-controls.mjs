@@ -470,16 +470,25 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   assert.equal(throwButton.hidden, false, 'canonical active slot plus recall capability exposes Recall');
   const commandsBeforeBoat = commands.length;
   windowLike.dispatchEvent(pirateControlMode('boat'));
-  monster.sync();
   assert.equal(throwButton.hidden, true, 'dedicated monster button is hidden in Pirate boat mode');
   assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบขวา');
   throwButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
   assert.equal(commands.length, commandsBeforeBoat, 'hidden boat-mode monster button cannot dispatch summon/Recall');
   windowLike.dispatchEvent(pirateControlMode('player'));
-  monster.sync();
   assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'โจมตี');
   assert.equal(throwButton.hidden, false, 'returning to Pirate player mode restores canonical Recall control');
+  const attackStyle = elements.get('captureBtn').style;
+  let backgroundWrites = 0;
+  let backgroundValue = attackStyle.backgroundImage;
+  Object.defineProperty(attackStyle, 'backgroundImage', {
+    configurable: true,
+    get: () => backgroundValue,
+    set: value => { backgroundWrites++; backgroundValue = value; },
+  });
+  for (let update = 0; update < 20; update++) monster.sync();
+  assert.equal(backgroundWrites, 0, 'ข้อมูลมอนอัปเดตแต่โหมดเดิมต้องไม่ล้างสไตล์ปุ่มโจมตีซ้ำ');
+  Object.defineProperty(attackStyle, 'backgroundImage', { configurable: true, writable: true, value: backgroundValue });
   elements.get('joystick').dispatchEvent(pointer('pointerdown', 902, 80, 50));
   windowLike.dispatchEvent(pointer('pointermove', 902, 90, 50));
   windowLike.dispatchEvent(pointer('pointerup', 902, 90, 50));
@@ -491,7 +500,11 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   elements.get('skill1Btn').dispatchEvent(pointer('pointerdown', 903, 0, 0));
   elements.get('skill1Btn').dispatchEvent(pointer('pointerup', 903, 0, 0));
   assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions + 2);
+  const visibleBeforeDetach = throwButton.hidden;
   detach();
+  windowLike.dispatchEvent(pirateControlMode('boat'));
+  assert.equal(throwButton.hidden, visibleBeforeDetach, 'detached scene binding removes the control-mode repaint listener');
+  windowLike.dispatchEvent(pirateControlMode('player'));
   monster.dispose();
 
   const shownFailures = [];

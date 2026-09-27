@@ -45,6 +45,17 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
     button.setAttribute?.('aria-disabled', String(state.disabled));
     button.title = state.label;
   };
+  const refreshThrowButtonForControlMode = () => {
+    if (!isPirate()) return;
+    const button = documentLike.getElementById('monsterThrowBtn');
+    if (!button) return;
+    const snapshot = controller.snapshot?.();
+    if (isPiratePlayerMode()) paintPirateThrowButton(button, snapshot);
+    else {
+      button.hidden = true;
+      button.disabled = true;
+    }
+  };
   for (let slot = 0; slot < 3; slot += 1) {
     const button = documentLike.getElementById(`monsterSlot${slot + 1}Btn`);
     if (!button) continue;
@@ -170,6 +181,8 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
     throwButton.addEventListener('click', click, true);
     buttons.push({ button: throwButton, click });
   }
+  const onPirateControlModeChange = () => refreshThrowButtonForControlMode();
+  controlWindow.addEventListener?.('pocketmonster:pirate-control-mode-v1', onPirateControlModeChange);
   for (const id of ['monsterRecallBtn', 'monsterReleaseBtn', 'monsterStoreBtn']) {
     const button = documentLike.getElementById(id);
     if (!button) continue;
@@ -186,6 +199,7 @@ export function bindMonsterControlScene({ sceneWindow, controller } = {}) {
   }
   return () => {
     unsubscribe?.();
+    controlWindow.removeEventListener?.('pocketmonster:pirate-control-mode-v1', onPirateControlModeChange);
     if (!isPirate()) controlWindow.POCKETMONSTER_HELD_MONSTER_VISUAL?.(null);
     for (const { button, pointerdown, click } of buttons) {
       pointerdown && button.removeEventListener('pointerdown', pointerdown, true);

@@ -767,8 +767,15 @@ export function createUnifiedMobileControls({
       monsterController = controller || null;
       reportedThrowFailure = null;
       reportedThrowFailureId = 0;
+      let previousPanelMode = Symbol('unpainted');
       unsubscribeMonster = monsterController?.subscribe?.(state => {
-        setControlMode(activeWorldId);
+        const panelMode = state?.controlPanel?.mode;
+        // HP/ตำแหน่งมอนเปลี่ยนไม่จำเป็นต้องล้างสไตล์และผูกปุ่มใหม่ทั้งชุด
+        // เปลี่ยนฉาก/ขึ้นเรือยังใช้เส้นทาง setControlMode ของเหตุการณ์นั้นตามเดิม
+        if (activeWorldId !== 'pirate-fruit' || panelMode !== previousPanelMode) {
+          setControlMode(activeWorldId);
+        }
+        previousPanelMode = panelMode;
         paintMonsterSkills();
         if (state?.lastFailure && state.lastFailureId !== reportedThrowFailureId) {
           reportedThrowFailure = state.lastFailure;
