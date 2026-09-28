@@ -65,6 +65,14 @@ class CombatTiming:
         async def pose():
             return await game.evaluate('window.POCKETMONSTER_WORLD_STATE?.() || null')
 
+        async def confirm(expression):
+            # evaluate ผ่าน DevTools โดยตรง ไม่ใช้ wait_for_function ที่ eval ชน CSP
+            for _ in range(60):
+                if await scene.evaluate(expression):
+                    return
+                await asyncio.sleep(.25)
+            raise RuntimeError('timing-primary-state-not-confirmed')
+
         async def drag(x, z, duration):
             box = await scene.locator('#joystick').bounding_box()
             if not box:
@@ -109,9 +117,9 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
-            await scene.wait_for_function("document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'ปามอนสเตอร์'")
+            await confirm("document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'ปามอนสเตอร์'")
             await scene.locator('#captureBtn').click(timeout=15000)
-            await scene.wait_for_function("window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots.some(s=>s?.active)")
+            await confirm("window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots.some(s=>s?.active)")
             await phase('combat')
             await asyncio.sleep(5)
             await game.screenshot(path=str(out/'timing-combat.png'))

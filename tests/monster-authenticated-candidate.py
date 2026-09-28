@@ -32,6 +32,8 @@ EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
             'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
             'stage': 'start', 'networkFailures': []}
+if COMBAT_TIMING:
+    GATES['combat-timing-captured'] = 'UNKNOWN'
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
