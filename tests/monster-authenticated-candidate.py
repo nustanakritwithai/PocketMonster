@@ -344,6 +344,15 @@ async def main():
                 await game.screenshot(path=str(OUT / 'primary-selected-throw.png'))
                 separate_hidden = await scene.locator('#monsterThrowBtn').is_hidden()
                 command_start = len(monster_commands)
+                await scene.evaluate("""() => {
+                    window.__qaPrimaryInputs = [];
+                    for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) {
+                        window.addEventListener(type, event => {
+                            if (event.target?.closest?.('#captureBtn'))
+                                window.__qaPrimaryInputs.push({type, trusted:event.isTrusted});
+                        }, {capture:true});
+                    }
+                }""")
                 EVIDENCE['stage'] = 'primary-throw-click'
                 await primary.click(timeout=15000)
                 if not await confirm("""(() => {
@@ -351,6 +360,15 @@ async def main():
                     return !s.pending && s.slots.some(slot => slot?.active)
                         && document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'Recall';
                 })()"""):
+                    EVIDENCE['primaryFailure'] = await scene.evaluate("""() => {
+                        const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                        const text = document.querySelector('#actionReason')?.textContent || '';
+                        return {inputs:window.__qaPrimaryInputs, held:Boolean(s.held), pending:s.pending,
+                            panel:s.controlPanel?.mode, active:s.slots.some(slot=>slot?.active),
+                            available:s.slots[0]?.available,
+                            reason:['aim-unavailable','held-unavailable','control-error','nothing-held',
+                                    'PRESENCE_NOT_READY','ONLINE_SESSION_REQUIRED'].find(reason=>text.includes(reason)) || null};
+                    }""")
                     raise RuntimeError('primary-summon-not-confirmed')
                 await asyncio.sleep(0.5)
                 after = await primary.bounding_box()
