@@ -15,11 +15,16 @@ OUT = Path('authenticated-candidate-evidence')
 ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
 PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
+PRIMARY_THROW_ONLY = os.environ.get('PRIMARY_THROW_ONLY') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
          'healed-bag-ui': 'UNKNOWN', 'revived-summon': 'UNKNOWN',
          'damaged-monster-recovery': 'UNKNOWN'}
+if PRIMARY_THROW_ONLY:
+    GATES = {key: 'UNKNOWN' for key in ('firebase-login', 'launch-redeem',
+             'candidate-scene', 'original-primary-throw', 'single-summon-command',
+             'no-separate-throw-button', 'same-primary-position', 'candidate-assets')}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
             'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
@@ -34,6 +39,10 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
 async def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('โปรแกรมนี้อนุญาตเฉพาะ GitHub runner ไม่ใช่ VPS')
+    if PRIMARY_THROW_ONLY and PRODUCTION_LIVE:
+        raise SystemExit('โหมดคืนปุ่มทดสอบ candidate เท่านั้น')
+    if PRIMARY_THROW_ONLY:
+        EVIDENCE['scope'] = 'original-primary-throw-only-candidate-not-full-e2e'
     if PRODUCTION_LIVE:
         if os.environ.get('GITHUB_REF') != 'refs/heads/main':
             raise SystemExit('ตรวจ production ได้จาก main เท่านั้น')
@@ -77,6 +86,15 @@ async def main():
                 if path.endswith('/redeem') and response.status == 200:
                     GATES['launch-redeem'] = 'SAT'
         context.on('response', response_seen)
+        monster_commands = []
+        def monster_command_sent(request):
+            if request.method == 'POST' and urlsplit(request.url).path == '/api/monsters/command':
+                try:
+                    kind = request.post_data_json.get('kind')
+                    monster_commands.append(kind if kind in ('summon', 'recall', 'switch', 'skill') else 'unknown')
+                except Exception:
+                    monster_commands.append('unknown')
+        context.on('request', monster_command_sent)
         state_reads = []
         state_acks = []
         checkpoint_requests = []
@@ -299,6 +317,47 @@ async def main():
                 raise RuntimeError('canonical-controls-not-ready-after-bag')
             if not await confirm('window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0]?.available === true'):
                 raise RuntimeError('party-not-ready-after-bag-close')
+            if PRIMARY_THROW_ONLY:
+                EVIDENCE['stage'] = 'primary-before-selection'
+                primary = scene.locator('#captureBtn')
+                await primary.wait_for(state='visible')
+                if await primary.get_attribute('aria-label') != 'โจมตี':
+                    raise RuntimeError('original-attack-button-not-ready')
+                await scene.evaluate("window.__qaOriginalPrimary = document.querySelector('#captureBtn')")
+                before = await primary.bounding_box()
+                await game.screenshot(path=str(OUT / 'primary-before-selection.png'))
+                await scene.locator('#monsterSlot1Btn').click(timeout=15000)
+                if not await confirm("document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'ปามอนสเตอร์'"):
+                    raise RuntimeError('primary-did-not-become-throw')
+                selected = await primary.bounding_box()
+                await game.screenshot(path=str(OUT / 'primary-selected-throw.png'))
+                separate_hidden = await scene.locator('#monsterThrowBtn').is_hidden()
+                command_start = len(monster_commands)
+                EVIDENCE['stage'] = 'primary-throw-click'
+                await primary.click(timeout=15000)
+                if not await confirm("""(() => {
+                    const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                    return !s.pending && s.slots.some(slot => slot?.active)
+                        && document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'โจมตี';
+                })()"""):
+                    raise RuntimeError('primary-summon-not-confirmed')
+                await asyncio.sleep(0.5)
+                after = await primary.bounding_box()
+                await game.screenshot(path=str(OUT / 'primary-after-summon.png'))
+                same_node = await scene.evaluate("window.__qaOriginalPrimary === document.querySelector('#captureBtn')")
+                same_box = all(before and box and all(abs(before[k] - box[k]) <= 1 for k in ('x', 'y', 'width', 'height'))
+                               for box in (selected, after))
+                commands = monster_commands[command_start:]
+                EVIDENCE['primaryButton'] = {'id': 'captureBtn', 'sameNode': same_node,
+                    'before': before, 'selected': selected, 'after': after, 'commands': commands}
+                GATES['original-primary-throw'] = 'SAT'
+                GATES['single-summon-command'] = 'SAT' if commands == ['summon'] else 'VIOL'
+                GATES['no-separate-throw-button'] = 'SAT' if separate_hidden and await scene.locator('#monsterThrowBtn').is_hidden() else 'VIOL'
+                GATES['same-primary-position'] = 'SAT' if same_node and same_box else 'VIOL'
+                GATES['candidate-assets'] = 'SAT' if all(EVIDENCE['assets'].get(name) == hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in CRITICAL) else 'VIOL'
+                EVIDENCE['stage'] = 'primary-throw-confirmed'
+                EVIDENCE['visualReview'] = 'UNKNOWN-until-screenshots-inspected'
+                return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
                 raise RuntimeError('throw-button-not-ready')

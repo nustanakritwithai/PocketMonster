@@ -36,6 +36,10 @@ on:
         description: 'ตรวจไฟล์ live จริงหลัง deploy (อนุญาต main เท่านั้น)'
         type: boolean
         default: false
+      primary_throw_only:
+        description: 'ตรวจคืนปุ่มโจมตีเดิมเป็นปาเท่านั้น ไม่รับรอง Recall/Recovery'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -63,6 +67,7 @@ jobs:
         env:
           CANDIDATE_SHA: ${{ github.sha }}
           PRODUCTION_LIVE: ${{ inputs.production_live }}
+          PRIMARY_THROW_ONLY: ${{ inputs.primary_throw_only }}
         run: python tests/monster-authenticated-candidate.py
       - uses: actions/upload-artifact@v4
         if: always()

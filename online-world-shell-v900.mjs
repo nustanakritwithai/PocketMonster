@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=978';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=979';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -21,7 +21,7 @@ import { createMonsterControlController } from './monster-control-controller-v90
 import { createUnifiedMmorpgHud } from './unified-mmorpg-hud-v900.mjs?v=961';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterHttpProvider, mergeMonsterPartyControlState } from './monster-command-http-provider-v900.mjs?v=8';
-import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=4';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=5';
 import { createPirateMonsterInventorySync } from './pirate-monster-inventory-sync.mjs?v=2';
 
 export const ONLINE_WORLD_SHELL_VERSION = '9.0.1-persistent-shell';
@@ -164,7 +164,7 @@ try {
 function sceneUrl(worldId, panelId) {
   const url = new URL(ONLINE_WORLD_SCENE_ENTRY);
   url.search = combinedLocationQuery(worldId, panelId);
-  url.searchParams.set('shellRevision', '95');
+  url.searchParams.set('shellRevision', '96');
   return url.href;
 }
 
