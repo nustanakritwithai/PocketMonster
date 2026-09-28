@@ -40,6 +40,10 @@ on:
         description: 'ตรวจปุ่มเดิม ปา→Recall→โจมตี พร้อม canonical readback'
         type: boolean
         default: false
+      combat_timing:
+        description: 'เก็บเวลารับ snapshot/เฟรมระหว่างต่อสู้ ไม่ใช่รับรองความลื่นมือถือ'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -68,6 +72,7 @@ jobs:
           CANDIDATE_SHA: ${{ github.sha }}
           PRODUCTION_LIVE: ${{ inputs.production_live }}
           PRIMARY_RECALL_ONLY: ${{ inputs.primary_recall_only }}
+          COMBAT_TIMING: ${{ inputs.combat_timing }}
         run: python tests/monster-authenticated-candidate.py
       - uses: actions/upload-artifact@v4
         if: always()

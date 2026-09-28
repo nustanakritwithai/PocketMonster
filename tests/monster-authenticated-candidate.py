@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
+from monster_combat_timing import CombatTiming
 
 ROOT = Path('candidate-artifact/dist-pages').resolve()
 OUT = Path('authenticated-candidate-evidence')
@@ -16,6 +17,7 @@ ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
 PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
 PRIMARY_RECALL_ONLY = os.environ.get('PRIMARY_RECALL_ONLY') == 'true'
+COMBAT_TIMING = os.environ.get('COMBAT_TIMING') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
@@ -38,6 +40,8 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
             'unified-mobile-controls-v900.mjs', 'game-v800.js', 'style-v900.css'}
 
 async def main():
+    if COMBAT_TIMING and not PRIMARY_RECALL_ONLY:
+        raise SystemExit('combat timing ต้องใช้ปุ่ม primary เดิมเท่านั้น')
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('โปรแกรมนี้อนุญาตเฉพาะ GitHub runner ไม่ใช่ VPS')
     if PRIMARY_RECALL_ONLY:
@@ -181,6 +185,7 @@ async def main():
                     EVIDENCE['networkFailures'].append(item)
         context.on('requestfailed', failed_request)
         wild = []
+        timing = CombatTiming() if COMBAT_TIMING else None
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
@@ -197,6 +202,8 @@ async def main():
                         packet = json.loads(payload)
                         world = packet.get('payload', {})
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
+                            if timing:
+                                timing.receive(world)
                             wire_counts['worldSnapshots'] += 1
                             wild = [{'id': a['actorId'], 'x': a['pose']['x'], 'z': a['pose']['z'],
                                      'maxHp': a['authority']['hp']['max']}
@@ -422,6 +429,11 @@ async def main():
                     GATES['production-assets'] = GATES['candidate-assets']
                 EVIDENCE['stage'] = 'primary-recall-confirmed'
                 EVIDENCE['visualReview'] = 'UNKNOWN-until-screenshots-inspected'
+                if timing:
+                    EVIDENCE['stage'] = 'combat-timing'
+                    await timing.run(game, scene, lambda: wild, OUT)
+                    EVIDENCE['combatTiming'] = timing.summary()
+                    GATES['combat-timing-captured'] = 'SAT' if timing.summary()['combatHpChanges'] > 0 else 'UNKNOWN'
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
@@ -716,6 +728,8 @@ async def main():
             if type(error) is RuntimeError and re.fullmatch(r'[a-z]+(?:-[a-z]+){1,14}', str(error)):
                 EVIDENCE['errorCode'] = str(error)
         finally:
+            if timing:
+                EVIDENCE['combatTiming'] = timing.summary()
             if response_tasks:
                 await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
             if PRODUCTION_LIVE:
