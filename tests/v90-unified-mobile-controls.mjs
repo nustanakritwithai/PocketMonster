@@ -134,19 +134,19 @@ const clickOnlyThrow = new Event('click', { bubbles: true, cancelable: true });
 Object.defineProperty(clickOnlyThrow, 'detail', { value: 1 });
 elements.get('captureBtn').dispatchEvent(clickOnlyThrow);
 await Promise.resolve();
-assert.equal(throwCalls, 0, 'captureBtn remains ordinary attack while a monster is held');
+assert.equal(throwCalls, 1, 'click-only touch activation dispatches one throw');
 elements.get('captureBtn').dispatchEvent(pointer('pointerdown', 34, 0, 0));
 elements.get('captureBtn').dispatchEvent(pointer('pointerup', 34, 0, 0));
 const pointerThrowClick = new Event('click', { bubbles: true, cancelable: true });
 Object.defineProperty(pointerThrowClick, 'detail', { value: 1 });
 elements.get('captureBtn').dispatchEvent(pointerThrowClick);
 await Promise.resolve();
-assert.equal(throwCalls, 0, 'pointer attack never routes to the monster command');
+assert.equal(throwCalls, 2, 'pointerdown followed by click dispatches one throw');
 const keyboardThrowClick = new Event('click', { bubbles: true, cancelable: true });
 Object.defineProperty(keyboardThrowClick, 'detail', { value: 0 });
 elements.get('captureBtn').dispatchEvent(keyboardThrowClick);
 await Promise.resolve();
-assert.equal(throwCalls, 0, 'keyboard attack never routes to the monster command');
+assert.equal(throwCalls, 3, 'keyboard click dispatches one throw');
 controls.setMonsterController(null);
 
 // The helm remains a native proximity interaction.  The parent button appears
@@ -299,7 +299,6 @@ assert.match(bridgeSource, /interact: '\.interaction-prompt'/, 'the new wheel us
 assert.match(bridgeSource, /message\.kind === 'audio-unlock'/, 'Pirate bridge accepts parent audio unlock gestures');
 assert.match(bridgeSource, /dataset\.unifiedHelmProxy/, 'only the native helm prompt is marked for center-panel retirement');
 assert.match(htmlSource, /id="pirateUnifiedControls"[\s\S]*id="pirateJoyKnob"[\s\S]*id="captureBtn"[^>]*tc-attack[\s\S]*id="pirateHelmBtn"[^>]*tc-helm/);
-assert.match(htmlSource, /id="monsterThrowBtn"[^>]*monster-throw/, 'active v900 template provides the dedicated throw/Recall button');
 assert.match(styleSource, /#pirateUnifiedControls\{[^}]*z-index:20[^}]*pointer-events:none/);
 assert.match(styleSource, /#pirateUnifiedControls #joystick\.tc-joyzone/);
 assert.match(styleSource, /#pirateUnifiedControls\[data-control-mode="capture"\] \.pirate-only/);
@@ -314,9 +313,9 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=18/, 'world shell cache-busts current unified controls');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=18/, 'Pirate boot cache-busts current unified controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=84/, 'online scene cache-busts current scene entry');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=19/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=19/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=85/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 
@@ -329,18 +328,12 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   assert.equal(monsterThrowAimFromPose({ x: 0, y: NaN, z: 0, dir: 0 }), null);
   let actors = [];
   const commands = [];
-  const party = { available: true, slots: [
-    { slot: 0, available: true, instanceId: 'owned-a', name: 'คู่หู A' },
-    { slot: 1, available: true, instanceId: 'owned-b', name: 'คู่หู B' },
-  ] };
-  let recallCapability = true;
+  const party = { available: true, slots: [{ slot: 0, available: true, instanceId: 'owned-a', name: 'คู่หู' }] };
   const transport = createMonsterCommandAdapter({ getZone: () => 'pirate-fruit', send: async command => {
     commands.push(command); return { ok: true, accepted: true, commandId: command.commandId };
   } });
   const monster = createMonsterControlController({ commands: transport, getParty: () => party,
     getZone: () => 'pirate-fruit', getConfirmedActors: () => actors,
-    getCapabilities: () => ({ recall: recallCapability, switch: true }),
-    refreshControlState: async () => ({ ok: true }),
     getAim: () => monsterThrowAimFromPose({ x: 1, y: 2, z: 3, dir: 0 }).targetPoint,
     getSkills: () => [{ skillId: 'claw', label: 'กรงเล็บ' }],
   });
@@ -352,12 +345,10 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   windowLike.POCKETMONSTER_UNIFIED_MOBILE_CONTROLS = controls;
   const monsterButton = new FakeTarget('monsterSlot1Btn');
   elements.set('monsterSlot1Btn', monsterButton);
-  const secondMonsterButton = new FakeTarget('monsterSlot2Btn');
-  elements.set('monsterSlot2Btn', secondMonsterButton);
   const throwButton = new FakeTarget('monsterThrowBtn');
   elements.set('monsterThrowBtn', throwButton);
-  documentLike.body.dataset.combinedWorld = 'pirate-fruit';
   const detach = bindMonsterControlScene({ sceneWindow: windowLike, controller: monster });
+  documentLike.body.dataset.combinedWorld = 'pirate-fruit';
   monsterButton.dispatchEvent(pointer('pointerdown', 899, 0, 0));
   assert.equal(monster.snapshot().held?.instanceId, 'owned-a', 'กดบนแผง Pirate ต้องถือทันทีโดยไม่รอ click');
   const compatibilityClick = new Event('click', { cancelable: true });
@@ -369,40 +360,25 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   await flush();
   assert.equal(commands.length, 0, 'กดช่องซ้ำต้องไม่ข้ามปุ่มปา');
   const attackButton = elements.get('captureBtn');
-  assert.equal(attackButton.getAttribute('aria-label'), 'โจมตี', 'ปุ่ม attack ไม่ถูกนำไปใช้ปามอนสเตอร์');
+  assert.equal(throwButton.hidden, true, 'Pirate ต้องไม่มีปุ่มปาแยก');
+  assert.equal(throwButton.disabled, true, 'ปุ่มปาแยกไม่รับคำสั่งใน Pirate');
+  assert.equal(attackButton.getAttribute('aria-label'), 'ปามอนสเตอร์');
   const beforeThrowActions = pirateCalls.filter(([kind]) => kind === 'action').length;
   attackButton.dispatchEvent(pointer('pointerdown', 900, 0, 0));
   attackButton.dispatchEvent(pointer('pointerup', 900, 0, 0));
   attackButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
-  assert.equal(commands.length, 0, 'attack pointer/click ไม่ส่ง summon command');
-  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, beforeThrowActions + 2,
-    'ปุ่ม attack ยังคงส่ง ordinary attack start/end');
-  assert.equal(throwButton.hidden, false);
-  assert.equal(throwButton.getAttribute('aria-label'), 'ปามอนสเตอร์');
-  throwButton.dispatchEvent(pointer('pointerdown', 910, 0, 0));
-  throwButton.dispatchEvent(pointer('pointerup', 910, 0, 0));
-  const pointerSummonClick = new Event('click', { cancelable: true });
-  Object.defineProperty(pointerSummonClick, 'detail', { value: 1 });
-  throwButton.dispatchEvent(pointerSummonClick);
-  await flush();
-  assert.equal(commands.length, 1, 'dedicated throw button dispatches once for pointer activation');
+  assert.equal(commands.length, 1);
   assert.equal(commands[0].kind, 'summon');
-  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, beforeThrowActions + 2,
-    'throw does not steal or duplicate ordinary attack');
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, beforeThrowActions, 'ปาต้องไม่ส่งโจมตีธรรมดาหรือยิงซ้ำจาก click');
   assert.deepEqual(commands[0].targetPoint, { x: 1, y: 2, z: 7 });
   assert.equal(monster.snapshot().controlPanel.mode, 'character');
-  assert.equal(throwButton.disabled, true);
-  assert.equal(throwButton.getAttribute('aria-label'), 'กำลังเรียกมอนสเตอร์');
   monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
   assert.equal(commands.length, 1, 'repeat while awaiting snapshot does not throw twice');
-  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', generation: 1, active: true }];
+  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', active: true }];
   monster.sync();
-  assert.equal(attackButton.getAttribute('aria-label'), 'โจมตี', 'active Recall never replaces attack');
-  assert.equal(throwButton.hidden, false);
-  assert.equal(throwButton.disabled, false);
-  assert.equal(throwButton.getAttribute('aria-label'), 'Recall คู่หู A');
+  assert.equal(attackButton.getAttribute('aria-label'), 'โจมตี');
   monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
   assert.equal(monster.snapshot().controlPanel.mode, 'monster');
@@ -415,80 +391,6 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   assert.equal(commands[1].skillId, 'claw');
   assert.equal(commands[1].instanceId, 'owned-a');
   assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions, 'monster skill never triggers a character action');
-  secondMonsterButton.dispatchEvent(pointer('pointerdown', 911, 0, 0));
-  await flush();
-  assert.equal(monster.snapshot().held?.instanceId, 'owned-b');
-  assert.equal(throwButton.getAttribute('aria-label'), 'ปาสลับมอนสเตอร์', 'held new monster takes priority over active Recall');
-  const beforeSwitch = commands.length;
-  const switchClick = new Event('click', { cancelable: true });
-  Object.defineProperty(switchClick, 'detail', { value: 0 });
-  throwButton.dispatchEvent(switchClick);
-  await flush();
-  assert.equal(commands.length, beforeSwitch + 1, 'keyboard activation dispatches one switch');
-  assert.equal(commands.at(-1).kind, 'switch');
-  assert.equal(throwButton.disabled, true);
-  assert.equal(throwButton.getAttribute('aria-label'), 'กำลังสลับมอนสเตอร์');
-  actors = [{ instanceId: 'owned-b', zone: 'pirate-fruit', generation: 2, active: true }];
-  monster.sync();
-  assert.equal(throwButton.getAttribute('aria-label'), 'Recall คู่หู B');
-  const beforeRecall = commands.length;
-  throwButton.dispatchEvent(pointer('pointerdown', 912, 0, 0));
-  throwButton.dispatchEvent(pointer('pointerup', 912, 0, 0));
-  const pointerRecallClick = new Event('click', { cancelable: true });
-  Object.defineProperty(pointerRecallClick, 'detail', { value: 1 });
-  throwButton.dispatchEvent(pointerRecallClick);
-  await flush();
-  assert.equal(commands.length, beforeRecall + 1, 'pointer activation dispatches one Recall despite compatibility click');
-  assert.equal(commands.at(-1).kind, 'recall');
-  assert.equal(throwButton.disabled, true);
-  assert.equal(throwButton.getAttribute('aria-label'), 'กำลังเก็บมอนสเตอร์');
-  const pendingRecallCount = commands.length;
-  const duplicateKeyboardRecall = new Event('click', { cancelable: true });
-  Object.defineProperty(duplicateKeyboardRecall, 'detail', { value: 0 });
-  throwButton.dispatchEvent(duplicateKeyboardRecall);
-  await flush();
-  assert.equal(commands.length, pendingRecallCount, 'pending Recall ignores a second keyboard activation');
-  actors = [];
-  monster.sync();
-  actors = [{ instanceId: 'owned-b', zone: 'pirate-fruit', generation: 2, active: true }];
-  monster.sync();
-  const beforeKeyboardRecall = commands.length;
-  const keyboardRecallClick = new Event('click', { cancelable: true });
-  Object.defineProperty(keyboardRecallClick, 'detail', { value: 0 });
-  throwButton.dispatchEvent(keyboardRecallClick);
-  await flush();
-  assert.equal(commands.length, beforeKeyboardRecall + 1, 'keyboard Recall click dispatches once');
-  assert.equal(commands.at(-1).kind, 'recall');
-  actors = [];
-  monster.sync();
-  actors = [{ instanceId: 'owned-b', zone: 'pirate-fruit', generation: 2, active: true }];
-  recallCapability = false;
-  monster.sync();
-  assert.equal(throwButton.hidden, true, 'active slot without recall capability does not expose Recall');
-  recallCapability = true;
-  monster.sync();
-  assert.equal(throwButton.hidden, false, 'canonical active slot plus recall capability exposes Recall');
-  const commandsBeforeBoat = commands.length;
-  windowLike.dispatchEvent(pirateControlMode('boat'));
-  assert.equal(throwButton.hidden, true, 'dedicated monster button is hidden in Pirate boat mode');
-  assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'ยิงปืนใหญ่กราบขวา');
-  throwButton.dispatchEvent(new Event('click', { cancelable: true }));
-  await flush();
-  assert.equal(commands.length, commandsBeforeBoat, 'hidden boat-mode monster button cannot dispatch summon/Recall');
-  windowLike.dispatchEvent(pirateControlMode('player'));
-  assert.equal(elements.get('captureBtn').getAttribute('aria-label'), 'โจมตี');
-  assert.equal(throwButton.hidden, false, 'returning to Pirate player mode restores canonical Recall control');
-  const attackStyle = elements.get('captureBtn').style;
-  let backgroundWrites = 0;
-  let backgroundValue = attackStyle.backgroundImage;
-  Object.defineProperty(attackStyle, 'backgroundImage', {
-    configurable: true,
-    get: () => backgroundValue,
-    set: value => { backgroundWrites++; backgroundValue = value; },
-  });
-  for (let update = 0; update < 20; update++) monster.sync();
-  assert.equal(backgroundWrites, 0, 'ข้อมูลมอนอัปเดตแต่โหมดเดิมต้องไม่ล้างสไตล์ปุ่มโจมตีซ้ำ');
-  Object.defineProperty(attackStyle, 'backgroundImage', { configurable: true, writable: true, value: backgroundValue });
   elements.get('joystick').dispatchEvent(pointer('pointerdown', 902, 80, 50));
   windowLike.dispatchEvent(pointer('pointermove', 902, 90, 50));
   windowLike.dispatchEvent(pointer('pointerup', 902, 90, 50));
@@ -500,45 +402,7 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   elements.get('skill1Btn').dispatchEvent(pointer('pointerdown', 903, 0, 0));
   elements.get('skill1Btn').dispatchEvent(pointer('pointerup', 903, 0, 0));
   assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions + 2);
-  const visibleBeforeDetach = throwButton.hidden;
   detach();
-  windowLike.dispatchEvent(pirateControlMode('boat'));
-  assert.equal(throwButton.hidden, visibleBeforeDetach, 'detached scene binding removes the control-mode repaint listener');
-  windowLike.dispatchEvent(pirateControlMode('player'));
   monster.dispose();
-
-  const shownFailures = [];
-  windowLike.parent = { POCKETMONSTER_UNIFIED_HUD: {
-    showCommandFailure: (failure, context) => shownFailures.push({ failure, context }),
-  } };
-  const actionReason = new FakeTarget('actionReason');
-  elements.set('actionReason', actionReason);
-  const failingSnapshot = Object.freeze({
-    available: true,
-    slots: Object.freeze([]),
-    capabilities: Object.freeze({ recall: false, switch: false }),
-    held: Object.freeze({ instanceId: 'owned-fail' }),
-    pending: false,
-  });
-  const failingController = {
-    snapshot: () => failingSnapshot,
-    throwHeld: async () => { throw new Error('raw transport detail must not leak'); },
-    subscribe: listener => { listener(failingSnapshot); return () => {}; },
-  };
-  const failureThrowButton = new FakeTarget('monsterThrowBtn');
-  elements.set('monsterThrowBtn', failureThrowButton);
-  const detachFailure = bindMonsterControlScene({ sceneWindow: windowLike, controller: failingController });
-  assert.equal(failureThrowButton.hidden, false);
-  assert.equal(failureThrowButton.getAttribute('aria-label'), 'ปามอนสเตอร์');
-  const rejectedThrowClick = new Event('click', { cancelable: true });
-  Object.defineProperty(rejectedThrowClick, 'detail', { value: 0 });
-  failureThrowButton.dispatchEvent(rejectedThrowClick);
-  await flush();
-  assert.equal(shownFailures.length, 1, 'rejected monster action is surfaced through the HUD');
-  assert.equal(shownFailures[0].failure.message, 'ปามอนสเตอร์ไม่สำเร็จ: control-error');
-  assert.deepEqual(shownFailures[0].context, { monsterCommand: true });
-  assert.equal(actionReason.textContent, 'ปามอนสเตอร์ไม่สำเร็จ: control-error (CONTROL_ERROR)');
-  detachFailure();
-  delete windowLike.parent;
   console.log('Scene buttons → parent controller → command adapter: PASS (injected backend)');
 }

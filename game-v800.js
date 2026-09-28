@@ -7770,7 +7770,7 @@ el('breedingSalonIncubator')?.addEventListener('click',e=>{
 bindMobileNpcSheet(el('ranchServices'),closeRanchSurface);
 bindMobileNpcSheet(el('ranchStoragePage'),closeRanchSurface,el('ranchStoragePage'));
 installPirateMonsterBagButton();
-const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs?v=2');
+const {mountDirectMonsterControls}=await import('./monster-controls-runtime-v900.mjs?v=3');
 mountDirectMonsterControls({windowLike:window,config:runtimeConfig,sessionToken:authProfileBridge.sessionToken});
 document.querySelector('[data-ranch-service="storage"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');showRanchStorageShell({remote:hasOnlineMonsterSession});});
 document.querySelector('[data-ranch-service="heal"]')?.addEventListener('click',()=>{playSFX('sfx_ui_click');healAll();});

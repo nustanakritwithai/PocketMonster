@@ -1,7 +1,7 @@
 import { createMonsterHttpProvider } from './monster-command-http-provider-v900.mjs?v=8';
 import { createMonsterCommandAdapter } from './monster-command-adapter.mjs';
 import { createMonsterControlController } from './monster-control-controller-v900.mjs';
-import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=4';
+import { bindMonsterControlScene, monsterThrowAimFromPose } from './monster-control-scene-binding-v900.mjs?v=5';
 
 // หน้าเกมโดยตรงต้องมีตัวควบคุมด้วย ส่วนฉากฝังให้ shell เป็นเจ้าของต่อไป
 export function mountDirectMonsterControls({ windowLike, config, sessionToken }) {
