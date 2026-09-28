@@ -94,6 +94,7 @@ jobs:
           node tests/v91-combat-artifact.mjs
       - name: ตรวจคำสั่งมอนสเตอร์
         run: |
+          python3 tests/test_monster_combat_timing.py
           node tests/monster-command-adapter.mjs
           node tests/monster-bag-state-provider.mjs
           node tests/pirate-monster-bag-vitals.mjs

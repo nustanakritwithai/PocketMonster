@@ -31,7 +31,7 @@ class CombatTiming:
             if key in self.hp and self.hp[key] != value:
                 changes += 1
             self.hp[key] = value
-        if self.phase != 'setup' and len(self.samples) < 3000:
+        if self.phase not in ('setup', 'complete') and len(self.samples) < 3000:
             self.samples.append({'phase': self.phase, 'gapMs': round(now-self.last, 2) if self.last else None,
                                  'sequence': envelope.get('sequence'), 'freshMessages': fresh,
                                  'hpChanges': changes})
@@ -125,6 +125,8 @@ class CombatTiming:
             await game.screenshot(path=str(out/'timing-combat.png'))
             await asyncio.sleep(10)
         finally:
+            # จบหน้าต่างเดียวกันก่อน teardown/screenshot เพื่อไม่เพิ่ม packet หลังหยุด native probe
+            self.phase = 'complete'
             self.frames = await native.evaluate("""() => {
                 const p=window.__qaCombatTiming;
                 p.active=false; window.removeEventListener('message',p.listener);
