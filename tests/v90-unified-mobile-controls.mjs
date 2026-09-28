@@ -280,6 +280,7 @@ const gameSource = fs.readFileSync(new URL('../game-v800.js', import.meta.url), 
 const bootSource = fs.readFileSync(new URL('../boot-pirate-fruit-v900.mjs', import.meta.url), 'utf8');
 const bridgeSource = fs.readFileSync(new URL('../pirate-fruit-offline/unified-input-bridge-v900.mjs', import.meta.url), 'utf8');
 const styleSource = fs.readFileSync(new URL('../style-v900.css', import.meta.url), 'utf8');
+assert.ok(styleSource.includes('#captureBtn[data-pirate-icon="Recall"]::after{font-size:16px}'), 'Recall ต้องอ่านเต็มในปุ่มเดิมโดยไม่เปลี่ยนขนาดปุ่ม');
 const htmlSource = fs.readFileSync(new URL('../v900.html', import.meta.url), 'utf8');
 const sceneEntrySource = fs.readFileSync(new URL('../scene-entry-v900.mjs', import.meta.url), 'utf8');
 const sceneHtmlSource = fs.readFileSync(new URL('../scene-v900.html', import.meta.url), 'utf8');

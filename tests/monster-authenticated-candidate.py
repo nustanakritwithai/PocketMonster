@@ -25,7 +25,7 @@ if PRIMARY_RECALL_ONLY:
     GATES = {key: 'UNKNOWN' for key in ('firebase-login', 'launch-redeem',
              'candidate-scene', 'original-primary-throw', 'single-summon-command',
              'no-separate-throw-button', 'same-primary-position', 'candidate-assets',
-             'primary-recall', 'recall-readback', 'single-recall-command')}
+             'primary-recall', 'recall-readback', 'single-recall-command', 'recall-label-fits')}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
             'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
@@ -35,7 +35,7 @@ SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/monsters/control-state', '/api/monsters/command',
               '/api/monsters/recover', '/api/pirate/state/operation'}
 CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900.mjs',
-            'unified-mobile-controls-v900.mjs', 'game-v800.js'}
+            'unified-mobile-controls-v900.mjs', 'game-v800.js', 'style-v900.css'}
 
 async def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
@@ -355,6 +355,16 @@ async def main():
                 await asyncio.sleep(0.5)
                 after = await primary.bounding_box()
                 await game.screenshot(path=str(OUT / 'primary-after-summon.png'))
+                label_metrics = await primary.evaluate("""button => {
+                    const style = getComputedStyle(button, '::after');
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+                    return {fontSize: style.fontSize, textWidth: ctx.measureText('Recall').width,
+                            availableWidth: button.clientWidth - 8};
+                }""")
+                EVIDENCE['recallLabel'] = label_metrics
+                GATES['recall-label-fits'] = 'SAT' if label_metrics['textWidth'] <= label_metrics['availableWidth'] else 'VIOL'
                 same_node = await scene.evaluate("window.__qaOriginalPrimary === document.querySelector('#captureBtn')")
                 same_box = all(before and box and all(abs(before[k] - box[k]) <= 1 for k in ('x', 'y', 'width', 'height'))
                                for box in (selected, after))
