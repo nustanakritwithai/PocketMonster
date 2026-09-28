@@ -313,9 +313,9 @@ assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #onlineWorldScene
 assert.match(styleSource, /body\[data-pirate-dialogue="open"\] #pirateUnifiedControls\{[^}]*visibility:hidden/, 'open world overlay hides the parent control surface so close is tappable');
 assert.match(unifiedControlsSource, /mobile-dual-pointer-input-v900\.mjs\?v=10/, 'updated analog handoff bypasses stale mobile caches');
 assert.match(unifiedControlsSource, /controlSurface\.addEventListener\('pointerdown', unlockAudioFromGesture/, 'shared controls unlock audio from the real touch gesture');
-assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=19/, 'world shell cache-busts analog handoff controls');
-assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=19/, 'Pirate boot cache-busts analog handoff controls');
-assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=85/, 'online scene cache-busts analog handoff graph');
+assert.match(worldsSource, /unified-mobile-controls-v900\.mjs\?v=20/, 'world shell cache-busts analog handoff controls');
+assert.match(bootSource, /unified-mobile-controls-v900\.mjs\?v=20/, 'Pirate boot cache-busts analog handoff controls');
+assert.match(sceneHtmlSource, /scene-entry-v900.mjs\?v=86/, 'online scene cache-busts analog handoff graph');
 
 console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
 
@@ -327,12 +327,18 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   assert.deepEqual(monsterThrowAimFromPose({ x: 0, z: 0, dir: 0 }).targetPoint, { x: 0, y: 0, z: 4 });
   assert.equal(monsterThrowAimFromPose({ x: 0, y: NaN, z: 0, dir: 0 }), null);
   let actors = [];
+  let finishRecallReadback;
+  let rejectRecall = false;
   const commands = [];
   const party = { available: true, slots: [{ slot: 0, available: true, instanceId: 'owned-a', name: 'คู่หู' }] };
   const transport = createMonsterCommandAdapter({ getZone: () => 'pirate-fruit', send: async command => {
-    commands.push(command); return { ok: true, accepted: true, commandId: command.commandId };
+    commands.push(command);
+    if (rejectRecall && command.kind === 'recall') return { ok: false, reason: 'server-unavailable', code: 'SERVER_UNAVAILABLE' };
+    return { ok: true, accepted: true, commandId: command.commandId };
   } });
   const monster = createMonsterControlController({ commands: transport, getParty: () => party,
+    getCapabilities: () => ({ recall: true, switch: true }),
+    refreshControlState: () => new Promise(resolve => { finishRecallReadback = resolve; }),
     getZone: () => 'pirate-fruit', getConfirmedActors: () => actors,
     getAim: () => monsterThrowAimFromPose({ x: 1, y: 2, z: 3, dir: 0 }).targetPoint,
     getSkills: () => [{ skillId: 'claw', label: 'กรงเล็บ' }],
@@ -376,9 +382,9 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
   assert.equal(commands.length, 1, 'repeat while awaiting snapshot does not throw twice');
-  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', active: true }];
+  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', active: true, generation: 1 }];
   monster.sync();
-  assert.equal(attackButton.getAttribute('aria-label'), 'โจมตี');
+  assert.equal(attackButton.getAttribute('aria-label'), 'Recall');
   monsterButton.dispatchEvent(new Event('click', { cancelable: true }));
   await flush();
   assert.equal(monster.snapshot().controlPanel.mode, 'monster');
@@ -402,6 +408,40 @@ console.log('V9 Pirate-primary single-HTML mobile controls: PASS');
   elements.get('skill1Btn').dispatchEvent(pointer('pointerdown', 903, 0, 0));
   elements.get('skill1Btn').dispatchEvent(pointer('pointerup', 903, 0, 0));
   assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, playerActions + 2);
+  // Recall ต้องไม่ยิงโจมตี และ ACK อย่างเดียวห้ามคืนปุ่มโจมตี
+  const beforeRecallActions = pirateCalls.filter(([kind]) => kind === 'action').length;
+  attackButton.dispatchEvent(pointer('pointerdown', 904, 0, 0));
+  attackButton.dispatchEvent(pointer('pointerup', 904, 0, 0));
+  attackButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(commands.filter(command => command.kind === 'recall').length, 1);
+  assert.equal(attackButton.getAttribute('aria-label'), 'กำลังเก็บมอนสเตอร์');
+  assert.equal(monster.snapshot().pending, true);
+  attackButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(commands.filter(command => command.kind === 'recall').length, 1, 'กันกดซ้ำระหว่างอ่านกลับ');
+  actors = [];
+  monster.sync();
+  assert.equal(monster.snapshot().pending, true, 'snapshot ก่อน readback ยังไม่ยืนยันเก็บ');
+  finishRecallReadback({ ok: true });
+  await flush();
+  assert.equal(monster.snapshot().pending, false);
+  assert.equal(attackButton.getAttribute('aria-label'), 'โจมตี');
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, beforeRecallActions);
+  assert.equal(throwButton.hidden, true);
+  attackButton.dispatchEvent(pointer('pointerdown', 905, 0, 0));
+  attackButton.dispatchEvent(pointer('pointerup', 905, 0, 0));
+  assert.equal(pirateCalls.filter(([kind]) => kind === 'action').length, beforeRecallActions + 2,
+    'หลังเก็บสำเร็จปุ่มเดิมต้องโจมตีได้จริง');
+  // เก็บล้มเหลวต้องยังเป็น Recall ไม่เปลี่ยน active เอง
+  actors = [{ instanceId: 'owned-a', zone: 'pirate-fruit', active: true, generation: 2 }];
+  monster.sync();
+  rejectRecall = true;
+  attackButton.dispatchEvent(new Event('click', { cancelable: true }));
+  await flush();
+  assert.equal(attackButton.getAttribute('aria-label'), 'Recall');
+  assert.equal(monster.snapshot().slots[0].active, true);
+  assert.equal(commands.filter(command => command.kind === 'recall').length, 2);
   detach();
   monster.dispose();
   console.log('Scene buttons → parent controller → command adapter: PASS (injected backend)');

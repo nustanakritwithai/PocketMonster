@@ -15,16 +15,17 @@ OUT = Path('authenticated-candidate-evidence')
 ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
 PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
-PRIMARY_THROW_ONLY = os.environ.get('PRIMARY_THROW_ONLY') == 'true'
+PRIMARY_RECALL_ONLY = os.environ.get('PRIMARY_RECALL_ONLY') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
          'healed-bag-ui': 'UNKNOWN', 'revived-summon': 'UNKNOWN',
          'damaged-monster-recovery': 'UNKNOWN'}
-if PRIMARY_THROW_ONLY:
+if PRIMARY_RECALL_ONLY:
     GATES = {key: 'UNKNOWN' for key in ('firebase-login', 'launch-redeem',
              'candidate-scene', 'original-primary-throw', 'single-summon-command',
-             'no-separate-throw-button', 'same-primary-position', 'candidate-assets')}
+             'no-separate-throw-button', 'same-primary-position', 'candidate-assets',
+             'primary-recall', 'recall-readback', 'single-recall-command')}
 EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
             'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
@@ -39,10 +40,8 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
 async def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('โปรแกรมนี้อนุญาตเฉพาะ GitHub runner ไม่ใช่ VPS')
-    if PRIMARY_THROW_ONLY and PRODUCTION_LIVE:
-        raise SystemExit('โหมดคืนปุ่มทดสอบ candidate เท่านั้น')
-    if PRIMARY_THROW_ONLY:
-        EVIDENCE['scope'] = 'original-primary-throw-only-candidate-not-full-e2e'
+    if PRIMARY_RECALL_ONLY:
+        EVIDENCE['scope'] = 'primary-throw-recall-candidate-not-full-e2e'
     if PRODUCTION_LIVE:
         if os.environ.get('GITHUB_REF') != 'refs/heads/main':
             raise SystemExit('ตรวจ production ได้จาก main เท่านั้น')
@@ -71,8 +70,18 @@ async def main():
         # เปลี่ยนเฉพาะ asset ภายใน browser นี้ ไม่ intercept คำตอบ API หรือ WebSocket
         if not PRODUCTION_LIVE:
             await context.route(ORIGIN + PREFIX + '**', candidate)
+        recall_probe = {'armed': False, 'ack': False, 'reads': 0}
+        recall_read_requests = set()
         def response_seen(response):
             path = urlsplit(response.url).path
+            if recall_probe['armed'] and path == '/api/monsters/command' and response.status == 200:
+                try:
+                    if response.request.post_data_json.get('kind') == 'recall':
+                        recall_probe['ack'] = True
+                except Exception:
+                    pass
+            if response.request in recall_read_requests and response.status == 200:
+                recall_probe['reads'] += 1
             if urlsplit(response.url).hostname == 'identitytoolkit.googleapis.com' and path.endswith('/accounts:signUp') and response.status == 200:
                 GATES['firebase-login'] = 'SAT'
             if path in SAFE_PATHS:
@@ -88,6 +97,8 @@ async def main():
         context.on('response', response_seen)
         monster_commands = []
         def monster_command_sent(request):
+            if recall_probe['ack'] and request.method == 'GET' and urlsplit(request.url).path == '/api/monsters/control-state':
+                recall_read_requests.add(request)
             if request.method == 'POST' and urlsplit(request.url).path == '/api/monsters/command':
                 try:
                     kind = request.post_data_json.get('kind')
@@ -317,7 +328,7 @@ async def main():
                 raise RuntimeError('canonical-controls-not-ready-after-bag')
             if not await confirm('window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots[0]?.available === true'):
                 raise RuntimeError('party-not-ready-after-bag-close')
-            if PRIMARY_THROW_ONLY:
+            if PRIMARY_RECALL_ONLY:
                 EVIDENCE['stage'] = 'primary-before-selection'
                 primary = scene.locator('#captureBtn')
                 await primary.wait_for(state='visible')
@@ -338,7 +349,7 @@ async def main():
                 if not await confirm("""(() => {
                     const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
                     return !s.pending && s.slots.some(slot => slot?.active)
-                        && document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'โจมตี';
+                        && document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'Recall';
                 })()"""):
                     raise RuntimeError('primary-summon-not-confirmed')
                 await asyncio.sleep(0.5)
@@ -355,7 +366,33 @@ async def main():
                 GATES['no-separate-throw-button'] = 'SAT' if separate_hidden and await scene.locator('#monsterThrowBtn').is_hidden() else 'VIOL'
                 GATES['same-primary-position'] = 'SAT' if same_node and same_box else 'VIOL'
                 GATES['candidate-assets'] = 'SAT' if all(EVIDENCE['assets'].get(name) == hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in CRITICAL) else 'VIOL'
-                EVIDENCE['stage'] = 'primary-throw-confirmed'
+                EVIDENCE['stage'] = 'primary-recall-click'
+                recall_probe['armed'] = True
+                recall_start = len(monster_commands)
+                await primary.click(timeout=15000)
+                if not await confirm("""(() => {
+                    const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
+                    return !s.pending && !s.slots.some(slot => slot?.active)
+                        && document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'โจมตี';
+                })()"""):
+                    raise RuntimeError('primary-recall-not-confirmed')
+                await asyncio.sleep(0.5)
+                recalled = await primary.bounding_box()
+                await game.screenshot(path=str(OUT / 'primary-after-recall.png'))
+                recalled_same_node = await scene.evaluate("window.__qaOriginalPrimary === document.querySelector('#captureBtn')")
+                recall_commands = monster_commands[recall_start:]
+                EVIDENCE['primaryButton'].update({'recalled': recalled, 'recallCommands': recall_commands,
+                                                 'readbacksAfterRecallAck': recall_probe['reads']})
+                GATES['primary-recall'] = 'SAT'
+                GATES['single-recall-command'] = 'SAT' if recall_commands == ['recall'] else 'VIOL'
+                GATES['recall-readback'] = 'SAT' if recall_probe['ack'] and recall_probe['reads'] > 0 else 'VIOL'
+                if not recalled_same_node or not recalled or any(abs(before[k] - recalled[k]) > 1 for k in ('x', 'y', 'width', 'height')):
+                    GATES['same-primary-position'] = 'VIOL'
+                if not await scene.locator('#monsterThrowBtn').is_hidden():
+                    GATES['no-separate-throw-button'] = 'VIOL'
+                if PRODUCTION_LIVE:
+                    GATES['production-assets'] = GATES['candidate-assets']
+                EVIDENCE['stage'] = 'primary-recall-confirmed'
                 EVIDENCE['visualReview'] = 'UNKNOWN-until-screenshots-inspected'
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
