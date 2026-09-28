@@ -158,6 +158,7 @@ html[data-monster-overlay="open"],body[data-monster-overlay="open"] #monsterMana
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn{background-image:none!important}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn>*{visibility:hidden!important}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-btn::after{content:attr(data-pirate-icon);position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:inherit;line-height:1;text-shadow:0 2px 4px #0009}
+#pirateUnifiedControls[data-control-mode="pirate"] #captureBtn[data-pirate-icon="Recall"]::after{font-size:16px}
 #pirateUnifiedControls[data-control-mode="pirate"] .tc-monster:not(.monster-throw)::after{white-space:pre-line;font-size:10px;line-height:1.2;overflow:hidden}
 #pirateUnifiedControls[data-control-mode="capture"] .pirate-only,
 #pirateUnifiedControls[data-control-mode="travel"] .controls-right{display:none!important}

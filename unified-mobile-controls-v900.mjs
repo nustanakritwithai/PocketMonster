@@ -591,9 +591,12 @@ export function createUnifiedMobileControls({
   const monsterPrimaryAction = () => {
     if (activeWorldId !== 'pirate-fruit' || pirateControlMode === 'boat') return null;
     const snapshot = monsterController?.snapshot?.();
-    // คืนปุ่มโจมตีเดิมเป็นปาเฉพาะตอนถือมอนหรือกำลังรอยืนยันการปา
+    // คงเส้นทางปาเดิม; Recall ใช้สถานะ active ที่ controller ยืนยันจากเซิร์ฟเวอร์
     if (snapshot?.held || ['summon', 'switch'].includes(snapshot?.pendingKind)) return 'throw';
-    return null;
+    if (snapshot?.pendingKind === 'recall') return 'recall';
+    return snapshot?.capabilities?.recall === true
+      && snapshot.slots?.some(slot => slot.available === true && slot.active === true && slot.instanceId)
+      ? 'recall' : null;
   };
   const monsterThrowMode = () => monsterPrimaryAction() !== null;
   const paintMonsterThrow = () => {
@@ -611,16 +614,18 @@ export function createUnifiedMobileControls({
     const pending = monsterController.snapshot().pending === true;
     monsterPrimaryPainted = true;
     button.disabled = false;
-    button.setAttribute?.('data-pirate-icon', pending ? '…' : 'ปา');
-    button.setAttribute?.('aria-label', pending ? 'กำลังเรียกมอนสเตอร์' : 'ปามอนสเตอร์');
+    button.setAttribute?.('data-pirate-icon', pending ? '…' : action === 'recall' ? 'Recall' : 'ปา');
+    button.setAttribute?.('aria-label', pending
+      ? (action === 'recall' ? 'กำลังเก็บมอนสเตอร์' : 'กำลังเรียกมอนสเตอร์')
+      : action === 'recall' ? 'Recall' : 'ปามอนสเตอร์');
     button.setAttribute?.('aria-disabled', String(pending));
     if (button.style?.backgroundImage) button.style.backgroundImage = '';
   };
-  const reportThrowFailure = result => {
+  const reportThrowFailure = (result, action = 'throw') => {
     const failureResult = result && typeof result === 'object'
       ? result
       : { ok: false, reason: 'control-error', code: 'CONTROL_ERROR' };
-    const message = `ปามอนสเตอร์ไม่สำเร็จ: ${failureResult.reason || failureResult.code || 'SERVER_UNAVAILABLE'}`;
+    const message = `${action === 'recall' ? 'เก็บมอนสเตอร์ไม่สำเร็จ' : 'ปามอนสเตอร์ไม่สำเร็จ'}: ${failureResult.reason || failureResult.code || 'SERVER_UNAVAILABLE'}`;
     const failure = { ...failureResult, ok: false, message };
     if (activeWorldId === 'pirate-fruit') {
       try {
@@ -667,16 +672,19 @@ export function createUnifiedMobileControls({
   };
   const throwMonster = async () => {
     if (monsterActionInFlight) return;
+    const action = monsterPrimaryAction();
     if (monsterController?.snapshot?.()?.pending) {
-      reportThrowFailure({ ok: false, reason: 'summon-pending', code: 'SUMMON_PENDING' });
+      reportThrowFailure({ ok: false, reason: 'summon-pending', code: 'SUMMON_PENDING' }, action);
       return;
     }
     try {
       monsterActionInFlight = true;
-      const result = await monsterController?.throwHeld?.();
-      if (!result || result.ok === false) reportThrowFailure(result);
+      const result = action === 'recall'
+        ? await monsterController?.recallActive?.()
+        : await monsterController?.throwHeld?.();
+      if (!result || result.ok === false) reportThrowFailure(result, action);
     } catch (error) {
-      reportThrowFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' });
+      reportThrowFailure({ ok: false, reason: error?.code || 'control-error', code: 'CONTROL_ERROR' }, action);
     } finally {
       monsterActionInFlight = false;
     }

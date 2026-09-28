@@ -3,10 +3,10 @@ import fs from 'node:fs';
 
 const mobileSource = fs.readFileSync(new URL('../unified-mobile-controls-v900.mjs', import.meta.url), 'utf8');
 const hudSource = fs.readFileSync(new URL('../unified-mmorpg-hud-v900.mjs', import.meta.url), 'utf8');
-const start = mobileSource.indexOf('const reportThrowFailure = result => {');
+const start = mobileSource.indexOf("const reportThrowFailure = (result, action = 'throw') => {");
 const end = mobileSource.indexOf('\n  const monsterSkillPanel', start);
 assert.ok(start >= 0 && end > start);
-const throwMonster = new Function('activeWorldId', 'monsterController', 'windowLike', 'documentLike', `let monsterActionInFlight = false; ${mobileSource.slice(start, end)}; return throwMonster;`);
+const throwMonster = new Function('activeWorldId', 'monsterController', 'windowLike', 'documentLike', `let monsterActionInFlight = false; const monsterPrimaryAction = () => 'throw'; ${mobileSource.slice(start, end)}; return throwMonster;`);
 const skillStart = mobileSource.indexOf('const reportSkillFailure = result => {');
 const skillEnd = mobileSource.indexOf('\n  const throwMonster = async () => {', skillStart);
 assert.ok(skillStart >= 0 && skillEnd > skillStart);
@@ -21,6 +21,10 @@ const failure = { ok: false, reason: 'presence-not-ready', code: 'PRESENCE_NOT_R
 await throwMonster('pirate-fruit', { snapshot: () => ({ pending: false }), throwHeld: async () => failure }, pirateWindow, documentLike)();
 assert.equal(shown.message, 'ปามอนสเตอร์ไม่สำเร็จ: presence-not-ready');
 assert.equal(local.textContent, 'ปามอนสเตอร์ไม่สำเร็จ: presence-not-ready (PRESENCE_NOT_READY)', 'Pirate also leaves a local status for hidden HUD layouts');
+
+const recallMonster = new Function('activeWorldId', 'monsterController', 'windowLike', 'documentLike', `let monsterActionInFlight = false; const monsterPrimaryAction = () => 'recall'; ${mobileSource.slice(start, end)}; return throwMonster;`);
+await recallMonster('pirate-fruit', { snapshot: () => ({ pending: false }), recallActive: async () => failure }, pirateWindow, documentLike)();
+assert.equal(shown.message, 'เก็บมอนสเตอร์ไม่สำเร็จ: presence-not-ready', 'Recall ล้มเหลวต้องไม่รายงานเป็นปาล้มเหลว');
 
 shown = null;
 await throwMonster('pirate-fruit', { snapshot: () => ({ pending: false }), throwHeld: async () => failure }, { parent: {} }, documentLike)();
