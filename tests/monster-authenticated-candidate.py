@@ -193,7 +193,10 @@ async def main():
             def observe_socket(socket):
                 def sent(payload):
                     try:
-                        if json.loads(payload).get('type') == 'world-pos':
+                        packet = json.loads(payload)
+                        if timing:
+                            timing.sent(packet)
+                        if packet.get('type') == 'world-pos':
                             wire_counts['worldPoseSends'] += 1
                     except (ValueError, TypeError):
                         pass

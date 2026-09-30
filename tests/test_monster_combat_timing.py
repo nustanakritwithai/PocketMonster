@@ -4,6 +4,16 @@ from monster_combat_timing import CombatTiming
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_attack_probe_records_intent_not_tokens_or_other_players(self):
+        probe = CombatTiming()
+        probe.phase = 'combat'
+        probe.sent({'token': 'never-log-this'})
+        probe.sent({'type': 'world-pos', 'x': 1, 'z': 2, 'token': 'never-log-this',
+                    'monsterIntents': [{'sequence': 9, 'targetActorId': 'monster:starter-crab-1', 'category': 'style'}]})
+        self.assertEqual(len(probe.timeline), 1)
+        self.assertEqual(probe.timeline[0]['sequence'], 9)
+        self.assertNotIn('never-log-this', str(probe.summary()))
+
     async def test_replayed_history_is_not_fresh_damage(self):
         probe = CombatTiming()
         probe.phase = 'combat'

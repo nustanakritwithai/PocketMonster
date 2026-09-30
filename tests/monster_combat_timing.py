@@ -14,6 +14,24 @@ class CombatTiming:
         self.seen = set()
         self.hp = {}
         self.profiles = {}
+        self.timeline = []
+        self.attack_sequence = 0
+
+    def record(self, kind, **values):
+        if len(self.timeline) < 4000:
+            self.timeline.append({'kind': kind, 'phase': self.phase,
+                'atMs': round(asyncio.get_running_loop().time()*1000, 2), **values})
+
+    def sent(self, packet):
+        if packet.get('type') != 'world-pos':
+            return
+        for intent in packet.get('monsterIntents') or []:
+            self.attack_sequence += 1
+            target = intent.get('targetActorId', '')
+            self.record('socket-intent', number=self.attack_sequence,
+                sequence=intent.get('sequence'), targeted=target.startswith('monster:'),
+                target=target if re.fullmatch(r'monster:[a-z0-9-]{1,70}', target) else None,
+                category=intent.get('category'), x=packet.get('x'), z=packet.get('z'))
 
     def receive(self, world):
         now = asyncio.get_running_loop().time() * 1000
@@ -32,6 +50,9 @@ class CombatTiming:
             value = actor.get('authority', {}).get('hp', {}).get('current')
             if key in self.hp and self.hp[key] != value:
                 changes += 1
+                if isinstance(key, str) and re.fullmatch(r'monster:[a-z0-9-]{1,70}', key):
+                    self.record('socket-hp', target=key, before=self.hp[key], hp=value,
+                                sequence=envelope.get('sequence'))
             self.hp[key] = value
         if self.phase not in ('setup', 'complete') and len(self.samples) < 3000:
             self.samples.append({'phase': self.phase, 'gapMs': round(now-self.last, 2) if self.last else None,
@@ -60,13 +81,27 @@ class CombatTiming:
             raise RuntimeError('timing-native-frame-missing')
         # เก็บเฉพาะตัวเลข ไม่เก็บ URL/token/payload; ไม่แทนที่ WebSocket หรือ handler เกม
         await native.evaluate("""() => {
-            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], active:true};
+            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], active:true};
+            const combat=window.__combat;
+            p.originalHit=combat?.onSharedMonsterAttack;
+            if(typeof p.originalHit==='function') {
+                p.observedHit=function(info) {
+                    if(p.hits.length<400) p.hits.push({phase:p.phase,at:performance.now(),
+                        x:info.origin?.x,z:info.origin?.z,range:info.range,
+                        forwardX:info.forwardX,forwardZ:info.forwardZ,kind:info.kind,
+                        targets:(window.__sharedMonsterActors?.()||[]).filter(a=>a.actorId?.startsWith('monster:'))
+                            .map(a=>({id:a.actorId,x:a.pose?.x,z:a.pose?.z})).slice(0,24)});
+                    return p.originalHit.apply(this,arguments);
+                };
+                combat.onSharedMonsterAttack=p.observedHit;
+            }
             const seen = new Set();
             let pendingEvents=0, oldestEvent=null;
             let last=performance.now();
             const frame=now=>{
                 if(!p.active) return;
                 if(p.frames.length<5000) p.frames.push({phase:p.phase,gapMs:now-last,
+                    at:now,state:window.__combat?.state,
                     eventsSinceFrame:pendingEvents,eventWaitMs:oldestEvent===null?0:performance.now()-oldestEvent});
                 pendingEvents=0; oldestEvent=null;
                 last=now; requestAnimationFrame(frame);
@@ -84,7 +119,9 @@ class CombatTiming:
                 }
                 if(seen.size>8192) seen.clear();
                 if(w && p.messages.length<3000) p.messages.push({phase:p.phase,
-                    at:performance.now(),sequence:w.sequence,count:w.messages?.length||0});
+                    at:performance.now(),sequence:w.sequence,count:w.messages?.length||0,
+                    hp:(e.data?.payload?.actors||[]).filter(a=>a.actorId?.startsWith('monster:'))
+                        .map(a=>({id:a.actorId,hp:a.authority?.hp?.current})).slice(0,24)});
             };
             window.addEventListener('message',p.listener);
         }""")
@@ -134,6 +171,18 @@ class CombatTiming:
             finally:
                 await game.mouse.up()
 
+        async def attack(name, count, delay):
+            await phase(name)
+            for _ in range(count):
+                current = await pose()
+                target = next((a for a in get_wild() if a['id']=='monster:starter-boss-north'), None)
+                self.record('input-before', x=current.get('x') if current else None,
+                    z=current.get('z') if current else None,
+                    distance=math.hypot(target['x']-current['x'],target['z']-current['z']) if target and current else None)
+                await scene.locator('#captureBtn').click(timeout=10000)
+                self.record('input-after')
+                await asyncio.sleep(delay)
+
         try:
             await measure('idle', 5)
             await phase('capture')
@@ -150,6 +199,7 @@ class CombatTiming:
                 raise RuntimeError('timing-joystick-movement-not-observed')
             rx, rz = dx/length, dz/length
             reached = False
+            approach_tested = False
             for _ in range(90):
                 target = next((a for a in get_wild() if a['id']=='monster:starter-boss-north'), None)
                 if not target:
@@ -157,18 +207,22 @@ class CombatTiming:
                 current = await pose()
                 dx, dz = target['x']-current['x'], target['z']-current['z']
                 distance = math.hypot(dx, dz)
-                if distance < 3:
+                if distance < 6 and not approach_tested:
+                    approach_tested = True
+                    await attack('approach-attack', 3, .35)
+                    await phase('approach')
+                if distance < 1.5:
                     reached = True
                     break
                 await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
                            min(.5, max(.12, distance/8)))
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
-            await scene.locator('#monsterSlot1Btn').click(timeout=15000)
-            await confirm("document.querySelector('#captureBtn')?.getAttribute('aria-label') === 'ปามอนสเตอร์'")
-            await scene.locator('#captureBtn').click(timeout=15000)
-            await confirm("window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot().slots.some(s=>s?.active)")
-            await measure('combat', 15)
+            # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
+            await attack('combat', 8, .6)
+            await attack('rapid', 12, .12)
+            await phase('settle')
+            await asyncio.sleep(3)
             await phase('capture')
             await game.screenshot(path=str(out/'timing-combat.png'))
         finally:
@@ -178,7 +232,9 @@ class CombatTiming:
             self.frames = await native.evaluate("""() => {
                 const p=window.__qaCombatTiming;
                 p.active=false; window.removeEventListener('message',p.listener);
-                return {frames:p.frames,messages:p.messages};
+                if(window.__combat?.onSharedMonsterAttack===p.observedHit)
+                    window.__combat.onSharedMonsterAttack=p.originalHit;
+                return {frames:p.frames,messages:p.messages,hits:p.hits};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
 
@@ -186,4 +242,5 @@ class CombatTiming:
         return {'scope':'runner-swiftshader-not-mobile-render-proof',
                 'profiles':self.profiles,
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
+                'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
                 'combatHpChanges':sum(s['hpChanges'] for s in self.samples if s['phase']=='combat')}
