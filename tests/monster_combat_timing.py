@@ -16,6 +16,7 @@ class CombatTiming:
         self.profiles = {}
         self.timeline = []
         self.attack_sequence = 0
+        self.clock_samples = []
 
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
@@ -86,8 +87,15 @@ class CombatTiming:
             raise RuntimeError('timing-native-frame-missing')
         # เก็บเฉพาะตัวเลข ไม่เก็บ URL/token/payload; ไม่แทนที่ WebSocket หรือ handler เกม
         await native.evaluate("""() => {
-            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], active:true};
+            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], inputs:[], active:true};
             const combat=window.__combat;
+            p.pointer=e=>{
+                if(e.target?.closest?.('.tc-attack') && p.inputs.length<400)
+                    p.inputs.push({phase:p.phase,at:performance.now(),type:e.type,
+                        state:combat?.state,timer:combat?.swing?.timer??null});
+            };
+            document.addEventListener('pointerdown',p.pointer,true);
+            document.addEventListener('pointerup',p.pointer,true);
             p.originalHit=combat?.onSharedMonsterAttack;
             if(typeof p.originalHit==='function') {
                 p.observedHit=function(info) {
@@ -106,7 +114,7 @@ class CombatTiming:
             const frame=now=>{
                 if(!p.active) return;
                 if(p.frames.length<5000) p.frames.push({phase:p.phase,gapMs:now-last,
-                    at:now,state:window.__combat?.state,
+                    at:now,state:window.__combat?.state,timer:combat?.swing?.timer??null,
                     eventsSinceFrame:pendingEvents,eventWaitMs:oldestEvent===null?0:performance.now()-oldestEvent});
                 pendingEvents=0; oldestEvent=null;
                 last=now; requestAnimationFrame(frame);
@@ -132,7 +140,10 @@ class CombatTiming:
         }""")
         async def phase(name):
             self.phase = name
-            await native.evaluate('(name)=>{window.__qaCombatTiming.phase=name}', name)
+            before = asyncio.get_running_loop().time()*1000
+            clock = await native.evaluate('(name)=>{window.__qaCombatTiming.phase=name;return performance.now()}', name)
+            after = asyncio.get_running_loop().time()*1000
+            self.clock_samples.append({'phase':name,'nativeMs':clock,'hostBeforeMs':before,'hostAfterMs':after})
 
         cdp = await game.context.new_cdp_session(game)
         await cdp.send('Profiler.enable')
@@ -227,7 +238,7 @@ class CombatTiming:
                     approach_tested = True
                     await attack('approach-attack', 3, .35)
                     await phase('approach')
-                if distance < 1.5:
+                if distance < 2.6:
                     reached = True
                     break
                 await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
@@ -248,9 +259,11 @@ class CombatTiming:
             self.frames = await native.evaluate("""() => {
                 const p=window.__qaCombatTiming;
                 p.active=false; window.removeEventListener('message',p.listener);
+                document.removeEventListener('pointerdown',p.pointer,true);
+                document.removeEventListener('pointerup',p.pointer,true);
                 if(window.__combat?.onSharedMonsterAttack===p.observedHit)
                     window.__combat.onSharedMonsterAttack=p.originalHit;
-                return {frames:p.frames,messages:p.messages,hits:p.hits};
+                return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
 
@@ -259,4 +272,5 @@ class CombatTiming:
                 'profiles':self.profiles,
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
                 'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
+                'clockSamples':self.clock_samples,
                 'combatHpChanges':sum(s['hpChanges'] for s in self.samples if s['phase']=='combat')}
