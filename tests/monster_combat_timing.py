@@ -76,7 +76,12 @@ class CombatTiming:
                 for k, v in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:40]]
 
     async def run(self, game, scene, get_wild, out):
-        native = next((f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')), None)
+        natives = [f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')]
+        native = None
+        for frame in natives:
+            if await (await frame.frame_element()).is_visible():
+                native = frame
+                break
         if not native:
             raise RuntimeError('timing-native-frame-missing')
         # เก็บเฉพาะตัวเลข ไม่เก็บ URL/token/payload; ไม่แทนที่ WebSocket หรือ handler เกม
@@ -148,7 +153,10 @@ class CombatTiming:
                                 ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
 
         async def pose():
-            return await game.evaluate('window.POCKETMONSTER_WORLD_STATE?.() || null')
+            return await native.evaluate('''() => {
+                const p=window.__combat?.controller?.position;
+                return p ? {x:p.x,z:p.z} : null;
+            }''')
 
         async def confirm(expression):
             # evaluate ผ่าน DevTools โดยตรง ไม่ใช้ wait_for_function ที่ eval ชน CSP
@@ -179,7 +187,15 @@ class CombatTiming:
                 self.record('input-before', x=current.get('x') if current else None,
                     z=current.get('z') if current else None,
                     distance=math.hypot(target['x']-current['x'],target['z']-current['z']) if target and current else None)
-                await scene.locator('#captureBtn').click(timeout=10000)
+                button = scene.locator('#captureBtn')
+                state = await button.evaluate('''b => ({disabled:b.disabled,
+                    ariaDisabled:b.getAttribute('aria-disabled'),reason:b.getAttribute('data-reason')})''')
+                self.record('button-state', **state)
+                box = await button.bounding_box()
+                if not box or state['disabled']:
+                    raise RuntimeError('timing-attack-actually-disabled')
+                # คลิกพิกัดจริง ไม่ลบdisabled ไม่force และไม่เรียกcombat APIแทนผู้เล่น
+                await game.mouse.click(box['x']+box['width']/2, box['y']+box['height']/2, delay=100)
                 self.record('input-after')
                 await asyncio.sleep(delay)
 
