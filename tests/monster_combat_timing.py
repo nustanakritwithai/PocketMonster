@@ -76,7 +76,8 @@ class CombatTiming:
         if self.vitals and generation == self.vitals['generation'] and revision < self.vitals['revision']:
             return
         sample = {'phase': self.phase, 'revision': revision, 'hp': hp, 'dead': dead,
-                  'respawnRevision': respawn_revision, 'generation': generation}
+                  'respawnRevision': respawn_revision, 'generation': generation,
+                  'atMs': round(asyncio.get_running_loop().time()*1000, 2)}
         self.vitals = sample
         if self.life_baseline is not None and self.phase not in ('setup', 'complete'):
             if len(self.life_events) < 3000:
@@ -378,10 +379,9 @@ class CombatTiming:
                 self.life_baseline = dict(self.vitals)
                 if await attack('combat', 1, .25):
                     await wait_damage('combat')
-                    await phase('settle')
-                    await asyncio.sleep(.5)
                     self.require_same_life()
-                    await game.screenshot(path=str(out/'timing-first-strike.png'))
+                    # ไม่หยุดถ่ายภาพกลางต่อสู้: runner capture ใช้หลายวินาทีจนตัวละครตายก่อนถอย
+                    # เก็บ trace ต่อเนื่องและภาพหลังจบ/หยุดแทน ไม่เปลี่ยนกฎหรือนาฬิกาของเกม
                     await phase('retreat')
                     escaped = False
                     for _ in range(16):
@@ -400,7 +400,6 @@ class CombatTiming:
                         await steer(current, dx, dz, .3)
                     if not escaped:
                         raise RuntimeError('timing-retreat-not-observed')
-                    await game.screenshot(path=str(out/'timing-retreat.png'))
                     await phase('reapproach')
                     returned = False
                     for _ in range(90):
