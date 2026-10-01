@@ -1,9 +1,17 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming
+import math
+from monster_combat_timing import CombatTiming, movement_input
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_joystick_mapping_uses_current_camera_not_old_basis(self):
+        for yaw in (0, math.pi/2, math.pi, -.7):
+            ix, iz = movement_input(3, 4, yaw)
+            self.assertAlmostEqual(ix*math.cos(yaw)+iz*math.sin(yaw), .6)
+            self.assertAlmostEqual(-ix*math.sin(yaw)+iz*math.cos(yaw), .8)
+        self.assertEqual(movement_input(0, 0, 1), (0, 0))
+
     async def test_capture_requires_damage_to_target_after_intent(self):
         probe = CombatTiming()
         probe.phase = 'combat'

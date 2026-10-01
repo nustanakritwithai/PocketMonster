@@ -5,6 +5,14 @@ import re
 from urllib.parse import urlsplit
 
 
+def movement_input(dx, dz, yaw):
+    distance = math.hypot(dx, dz)
+    if distance < .0001:
+        return 0, 0
+    return ((dx*math.cos(yaw)-dz*math.sin(yaw))/distance,
+            (dx*math.sin(yaw)+dz*math.cos(yaw))/distance)
+
+
 class CombatTiming:
     def __init__(self, reentry=False):
         self.phase = 'setup'
@@ -187,8 +195,10 @@ class CombatTiming:
 
         async def pose():
             return await native.evaluate('''() => {
-                const p=window.__combat?.controller?.position;
-                return p ? {x:p.x,z:p.z} : null;
+                const c=window.__combat?.controller;
+                const p=c?.position;
+                const yaw=typeof c?.getCameraYaw==='function'?c.getCameraYaw():null;
+                return p ? {x:p.x,z:p.z,cameraYaw:Number.isFinite(yaw)?yaw:null} : null;
             }''')
 
         async def confirm(expression):
@@ -269,6 +279,13 @@ class CombatTiming:
             if length < .03:
                 raise RuntimeError('timing-joystick-movement-not-observed')
             rx, rz = dx/length, dz/length
+            async def steer(current, dx, dz, duration):
+                # จอยอิงมุมกล้องปัจจุบัน ไม่ใช้ basis ก่อนต่อสู้/respawn ตลอด scenario
+                yaw = current.get('cameraYaw')
+                if not isinstance(yaw, (int,float)):
+                    yaw = math.atan2(-rz, rx)
+                ix, iz = movement_input(dx, dz, yaw)
+                await drag(ix, iz, duration)
             reached = False
             for _ in range(90):
                 target = next((a for a in get_wild() if a['id']==target_id), None)
@@ -281,8 +298,7 @@ class CombatTiming:
                 if distance < 2.3:
                     reached = True
                     break
-                await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
-                           min(.5, max(.12, distance/8)))
+                await steer(current, dx, dz, min(.5, max(.12, distance/8)))
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
@@ -307,13 +323,13 @@ class CombatTiming:
                             break
                         if distance < .05:
                             dx, dz, distance = rx, rz, 1
-                        await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance, .3)
+                        await steer(current, dx, dz, .3)
                     if not escaped:
                         raise RuntimeError('timing-retreat-not-observed')
                     await game.screenshot(path=str(out/'timing-retreat.png'))
                     await phase('reapproach')
                     returned = False
-                    for _ in range(40):
+                    for _ in range(90):
                         target = next((a for a in get_wild() if a['id']==target_id), None)
                         current = await pose()
                         if not target or not current:
@@ -324,8 +340,7 @@ class CombatTiming:
                         if distance < 2.3:
                             returned = True
                             break
-                        await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
-                            min(.3, max(.12, distance/8)))
+                        await steer(current, dx, dz, min(.3, max(.12, distance/8)))
                     if not returned:
                         raise RuntimeError('timing-reentry-not-reached')
                     if await attack('reentry', 1, .25):
