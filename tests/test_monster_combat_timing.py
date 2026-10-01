@@ -30,9 +30,49 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe.sent({'token': 'never-log-this'})
         probe.sent({'type': 'world-pos', 'x': 1, 'z': 2, 'token': 'never-log-this',
                     'monsterIntents': [{'sequence': 9, 'targetActorId': 'monster:starter-crab-1', 'category': 'style'}]})
-        self.assertEqual(len(probe.timeline), 1)
-        self.assertEqual(probe.timeline[0]['sequence'], 9)
+        intents = [e for e in probe.timeline if e['kind'] == 'socket-intent']
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]['sequence'], 9)
         self.assertNotIn('never-log-this', str(probe.summary()))
+
+    async def test_pose_and_socket_lifecycle_are_bounded_without_payloads(self):
+        probe = CombatTiming(reentry=True)
+        probe.phase = 'approach'
+        probe.sent({'type':'world-pos', 'x':1, 'z':2, 'token':'secret', 'username':'private'})
+        self.assertEqual(probe.timeline[0]['kind'], 'socket-pose')
+        for _ in range(300):
+            probe.socket_event('close', 1)
+        self.assertEqual(len(probe.socket_events), 256)
+        self.assertNotIn('secret', str(probe.summary()))
+        self.assertNotIn('private', str(probe.summary()))
+
+    async def test_reentry_needs_two_separate_targeted_damage_windows(self):
+        probe = CombatTiming(reentry=True)
+        probe.phase = 'combat'
+        probe.sent({'type':'world-pos', 'monsterIntents':[{'targetActorId':'monster:crab','sequence':1}]})
+        probe.timeline[-1]['atMs'] = 1
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        probe.timeline[-1]['atMs'] = 2
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+        probe.phase = 'reentry'
+        probe.sent({'type':'world-pos', 'monsterIntents':[{'targetActorId':'monster:crab','sequence':2}]})
+        probe.timeline[-1]['atMs'] = 3
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=58, hp=46)
+        probe.timeline[-1]['atMs'] = 4
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'SAT')
+        probe.stop_reason = 'target-out-of-range'
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+
+    async def test_delayed_first_damage_does_not_prove_reentry(self):
+        probe = CombatTiming(reentry=True)
+        for phase, sequence in [('combat',1), ('reentry',2)]:
+            probe.phase = phase
+            probe.sent({'type':'world-pos','monsterIntents':[{'targetActorId':'monster:crab','sequence':sequence}]})
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
 
     async def test_replayed_history_is_not_fresh_damage(self):
         probe = CombatTiming()

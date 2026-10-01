@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 
 class CombatTiming:
-    def __init__(self):
+    def __init__(self, reentry=False):
         self.phase = 'setup'
         self.samples = []
         self.frames = []
@@ -18,6 +18,16 @@ class CombatTiming:
         self.attack_sequence = 0
         self.clock_samples = []
         self.stop_reason = None
+        self.reentry = reentry
+        self.socket_events = []
+
+    def socket_event(self, kind, connection):
+        # ไม่เก็บ URL, token, error payload หรือชื่อผู้เล่น
+        if kind not in ('open', 'close', 'error'):
+            return
+        if len(self.socket_events) < 256:
+            self.socket_events.append({'kind': kind, 'connection': connection,
+                'phase': self.phase, 'atMs': round(asyncio.get_running_loop().time()*1000, 2)})
 
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
@@ -27,6 +37,9 @@ class CombatTiming:
     def sent(self, packet):
         if packet.get('type') != 'world-pos':
             return
+        if self.phase in ('approach', 'combat', 'retreat', 'reapproach', 'reentry', 'settle'):
+            self.record('socket-pose', x=packet.get('x'), z=packet.get('z'),
+                locomotion=packet.get('locomotion'), intentCount=len(packet.get('monsterIntents') or []))
         for intent in packet.get('monsterIntents') or []:
             self.attack_sequence += 1
             target = intent.get('targetActorId', '')
@@ -146,6 +159,13 @@ class CombatTiming:
             clock = await native.evaluate('(name)=>{window.__qaCombatTiming.phase=name;return performance.now()}', name)
             after = asyncio.get_running_loop().time()*1000
             self.clock_samples.append({'phase':name,'nativeMs':clock,'hostBeforeMs':before,'hostAfterMs':after})
+            diagnostics = await scene.evaluate('''() => {
+                const d=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
+                return d ? {socketGeneration:d.socketGeneration,socketReadyState:d.socketReadyState,
+                    reconnectPending:d.reconnectPending,worldConnected:d.worldConnected,
+                    paused:d.paused,stopped:d.stopped,snapshots:d.worldPresence?.acceptedSnapshots} : null;
+            }''')
+            self.record('transport-state', observation=diagnostics)
 
         cdp = await game.context.new_cdp_session(game)
         await cdp.send('Profiler.enable')
@@ -249,7 +269,49 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
-            if await attack('combat', 2, .25):
+            if self.reentry:
+                if await attack('combat', 1, .25):
+                    await phase('settle')
+                    await asyncio.sleep(.5)
+                    await game.screenshot(path=str(out/'timing-first-strike.png'))
+                    await phase('retreat')
+                    escaped = False
+                    for _ in range(16):
+                        target = next((a for a in get_wild() if a['id']==target_id), None)
+                        current = await pose()
+                        if not target or not current:
+                            raise RuntimeError('timing-reentry-target-or-pose-missing')
+                        dx, dz = current['x']-target['x'], current['z']-target['z']
+                        distance = math.hypot(dx, dz)
+                        self.record('retreat-distance', distance=distance)
+                        if distance >= 6:
+                            escaped = True
+                            break
+                        if distance < .05:
+                            dx, dz, distance = rx, rz, 1
+                        await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance, .3)
+                    if not escaped:
+                        raise RuntimeError('timing-retreat-not-observed')
+                    await game.screenshot(path=str(out/'timing-retreat.png'))
+                    await phase('reapproach')
+                    returned = False
+                    for _ in range(40):
+                        target = next((a for a in get_wild() if a['id']==target_id), None)
+                        current = await pose()
+                        if not target or not current:
+                            raise RuntimeError('timing-reentry-target-or-pose-missing')
+                        dx, dz = target['x']-current['x'], target['z']-current['z']
+                        distance = math.hypot(dx, dz)
+                        self.record('reapproach-distance', distance=distance)
+                        if distance < 2.3:
+                            returned = True
+                            break
+                        await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
+                            min(.3, max(.12, distance/8)))
+                    if not returned:
+                        raise RuntimeError('timing-reentry-not-reached')
+                    await attack('reentry', 1, .25)
+            elif await attack('combat', 2, .25):
                 await attack('rapid', 4, .12)
             await phase('settle')
             await asyncio.sleep(3)
@@ -271,6 +333,14 @@ class CombatTiming:
             await game.screenshot(path=str(out/'timing-final.png'))
 
     def summary(self):
+        def captured(attack_phase, response_phases):
+            return any(event['kind'] == 'socket-hp'
+                and isinstance(event.get('hp'), (int, float))
+                and isinstance(event.get('before'), (int, float))
+                and event['hp'] < event['before'] and event['phase'] in response_phases
+                and any(sent['kind'] == 'socket-intent' and sent.get('target') == event.get('target')
+                    and sent['phase'] == attack_phase and sent['atMs'] < event['atMs']
+                    for sent in self.timeline) for event in self.timeline)
         # ต้องเห็น intent ไปยังมอนตัวเดียวกันก่อน HP authority ลด; HP ของตัวอื่นไม่นับ
         targeted_damage = any(
             event['kind'] == 'socket-hp' and event.get('hp', 0) < event.get('before', 0)
@@ -279,8 +349,20 @@ class CombatTiming:
                     and sent['phase'] in ('combat', 'rapid') and sent['atMs'] < event['atMs']
                     for sent in self.timeline)
             for event in self.timeline)
+        first_strike = captured('combat', ('combat', 'settle', 'retreat'))
+        reentry = captured('reentry', ('reentry', 'settle'))
+        reentry_sent = [e['atMs'] for e in self.timeline if e['kind']=='socket-intent' and e['phase']=='reentry']
+        # ผลจากการตีครั้งแรกที่มาช้าหลังเริ่ม reentry ยังแยกไม่ได้ จึงห้ามนับเป็นหลักฐานรอบสอง
+        first_results = [e['atMs'] for e in self.timeline if e['kind']=='socket-hp'
+            and e['phase'] in ('combat', 'settle', 'retreat') and isinstance(e.get('hp'), (int,float))
+            and isinstance(e.get('before'), (int,float)) and e['hp'] < e['before']]
+        reentry_gate = 'SAT' if self.reentry and first_strike and reentry and not self.stop_reason \
+            and reentry_sent and first_results and min(first_results) < min(reentry_sent) else 'UNKNOWN'
         return {'scope':'runner-swiftshader-not-mobile-render-proof',
                 'targetedDamageCaptured': targeted_damage,
+                'reentryCaptureGate': reentry_gate,
+                'firstStrikeDamageCaptured': first_strike, 'reentryDamageCaptured': reentry,
+                'socketLifecycle': self.socket_events,
                 'stopReason': self.stop_reason,
                 'rapidScenario': 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
                 'profiles':self.profiles,

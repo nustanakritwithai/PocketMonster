@@ -18,6 +18,7 @@ PREFIX = '/PocketMonster/'
 PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
 PRIMARY_RECALL_ONLY = os.environ.get('PRIMARY_RECALL_ONLY') == 'true'
 COMBAT_TIMING = os.environ.get('COMBAT_TIMING') == 'true'
+COMBAT_REENTRY = os.environ.get('COMBAT_REENTRY') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
@@ -34,6 +35,8 @@ EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'stage': 'start', 'networkFailures': []}
 if COMBAT_TIMING:
     GATES['combat-timing-captured'] = 'UNKNOWN'
+if COMBAT_REENTRY:
+    GATES['combat-reentry-captured'] = 'UNKNOWN'
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
@@ -42,6 +45,8 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
             'unified-mobile-controls-v900.mjs', 'game-v800.js', 'style-v900.css'}
 
 async def main():
+    if COMBAT_REENTRY and not COMBAT_TIMING:
+        raise SystemExit('combat reentry ต้องเปิด combat timing ด้วย')
     if COMBAT_TIMING and not PRIMARY_RECALL_ONLY:
         raise SystemExit('combat timing ต้องใช้ปุ่ม primary เดิมเท่านั้น')
     if os.environ.get('GITHUB_ACTIONS') != 'true':
@@ -189,10 +194,18 @@ async def main():
                     EVIDENCE['networkFailures'].append(item)
         context.on('requestfailed', failed_request)
         wild = []
-        timing = CombatTiming() if COMBAT_TIMING else None
+        timing = CombatTiming(reentry=COMBAT_REENTRY) if COMBAT_TIMING else None
+        socket_count = 0
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
+                nonlocal socket_count
+                socket_count += 1
+                connection = socket_count
+                if timing:
+                    timing.socket_event('open', connection)
+                    socket.on('close', lambda: timing.socket_event('close', connection))
+                    socket.on('socketerror', lambda _: timing.socket_event('error', connection))
                 def sent(payload):
                     try:
                         packet = json.loads(payload)
@@ -446,6 +459,8 @@ async def main():
                     EVIDENCE['combatTiming'] = timing.summary()
                     captured = timing.summary()
                     GATES['combat-timing-captured'] = 'SAT' if captured['targetedDamageCaptured'] and captured['native']['hits'] else 'UNKNOWN'
+                    if COMBAT_REENTRY:
+                        GATES['combat-reentry-captured'] = captured['reentryCaptureGate']
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):

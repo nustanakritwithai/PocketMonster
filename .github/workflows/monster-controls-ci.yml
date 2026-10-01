@@ -44,6 +44,10 @@ on:
         description: 'เก็บเวลารับ snapshot/เฟรมระหว่างต่อสู้ ไม่ใช่รับรองความลื่นมือถือ'
         type: boolean
         default: false
+      combat_reentry:
+        description: 'จับตีครั้งแรก→เดินหนี→กลับตี พร้อม socket lifecycle (ต้องเปิด combat_timing)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -73,6 +77,7 @@ jobs:
           PRODUCTION_LIVE: ${{ inputs.production_live }}
           PRIMARY_RECALL_ONLY: ${{ inputs.primary_recall_only }}
           COMBAT_TIMING: ${{ inputs.combat_timing }}
+          COMBAT_REENTRY: ${{ inputs.combat_reentry }}
         run: python tests/monster-authenticated-candidate.py
       - uses: actions/upload-artifact@v4
         if: always()
