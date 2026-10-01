@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
+from monster_combat_timing import CombatTiming
 
 ROOT = Path('candidate-artifact/dist-pages').resolve()
 OUT = Path('authenticated-candidate-evidence')
@@ -16,6 +17,7 @@ ORIGIN = 'https://nustanakritwithai.github.io'
 PREFIX = '/PocketMonster/'
 PRODUCTION_LIVE = os.environ.get('PRODUCTION_LIVE') == 'true'
 PRIMARY_RECALL_ONLY = os.environ.get('PRIMARY_RECALL_ONLY') == 'true'
+COMBAT_TIMING = os.environ.get('COMBAT_TIMING') == 'true'
 GATES = {'firebase-login': 'UNKNOWN', 'launch-redeem': 'UNKNOWN',
          'candidate-scene': 'UNKNOWN', 'throw-recall': 'UNKNOWN',
          'save-reload': 'UNKNOWN',
@@ -30,6 +32,8 @@ EVIDENCE = {'sha': os.environ.get('CANDIDATE_SHA'), 'gates': GATES,
             'scope': 'runner-browser-candidate-assets-live-guest-no-deploy',
             'http': [], 'assets': {}, 'visibleControls': [], 'errorType': None,
             'stage': 'start', 'networkFailures': []}
+if COMBAT_TIMING:
+    GATES['combat-timing-captured'] = 'UNKNOWN'
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
@@ -38,6 +42,8 @@ CRITICAL = {'index.html', 'scene-v900.html', 'monster-control-scene-binding-v900
             'unified-mobile-controls-v900.mjs', 'game-v800.js', 'style-v900.css'}
 
 async def main():
+    if COMBAT_TIMING and not PRIMARY_RECALL_ONLY:
+        raise SystemExit('combat timing ต้องใช้ปุ่ม primary เดิมเท่านั้น')
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('โปรแกรมนี้อนุญาตเฉพาะ GitHub runner ไม่ใช่ VPS')
     if PRIMARY_RECALL_ONLY:
@@ -52,7 +58,9 @@ async def main():
         raise SystemExit('candidate artifact ขาด index.html')
     async with async_playwright() as p:
         browser = await p.chromium.launch(args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
-        context = await browser.new_context(viewport={'width': 960, 'height': 540},
+        viewport = {'width': 960, 'height': 540}
+        EVIDENCE['viewport'] = viewport
+        context = await browser.new_context(viewport=viewport,
                                             has_touch=True, device_scale_factor=1, service_workers='block')
         async def candidate(route):
             url = urlsplit(route.request.url)
@@ -181,12 +189,16 @@ async def main():
                     EVIDENCE['networkFailures'].append(item)
         context.on('requestfailed', failed_request)
         wild = []
+        timing = CombatTiming() if COMBAT_TIMING else None
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
                 def sent(payload):
                     try:
-                        if json.loads(payload).get('type') == 'world-pos':
+                        packet = json.loads(payload)
+                        if timing:
+                            timing.sent(packet)
+                        if packet.get('type') == 'world-pos':
                             wire_counts['worldPoseSends'] += 1
                     except (ValueError, TypeError):
                         pass
@@ -197,6 +209,8 @@ async def main():
                         packet = json.loads(payload)
                         world = packet.get('payload', {})
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
+                            if timing:
+                                timing.receive(world)
                             wire_counts['worldSnapshots'] += 1
                             wild = [{'id': a['actorId'], 'x': a['pose']['x'], 'z': a['pose']['z'],
                                      'maxHp': a['authority']['hp']['max']}
@@ -422,6 +436,16 @@ async def main():
                     GATES['production-assets'] = GATES['candidate-assets']
                 EVIDENCE['stage'] = 'primary-recall-confirmed'
                 EVIDENCE['visualReview'] = 'UNKNOWN-until-screenshots-inspected'
+                if timing:
+                    EVIDENCE['stage'] = 'combat-timing'
+                    # รักษาขนาดมาตรฐานตอนตรวจช่องมอน; ลดเฉพาะหน้าต่างวัด combat
+                    combat_viewport = {'width': 640, 'height': 360}
+                    await game.set_viewport_size(combat_viewport)
+                    EVIDENCE['combatViewport'] = combat_viewport
+                    await timing.run(game, scene, lambda: wild, OUT)
+                    EVIDENCE['combatTiming'] = timing.summary()
+                    captured = timing.summary()
+                    GATES['combat-timing-captured'] = 'SAT' if captured['targetedDamageCaptured'] and captured['native']['hits'] else 'UNKNOWN'
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
@@ -716,6 +740,8 @@ async def main():
             if type(error) is RuntimeError and re.fullmatch(r'[a-z]+(?:-[a-z]+){1,14}', str(error)):
                 EVIDENCE['errorCode'] = str(error)
         finally:
+            if timing:
+                EVIDENCE['combatTiming'] = timing.summary()
             if response_tasks:
                 await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
             if PRODUCTION_LIVE:
