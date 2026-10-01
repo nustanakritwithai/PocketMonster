@@ -73,6 +73,7 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe.phase = 'settle'
         probe.record('socket-hp', target='monster:crab', before=70, hp=58)
         self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+        self.assertEqual(probe.summary()['rapidScenario'], 'NOT_RUN')
 
     async def test_replayed_history_is_not_fresh_damage(self):
         probe = CombatTiming()

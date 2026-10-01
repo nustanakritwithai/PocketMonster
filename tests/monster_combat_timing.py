@@ -336,6 +336,11 @@ class CombatTiming:
             await asyncio.sleep(3)
             await phase('capture')
             await game.screenshot(path=str(out/'timing-combat.png'))
+        except RuntimeError as error:
+            code = str(error)
+            self.stop_reason = code if re.fullmatch(r'timing-[a-z]+(?:-[a-z]+){1,12}', code) else 'scenario-interrupted'
+            self.record('scenario-stopped', reason=self.stop_reason)
+            raise
         finally:
             # จบหน้าต่างเดียวกันก่อน teardown/screenshot เพื่อไม่เพิ่ม packet หลังหยุด native probe
             self.phase = 'complete'
@@ -383,7 +388,7 @@ class CombatTiming:
                 'firstStrikeDamageCaptured': first_strike, 'reentryDamageCaptured': reentry,
                 'socketLifecycle': self.socket_events,
                 'stopReason': self.stop_reason,
-                'rapidScenario': 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
+                'rapidScenario': 'NOT_RUN' if self.reentry else 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
                 'profiles':self.profiles,
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
                 'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
