@@ -35,22 +35,43 @@ class CombatTiming:
 
     def observe_life(self, envelope):
         # อ่าน canonical vitals เท่านั้น ไม่เก็บ spawnId/ข้อมูลผู้เล่นและไม่เขียน HP
+        def invalid():
+            if self.life_baseline is not None:
+                self.life_interruption = self.life_interruption or 'vitals-evidence-gap'
+
+        def finite(value):
+            return type(value) in (int, float) and math.isfinite(value)
+
         v = envelope.get('vitals')
         if not isinstance(v, dict) or v.get('contract') != 'pirate-vitals/1':
+            invalid()
             return
         revision, hp, maximum, dead = (v.get(k) for k in ('revision', 'hp', 'maxHp', 'dead'))
         if (type(revision) is not int or revision < 0 or type(dead) is not bool
             or type(hp) not in (int, float) or type(maximum) not in (int, float)
             or not math.isfinite(hp) or not math.isfinite(maximum)
             or not 0 <= hp <= maximum or maximum <= 0 or dead != (hp <= 0)):
+            invalid()
+            return
+        for value_key, max_key in (('guard', 'guardMax'), ('energy', 'maxEnergy'), ('mp', 'maxMp')):
+            if not finite(v.get(value_key)) or not finite(v.get(max_key)) or not 0 <= v[value_key] <= v[max_key]:
+                invalid()
+                return
+        if (type(v.get('guardBroken')) is not bool or any(not finite(v.get(k)) or v[k] < 0
+            for k in ('serverTimeMs', 'hitstunUntil'))):
+            invalid()
             return
         respawn = v.get('respawn')
         respawn_revision = respawn.get('atRevision') if isinstance(respawn, dict) else None
         if respawn is not None and (type(respawn_revision) is not int
-            or not 1 <= respawn_revision <= revision):
+            or not 1 <= respawn_revision <= revision
+            or any(not isinstance(respawn.get(k), str) or not respawn[k] for k in ('spawnId', 'islandId'))
+            or any(not finite(respawn.get(k)) for k in ('x', 'y', 'z', 'heading'))):
+            invalid()
             return
         generation = envelope.get('generation')
-        if type(generation) is not int:
+        if type(generation) is not int or generation < 1:
+            invalid()
             return
         if self.vitals and generation == self.vitals['generation'] and revision < self.vitals['revision']:
             return

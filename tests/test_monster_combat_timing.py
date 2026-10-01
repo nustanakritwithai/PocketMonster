@@ -6,9 +6,12 @@ from monster_combat_timing import CombatTiming, movement_input
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
     def vitals(self, revision=1, hp=100, dead=False, respawn=None, generation=1):
-        value = {'contract':'pirate-vitals/1', 'revision':revision, 'hp':hp, 'maxHp':100, 'dead':dead}
+        value = {'contract':'pirate-vitals/1', 'revision':revision, 'hp':hp, 'maxHp':100, 'dead':dead,
+                 'serverTimeMs':10, 'guard':10, 'guardMax':10, 'guardBroken':False,
+                 'hitstunUntil':0, 'energy':10, 'maxEnergy':10, 'mp':10, 'maxMp':10}
         if respawn is not None:
-            value['respawn'] = {'atRevision':respawn, 'spawnId':'private-spawn'}
+            value['respawn'] = {'atRevision':respawn, 'spawnId':'private-spawn', 'islandId':'private-island',
+                               'x':0, 'y':0, 'z':0, 'heading':0}
         return {'generation':generation, 'vitals':value}
 
     def two_damage_windows(self, probe):
@@ -67,11 +70,12 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe.life_baseline = dict(probe.vitals)
         probe.phase = 'combat'
         probe.observe_life(self.vitals(2, 0, True))
+        self.assertIsNone(probe.life_interruption)
         for envelope in (self.vitals(4, float('nan')), self.vitals(4, 0, False),
                          self.vitals(4, respawn=5), {'generation':1}):
             probe.observe_life(envelope)
         self.assertEqual(probe.life_events, [])
-        self.assertIsNone(probe.life_interruption)
+        self.assertEqual(probe.life_interruption, 'vitals-evidence-gap')
 
     async def test_joystick_mapping_uses_current_camera_not_old_basis(self):
         for yaw in (0, math.pi/2, math.pi, -.7):
