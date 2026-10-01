@@ -1,0 +1,87 @@
+name: Prepare client patch paired with Server 55
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/server-paired-patch-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLIENT_BASE: '169fdd589c038f4c5664e609102073ee462e829d'
+      SERVER_CANDIDATE: '3548e789f506496fca7dfded93c34803d2bf37a2'
+      MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
+      MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
+      MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
+      MONSTERLIFE_LAUNCH_TICKET: 'true'
+      MONSTERLIFE_RELEASE_VERSION: '8.4.0-github.${{ github.event.pull_request.head.sha }}'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ตรวจ scope ว่าไม่มีเกมหรือ UI เปลี่ยนจาก production baseline
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          const files=execFileSync('git',['diff','--name-only',process.env.CLIENT_BASE,'HEAD'],{encoding:'utf8'}).trim().split('\n');
+          assert.deepEqual(files,['.github/workflows/server-paired-patch-candidate.yml']);
+          NODE
+      - name: สร้าง metadata release ใหม่ด้วย writer เดิม ไม่เปิด write flags
+        run: node scripts/write-deployment-runtime-config.mjs
+      - name: ตรวจ contract และเกมเดิมบน runner เท่านั้น
+        run: |
+          node tests/deployment-runtime-config.mjs
+          node tests/production-launch-workflows.mjs
+          node tests/hosting-architecture.mjs
+          node tests/v90-deployment-gates.mjs
+          npm run check
+      - name: สร้าง patch ด้วย builder เดิมและตรวจทุกโลก
+        run: |
+          node scripts/build-github-pages.mjs --write-root-manifest
+          node tests/v90-unified-pages-artifact.mjs
+          node tests/v91-combat-artifact.mjs
+      - name: ตรวจ delta เฉพาะ runtime metadata และผูก artifact กับ Server exact SHA
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const oldFile=p=>JSON.parse(execFileSync('git',['show',`${process.env.CLIENT_BASE}:${p}`],{encoding:'utf8'}));
+          const oldRuntime=oldFile('runtime-config.json');
+          const runtime=JSON.parse(fs.readFileSync('dist-pages/runtime-config.json','utf8'));
+          assert.notEqual(runtime.deployedRelease,oldRuntime.deployedRelease);
+          assert.deepEqual({...runtime,deployedRelease:''},{...oldRuntime,deployedRelease:''});
+          const oldManifest=oldFile('patch-manifest.json');
+          const manifest=JSON.parse(fs.readFileSync('dist-pages/patch-manifest.json','utf8'));
+          assert.equal(manifest.serverVersion,'8.4.0');
+          assert.equal(manifest.gameVersion,'8.4.0');
+          assert.equal(manifest.files.length,oldManifest.files.length);
+          const previous=new Map(oldManifest.files.map(e=>[e.path,e]));
+          const delta=manifest.files.filter(e=>e.sha256!==previous.get(e.path)?.sha256||e.size!==previous.get(e.path)?.size).map(e=>e.path);
+          assert.deepEqual(delta,['runtime-config.json']);
+          assert.notEqual(manifest.buildId,oldManifest.buildId);
+          const evidence={clientCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
+            clientBase:process.env.CLIENT_BASE,serverCandidate:process.env.SERVER_CANDIDATE,
+            serverCandidateCi:36826048716,buildId:manifest.buildId,files:manifest.files.length,
+            changedPublicFiles:delta,metadataGate:'SAT',deployed:false,
+            candidateServerStartupGate:'UNKNOWN',productionCombatGate:'UNKNOWN'};
+          fs.writeFileSync('paired-release-evidence.json',JSON.stringify(evidence,null,2)+'\n');
+          console.log(JSON.stringify(evidence));
+          NODE
+      - name: เก็บ candidate เท่านั้น ไม่เผยแพร่ Pages/Firebase/Server
+        uses: actions/upload-artifact@v4
+        with:
+          name: server55-paired-client-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist-pages/
+            patch-manifest.json
+            paired-release-evidence.json
+          if-no-files-found: error
+          retention-days: 14
