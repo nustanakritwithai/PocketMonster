@@ -58,7 +58,7 @@ async def main():
         raise SystemExit('candidate artifact ขาด index.html')
     async with async_playwright() as p:
         browser = await p.chromium.launch(args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
-        viewport = {'width': 640, 'height': 360} if COMBAT_TIMING else {'width': 960, 'height': 540}
+        viewport = {'width': 960, 'height': 540}
         EVIDENCE['viewport'] = viewport
         context = await browser.new_context(viewport=viewport,
                                             has_touch=True, device_scale_factor=1, service_workers='block')
@@ -438,6 +438,10 @@ async def main():
                 EVIDENCE['visualReview'] = 'UNKNOWN-until-screenshots-inspected'
                 if timing:
                     EVIDENCE['stage'] = 'combat-timing'
+                    # รักษาขนาดมาตรฐานตอนตรวจช่องมอน; ลดเฉพาะหน้าต่างวัด combat
+                    combat_viewport = {'width': 640, 'height': 360}
+                    await game.set_viewport_size(combat_viewport)
+                    EVIDENCE['combatViewport'] = combat_viewport
                     await timing.run(game, scene, lambda: wild, OUT)
                     EVIDENCE['combatTiming'] = timing.summary()
                     captured = timing.summary()
