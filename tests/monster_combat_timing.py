@@ -159,7 +159,7 @@ class CombatTiming:
             clock = await native.evaluate('(name)=>{window.__qaCombatTiming.phase=name;return performance.now()}', name)
             after = asyncio.get_running_loop().time()*1000
             self.clock_samples.append({'phase':name,'nativeMs':clock,'hostBeforeMs':before,'hostAfterMs':after})
-            diagnostics = await scene.evaluate('''() => {
+            diagnostics = await game.evaluate('''() => {
                 const d=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
                 return d ? {socketGeneration:d.socketGeneration,socketReadyState:d.socketReadyState,
                     reconnectPending:d.reconnectPending,worldConnected:d.worldConnected,
@@ -237,6 +237,23 @@ class CombatTiming:
                 await asyncio.sleep(delay)
             return True
 
+        async def wait_damage(name):
+            # คงชื่อหน้าต่างโจมตีจนผลมาถึง ไม่เปลี่ยนเป็น settle ก่อน windup จบ
+            # deadline นี้เพื่อเก็บหลักฐานเท่านั้น ไม่ใช่เกณฑ์ความลื่นหรือแก้ gameplay
+            for _ in range(50):
+                if any(e['kind']=='socket-hp' and e.get('target')==target_id
+                    and isinstance(e.get('hp'), (int,float))
+                    and isinstance(e.get('before'), (int,float)) and e['hp'] < e['before']
+                    and e['phase']==name
+                    and any(s['kind']=='socket-intent' and s.get('target')==target_id
+                        and s['phase']==name and s['atMs'] < e['atMs'] for s in self.timeline)
+                    for e in self.timeline):
+                    return
+                await asyncio.sleep(.1)
+            self.stop_reason = name+'-damage-not-observed'
+            self.record('scenario-stopped', reason=self.stop_reason)
+            raise RuntimeError('timing-'+self.stop_reason)
+
         try:
             await measure('idle', 5)
             await phase('capture')
@@ -271,6 +288,7 @@ class CombatTiming:
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
             if self.reentry:
                 if await attack('combat', 1, .25):
+                    await wait_damage('combat')
                     await phase('settle')
                     await asyncio.sleep(.5)
                     await game.screenshot(path=str(out/'timing-first-strike.png'))
@@ -310,7 +328,8 @@ class CombatTiming:
                             min(.3, max(.12, distance/8)))
                     if not returned:
                         raise RuntimeError('timing-reentry-not-reached')
-                    await attack('reentry', 1, .25)
+                    if await attack('reentry', 1, .25):
+                        await wait_damage('reentry')
             elif await attack('combat', 2, .25):
                 await attack('rapid', 4, .12)
             await phase('settle')
