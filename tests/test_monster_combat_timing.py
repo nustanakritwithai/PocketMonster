@@ -8,11 +8,15 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe = CombatTiming()
         probe.phase = 'combat'
         probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        probe.timeline[-1]['atMs'] = 1
         self.assertFalse(probe.summary()['targetedDamageCaptured'])
         probe.sent({'type': 'world-pos', 'monsterIntents': [{'sequence': 1, 'targetActorId': 'monster:crab'}]})
+        probe.timeline[-1]['atMs'] = 2
         probe.record('socket-hp', target='monster:other', before=70, hp=58)
+        probe.timeline[-1]['atMs'] = 3
         self.assertFalse(probe.summary()['targetedDamageCaptured'])
         probe.record('socket-hp', target='monster:crab', before=58, hp=46)
+        probe.timeline[-1]['atMs'] = 4
         self.assertTrue(probe.summary()['targetedDamageCaptured'])
 
     async def test_out_of_range_does_not_claim_rapid_acceptance(self):

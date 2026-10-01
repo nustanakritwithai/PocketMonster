@@ -276,7 +276,7 @@ class CombatTiming:
             event['kind'] == 'socket-hp' and event.get('hp', 0) < event.get('before', 0)
             and event['phase'] in ('combat', 'rapid', 'settle')
             and any(sent['kind'] == 'socket-intent' and sent.get('target') == event.get('target')
-                    and sent['phase'] in ('combat', 'rapid') and sent['atMs'] <= event['atMs']
+                    and sent['phase'] in ('combat', 'rapid') and sent['atMs'] < event['atMs']
                     for sent in self.timeline)
             for event in self.timeline)
         return {'scope':'runner-swiftshader-not-mobile-render-proof',
