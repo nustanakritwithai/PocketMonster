@@ -4,6 +4,22 @@ from monster_combat_timing import CombatTiming
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_capture_requires_damage_to_target_after_intent(self):
+        probe = CombatTiming()
+        probe.phase = 'combat'
+        probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        self.assertFalse(probe.summary()['targetedDamageCaptured'])
+        probe.sent({'type': 'world-pos', 'monsterIntents': [{'sequence': 1, 'targetActorId': 'monster:crab'}]})
+        probe.record('socket-hp', target='monster:other', before=70, hp=58)
+        self.assertFalse(probe.summary()['targetedDamageCaptured'])
+        probe.record('socket-hp', target='monster:crab', before=58, hp=46)
+        self.assertTrue(probe.summary()['targetedDamageCaptured'])
+
+    async def test_out_of_range_does_not_claim_rapid_acceptance(self):
+        probe = CombatTiming()
+        probe.stop_reason = 'target-out-of-range'
+        self.assertEqual(probe.summary()['rapidScenario'], 'UNKNOWN')
+
     async def test_attack_probe_records_intent_not_tokens_or_other_players(self):
         probe = CombatTiming()
         probe.phase = 'combat'

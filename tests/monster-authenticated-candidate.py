@@ -438,7 +438,8 @@ async def main():
                     EVIDENCE['stage'] = 'combat-timing'
                     await timing.run(game, scene, lambda: wild, OUT)
                     EVIDENCE['combatTiming'] = timing.summary()
-                    GATES['combat-timing-captured'] = 'SAT' if timing.summary()['combatHpChanges'] > 0 else 'UNKNOWN'
+                    captured = timing.summary()
+                    GATES['combat-timing-captured'] = 'SAT' if captured['targetedDamageCaptured'] and captured['native']['hits'] else 'UNKNOWN'
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):

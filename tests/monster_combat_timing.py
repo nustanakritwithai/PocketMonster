@@ -17,6 +17,7 @@ class CombatTiming:
         self.timeline = []
         self.attack_sequence = 0
         self.clock_samples = []
+        self.stop_reason = None
 
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
@@ -197,7 +198,9 @@ class CombatTiming:
                 current = await pose()
                 target = next((a for a in get_wild() if a['id']==target_id), None)
                 if not target or not current or math.hypot(target['x']-current['x'], target['z']-current['z']) >= 2.6:
-                    raise RuntimeError('timing-attack-target-out-of-range')
+                    self.stop_reason = 'target-out-of-range'
+                    self.record('scenario-stopped', reason=self.stop_reason)
+                    return False
                 self.record('input-before', x=current.get('x') if current else None,
                     z=current.get('z') if current else None,
                     distance=math.hypot(target['x']-current['x'],target['z']-current['z']) if target and current else None)
@@ -212,6 +215,7 @@ class CombatTiming:
                 await game.mouse.click(box['x']+box['width']/2, box['y']+box['height']/2, delay=100)
                 self.record('input-after')
                 await asyncio.sleep(delay)
+            return True
 
         try:
             await measure('idle', 5)
@@ -245,8 +249,8 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
-            await attack('combat', 2, .25)
-            await attack('rapid', 4, .12)
+            if await attack('combat', 2, .25):
+                await attack('rapid', 4, .12)
             await phase('settle')
             await asyncio.sleep(3)
             await phase('capture')
@@ -267,7 +271,18 @@ class CombatTiming:
             await game.screenshot(path=str(out/'timing-final.png'))
 
     def summary(self):
+        # ต้องเห็น intent ไปยังมอนตัวเดียวกันก่อน HP authority ลด; HP ของตัวอื่นไม่นับ
+        targeted_damage = any(
+            event['kind'] == 'socket-hp' and event.get('hp', 0) < event.get('before', 0)
+            and event['phase'] in ('combat', 'rapid', 'settle')
+            and any(sent['kind'] == 'socket-intent' and sent.get('target') == event.get('target')
+                    and sent['phase'] in ('combat', 'rapid') and sent['atMs'] <= event['atMs']
+                    for sent in self.timeline)
+            for event in self.timeline)
         return {'scope':'runner-swiftshader-not-mobile-render-proof',
+                'targetedDamageCaptured': targeted_damage,
+                'stopReason': self.stop_reason,
+                'rapidScenario': 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
                 'profiles':self.profiles,
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
                 'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
