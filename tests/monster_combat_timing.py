@@ -28,6 +28,48 @@ class CombatTiming:
         self.stop_reason = None
         self.reentry = reentry
         self.socket_events = []
+        self.vitals = None
+        self.life_baseline = None
+        self.life_events = []
+        self.life_interruption = None
+
+    def observe_life(self, envelope):
+        # อ่าน canonical vitals เท่านั้น ไม่เก็บ spawnId/ข้อมูลผู้เล่นและไม่เขียน HP
+        v = envelope.get('vitals')
+        if not isinstance(v, dict) or v.get('contract') != 'pirate-vitals/1':
+            return
+        revision, hp, maximum, dead = (v.get(k) for k in ('revision', 'hp', 'maxHp', 'dead'))
+        if (type(revision) is not int or revision < 0 or type(dead) is not bool
+            or type(hp) not in (int, float) or type(maximum) not in (int, float)
+            or not math.isfinite(hp) or not math.isfinite(maximum)
+            or not 0 <= hp <= maximum or maximum <= 0 or dead != (hp <= 0)):
+            return
+        respawn = v.get('respawn')
+        respawn_revision = respawn.get('atRevision') if isinstance(respawn, dict) else None
+        if respawn is not None and (type(respawn_revision) is not int
+            or not 1 <= respawn_revision <= revision):
+            return
+        generation = envelope.get('generation')
+        if type(generation) is not int:
+            return
+        if self.vitals and generation == self.vitals['generation'] and revision < self.vitals['revision']:
+            return
+        sample = {'phase': self.phase, 'revision': revision, 'hp': hp, 'dead': dead,
+                  'respawnRevision': respawn_revision, 'generation': generation}
+        self.vitals = sample
+        if self.life_baseline is not None and self.phase not in ('setup', 'complete'):
+            if len(self.life_events) < 3000:
+                self.life_events.append(sample)
+            else:
+                self.life_interruption = self.life_interruption or 'evidence-cap'
+            reason = ('authoritative-death' if dead else
+                      'worker-generation-changed' if generation != self.life_baseline['generation'] else
+                      'authoritative-respawn' if respawn_revision != self.life_baseline['respawnRevision'] else None)
+            self.life_interruption = self.life_interruption or reason
+
+    def require_same_life(self):
+        if self.reentry and self.life_interruption:
+            raise RuntimeError('timing-' + self.life_interruption)
 
     def socket_event(self, kind, connection):
         # ไม่เก็บ URL, token, error payload หรือชื่อผู้เล่น
@@ -59,6 +101,7 @@ class CombatTiming:
     def receive(self, world):
         now = asyncio.get_running_loop().time() * 1000
         envelope = world.get('pirateWorld') or {}
+        self.observe_life(envelope)
         fresh = 0
         for msg in envelope.get('messages', []):
             key = (envelope.get('generation'), msg.get('seq'))
@@ -194,12 +237,17 @@ class CombatTiming:
                                 ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
 
         async def pose():
-            return await native.evaluate('''() => {
+            self.require_same_life()
+            value = await native.evaluate('''() => {
                 const c=window.__combat?.controller;
                 const p=c?.position;
                 const yaw=typeof c?.getCameraYaw==='function'?c.getCameraYaw():null;
-                return p ? {x:p.x,z:p.z,cameraYaw:Number.isFinite(yaw)?yaw:null} : null;
+                return p ? {x:p.x,z:p.z,hp:c.hp,cameraYaw:Number.isFinite(yaw)?yaw:null} : null;
             }''')
+            if self.life_baseline is not None and value and type(value.get('hp')) in (int,float) and value['hp'] <= 0:
+                self.life_interruption = self.life_interruption or 'native-death'
+            self.require_same_life()
+            return value
 
         async def confirm(expression):
             # evaluate ผ่าน DevTools โดยตรง ไม่ใช้ wait_for_function ที่ eval ชน CSP
@@ -251,6 +299,7 @@ class CombatTiming:
             # คงชื่อหน้าต่างโจมตีจนผลมาถึง ไม่เปลี่ยนเป็น settle ก่อน windup จบ
             # deadline นี้เพื่อเก็บหลักฐานเท่านั้น ไม่ใช่เกณฑ์ความลื่นหรือแก้ gameplay
             for _ in range(50):
+                self.require_same_life()
                 if any(e['kind']=='socket-hp' and e.get('target')==target_id
                     and isinstance(e.get('hp'), (int,float))
                     and isinstance(e.get('before'), (int,float)) and e['hp'] < e['before']
@@ -303,10 +352,14 @@ class CombatTiming:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
             if self.reentry:
+                if not self.vitals or self.vitals['dead']:
+                    raise RuntimeError('timing-alive-vitals-not-observed')
+                self.life_baseline = dict(self.vitals)
                 if await attack('combat', 1, .25):
                     await wait_damage('combat')
                     await phase('settle')
                     await asyncio.sleep(.5)
+                    self.require_same_life()
                     await game.screenshot(path=str(out/'timing-first-strike.png'))
                     await phase('retreat')
                     escaped = False
@@ -349,6 +402,7 @@ class CombatTiming:
                 await attack('rapid', 4, .12)
             await phase('settle')
             await asyncio.sleep(3)
+            self.require_same_life()
             await phase('capture')
             await game.screenshot(path=str(out/'timing-combat.png'))
         except RuntimeError as error:
@@ -397,9 +451,16 @@ class CombatTiming:
             and isinstance(e.get('before'), (int,float)) and e['hp'] < e['before']]
         reentry_gate = 'SAT' if self.reentry and first_strike and reentry and not self.stop_reason \
             and reentry_sent and first_results and min(first_results) < min(reentry_sent) else 'UNKNOWN'
+        # สองหน้าต่าง damage เป็นเพียง capture; ต้องมี vitals ทุกช่วงและไม่ตาย/เกิดใหม่ด้วย
+        observed_phases = {e['phase'] for e in self.life_events}
+        same_life = 'SAT' if reentry_gate == 'SAT' and self.life_baseline and not self.life_interruption \
+            and {'combat', 'retreat', 'reapproach', 'reentry'} <= observed_phases else 'UNKNOWN'
         return {'scope':'runner-swiftshader-not-mobile-render-proof',
                 'targetedDamageCaptured': targeted_damage,
                 'reentryCaptureGate': reentry_gate,
+                'sameLifeReentryGate': same_life,
+                'lifeBaseline': self.life_baseline, 'lifeEvents': self.life_events,
+                'lifeInterruption': self.life_interruption,
                 'firstStrikeDamageCaptured': first_strike, 'reentryDamageCaptured': reentry,
                 'socketLifecycle': self.socket_events,
                 'stopReason': self.stop_reason,

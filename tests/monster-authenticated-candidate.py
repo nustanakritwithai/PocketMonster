@@ -37,6 +37,7 @@ if COMBAT_TIMING:
     GATES['combat-timing-captured'] = 'UNKNOWN'
 if COMBAT_REENTRY:
     GATES['combat-reentry-captured'] = 'UNKNOWN'
+    GATES['combat-same-life-reentry'] = 'UNKNOWN'
 SAFE_PATHS = {'/api/auth/firebase/login', '/api/auth/launch-ticket',
               '/api/auth/launch-ticket/redeem', '/api/pirate/state',
               '/api/monsters/control-state', '/api/monsters/command',
@@ -461,6 +462,7 @@ async def main():
                     GATES['combat-timing-captured'] = 'SAT' if captured['targetedDamageCaptured'] and captured['native']['hits'] else 'UNKNOWN'
                     if COMBAT_REENTRY:
                         GATES['combat-reentry-captured'] = captured['reentryCaptureGate']
+                        GATES['combat-same-life-reentry'] = captured['sameLifeReentryGate']
                 return 0 if all(value == 'SAT' for value in GATES.values()) else 1
             await scene.locator('#monsterSlot1Btn').click(timeout=15000)
             if not await confirm("document.querySelector('#monsterThrowBtn')?.dataset.pirateIcon === 'ปา'"):
