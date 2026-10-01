@@ -77,6 +77,7 @@ class CombatTiming:
                 for k, v in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:40]]
 
     async def run(self, game, scene, get_wild, out):
+        target_id = 'monster:starter-crab-1'
         natives = [f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')]
         native = None
         for frame in natives:
@@ -194,7 +195,9 @@ class CombatTiming:
             await phase(name)
             for _ in range(count):
                 current = await pose()
-                target = next((a for a in get_wild() if a['id']=='monster:starter-boss-north'), None)
+                target = next((a for a in get_wild() if a['id']==target_id), None)
+                if not target or not current or math.hypot(target['x']-current['x'], target['z']-current['z']) >= 2.6:
+                    raise RuntimeError('timing-attack-target-out-of-range')
                 self.record('input-before', x=current.get('x') if current else None,
                     z=current.get('z') if current else None,
                     distance=math.hypot(target['x']-current['x'],target['z']-current['z']) if target and current else None)
@@ -226,19 +229,15 @@ class CombatTiming:
                 raise RuntimeError('timing-joystick-movement-not-observed')
             rx, rz = dx/length, dz/length
             reached = False
-            approach_tested = False
             for _ in range(90):
-                target = next((a for a in get_wild() if a['id']=='monster:starter-boss-north'), None)
+                target = next((a for a in get_wild() if a['id']==target_id), None)
                 if not target:
                     raise RuntimeError('timing-live-target-missing')
                 current = await pose()
                 dx, dz = target['x']-current['x'], target['z']-current['z']
                 distance = math.hypot(dx, dz)
-                if distance < 6 and not approach_tested:
-                    approach_tested = True
-                    await attack('approach-attack', 3, .35)
-                    await phase('approach')
-                if distance < 2.6:
+                # เริ่มวัดก่อนเสียเวลาตีอยู่นอกระยะ; อ่าน pose ใหม่ทุกครั้งหลัง await
+                if distance < 2.3:
                     reached = True
                     break
                 await drag((dx*rx+dz*rz)/distance, (-dx*rz+dz*rx)/distance,
@@ -246,8 +245,8 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
-            await attack('combat', 8, .6)
-            await attack('rapid', 12, .12)
+            await attack('combat', 2, .25)
+            await attack('rapid', 4, .12)
             await phase('settle')
             await asyncio.sleep(3)
             await phase('capture')
