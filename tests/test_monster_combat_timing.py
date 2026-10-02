@@ -1,9 +1,70 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT
+
+
+class FakeCDP:
+    def __init__(self):
+        self.calls = []
+        self.metrics_count = 0
+
+    async def send(self, command):
+        self.calls.append(command)
+        if command == 'Performance.getMetrics':
+            self.metrics_count += 1
+            return {'metrics': [{'name': 'ScriptDuration', 'value': self.metrics_count}]}
+        if command == 'Profiler.stop':
+            return {'profile': {'nodes': [{'id': 1, 'callFrame': {
+                'functionName': 'attackUpdate',
+                'url': 'https://invalid.example/index-CrbfA8Ln.js?token=never-log-this',
+                'lineNumber': 12, 'columnNumber': 34}}],
+                'samples': [1], 'timeDeltas': [2500]}}
+        return {}
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
+        self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
+        self.assertIn('p.parentPosts.length<400', GPU_PROBE_SCRIPT)
+        self.assertIn('original.apply(this,args)', GPU_PROBE_SCRIPT)
+        self.assertIn('original.call(this,message,...args)', GPU_PROBE_SCRIPT)
+        self.assertIn('finally', GPU_PROBE_SCRIPT)
+        for forbidden in ['getShaderSource', 'shaderSource', 'checkShaderErrors',
+                          'deleteShader', 'createShader', 'token', 'getError']:
+            self.assertNotIn(forbidden, GPU_PROBE_SCRIPT)
+
+    async def test_profile_measures_existing_operation_once_and_redacts_url(self):
+        probe, cdp = CombatTiming(), FakeCDP()
+        calls = []
+
+        async def operation():
+            calls.append('existing-ui-sequence')
+            self.assertEqual(cdp.calls[-1], 'Profiler.start')
+            return True
+
+        self.assertTrue(await probe.profile_interval(cdp, 'combat-and-rapid', operation))
+        self.assertEqual(calls, ['existing-ui-sequence'])
+        self.assertEqual(cdp.calls, ['Performance.getMetrics', 'Profiler.start',
+                                    'Profiler.stop', 'Performance.getMetrics'])
+        profile = probe.summary()['profiles']['combat-and-rapid']
+        self.assertEqual(profile['metrics']['ScriptDuration'], 1)
+        self.assertEqual(profile['cpu'][0]['selfMs'], 2.5)
+        self.assertEqual(profile['cpu'][0]['asset'], 'index-CrbfA8Ln.js')
+        self.assertNotIn('never-log-this', str(probe.summary()))
+        self.assertNotIn('invalid.example', str(probe.summary()))
+        self.assertEqual(probe.summary()['visualBatchingGate'], 'UNKNOWN')
+
+    async def test_failed_scenario_stops_profiler_without_changing_failure(self):
+        probe, cdp = CombatTiming(), FakeCDP()
+
+        async def operation():
+            raise RuntimeError('timing-original-scenario-error')
+
+        with self.assertRaisesRegex(RuntimeError, 'timing-original-scenario-error'):
+            await probe.profile_interval(cdp, 'combat-and-rapid', operation)
+        self.assertIn('Profiler.stop', cdp.calls)
+        self.assertIn('combat-and-rapid', probe.profiles)
+
     async def test_capture_requires_damage_to_target_after_intent(self):
         probe = CombatTiming()
         probe.phase = 'combat'

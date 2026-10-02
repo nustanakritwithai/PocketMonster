@@ -5,6 +5,76 @@ import re
 from urllib.parse import urlsplit
 
 
+# ใช้เฉพาะQAบนrunner: ส่งคืนผลเดิม/exceptionเดิม ไม่อ่านGLSL/tokenหรือแก้shader
+GPU_PROBE_SCRIPT = r"""() => {
+    const p=window.__qaCombatTiming;
+    p.gpuCalls=[]; p.gpuStatus='UNKNOWN-no-context'; p.gpuWrappers=[];
+    p.parentPosts=[]; p.postStatus='UNKNOWN-unavailable';
+    const canvas=document.querySelector('#app > canvas');
+    const gl=canvas?.getContext('webgl2');
+    let proto=Object.getPrototypeOf(window.__combat?.effects?.scene??{});
+    while(proto && !Object.hasOwn(proto,'onBeforeRender')) proto=Object.getPrototypeOf(proto);
+    if(proto && typeof proto.onBeforeRender==='function' && typeof proto.onAfterRender==='function') {
+        const before=proto.onBeforeRender, after=proto.onAfterRender;
+        const types=new Set(['MeshBasicMaterial','MeshStandardMaterial','MeshPhysicalMaterial',
+            'SpriteMaterial','LineBasicMaterial','ShaderMaterial','MeshDepthMaterial','MeshDistanceMaterial']);
+        const wrappedBefore=function(...args) {
+            const m=args[4];
+            p.drawMaterial=m?{type:types.has(m.type)?m.type:'other',
+                toneMapped:m.toneMapped===true,fog:m.fog===true,map:!!m.map,
+                vertexColors:m.vertexColors===true,transparent:m.transparent===true,
+                side:Number.isSafeInteger(m.side)?m.side:null}:null;
+            return before.apply(this,args);
+        };
+        const wrappedAfter=function(...args) {
+            try { return after.apply(this,args); } finally { p.drawMaterial=null; }
+        };
+        proto.onBeforeRender=wrappedBefore; proto.onAfterRender=wrappedAfter;
+        p.drawWrapper={proto,before,after,wrappedBefore,wrappedAfter};
+    }
+    if(gl) {
+        const ids=new WeakMap(); let nextId=0;
+        const id=value=>{
+            if(!value || typeof value!=='object') return null;
+            if(!ids.has(value)) ids.set(value,++nextId);
+            return ids.get(value);
+        };
+        for(const method of ['linkProgram','deleteProgram','getProgramInfoLog','getShaderInfoLog']) {
+            const original=gl[method];
+            if(typeof original!=='function') continue;
+            const wrapped=function(...args) {
+                const at=performance.now();
+                try { return original.apply(this,args); }
+                finally {
+                    if(p.active && p.gpuCalls.length<400)
+                        p.gpuCalls.push({phase:p.phase,method,object:id(args[0]),at,
+                            durationMs:performance.now()-at,material:p.drawMaterial??null});
+                }
+            };
+            gl[method]=wrapped;
+            p.gpuWrappers.push({gl,method,original,wrapped});
+        }
+        p.gpuStatus='CAPTURED-numeric-calls-not-mobile-proof';
+    }
+    try {
+        const host=window.parent, original=host.postMessage;
+        const wrapped=function(message,...args) {
+            if(p.active && message?.type==='pocketmonster:pirate-presence-v1'
+                && Array.isArray(message.monsterIntents) && message.monsterIntents.length
+                && p.parentPosts.length<400)
+                p.parentPosts.push({phase:p.phase,at:performance.now(),
+                    count:message.monsterIntents.length,
+                    sequences:message.monsterIntents.slice(0,32).map(i=>i.sequence)
+                        .filter(Number.isSafeInteger)});
+            return original.call(this,message,...args);
+        };
+        host.postMessage=wrapped;
+        p.parentPostWrapper={host,original,wrapped};
+        p.postStatus='CAPTURED-sender-not-receive-or-ack';
+    } catch { p.postStatus='UNKNOWN-unavailable'; }
+}"""
+
+
 class CombatTiming:
     def __init__(self):
         self.phase = 'setup'
@@ -77,6 +147,21 @@ class CombatTiming:
         return [{'asset': k[0], 'function': k[1], 'line': k[2], 'column': k[3], 'selfMs': round(v/1000, 2)}
                 for k, v in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:40]]
 
+    async def profile_interval(self, cdp, name, operation):
+        # วัดรอบUIเดิม ไม่เพิ่มการตี/ย้ายตัวละคร และไม่บันทึกrawprofileหรือURL
+        before = await cdp.send('Performance.getMetrics')
+        await cdp.send('Profiler.start')
+        try:
+            return await operation()
+        finally:
+            result = await cdp.send('Profiler.stop')
+            after = await cdp.send('Performance.getMetrics')
+            a = {m['name']: m['value'] for m in before['metrics']}
+            b = {m['name']: m['value'] for m in after['metrics']}
+            self.profiles[name] = {'cpu': self.cpu_summary(result['profile']),
+                'metrics': {key: b.get(key, 0)-a.get(key, 0) for key in
+                            ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
+
     async def run(self, game, scene, get_wild, out):
         target_id = 'monster:starter-crab-1'
         natives = [f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')]
@@ -89,7 +174,24 @@ class CombatTiming:
             raise RuntimeError('timing-native-frame-missing')
         # เก็บเฉพาะตัวเลข ไม่เก็บ URL/token/payload; ไม่แทนที่ WebSocket หรือ handler เกม
         await native.evaluate("""() => {
-            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], inputs:[], active:true};
+            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], inputs:[],
+                longTasks:[],longTaskStatus:'UNKNOWN-unsupported',active:true};
+            // longtaskเก็บเฉพาะตัวเลข; phaseคือช่วงที่observerได้รับ ไม่เดาว่าทั้งtaskอยู่phaseนั้น
+            try {
+                if(PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+                    p.longTaskObserver=new PerformanceObserver(list=>{
+                        if(!p.active) return;
+                        for(const entry of list.getEntries()) {
+                            if(p.longTasks.length>=400) break;
+                            if(Number.isFinite(entry.startTime)&&Number.isFinite(entry.duration))
+                                p.longTasks.push({phaseAtObservation:p.phase,at:entry.startTime,
+                                    durationMs:entry.duration,observedAtMs:performance.now()});
+                        }
+                    });
+                    p.longTaskObserver.observe({type:'longtask',buffered:false});
+                    p.longTaskStatus='CAPTURED-not-mobile-proof';
+                }
+            } catch { p.longTaskStatus='UNKNOWN-observer-unavailable'; }
             const combat=window.__combat;
             p.pointer=e=>{
                 if(e.target?.closest?.('.tc-attack') && p.inputs.length<400)
@@ -140,6 +242,7 @@ class CombatTiming:
             };
             window.addEventListener('message',p.listener);
         }""")
+        await native.evaluate(GPU_PROBE_SCRIPT)
         async def phase(name):
             self.phase = name
             before = asyncio.get_running_loop().time()*1000
@@ -152,18 +255,7 @@ class CombatTiming:
         await cdp.send('Performance.enable')
         async def measure(name, seconds):
             await phase(name)
-            before = await cdp.send('Performance.getMetrics')
-            await cdp.send('Profiler.start')
-            try:
-                await asyncio.sleep(seconds)
-            finally:
-                result = await cdp.send('Profiler.stop')
-                after = await cdp.send('Performance.getMetrics')
-                a = {m['name']: m['value'] for m in before['metrics']}
-                b = {m['name']: m['value'] for m in after['metrics']}
-                self.profiles[name] = {'cpu': self.cpu_summary(result['profile']),
-                    'metrics': {key: b.get(key, 0)-a.get(key, 0) for key in
-                                ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
+            await self.profile_interval(cdp, name, lambda: asyncio.sleep(seconds))
 
         async def pose():
             return await native.evaluate('''() => {
@@ -249,8 +341,10 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
-            if await attack('combat', 2, .25):
-                await attack('rapid', 4, .12)
+            async def combat_sequence():
+                if await attack('combat', 2, .25):
+                    await attack('rapid', 4, .12)
+            await self.profile_interval(cdp, 'combat-and-rapid', combat_sequence)
             await phase('settle')
             await asyncio.sleep(3)
             await phase('capture')
@@ -261,12 +355,25 @@ class CombatTiming:
             await cdp.detach()
             self.frames = await native.evaluate("""() => {
                 const p=window.__qaCombatTiming;
-                p.active=false; window.removeEventListener('message',p.listener);
+                p.active=false; p.longTaskObserver?.disconnect();
+                window.removeEventListener('message',p.listener);
                 document.removeEventListener('pointerdown',p.pointer,true);
                 document.removeEventListener('pointerup',p.pointer,true);
                 if(window.__combat?.onSharedMonsterAttack===p.observedHit)
                     window.__combat.onSharedMonsterAttack=p.originalHit;
-                return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs};
+                for(const w of p.gpuWrappers||[])
+                    if(w.gl[w.method]===w.wrapped) w.gl[w.method]=w.original;
+                const d=p.drawWrapper;
+                if(d) {
+                    if(d.proto.onBeforeRender===d.wrappedBefore) d.proto.onBeforeRender=d.before;
+                    if(d.proto.onAfterRender===d.wrappedAfter) d.proto.onAfterRender=d.after;
+                }
+                const w=p.parentPostWrapper;
+                if(w && w.host.postMessage===w.wrapped) w.host.postMessage=w.original;
+                return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs,
+                    longTasks:p.longTasks,longTaskStatus:p.longTaskStatus,
+                    gpuCalls:p.gpuCalls,gpuStatus:p.gpuStatus,
+                    parentPosts:p.parentPosts,postStatus:p.postStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
 
@@ -284,6 +391,7 @@ class CombatTiming:
                 'stopReason': self.stop_reason,
                 'rapidScenario': 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
                 'profiles':self.profiles,
+                'cpuScope':'runner-main-target-cdp-not-mobile-proof',
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
                 'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
                 'clockSamples':self.clock_samples,
