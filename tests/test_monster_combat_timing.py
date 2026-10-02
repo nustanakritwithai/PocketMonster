@@ -211,6 +211,48 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(probe.wire_sends[1]['frameBytes'])
         self.assertNotIn('never-log-this', str(probe.wire_sends))
 
+    async def test_inbound_metadata_is_numeric_per_socket_and_phase_without_payload(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.received_size(alias, 1000, True, 42)
+        probe.received_size(alias, 2000, True, 51)
+        probe.received_size(alias, 100, False)
+        probe.phase = 'combat'
+        probe.received_size(alias, 1500, True, 8)
+        inbound = probe.summary()['inboundObservation']
+        setup, combat = inbound['socketsByPhase']
+        self.assertEqual(setup['frames'], 3)
+        self.assertEqual(setup['worldSnapshots'], 2)
+        self.assertEqual(setup['totalFrameBytes'], 3100)
+        self.assertEqual(setup['maxFrameBytes'], 2000)
+        self.assertEqual(setup['meanWorldFrameBytes'], 1500)
+        self.assertEqual(setup['maxMessageCount'], 51)
+        self.assertEqual(combat['phase'], 'combat')
+        self.assertEqual(combat['worldSnapshots'], 1)
+        self.assertEqual(inbound['serverSendWaitGate'], 'UNKNOWN')
+
+    async def test_inbound_unknown_size_and_unassociated_socket_are_not_zero_evidence(self):
+        probe = CombatTiming()
+        probe.received_size(1, 100, True, 1)
+        self.assertEqual(probe.summary()['inboundObservation']['status'], 'UNKNOWN-not-observed')
+        alias = probe.new_socket_alias()
+        probe.received_size(alias, True, True, True)
+        row = probe.summary()['inboundObservation']['socketsByPhase'][0]
+        self.assertEqual(row['unknownByteFrames'], 1)
+        self.assertIsNone(row['meanWorldFrameBytes'])
+        self.assertIsNone(row['maxMessageCount'])
+
+    async def test_inbound_bound_and_complete_phase_do_not_retain_late_frames(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        for _ in range(5010):
+            probe.received_size(alias, 10, True, 1)
+        self.assertEqual(probe.summary()['inboundObservation']['frames'], 5000)
+        self.assertTrue(probe.summary()['inboundObservation']['truncated'])
+        probe.phase = 'complete'
+        probe.received_size(alias, 9999, True, 512)
+        self.assertEqual(probe.inbound_frames, 5000)
+
     async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
         probe = CombatTiming()
         event = probe.socket_event('close')

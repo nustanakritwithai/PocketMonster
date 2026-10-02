@@ -245,6 +245,9 @@ class CombatTiming:
         self.socket_generations = {}
         self.wire_sends = []
         self.wire_truncated = False
+        self.inbound = {}
+        self.inbound_frames = 0
+        self.inbound_truncated = False
 
     def new_socket_alias(self):
         if self.phase == 'complete':
@@ -348,6 +351,47 @@ class CombatTiming:
         return {'status': 'CAPTURED-client-callback-not-server-arrival' if self.socket_serial else 'UNKNOWN-not-observed',
                 'windowMs': 10000, 'serverArrivalGate': 'UNKNOWN',
                 'sockets': rows, 'sends': self.wire_sends, 'truncated': self.wire_truncated}
+
+    def received_size(self, socket_alias, frame_bytes, is_world, message_count=None):
+        # เก็บเฉพาะขนาด/จำนวน ไม่เก็บ packet หรือ identity; callback ไม่ใช่เวลาเริ่มส่งของ Server
+        if self.phase == 'complete' or type(socket_alias) is not int or not 1 <= socket_alias <= self.socket_serial:
+            return
+        if self.inbound_frames >= 5000:
+            self.inbound_truncated = True
+            return
+        self.inbound_frames += 1
+        phase = self.phase if self.phase in ('setup', 'idle', 'settle', 'approach', 'combat', 'rapid', 'tail') else 'other'
+        key = (socket_alias, phase)
+        now = asyncio.get_running_loop().time()*1000
+        row = self.inbound.setdefault(key, {'socketAlias':socket_alias, 'phase':phase,
+            'frames':0, 'worldSnapshots':0, 'measuredWorldSnapshots':0,
+            'totalFrameBytes':0, 'totalWorldBytes':0, 'maxFrameBytes':0,
+            'maxMessageCount':None, 'unknownByteFrames':0,
+            'firstAtMs':round(now, 2), 'lastAtMs':round(now, 2), 'maxGapMs':0})
+        row['frames'] += 1
+        row['maxGapMs'] = max(row['maxGapMs'], round(now-row['lastAtMs'], 2))
+        row['lastAtMs'] = round(now, 2)
+        if is_world is True:
+            row['worldSnapshots'] += 1
+            if type(message_count) is int and 0 <= message_count <= 512:
+                row['maxMessageCount'] = max(row['maxMessageCount'] or 0, message_count)
+        if type(frame_bytes) is int and 0 <= frame_bytes <= 16_777_216:
+            row['totalFrameBytes'] += frame_bytes
+            row['maxFrameBytes'] = max(row['maxFrameBytes'], frame_bytes)
+            if is_world is True:
+                row['totalWorldBytes'] += frame_bytes
+                row['measuredWorldSnapshots'] += 1
+        else:
+            row['unknownByteFrames'] += 1
+
+    def inbound_summary(self):
+        rows = []
+        for row in self.inbound.values():
+            count = row['measuredWorldSnapshots']
+            rows.append({**row, 'meanWorldFrameBytes':round(row['totalWorldBytes']/count, 2) if count else None})
+        return {'status':'CAPTURED-runner-callback-not-server-send' if self.inbound_frames else 'UNKNOWN-not-observed',
+                'serverSendWaitGate':'UNKNOWN', 'frames':self.inbound_frames,
+                'truncated':self.inbound_truncated, 'socketsByPhase':rows}
 
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
@@ -692,4 +736,5 @@ class CombatTiming:
                 'socketLifecycle':self.socket_lifecycle,
                 'socketLifecycleTruncated':self.socket_truncated,
                 'wireObservation':self.wire_summary(),
+                'inboundObservation':self.inbound_summary(),
                 'combatHpChanges':sum(s['hpChanges'] for s in self.samples if s['phase']=='combat')}
