@@ -77,6 +77,21 @@ class CombatTiming:
         return [{'asset': k[0], 'function': k[1], 'line': k[2], 'column': k[3], 'selfMs': round(v/1000, 2)}
                 for k, v in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:40]]
 
+    async def profile_interval(self, cdp, name, operation):
+        # วัดรอบUIเดิม ไม่เพิ่มการตี/ย้ายตัวละคร และไม่บันทึกrawprofileหรือURL
+        before = await cdp.send('Performance.getMetrics')
+        await cdp.send('Profiler.start')
+        try:
+            return await operation()
+        finally:
+            result = await cdp.send('Profiler.stop')
+            after = await cdp.send('Performance.getMetrics')
+            a = {m['name']: m['value'] for m in before['metrics']}
+            b = {m['name']: m['value'] for m in after['metrics']}
+            self.profiles[name] = {'cpu': self.cpu_summary(result['profile']),
+                'metrics': {key: b.get(key, 0)-a.get(key, 0) for key in
+                            ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
+
     async def run(self, game, scene, get_wild, out):
         target_id = 'monster:starter-crab-1'
         natives = [f for f in game.frames if urlsplit(f.url).path.endswith('/pirate-fruit-offline/index.html')]
@@ -89,7 +104,24 @@ class CombatTiming:
             raise RuntimeError('timing-native-frame-missing')
         # เก็บเฉพาะตัวเลข ไม่เก็บ URL/token/payload; ไม่แทนที่ WebSocket หรือ handler เกม
         await native.evaluate("""() => {
-            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], inputs:[], active:true};
+            const p = window.__qaCombatTiming = {phase:'idle', frames:[], messages:[], hits:[], inputs:[],
+                longTasks:[],longTaskStatus:'UNKNOWN-unsupported',active:true};
+            // longtaskเก็บเฉพาะตัวเลข; phaseคือช่วงที่observerได้รับ ไม่เดาว่าทั้งtaskอยู่phaseนั้น
+            try {
+                if(PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+                    p.longTaskObserver=new PerformanceObserver(list=>{
+                        if(!p.active) return;
+                        for(const entry of list.getEntries()) {
+                            if(p.longTasks.length>=400) break;
+                            if(Number.isFinite(entry.startTime)&&Number.isFinite(entry.duration))
+                                p.longTasks.push({phaseAtObservation:p.phase,at:entry.startTime,
+                                    durationMs:entry.duration,observedAtMs:performance.now()});
+                        }
+                    });
+                    p.longTaskObserver.observe({type:'longtask',buffered:false});
+                    p.longTaskStatus='CAPTURED-not-mobile-proof';
+                }
+            } catch { p.longTaskStatus='UNKNOWN-observer-unavailable'; }
             const combat=window.__combat;
             p.pointer=e=>{
                 if(e.target?.closest?.('.tc-attack') && p.inputs.length<400)
@@ -152,18 +184,7 @@ class CombatTiming:
         await cdp.send('Performance.enable')
         async def measure(name, seconds):
             await phase(name)
-            before = await cdp.send('Performance.getMetrics')
-            await cdp.send('Profiler.start')
-            try:
-                await asyncio.sleep(seconds)
-            finally:
-                result = await cdp.send('Profiler.stop')
-                after = await cdp.send('Performance.getMetrics')
-                a = {m['name']: m['value'] for m in before['metrics']}
-                b = {m['name']: m['value'] for m in after['metrics']}
-                self.profiles[name] = {'cpu': self.cpu_summary(result['profile']),
-                    'metrics': {key: b.get(key, 0)-a.get(key, 0) for key in
-                                ('ScriptDuration', 'TaskDuration', 'LayoutDuration', 'RecalcStyleDuration')}}
+            await self.profile_interval(cdp, name, lambda: asyncio.sleep(seconds))
 
         async def pose():
             return await native.evaluate('''() => {
@@ -249,8 +270,10 @@ class CombatTiming:
             if not reached:
                 raise RuntimeError('timing-target-not-reached')
             # มอนของQAถูกRecallแล้วจากขั้นก่อนหน้า ใช้ปุ่มเดิมตีเอง ไม่summonมอนช่วย
-            if await attack('combat', 2, .25):
-                await attack('rapid', 4, .12)
+            async def combat_sequence():
+                if await attack('combat', 2, .25):
+                    await attack('rapid', 4, .12)
+            await self.profile_interval(cdp, 'combat-and-rapid', combat_sequence)
             await phase('settle')
             await asyncio.sleep(3)
             await phase('capture')
@@ -261,12 +284,14 @@ class CombatTiming:
             await cdp.detach()
             self.frames = await native.evaluate("""() => {
                 const p=window.__qaCombatTiming;
-                p.active=false; window.removeEventListener('message',p.listener);
+                p.active=false; p.longTaskObserver?.disconnect();
+                window.removeEventListener('message',p.listener);
                 document.removeEventListener('pointerdown',p.pointer,true);
                 document.removeEventListener('pointerup',p.pointer,true);
                 if(window.__combat?.onSharedMonsterAttack===p.observedHit)
                     window.__combat.onSharedMonsterAttack=p.originalHit;
-                return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs};
+                return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs,
+                    longTasks:p.longTasks,longTaskStatus:p.longTaskStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
 
@@ -284,6 +309,7 @@ class CombatTiming:
                 'stopReason': self.stop_reason,
                 'rapidScenario': 'UNKNOWN' if self.stop_reason else 'CAPTURED-not-acceptance',
                 'profiles':self.profiles,
+                'cpuScope':'runner-main-target-cdp-not-mobile-proof',
                 'visualBatchingGate':'UNKNOWN', 'packets':self.samples, 'native':self.frames,
                 'timeline':self.timeline, 'perIntentServerRejection':'UNKNOWN-no-ack-on-wire',
                 'clockSamples':self.clock_samples,
