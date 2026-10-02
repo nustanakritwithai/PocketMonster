@@ -1,7 +1,7 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
 import asyncio
-from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle, attack_geometry
 
 
 class FakeCDP:
@@ -134,10 +134,11 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
             probe.sent(packet, alias)
         wire = probe.summary()['wireObservation']
         self.assertEqual([e['type'] for e in wire['sends']],
-                         ['world-pos','combat-prediction','other-control','other-control','other-control'])
+                         ['world-pos','combat-prediction','other-control','unknown-frame','unknown-frame'])
         self.assertEqual(wire['sockets'][0]['world'], 1)
         self.assertEqual(wire['sockets'][0]['combatPrediction'], 1)
-        self.assertEqual(wire['sockets'][0]['otherControl'], 3)
+        self.assertEqual(wire['sockets'][0]['otherControl'], 1)
+        self.assertEqual(wire['sockets'][0]['unknownFrames'], 2)
         self.assertEqual(wire['serverArrivalGate'], 'UNKNOWN')
         for value in ('never-log-this','private-player','invalid.example'):
             self.assertNotIn(value, str(wire))
@@ -153,7 +154,7 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
                             for i in range(120)]
         first, second = probe.summary()['wireObservation']['sockets']
         self.assertEqual(first['worldPeak10s'], 241)
-        self.assertEqual(first['controlPeak10s'], 120)
+        self.assertEqual(first['controlCandidatePeak10s'], 120)
         self.assertEqual(second['worldPeak10s'], 1)
 
     async def test_wire_storage_is_bounded_and_unassociated_socket_is_unknown(self):
@@ -165,6 +166,23 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
             probe.sent({'type':'world-pos'}, alias)
         self.assertEqual(len(probe.wire_sends), 5000)
         self.assertTrue(probe.summary()['wireObservation']['truncated'])
+
+    async def test_attack_geometry_distinguishes_behind_from_within_range(self):
+        before = {'x':0,'z':0,'heading':0}
+        behind = attack_geometry(before, {'x':0,'z':-.5})
+        front = attack_geometry(before, {'x':0,'z':.5})
+        self.assertEqual(behind['distance'], .5)
+        self.assertEqual(behind['facingDot'], -1)
+        self.assertEqual(front['facingDot'], 1)
+        self.assertEqual(before, {'x':0,'z':0,'heading':0})
+
+    async def test_unavailable_aim_is_unknown_not_forward(self):
+        self.assertIsNone(attack_geometry({'x':0,'z':0}, {'x':0,'z':1}))
+        self.assertIsNone(attack_geometry({'x':0,'z':0,'heading':float('nan')}, {'x':0,'z':1}))
+        self.assertIsNone(attack_geometry({'x':True,'z':0,'heading':0}, {'x':0,'z':1}))
+        geometry = attack_geometry({'x':0,'z':0,'heading':0}, {'x':0,'z':0})
+        self.assertEqual(geometry['distance'], 0)
+        self.assertIsNone(geometry['facingDot'])
 
     async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
         probe = CombatTiming()

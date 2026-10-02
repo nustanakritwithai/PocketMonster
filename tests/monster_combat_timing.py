@@ -5,6 +5,20 @@ import re
 from urllib.parse import urlsplit
 
 
+def attack_geometry(pose, target):
+    # คำนวณข้อเท็จจริงเพื่อQAเท่านั้น ไม่เขียนheading/positionหรือเปลี่ยนกรวยของเกม
+    if not isinstance(pose, dict) or not isinstance(target, dict):
+        return None
+    values = [pose.get('x'), pose.get('z'), pose.get('heading'), target.get('x'), target.get('z')]
+    if any(type(v) not in (int, float) or not math.isfinite(v) for v in values):
+        return None
+    x, z, heading, tx, tz = values
+    dx, dz = tx-x, tz-z
+    distance = math.hypot(dx, dz)
+    return {'distance': distance,
+            'facingDot': (dx*math.sin(heading)+dz*math.cos(heading))/distance if distance >= .001 else None}
+
+
 def observe_socket_lifecycle(timing, socket, read_diagnostics=None, page_socket_ordinal=None):
     # อ่าน lifecycle ของsocketเกมเดิม ไม่เปิดconnectionหรือเก็บURL/ข้อความerror
     if timing is None:
@@ -290,10 +304,11 @@ class CombatTiming:
             row = {'socketAlias': alias, 'sends': len(sends),
                    'world': sum(e['type'] == 'world-pos' for e in sends),
                    'combatPrediction': sum(e['type'] == 'combat-prediction' for e in sends),
-                   'otherControl': sum(e['type'] == 'other-control' for e in sends)}
+                   'otherControl': sum(e['type'] == 'other-control' for e in sends),
+                   'unknownFrames': sum(e['type'] == 'unknown-frame' for e in sends)}
             for name, events in (
                     ('worldPeak10s', [e for e in sends if e['type'] == 'world-pos']),
-                    ('controlPeak10s', [e for e in sends if e['type'] != 'world-pos'])):
+                    ('controlCandidatePeak10s', [e for e in sends if e['type'] in ('combat-prediction', 'other-control')])):
                 left, peak = 0, 0
                 for right, event in enumerate(events):
                     while events[left]['atMs'] <= event['atMs']-10000:
@@ -314,7 +329,7 @@ class CombatTiming:
         if self.phase == 'complete':
             return
         if type(socket_alias) is int and 1 <= socket_alias <= self.socket_serial:
-            kind = 'world-pos' if isinstance(packet, dict) and packet.get('type') == 'world-pos' else (
+            kind = 'unknown-frame' if not isinstance(packet, dict) else 'world-pos' if packet.get('type') == 'world-pos' else (
                 'combat-prediction' if isinstance(packet, dict) and packet.get('schemaVersion') == 'combat-prediction-envelope/v9.1'
                 else 'other-control')
             if len(self.wire_sends) < 5000:
@@ -488,8 +503,8 @@ class CombatTiming:
 
         async def pose():
             return await native.evaluate('''() => {
-                const p=window.__combat?.controller?.position;
-                return p ? {x:p.x,z:p.z} : null;
+                const c=window.__combat?.controller,p=c?.position;
+                return p ? {x:p.x,z:p.z,heading:c.heading} : null;
             }''')
 
         async def confirm(expression):
@@ -516,15 +531,31 @@ class CombatTiming:
         async def attack(name, count, delay):
             await phase(name)
             for _ in range(count):
-                current = await pose()
-                target = next((a for a in get_wild() if a['id']==target_id), None)
-                if not target or not current or math.hypot(target['x']-current['x'], target['z']-current['z']) >= 2.6:
-                    self.stop_reason = 'target-out-of-range'
+                geometry = None
+                for _ in range(8):
+                    current = await pose()
+                    target = next((a for a in get_wild() if a['id']==target_id), None)
+                    geometry = attack_geometry(current, target)
+                    if not geometry or geometry['distance'] >= 2.6:
+                        self.stop_reason = 'target-out-of-range'
+                        break
+                    if geometry['facingDot'] is None:
+                        self.stop_reason = 'target-too-close-to-aim'
+                        break
+                    if geometry['facingDot'] >= .75:
+                        break
+                    # หันผ่านจอยเดิมด้วยการเดินสั้น ๆ แล้วอ่านทั้งpose/targetใหม่
+                    # ไม่forceheading ไม่autotarget ไม่ขยายrangeหรือกรวย120องศาของเกม
+                    dx, dz, distance = target['x']-current['x'], target['z']-current['z'], geometry['distance']
+                    await drag(.25*(dx*rx+dz*rz)/distance, .25*(-dx*rz+dz*rx)/distance, .15)
+                else:
+                    self.stop_reason = 'target-not-facing'
+                if self.stop_reason:
                     self.record('scenario-stopped', reason=self.stop_reason)
                     return False
                 self.record('input-before', x=current.get('x') if current else None,
                     z=current.get('z') if current else None,
-                    distance=math.hypot(target['x']-current['x'],target['z']-current['z']) if target and current else None)
+                    distance=geometry['distance'], facingDot=geometry['facingDot'])
                 button = scene.locator('#captureBtn')
                 state = await button.evaluate('''b => ({disabled:b.disabled,
                     ariaDisabled:b.getAttribute('aria-disabled'),reason:b.getAttribute('data-reason')})''')
