@@ -1,6 +1,6 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle
 
 
 class FakeCDP:
@@ -23,6 +23,52 @@ class FakeCDP:
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unobserved_socket_is_unknown_not_zero_faults(self):
+        probe = CombatTiming()
+        self.assertEqual(probe.summary()['socketLifecycleStatus'], 'UNKNOWN-not-observed')
+        self.assertEqual(probe.summary()['socketLifecycle'], [])
+
+    async def test_existing_socket_observer_filters_path_and_drops_sensitive_arguments(self):
+        class FakeSocket:
+            def __init__(self, url):
+                self.url = url
+                self.handlers = {}
+
+            def on(self, event, handler):
+                self.handlers[event] = handler
+
+        probe = CombatTiming()
+        other = FakeSocket('wss://invalid.example/other?token=never-log-this')
+        observe_socket_lifecycle(probe, other)
+        self.assertEqual(other.handlers, {})
+        socket = FakeSocket('wss://invalid.example/ws/chat?token=never-log-this')
+        observe_socket_lifecycle(probe, socket)
+        self.assertEqual(set(socket.handlers), {'close', 'socketerror'})
+        probe.phase = 'combat'
+        socket.handlers['socketerror']('private-player never-log-this')
+        socket.handlers['close'](socket)
+        self.assertEqual([e['kind'] for e in probe.summary()['socketLifecycle']],
+                         ['created', 'error', 'close'])
+        self.assertNotIn('never-log-this', str(probe.summary()))
+        self.assertNotIn('invalid.example', str(probe.summary()))
+        self.assertNotIn('private-player', str(probe.summary()))
+        self.assertEqual(probe.summary()['socketLifecycleStatus'],
+                         'CAPTURED-socket-events-not-connection-acceptance')
+
+    async def test_socket_probe_is_bounded_and_ignores_teardown_and_unknown_events(self):
+        probe = CombatTiming()
+        probe.socket_event('untrusted-private-text')
+        self.assertEqual(probe.summary()['socketLifecycleStatus'], 'UNKNOWN-not-observed')
+        probe.phase = 'combat'
+        for _ in range(401):
+            probe.socket_event('error')
+        self.assertEqual(len(probe.socket_lifecycle), 400)
+        self.assertTrue(probe.summary()['socketLifecycleTruncated'])
+        probe.phase = 'complete'
+        before = list(probe.socket_lifecycle)
+        probe.socket_event('close')
+        self.assertEqual(probe.socket_lifecycle, before)
+
     async def test_material_probe_uses_real_scene_not_scoped_effects_and_tracks_shadow(self):
         self.assertIn('window.__combat?.scene', GPU_PROBE_SCRIPT)
         self.assertNotIn('window.__combat?.effects?.scene', GPU_PROBE_SCRIPT)

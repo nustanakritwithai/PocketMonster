@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
-from monster_combat_timing import CombatTiming
+from monster_combat_timing import CombatTiming, observe_socket_lifecycle
 from combat_browser_viewport import resize_combat_viewport
 
 ROOT = Path('candidate-artifact/dist-pages').resolve()
@@ -195,6 +195,7 @@ async def main():
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
+                observe_socket_lifecycle(timing, socket)
                 def sent(payload):
                     try:
                         packet = json.loads(payload)

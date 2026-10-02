@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as vendor from '../pirate-fruit-offline/assets/vendor-three-nlAIzLqr.js';
+import * as vendor from '../pirate-fruit-offline/assets/vendor-three-YfRDs8-E.js';
 import { threeFromPirateFruitVendor } from '../asset-presentation/pirate-fruit-client-bridge.mjs';
 import { createPirateOwnedMonsterCarry } from '../pirate-fruit-offline/pirate-owned-monster-carry.mjs';
 import { createPirateMonsterInventorySync } from '../pirate-monster-inventory-sync.mjs';
