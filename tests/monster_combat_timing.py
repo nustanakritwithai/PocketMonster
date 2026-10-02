@@ -12,6 +12,26 @@ GPU_PROBE_SCRIPT = r"""() => {
     p.parentPosts=[]; p.postStatus='UNKNOWN-unavailable';
     const canvas=document.querySelector('#app > canvas');
     const gl=canvas?.getContext('webgl2');
+    let proto=Object.getPrototypeOf(window.__combat?.effects?.scene??{});
+    while(proto && !Object.hasOwn(proto,'onBeforeRender')) proto=Object.getPrototypeOf(proto);
+    if(proto && typeof proto.onBeforeRender==='function' && typeof proto.onAfterRender==='function') {
+        const before=proto.onBeforeRender, after=proto.onAfterRender;
+        const types=new Set(['MeshBasicMaterial','MeshStandardMaterial','MeshPhysicalMaterial',
+            'SpriteMaterial','LineBasicMaterial','ShaderMaterial','MeshDepthMaterial','MeshDistanceMaterial']);
+        const wrappedBefore=function(...args) {
+            const m=args[4];
+            p.drawMaterial=m?{type:types.has(m.type)?m.type:'other',
+                toneMapped:m.toneMapped===true,fog:m.fog===true,map:!!m.map,
+                vertexColors:m.vertexColors===true,transparent:m.transparent===true,
+                side:Number.isSafeInteger(m.side)?m.side:null}:null;
+            return before.apply(this,args);
+        };
+        const wrappedAfter=function(...args) {
+            try { return after.apply(this,args); } finally { p.drawMaterial=null; }
+        };
+        proto.onBeforeRender=wrappedBefore; proto.onAfterRender=wrappedAfter;
+        p.drawWrapper={proto,before,after,wrappedBefore,wrappedAfter};
+    }
     if(gl) {
         const ids=new WeakMap(); let nextId=0;
         const id=value=>{
@@ -28,7 +48,7 @@ GPU_PROBE_SCRIPT = r"""() => {
                 finally {
                     if(p.active && p.gpuCalls.length<400)
                         p.gpuCalls.push({phase:p.phase,method,object:id(args[0]),at,
-                            durationMs:performance.now()-at});
+                            durationMs:performance.now()-at,material:p.drawMaterial??null});
                 }
             };
             gl[method]=wrapped;
@@ -343,6 +363,11 @@ class CombatTiming:
                     window.__combat.onSharedMonsterAttack=p.originalHit;
                 for(const w of p.gpuWrappers||[])
                     if(w.gl[w.method]===w.wrapped) w.gl[w.method]=w.original;
+                const d=p.drawWrapper;
+                if(d) {
+                    if(d.proto.onBeforeRender===d.wrappedBefore) d.proto.onBeforeRender=d.before;
+                    if(d.proto.onAfterRender===d.wrappedAfter) d.proto.onAfterRender=d.after;
+                }
                 const w=p.parentPostWrapper;
                 if(w && w.host.postMessage===w.wrapped) w.host.postMessage=w.original;
                 return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs,
