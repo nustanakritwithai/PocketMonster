@@ -1,7 +1,7 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
 import asyncio
-from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle, attack_geometry
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle, attack_geometry, wire_shape
 
 
 class FakeCDP:
@@ -183,6 +183,33 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         geometry = attack_geometry({'x':0,'z':0,'heading':0}, {'x':0,'z':0})
         self.assertEqual(geometry['distance'], 0)
         self.assertIsNone(geometry['facingDot'])
+
+    async def test_wire_shape_only_counts_root_routing_fields_and_nested_containers(self):
+        shape = wire_shape({'type':'world-pos','visual':{'schemaVersion':1,'events':[]},
+                            'monsterIntents':[{'targetActorId':'private-player'}]})
+        self.assertEqual(shape['rootCombatFieldCount'], 0)
+        self.assertEqual(shape['jsonDepthCapped9'], 3)
+        self.assertEqual(wire_shape({'SCHEMAVERSION':'never-log-this'})['rootCombatFieldCount'], 1)
+        self.assertNotIn('private-player', str(shape))
+        self.assertNotIn('never-log-this', str(wire_shape({'SCHEMAVERSION':'never-log-this'})))
+
+    async def test_wire_shape_depth_and_node_work_are_bounded(self):
+        deep = {}
+        for _ in range(50):
+            deep = {'private-player':deep}
+        self.assertEqual(wire_shape(deep)['jsonDepthCapped9'], 9)
+        wide = {'private-player':[{} for _ in range(1100)]}
+        self.assertEqual(wire_shape(wide)['shapeStatus'], 'UNKNOWN-node-bound')
+        self.assertIsNone(wire_shape(wide)['jsonDepthCapped9'])
+
+    async def test_frame_byte_metadata_preserves_unknown_and_never_keeps_payload(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.sent({'type':'world-pos','token':'never-log-this'}, alias, 1234)
+        probe.sent(None, alias, True)
+        self.assertEqual(probe.wire_sends[0]['frameBytes'], 1234)
+        self.assertIsNone(probe.wire_sends[1]['frameBytes'])
+        self.assertNotIn('never-log-this', str(probe.wire_sends))
 
     async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
         probe = CombatTiming()

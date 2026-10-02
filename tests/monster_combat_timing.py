@@ -5,6 +5,35 @@ import re
 from urllib.parse import urlsplit
 
 
+COMBAT_ROUTING_FIELDS = frozenset(name.casefold() for name in (
+    'schemaVersion', 'intentId', 'combatId', 'actionSequence', 'actorEntityId', 'targetEntityId',
+    'combatRulesVersion', 'calculationVersion', 'actionId', 'actionDefinitionVersion',
+    'worldSnapshotTick', 'actorStateVersion', 'targetStateVersion', 'actorStatusStateVersion',
+    'targetStatusStateVersion', 'actorProfileFingerprint', 'targetProfileFingerprint',
+    'actorStatusFingerprint', 'targetStatusFingerprint', 'actionFingerprint',
+    'worldSnapshotFingerprint', 'rngVersion', 'rngTicketId', 'rngTicketStateVersion',
+    'rngStreamFingerprint', 'predictedResultFingerprint', 'predictedCommitFingerprint',
+    'envelopeFingerprint'))
+
+
+def wire_shape(packet):
+    # รูปทรงJSONเป็นตัวเลขเท่านั้น เพื่อเทียบขอบเขตparser ไม่ใช่ผลclassify/acceptจากServer
+    depth, visited = 0, 0
+    stack = [(packet, 1)] if isinstance(packet, (dict, list)) else []
+    while stack and visited < 1024:
+        value, level = stack.pop()
+        visited += 1
+        depth = max(depth, level)
+        if level >= 9:
+            return {'jsonDepthCapped9': 9, 'shapeStatus': 'CAPTURED-depth-at-least-9',
+                    'rootCombatFieldCount': sum(k.casefold() in COMBAT_ROUTING_FIELDS for k in packet) if isinstance(packet, dict) else None}
+        children = value.values() if isinstance(value, dict) else value
+        stack.extend((v, level+1) for v in children if isinstance(v, (dict, list)))
+    return {'jsonDepthCapped9': depth if not stack else None,
+            'shapeStatus': 'CAPTURED-numeric-shape-not-server-classification' if not stack else 'UNKNOWN-node-bound',
+            'rootCombatFieldCount': sum(k.casefold() in COMBAT_ROUTING_FIELDS for k in packet) if isinstance(packet, dict) else None}
+
+
 def attack_geometry(pose, target):
     # คำนวณข้อเท็จจริงเพื่อQAเท่านั้น ไม่เขียนheading/positionหรือเปลี่ยนกรวยของเกม
     if not isinstance(pose, dict) or not isinstance(target, dict):
@@ -325,7 +354,7 @@ class CombatTiming:
             self.timeline.append({'kind': kind, 'phase': self.phase,
                 'atMs': round(asyncio.get_running_loop().time()*1000, 2), **values})
 
-    def sent(self, packet, socket_alias=None):
+    def sent(self, packet, socket_alias=None, frame_bytes=None):
         if self.phase == 'complete':
             return
         if type(socket_alias) is int and 1 <= socket_alias <= self.socket_serial:
@@ -334,7 +363,9 @@ class CombatTiming:
                 else 'other-control')
             if len(self.wire_sends) < 5000:
                 self.wire_sends.append({'socketAlias': socket_alias, 'type': kind, 'phase': self.phase,
-                    'atMs': round(asyncio.get_running_loop().time()*1000, 2)})
+                    'atMs': round(asyncio.get_running_loop().time()*1000, 2),
+                    'frameBytes': frame_bytes if type(frame_bytes) is int and 0 <= frame_bytes <= 1_048_576 else None,
+                    **wire_shape(packet)})
             else:
                 self.wire_truncated = True
         if not isinstance(packet, dict):

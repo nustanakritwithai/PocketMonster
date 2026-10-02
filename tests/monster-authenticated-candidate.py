@@ -212,7 +212,8 @@ async def main():
                     except (ValueError, TypeError):
                         packet = None
                     if timing and alias is not None:
-                        timing.sent(packet, alias)
+                        size = len(payload.encode('utf-8')) if isinstance(payload, str) else len(payload) if isinstance(payload, bytes) else None
+                        timing.sent(packet, alias, size)
                     if isinstance(packet, dict) and packet.get('type') == 'world-pos':
                         wire_counts['worldPoseSends'] += 1
                 socket.on('framesent', sent)
