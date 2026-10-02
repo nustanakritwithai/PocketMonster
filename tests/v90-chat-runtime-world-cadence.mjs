@@ -18,6 +18,7 @@ globalThis.document = {
 };
 globalThis.sessionStorage = { getItem() { return JSON.stringify({ sessionToken: 'cadence-session', expiresAtUtc: '2099-01-01T00:00:00Z' }); }, removeItem() {} };
 window.POCKETMONSTER_RUNTIME_CONFIG = { apiBaseUrl: 'https://server.example', webSocketUrl: 'wss://server.example/ws' };
+window.POCKETMONSTER_SELF_PRESENCE_ID = 'self-player';
 globalThis.fetch = async () => ({ ok: true, json: async () => ({ messages: [] }) });
 
 const intervals = [];
@@ -39,7 +40,8 @@ class FakeWebSocket {
 }
 globalThis.WebSocket = FakeWebSocket;
 window.POCKETMONSTER_WORLD_STATE = () => ({ zone: 'pirate-fruit', x: 1, z: 2, dir: 0.25 });
-window.POCKETMONSTER_WORLD_PRESENCE = () => true;
+const receivedSnapshots = [];
+window.POCKETMONSTER_WORLD_PRESENCE = snapshot => { receivedSnapshots.push(snapshot); return true; };
 
 try {
   await import(`../chat-runtime.mjs?world-cadence=${Date.now()}`);
@@ -94,13 +96,29 @@ try {
   socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
   socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [actor] } }) });
   socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [] } }) });
+  const playerAuthority = { schemaVersion: 1, serverTimeUtc: '2026-09-08T16:00:00.000Z', players: [
+    { playerId: 'self-player', generation: 2, stateSequence: 7, hp: { current: 87.5, max: 100, revision: 3 }, resultRevision: 2, lifeState: 'alive' },
+    { playerId: 'observer-player', generation: 2, stateSequence: 8, hp: { current: 0, max: 120, revision: 4 }, resultRevision: 5, lifeState: 'dead' },
+  ], results: [
+    { attackerId: 'monster:east-forest', targetId: 'self-player', attackId: 'hit-1', generation: 2, resultRevision: 1, authoritativeFinalHp: 87.5, serverTimeUtc: '2026-09-08T16:00:00.000Z' },
+    { attackerId: 'monster:east-forest', targetId: 'observer-player', attackId: 'hit-1', generation: 2, resultRevision: 1, authoritativeFinalHp: 0, serverTimeUtc: '2026-09-08T16:00:00.000Z' },
+  ] };
+  socket.emit('message', { data: JSON.stringify({ type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [{ id: 'self-player', x: 9, z: 9 }, { id: 'observer-player', x: 3, z: 4 }], playerAuthority } }) });
+  const authoritySnapshot = receivedSnapshots.at(-1);
+  assert.equal(authoritySnapshot.players.some(player => player.id === 'self-player'), false, 'self is filtered from visual players at parent ingress');
+  assert.equal(authoritySnapshot.players.some(player => player.id === 'observer-player'), true, 'observer remains in visual players at parent ingress');
+  assert.equal(authoritySnapshot.playerAuthority.players[0].playerId, 'self-player', 'self authority survives visual self filtering');
+  assert.equal(authoritySnapshot.playerAuthority.players[0].hp.current, 87.5, 'bridge preserves authoritative self HP');
+  assert.equal(authoritySnapshot.playerAuthority.players[1].lifeState, 'dead', 'bridge preserves observer death state');
+  assert.equal(authoritySnapshot.playerAuthority.results.length, 2, 'bridge preserves bounded multi-target results');
+  assert.equal(authoritySnapshot.playerAuthority.results[1].targetId, 'observer-player', 'bridge preserves result target identity');
   const route = window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldPresence;
-  assert.equal(route.acceptedSnapshots, 3, 'inbound world snapshots reach local route diagnostics');
+  assert.equal(route.acceptedSnapshots, 4, 'inbound world snapshots reach local route diagnostics');
   assert.equal(route.staleActors, 1, 'duplicate actor sequence is observable at the parent ingress');
   assert.equal(route.staleHpRevisions, 1, 'duplicate HP revisions are observable at the parent ingress');
   assert.equal(route.staleResultRevisions, 1, 'duplicate combat result revisions are observable at the parent ingress');
   assert.equal(route.actorsOmitted, 1, 'omitted actors are observable separately from actors[]');
-  assert.equal(route.sampleCount, 2, 'snapshot receive intervals are retained for p95/p99 capture');
+  assert.equal(route.sampleCount, 3, 'snapshot receive intervals are retained for p95/p99 capture');
   console.log('V9 chat WORLD_STATE 20Hz and visual-envelope guard: PASS');
 } finally {
   globalThis.setInterval = realSetInterval;
