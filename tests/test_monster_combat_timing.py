@@ -253,6 +253,13 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe.received_size(alias, 9999, True, 512)
         self.assertEqual(probe.inbound_frames, 5000)
 
+    async def test_malformed_intent_container_and_target_do_not_break_observer(self):
+        probe = CombatTiming()
+        for intents in (None, {}, 'invalid', [None, 7], [{'targetActorId':123} ]):
+            probe.sent({'type':'world-pos','monsterIntents':intents})
+        self.assertFalse(any(event.get('targeted') for event in probe.timeline))
+        self.assertTrue(all(event.get('target') is None for event in probe.timeline))
+
     async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
         probe = CombatTiming()
         event = probe.socket_event('close')

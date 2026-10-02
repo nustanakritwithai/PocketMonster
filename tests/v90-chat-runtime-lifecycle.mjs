@@ -18,6 +18,7 @@ if (!scenario) {
     'suspend-send-resume',
     'closing-resume',
     'fast-reconnect-and-backoff',
+    'flow-credit-reset',
     'store-auth-rejection-resets',
   ]) {
     const result = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name], { encoding: 'utf8' });
@@ -502,6 +503,46 @@ if (scenario === 'stop-during-config') {
   assert.equal(FakeWebSocket.instances.length, 8, 'even a late timer cannot reconnect after logout');
   globalThis.setTimeout = nativeSetTimeout;
   globalThis.clearTimeout = nativeClearTimeout;
+} else if (scenario === 'flow-credit-reset') {
+  window.POCKETMONSTER_RUNTIME_CONFIG = {
+    apiBaseUrl: 'https://server.example', webSocketUrl: 'wss://server.example/ws/chat',
+  };
+  globalThis.fetch = async () => reply({ messages: [] });
+  const nativeSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) => nativeSetTimeout(callback, delay === 200 ? 0 : delay, ...args);
+  await import(`../chat-runtime.mjs?flow-reset=${Date.now()}`);
+  const runtime = window.POCKETMONSTER_CHAT_RUNTIME;
+  const message = snapshotSequence => ({ data: JSON.stringify({ type: 'world-snapshot',
+    payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [], worldFlow: {
+      contract: 'world-flow/1', snapshotSequence, inputReceived: 0, inputWindow: 16, snapshotWindow: 8,
+    } } }) });
+  const first = FakeWebSocket.instances[0];
+  first.readyState = FakeWebSocket.OPEN;
+  first.emit('open');
+  first.emit('message', message(40));
+  assert.equal(runtime.diagnostics().worldFlow.supported, true);
+  first.readyState = FakeWebSocket.CLOSED;
+  first.emit('close', { code: 1006 });
+  await wait();
+  const second = FakeWebSocket.instances.at(-1);
+  assert.notEqual(second, first);
+  assert.deepEqual([runtime.diagnostics().worldFlow.supported, runtime.diagnostics().worldFlow.inputSent,
+    runtime.diagnostics().worldFlow.snapshotReceived], [false, 0, 0], 'replacement socket cannot inherit credit or snapshot ACK');
+  second.readyState = FakeWebSocket.OPEN;
+  second.emit('open');
+  first.emit('message', message(900));
+  first.emit('open');
+  assert.equal(runtime.diagnostics().worldFlow.supported, false, 'stale socket cannot negotiate credit for replacement');
+  second.emit('message', message(2));
+  assert.equal(runtime.diagnostics().worldFlow.snapshotReceived, 2);
+  first.emit('message', message(901));
+  assert.equal(runtime.diagnostics().worldFlow.snapshotReceived, 2, 'stale snapshot cannot advance active ACK');
+  window.dispatchEvent(new Event('pagehide'));
+  window.dispatchEvent(new Event('pageshow'));
+  await wait();
+  assert.equal(runtime.diagnostics().worldFlow.supported, false, 'resume negotiates a fresh transport window');
+  window.dispatchEvent(new Event('pocketmonster:session-ended'));
+  globalThis.setTimeout = nativeSetTimeout;
 } else if (scenario === 'store-auth-rejection-resets') {
   window.POCKETMONSTER_RUNTIME_CONFIG = {
     apiBaseUrl: 'https://server.example',

@@ -224,10 +224,15 @@ async def main():
                         if timing and alias is not None:
                             size = len(payload.encode('utf-8')) if isinstance(payload, str) else len(payload) if isinstance(payload, bytes) else None
                             is_world = isinstance(packet, dict) and packet.get('type') == 'world-snapshot'
-                            envelope = packet.get('payload', {}).get('pirateWorld', {}) if is_world else {}
+                            body = packet.get('payload') if is_world else None
+                            envelope = body.get('pirateWorld') if isinstance(body, dict) else None
                             messages = envelope.get('messages') if isinstance(envelope, dict) else None
                             timing.received_size(alias, size, is_world, len(messages) if isinstance(messages, list) else None)
+                        if not isinstance(packet, dict):
+                            return
                         world = packet.get('payload', {})
+                        if not isinstance(world, dict):
+                            return
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
                             if timing:
                                 timing.receive(world)
@@ -807,6 +812,13 @@ async def main():
                             socketCreates:Number.isSafeInteger(chat?.socketCreates)?chat.socketCreates:null,
                             combatPredictionSends:Number.isSafeInteger(chat?.combatPredictionSends)?chat.combatPredictionSends:null,
                             combatAuthorityMessages:Number.isSafeInteger(chat?.combatAuthorityMessages)?chat.combatAuthorityMessages:null,
+                            worldFlow:chat?.worldFlow ? {supported:chat.worldFlow.supported===true,
+                                inputSent:Number.isSafeInteger(chat.worldFlow.inputSent)?chat.worldFlow.inputSent:null,
+                                inputReceived:Number.isSafeInteger(chat.worldFlow.inputReceived)?chat.worldFlow.inputReceived:null,
+                                inputInFlight:Number.isSafeInteger(chat.worldFlow.inputInFlight)?chat.worldFlow.inputInFlight:null,
+                                peakInputInFlight:Number.isSafeInteger(chat.worldFlow.peakInputInFlight)?chat.worldFlow.peakInputInFlight:null,
+                                inputHeld:Number.isSafeInteger(chat.worldFlow.inputHeld)?chat.worldFlow.inputHeld:null,
+                                ackOnlySends:Number.isSafeInteger(chat.worldFlow.ackOnlySends)?chat.worldFlow.ackOnlySends:null} : null,
                             bootState:d?.sceneBootState,controlAvailable:s?.available,pending:c?.pending,
                             failure:/^[A-Z0-9_]{1,64}$/.test(code||'')?code:null};
                     }""")

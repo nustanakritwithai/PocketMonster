@@ -17,6 +17,11 @@ const COMBAT_AUTHORITY_RESPONSE_SCHEMA = 'combat-authority-response/v9.1.2';
 // เวลาretryเป็นนโยบายtransportเท่านั้น ไม่เปลี่ยน50ms world tickหรือจังหวะโจมตี
 const RECONNECT_DELAYS_MS = Object.freeze([200, 400, 800, 1600, 3200, 5000]);
 const RECONNECT_STABLE_WINDOW_MS = 5000;
+// credit เป็น transport เท่านั้น: เก็บ cadence เดิมเมื่อ ACK เดินหน้า และไม่ส่ง backlog ไม่จำกัด
+const WORLD_FLOW_CONTRACT = 'world-flow/1';
+const WORLD_INPUT_WINDOW = 16;
+const WORLD_SNAPSHOT_WINDOW = 8;
+const WORLD_ACK_ONLY_INTERVAL_MS = 200;
 const TERMINAL_SESSION_REJECTIONS = new Set([
   'AUTHENTICATION_REQUIRED',
   'INVALID_SESSION',
@@ -51,6 +56,7 @@ const state = {
   restAbortController: new AbortController(),
   socketCreates: 0,
   socketGeneration: 0,
+  worldFlow: null,
 };
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
@@ -481,6 +487,9 @@ function connectSocket() {
     state.socket = socket;
     state.socketCreates += 1;
     state.socketGeneration += 1;
+    const flow = { supported: false, inputSent: 0, inputReceived: 0, snapshotReceived: 0,
+      snapshotAckSent: 0, inputHeld: 0, ackOnlySends: 0, peakInputInFlight: 0, lastAckOnlyAt: null };
+    state.worldFlow = flow;
     socket.addEventListener('open', () => {
       if (state.socket !== socket || state.stopped || state.paused) return;
       const openContext = activeRequestContext();
@@ -488,12 +497,34 @@ function connectSocket() {
       state.socketOpenedAtMs = performance.now();
       socket.send(JSON.stringify({ token: openContext.token }));
       setCombatConnected(true);
+      const sendAckOnly = () => {
+        if (!flow.supported || flow.snapshotReceived <= flow.snapshotAckSent) return;
+        const now = performance.now();
+        if (flow.lastAckOnlyAt !== null && now - flow.lastAckOnlyAt < WORLD_ACK_ONLY_INTERVAL_MS) return;
+        try {
+          socket.send(JSON.stringify({ type: 'world-flow-ack', worldFlow: {
+            contract: WORLD_FLOW_CONTRACT, inputSequence: 0, snapshotAcknowledged: flow.snapshotReceived } }));
+          flow.snapshotAckSent = flow.snapshotReceived;
+          flow.lastAckOnlyAt = now;
+          flow.ackOnlySends += 1;
+        } catch { setWorldConnected(false); }
+      };
       const sendWorld = () => {
         if (!activeRequestContext()) return;
         if (state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        if (flow.supported && flow.inputSent - flow.inputReceived >= WORLD_INPUT_WINDOW) {
+          flow.inputHeld += 1;
+          // ACK-only ไม่เพิ่ม inputSequence/ไม่ commit visual หรือ consume monster intent
+          // ยังปลด credit ขากลับได้ จึงไม่ deadlock เมื่อสองฝั่งรอ ACK พร้อมกัน
+          sendAckOnly();
+          return;
+        }
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
         const frame = buildWorldPosFrame(snapshot);
-        if (!frame) return;
+        if (!frame) { sendAckOnly(); return; }
+        const flowMetadata = flow.supported ? { worldFlow: { contract: WORLD_FLOW_CONTRACT,
+          inputSequence: flow.inputSent + 1, snapshotAcknowledged: flow.snapshotReceived } } : {};
+        const packet = candidate => ({ type: 'world-pos', ...candidate, ...flowMetadata });
         if (lastWorldZone && lastWorldZone !== frame.zone) worldVisualQueue.clear();
         lastWorldZone = frame.zone;
         // Keep pose cadence independent from a pending visual batch.  The
@@ -507,19 +538,24 @@ function connectSocket() {
         const queuedEvents = visualEnvelopeReady ? worldVisualQueue.peek(32, candidate => {
           const candidateFrame = buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: candidate } });
           if (!candidateFrame) return false;
-          return new TextEncoder().encode(JSON.stringify({ type: 'world-pos', ...candidateFrame })).byteLength <= MAX_COMBAT_FRAME_BYTES;
+          return new TextEncoder().encode(JSON.stringify(packet(candidateFrame))).byteLength <= MAX_COMBAT_FRAME_BYTES;
         }) : [];
         const outboundFrame = queuedEvents.length
           ? buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: queuedEvents } })
           : baseFrame;
         if (!outboundFrame || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
-        const serialized = JSON.stringify({ type: 'world-pos', ...outboundFrame });
-        if (new TextEncoder().encode(serialized).byteLength > MAX_COMBAT_FRAME_BYTES) return;
+        const serialized = JSON.stringify(packet(outboundFrame));
+        if (new TextEncoder().encode(serialized).byteLength > MAX_COMBAT_FRAME_BYTES) { sendAckOnly(); return; }
         try {
           socket.send(serialized);
         } catch {
           setWorldConnected(false);
           return;
+        }
+        if (flow.supported) {
+          flow.inputSent += 1;
+          flow.snapshotAckSent = flow.snapshotReceived;
+          flow.peakInputInFlight = Math.max(flow.peakInputInFlight, flow.inputSent - flow.inputReceived);
         }
         worldVisualQueue.commit(queuedEvents.length, queuedEvents);
       };
@@ -545,6 +581,16 @@ function connectSocket() {
           if (!payload) {
             worldPresenceDiagnostics.recordRejected();
             return;
+          }
+          const advertised = message.payload?.worldFlow;
+          if (advertised?.contract === WORLD_FLOW_CONTRACT
+              && advertised.inputWindow === WORLD_INPUT_WINDOW && advertised.snapshotWindow === WORLD_SNAPSHOT_WINDOW
+              && Number.isSafeInteger(advertised.snapshotSequence) && advertised.snapshotSequence > 0
+              && Number.isSafeInteger(advertised.inputReceived) && advertised.inputReceived >= 0
+              && advertised.inputReceived <= flow.inputSent) {
+            flow.supported = true;
+            flow.snapshotReceived = Math.max(flow.snapshotReceived, advertised.snapshotSequence);
+            flow.inputReceived = Math.max(flow.inputReceived, advertised.inputReceived);
           }
           const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
           worldPresenceDiagnostics.observeSnapshot(filtered);
@@ -733,6 +779,11 @@ const runtime = Object.freeze({
     combatConnected: state.combatConnected,
     combatPredictionSends: state.combatPredictionSends,
     combatAuthorityMessages: state.combatAuthorityMessages,
+    worldFlow: state.worldFlow ? Object.freeze({ supported: state.worldFlow.supported,
+      inputSent: state.worldFlow.inputSent, inputReceived: state.worldFlow.inputReceived,
+      inputInFlight: state.worldFlow.inputSent - state.worldFlow.inputReceived,
+      peakInputInFlight: state.worldFlow.peakInputInFlight, inputHeld: state.worldFlow.inputHeld,
+      ackOnlySends: state.worldFlow.ackOnlySends, snapshotReceived: state.worldFlow.snapshotReceived }) : null,
     stopped: state.stopped,
     paused: state.paused,
     stopReason: state.stopReason,

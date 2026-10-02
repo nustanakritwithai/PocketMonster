@@ -416,12 +416,17 @@ class CombatTiming:
             return
         if packet.get('type') != 'world-pos':
             return
-        for intent in packet.get('monsterIntents') or []:
+        intents = packet.get('monsterIntents')
+        if not isinstance(intents, list):
+            return
+        for intent in intents[:32]:
+            if not isinstance(intent, dict):
+                continue
             self.attack_sequence += 1
             target = intent.get('targetActorId', '')
             self.record('socket-intent', number=self.attack_sequence,
-                sequence=intent.get('sequence'), targeted=target.startswith('monster:'),
-                target=target if re.fullmatch(r'monster:[a-z0-9-]{1,70}', target) else None,
+                sequence=intent.get('sequence'), targeted=isinstance(target, str) and target.startswith('monster:'),
+                target=target if isinstance(target, str) and re.fullmatch(r'monster:[a-z0-9-]{1,70}', target) else None,
                 category=intent.get('category'), x=packet.get('x'), z=packet.get('z'))
 
     def receive(self, world):
