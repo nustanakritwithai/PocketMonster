@@ -12,25 +12,59 @@ GPU_PROBE_SCRIPT = r"""() => {
     p.parentPosts=[]; p.postStatus='UNKNOWN-unavailable';
     const canvas=document.querySelector('#app > canvas');
     const gl=canvas?.getContext('webgl2');
-    let proto=Object.getPrototypeOf(window.__combat?.effects?.scene??{});
+    p.drawWrappers=[]; p.gpuDrawStatus='UNKNOWN-no-scene-hooks';
+    // เก็บreferenceเฉพาะระหว่างdraw ไม่สร้างmetadataหลายพันครั้งต่อเฟรม
+    // สรุปเมื่อมีGPUcallจริงเท่านั้น; geometry/ancestorใช้รายการอนุญาต ไม่ส่งname/uuid
+    const types=new Set(['MeshBasicMaterial','MeshStandardMaterial','MeshPhysicalMaterial',
+        'SpriteMaterial','LineBasicMaterial','ShaderMaterial','MeshDepthMaterial','MeshDistanceMaterial']);
+    const geometries=new Set(['TorusGeometry','CircleGeometry','PlaneGeometry','BoxGeometry',
+        'SphereGeometry','RingGeometry','IcosahedronGeometry','BufferGeometry']);
+    const describeDraw=()=>{
+        const m=p.drawMaterial,o=p.drawObject,g=p.drawGeometry;
+        if(!m) return null;
+        let source='other',ancestor=o;
+        for(let depth=0;ancestor&&depth<12;depth++,ancestor=ancestor.parent) {
+            if(ancestor.name==='pocket-monster-world-portal'||ancestor.name==='living-world-portal') {
+                source='world-portal'; break;
+            }
+            if(typeof ancestor.name==='string'&&ancestor.name.startsWith('effect:')) source='combat-effect';
+        }
+        return {pass:p.drawPass,type:types.has(m.type)?m.type:'other',
+            toneMapped:m.toneMapped===true,fog:m.fog===true,map:!!m.map,
+            vertexColors:m.vertexColors===true,transparent:m.transparent===true,
+            side:Number.isSafeInteger(m.side)?m.side:null,
+            geometry:geometries.has(g?.type)?g.type:'other',source,
+            instanced:o?.isInstancedMesh===true,batched:o?.isBatchedMesh===true,
+            skinned:o?.isSkinnedMesh===true,morph:!!g?.morphAttributes?.position,
+            alphaTest:Number.isFinite(m.alphaTest)?m.alphaTest:null,alphaHash:m.alphaHash===true,
+            depthTest:m.depthTest===true,depthWrite:m.depthWrite===true};
+    };
+    // effectsของPlayerCombatอาจเป็นScopedVisualEffects; sceneเป็นฉากจริงจากconstructor
+    let proto=Object.getPrototypeOf(window.__combat?.scene??{});
     while(proto && !Object.hasOwn(proto,'onBeforeRender')) proto=Object.getPrototypeOf(proto);
-    if(proto && typeof proto.onBeforeRender==='function' && typeof proto.onAfterRender==='function') {
-        const before=proto.onBeforeRender, after=proto.onAfterRender;
-        const types=new Set(['MeshBasicMaterial','MeshStandardMaterial','MeshPhysicalMaterial',
-            'SpriteMaterial','LineBasicMaterial','ShaderMaterial','MeshDepthMaterial','MeshDistanceMaterial']);
-        const wrappedBefore=function(...args) {
-            const m=args[4];
-            p.drawMaterial=m?{type:types.has(m.type)?m.type:'other',
-                toneMapped:m.toneMapped===true,fog:m.fog===true,map:!!m.map,
-                vertexColors:m.vertexColors===true,transparent:m.transparent===true,
-                side:Number.isSafeInteger(m.side)?m.side:null}:null;
-            return before.apply(this,args);
-        };
-        const wrappedAfter=function(...args) {
-            try { return after.apply(this,args); } finally { p.drawMaterial=null; }
-        };
-        proto.onBeforeRender=wrappedBefore; proto.onAfterRender=wrappedAfter;
-        p.drawWrapper={proto,before,after,wrappedBefore,wrappedAfter};
+    if(proto) {
+        for(const [beforeName,afterName,index,pass] of [
+            ['onBeforeRender','onAfterRender',4,'color'],
+            ['onBeforeShadow','onAfterShadow',5,'shadow']]) {
+            const before=proto[beforeName],after=proto[afterName];
+            if(typeof before!=='function'||typeof after!=='function') continue;
+            const wrappedBefore=function(...args) {
+                p.drawMaterial=args[index]??null; p.drawObject=this;
+                p.drawGeometry=args[index-1]??null; p.drawPass=pass;
+                try { return before.apply(this,args); }
+                catch(error) {
+                    p.drawMaterial=null; p.drawObject=null; p.drawGeometry=null; p.drawPass=null;
+                    throw error;
+                }
+            };
+            const wrappedAfter=function(...args) {
+                try { return after.apply(this,args); }
+                finally { p.drawMaterial=null; p.drawObject=null; p.drawGeometry=null; p.drawPass=null; }
+            };
+            proto[beforeName]=wrappedBefore; proto[afterName]=wrappedAfter;
+            p.drawWrappers.push({proto,beforeName,afterName,before,after,wrappedBefore,wrappedAfter});
+        }
+        if(p.drawWrappers.length===2) p.gpuDrawStatus='CAPTURED-color-and-shadow-variant';
     }
     if(gl) {
         const ids=new WeakMap(); let nextId=0;
@@ -46,9 +80,10 @@ GPU_PROBE_SCRIPT = r"""() => {
                 const at=performance.now();
                 try { return original.apply(this,args); }
                 finally {
+                    const durationMs=performance.now()-at;
                     if(p.active && p.gpuCalls.length<400)
                         p.gpuCalls.push({phase:p.phase,method,object:id(args[0]),at,
-                            durationMs:performance.now()-at,material:p.drawMaterial??null});
+                            durationMs,material:describeDraw()});
                 }
             };
             gl[method]=wrapped;
@@ -363,16 +398,16 @@ class CombatTiming:
                     window.__combat.onSharedMonsterAttack=p.originalHit;
                 for(const w of p.gpuWrappers||[])
                     if(w.gl[w.method]===w.wrapped) w.gl[w.method]=w.original;
-                const d=p.drawWrapper;
-                if(d) {
-                    if(d.proto.onBeforeRender===d.wrappedBefore) d.proto.onBeforeRender=d.before;
-                    if(d.proto.onAfterRender===d.wrappedAfter) d.proto.onAfterRender=d.after;
+                for(const d of p.drawWrappers||[]) {
+                    if(d.proto[d.beforeName]===d.wrappedBefore) d.proto[d.beforeName]=d.before;
+                    if(d.proto[d.afterName]===d.wrappedAfter) d.proto[d.afterName]=d.after;
                 }
                 const w=p.parentPostWrapper;
                 if(w && w.host.postMessage===w.wrapped) w.host.postMessage=w.original;
                 return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs,
                     longTasks:p.longTasks,longTaskStatus:p.longTaskStatus,
                     gpuCalls:p.gpuCalls,gpuStatus:p.gpuStatus,
+                    gpuDrawStatus:p.gpuDrawStatus,
                     parentPosts:p.parentPosts,postStatus:p.postStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))

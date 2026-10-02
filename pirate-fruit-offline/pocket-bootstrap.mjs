@@ -1,4 +1,4 @@
 import { installPirateSaveSandbox } from '../pirate-save-bridge-v900.mjs?v=3';
 
 await installPirateSaveSandbox();
-await import('./assets/index-wqahs61e.js');
+await import('./assets/index-OPmXPOpF.js');
