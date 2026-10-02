@@ -5,6 +5,56 @@ import re
 from urllib.parse import urlsplit
 
 
+# ใช้เฉพาะQAบนrunner: ส่งคืนผลเดิม/exceptionเดิม ไม่อ่านGLSL/tokenหรือแก้shader
+GPU_PROBE_SCRIPT = r"""() => {
+    const p=window.__qaCombatTiming;
+    p.gpuCalls=[]; p.gpuStatus='UNKNOWN-no-context'; p.gpuWrappers=[];
+    p.parentPosts=[]; p.postStatus='UNKNOWN-unavailable';
+    const canvas=document.querySelector('#app > canvas');
+    const gl=canvas?.getContext('webgl2');
+    if(gl) {
+        const ids=new WeakMap(); let nextId=0;
+        const id=value=>{
+            if(!value || typeof value!=='object') return null;
+            if(!ids.has(value)) ids.set(value,++nextId);
+            return ids.get(value);
+        };
+        for(const method of ['linkProgram','deleteProgram','getProgramInfoLog','getShaderInfoLog']) {
+            const original=gl[method];
+            if(typeof original!=='function') continue;
+            const wrapped=function(...args) {
+                const at=performance.now();
+                try { return original.apply(this,args); }
+                finally {
+                    if(p.active && p.gpuCalls.length<400)
+                        p.gpuCalls.push({phase:p.phase,method,object:id(args[0]),at,
+                            durationMs:performance.now()-at});
+                }
+            };
+            gl[method]=wrapped;
+            p.gpuWrappers.push({gl,method,original,wrapped});
+        }
+        p.gpuStatus='CAPTURED-numeric-calls-not-mobile-proof';
+    }
+    try {
+        const host=window.parent, original=host.postMessage;
+        const wrapped=function(message,...args) {
+            if(p.active && message?.type==='pocketmonster:pirate-presence-v1'
+                && Array.isArray(message.monsterIntents) && message.monsterIntents.length
+                && p.parentPosts.length<400)
+                p.parentPosts.push({phase:p.phase,at:performance.now(),
+                    count:message.monsterIntents.length,
+                    sequences:message.monsterIntents.slice(0,32).map(i=>i.sequence)
+                        .filter(Number.isSafeInteger)});
+            return original.call(this,message,...args);
+        };
+        host.postMessage=wrapped;
+        p.parentPostWrapper={host,original,wrapped};
+        p.postStatus='CAPTURED-sender-not-receive-or-ack';
+    } catch { p.postStatus='UNKNOWN-unavailable'; }
+}"""
+
+
 class CombatTiming:
     def __init__(self):
         self.phase = 'setup'
@@ -172,6 +222,7 @@ class CombatTiming:
             };
             window.addEventListener('message',p.listener);
         }""")
+        await native.evaluate(GPU_PROBE_SCRIPT)
         async def phase(name):
             self.phase = name
             before = asyncio.get_running_loop().time()*1000
@@ -290,8 +341,14 @@ class CombatTiming:
                 document.removeEventListener('pointerup',p.pointer,true);
                 if(window.__combat?.onSharedMonsterAttack===p.observedHit)
                     window.__combat.onSharedMonsterAttack=p.originalHit;
+                for(const w of p.gpuWrappers||[])
+                    if(w.gl[w.method]===w.wrapped) w.gl[w.method]=w.original;
+                const w=p.parentPostWrapper;
+                if(w && w.host.postMessage===w.wrapped) w.host.postMessage=w.original;
                 return {frames:p.frames,messages:p.messages,hits:p.hits,inputs:p.inputs,
-                    longTasks:p.longTasks,longTaskStatus:p.longTaskStatus};
+                    longTasks:p.longTasks,longTaskStatus:p.longTaskStatus,
+                    gpuCalls:p.gpuCalls,gpuStatus:p.gpuStatus,
+                    parentPosts:p.parentPosts,postStatus:p.postStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
 

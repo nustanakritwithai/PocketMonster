@@ -1,6 +1,6 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT
 
 
 class FakeCDP:
@@ -23,6 +23,16 @@ class FakeCDP:
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
+        self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
+        self.assertIn('p.parentPosts.length<400', GPU_PROBE_SCRIPT)
+        self.assertIn('original.apply(this,args)', GPU_PROBE_SCRIPT)
+        self.assertIn('original.call(this,message,...args)', GPU_PROBE_SCRIPT)
+        self.assertIn('finally', GPU_PROBE_SCRIPT)
+        for forbidden in ['getShaderSource', 'shaderSource', 'checkShaderErrors',
+                          'deleteShader', 'createShader', 'token', 'getError']:
+            self.assertNotIn(forbidden, GPU_PROBE_SCRIPT)
+
     async def test_profile_measures_existing_operation_once_and_redacts_url(self):
         probe, cdp = CombatTiming(), FakeCDP()
         calls = []
