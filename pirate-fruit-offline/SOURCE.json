@@ -1,7 +1,7 @@
 {
   "repo": "https://github.com/nustanakritwithai/Pirate-fruit-",
-  "ref": "8fe8802c12205607fb1ba54e12915f5382d1db5c",
-  "commit": "8fe8802c12205607fb1ba54e12915f5382d1db5c",
+  "ref": "4133a685bf8064334349add710bc3af4f56be84d",
+  "commit": "4133a685bf8064334349add710bc3af4f56be84d",
   "mode": "offline",
   "remote": false,
   "viteBase": "./",
@@ -16,7 +16,7 @@
   "pocketPresentation": {
     "visual": "pocket-asset-engine",
     "hook": "./pocket-presentation.mjs",
-    "artifact": "github-actions/intent-flush-8fe8802c",
+    "artifact": "github-actions/ready-hit-4133a685",
     "bridge": "../asset-presentation/pirate-fruit-client-bridge.mjs",
     "player": "character.human.pirate-fruit.v1",
     "people": "character.human.blocky-bighead.v1",
@@ -82,5 +82,5 @@
       "productionActivation": "Requires the authenticated host and compatible server snapshot; no feature flags are enabled by this refresh."
     }
   },
-  "artifactWorkflowRun": 36818354017
+  "artifactWorkflowRun": 36987567898
 }
