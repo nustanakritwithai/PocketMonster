@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
 from monster_combat_timing import CombatTiming
+from combat_browser_viewport import resize_combat_viewport
 
 ROOT = Path('candidate-artifact/dist-pages').resolve()
 OUT = Path('authenticated-candidate-evidence')
@@ -149,7 +150,8 @@ async def main():
             if path in SAFE_PATHS and response.status >= 400:
                 try:
                     failure = await response.json()
-                    code = failure.get('errorCode') or failure.get('code')
+                    # เก็บ specific code ก่อน REQUEST_FAILED ของตัวห่อ โดยยังกรองรหัสปลอดภัย
+                    code = failure.get('code') or failure.get('errorCode')
                     if isinstance(code, str) and re.fullmatch(r'[A-Z0-9_]{1,64}', code):
                         item = {'path': path, 'status': response.status, 'code': code}
                         if path == '/api/pirate/state/operation':
@@ -330,6 +332,25 @@ async def main():
                     await asyncio.sleep(0.2)
                 return False
 
+            async def primary_diagnostics():
+                return await scene.evaluate("""() => {
+                    const s=window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER?.snapshot?.();
+                    const b=document.querySelector('#captureBtn');
+                    const safe=x=>typeof x==='string' && /^[a-zA-Z-]{1,32}$/.test(x)?x:null;
+                    let canonicalAvailable=null;
+                    try {
+                        const provider=window.parent.POCKETMONSTER_MONSTER_STATE_PROVIDER;
+                        if(provider) canonicalAvailable=provider.snapshot?.().available===true;
+                    } catch {}
+                    return {world:safe(document.body.dataset.combinedWorld),
+                        panel:safe(document.body.dataset.controlPanel),
+                        controlMode:safe(document.querySelector('#pirateUnifiedControls')?.dataset.controlMode),
+                        icon:safe(b?.getAttribute('data-pirate-icon')),
+                        pending:s?.pending===true, canRecall:s?.capabilities?.recall===true,
+                        activeSlots:s?.slots?.filter(slot=>slot?.active===true).length??null,
+                        canonicalAvailable};
+                }""")
+
             EVIDENCE['stage'] = 'throw-ui'
             # bag fallback ทำให้ช่องพร้อมได้ก่อน canonical control-state; setup ต้องรอเซิร์ฟเวอร์จริง
             canonical_ready = False
@@ -396,6 +417,7 @@ async def main():
                             availableWidth: button.clientWidth - 8};
                 }""")
                 EVIDENCE['recallLabel'] = label_metrics
+                EVIDENCE['primaryDiagnostics'] = {'afterSummon': await primary_diagnostics()}
                 GATES['recall-label-fits'] = 'SAT' if label_metrics['textWidth'] <= label_metrics['availableWidth'] else 'VIOL'
                 same_node = await scene.evaluate("window.__qaOriginalPrimary === document.querySelector('#captureBtn')")
                 same_box = all(before and box and all(abs(before[k] - box[k]) <= 1 for k in ('x', 'y', 'width', 'height'))
@@ -411,6 +433,7 @@ async def main():
                 EVIDENCE['stage'] = 'primary-recall-click'
                 recall_probe['armed'] = True
                 recall_start = len(monster_commands)
+                EVIDENCE['primaryDiagnostics']['beforeRecall'] = await primary_diagnostics()
                 await primary.click(timeout=15000)
                 if not await confirm("""(() => {
                     const s = window.POCKETMONSTER_MONSTER_CONTROL_CONTROLLER.snapshot();
@@ -425,6 +448,7 @@ async def main():
                 recall_commands = monster_commands[recall_start:]
                 EVIDENCE['primaryButton'].update({'recalled': recalled, 'recallCommands': recall_commands,
                                                  'readbacksAfterRecallAck': recall_probe['reads']})
+                EVIDENCE['primaryDiagnostics']['afterRecall'] = await primary_diagnostics()
                 GATES['primary-recall'] = 'SAT'
                 GATES['single-recall-command'] = 'SAT' if recall_commands == ['recall'] else 'VIOL'
                 GATES['recall-readback'] = 'SAT' if recall_probe['ack'] and recall_probe['reads'] > 0 else 'VIOL'
@@ -440,7 +464,7 @@ async def main():
                     EVIDENCE['stage'] = 'combat-timing'
                     # รักษาขนาดมาตรฐานตอนตรวจช่องมอน; ลดเฉพาะหน้าต่างวัด combat
                     combat_viewport = {'width': 640, 'height': 360}
-                    await game.set_viewport_size(combat_viewport)
+                    EVIDENCE['combatWindowRestored'] = await resize_combat_viewport(game, combat_viewport)
                     EVIDENCE['combatViewport'] = combat_viewport
                     await timing.run(game, scene, lambda: wild, OUT)
                     EVIDENCE['combatTiming'] = timing.summary()
