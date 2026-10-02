@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "buildId": "8.4.0.content.6197a1a3f2e5",
+  "buildId": "8.4.0.content.fddb5fed698e",
   "serverVersion": "8.4.0",
   "gameVersion": "8.4.0",
-  "publishedAtUtc": "2026-10-02T13:00:18.390Z",
+  "publishedAtUtc": "2026-10-02T13:18:45.838Z",
   "files": [
     {
       "path": "account-link-ui.mjs",
@@ -362,8 +362,8 @@
     },
     {
       "path": "chat-runtime.mjs",
-      "size": 30274,
-      "sha256": "907d593ff0485e5af919a1aa0314626b1f3e2697edb546c0695e45f6a646c646"
+      "size": 32591,
+      "sha256": "59a0fa6cc85ff25113e0deb774e070fe7023a7a44c9a40fccd37b900954ca561"
     },
     {
       "path": "combat-rating.mjs",
@@ -478,7 +478,7 @@
     {
       "path": "combined-worlds-v900.mjs",
       "size": 2629,
-      "sha256": "b32d3204083b657ef177ec3f9e12d0fa148bc5188d2b50020eb92d716c882db1"
+      "sha256": "859ff4ed5bdcab02fb3f8aafd782f616db49d791ae6b1a1b95beb10fb8fd39fc"
     },
     {
       "path": "content-catalog.mjs",
@@ -508,7 +508,7 @@
     {
       "path": "entry-preload-v900.mjs",
       "size": 2377,
-      "sha256": "2bfa0887e060fc896df590f7d2b03f392149d10090121bf0250a4f3ae592a4f8"
+      "sha256": "59c58b63cd3b0af2d9265f90390959e0a60437fde158db224154b7903266511c"
     },
     {
       "path": "equipment.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "index.html",
       "size": 40735,
-      "sha256": "d0de4a7a6f5823f7dacb6f8d97ade236e2f4f7b131ed154e1fbcc95813777391"
+      "sha256": "5082685513a6d3e33be0d372b9ce56ff28499e29ca84668583576b4cc4b98358"
     },
     {
       "path": "launch-bootstrap.mjs",
@@ -648,7 +648,7 @@
     {
       "path": "online-world-shell-v900.mjs",
       "size": 29118,
-      "sha256": "cb45090ee6bbd800b301b2d1485b40c8d41f8b1ee7ee1df4d25f89f00cf01bea"
+      "sha256": "e1dba439b2eb3e3d86fb24e34509276983c60d086ab8b2ae8e743ad390c11eca"
     },
     {
       "path": "passive-catalog.mjs",
@@ -868,7 +868,7 @@
     {
       "path": "scene-entry-v900.mjs",
       "size": 8435,
-      "sha256": "b6df466cefe01de3f2d29dc2cae3ac2693f46ea6ed56a73261fb97fe04c201fa"
+      "sha256": "2deae1478a6568cb19abb82aba47d7be3d780fce6e80064a2aab7cf2308d45a0"
     },
     {
       "path": "scene-resource-lifecycle.mjs",
@@ -883,7 +883,7 @@
     {
       "path": "scene-v900.html",
       "size": 1332,
-      "sha256": "ddfc1e5b514e7d0a6ac528330887f75db540c8c492a042776260894ebc395cf5"
+      "sha256": "9decfde7ce361937484274cbc4a50fd8506ffcc533ab698fe70673638c477ca1"
     },
     {
       "path": "secondary-type-resolver.mjs",
@@ -1053,7 +1053,7 @@
     {
       "path": "v900.html",
       "size": 40735,
-      "sha256": "d0de4a7a6f5823f7dacb6f8d97ade236e2f4f7b131ed154e1fbcc95813777391"
+      "sha256": "5082685513a6d3e33be0d372b9ce56ff28499e29ca84668583576b4cc4b98358"
     },
     {
       "path": "warp-routes.mjs",
@@ -1083,7 +1083,7 @@
     {
       "path": "worlds-v900.mjs",
       "size": 11126,
-      "sha256": "f0b48c1cd1f19603f7d4c46ee01055b974f59c0f8a6280be19534ac13aa99a4c"
+      "sha256": "5b74c67622e725fdc1c4587724a7b2dc40662dfd2d44eb793eb88892263e67fa"
     }
   ]
 }

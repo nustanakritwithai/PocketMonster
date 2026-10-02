@@ -195,7 +195,12 @@ async def main():
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
             def observe_socket(socket):
-                observe_socket_lifecycle(timing, socket)
+                async def socket_diagnostics():
+                    return await opened_page.evaluate('''() => {
+                        const d=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
+                        return d ? {lastSocketClose:d.lastSocketClose,reconnectDelayMs:d.reconnectDelayMs} : null;
+                    }''')
+                observe_socket_lifecycle(timing, socket, socket_diagnostics)
                 def sent(payload):
                     try:
                         packet = json.loads(payload)

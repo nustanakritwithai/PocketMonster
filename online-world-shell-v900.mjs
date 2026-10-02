@@ -1,4 +1,4 @@
-import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=988';
+import { COMBINED_VERSION, resolveCombinedWorld, worldById } from './combined-worlds-v900.mjs?v=989';
 import { allowedPanelForWorld, combinedLocationQuery, panelIdFromLocation } from './control-panels-v900.mjs';
 import {
   clearLaunchSession,
@@ -680,7 +680,7 @@ window.addEventListener('pageshow', event => {
 
 showSceneLoading(`กำลังเปิด${worldById(activeWorld)?.label || 'ฉาก'}…`);
 sceneFrame.src = sceneUrl(activeWorld, activePanel);
-await import('./chat-runtime.mjs?v=8.4.0-original-world-1');
+await import('./chat-runtime.mjs?v=8.4.0-original-world-2');
 monsterStateProvider = createMonsterHttpProvider({
   config: window.POCKETMONSTER_RUNTIME_CONFIG,
   sessionToken: window.POCKETMONSTER_LAUNCH_SESSION?.sessionToken || '',

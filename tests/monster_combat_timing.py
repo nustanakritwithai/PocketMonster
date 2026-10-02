@@ -5,7 +5,7 @@ import re
 from urllib.parse import urlsplit
 
 
-def observe_socket_lifecycle(timing, socket):
+def observe_socket_lifecycle(timing, socket, read_diagnostics=None):
     # อ่าน lifecycle ของsocketเกมเดิม ไม่เปิดconnectionหรือเก็บURL/ข้อความerror
     if timing is None:
         return
@@ -15,7 +15,13 @@ def observe_socket_lifecycle(timing, socket):
         return
     if address.scheme not in ('ws', 'wss') or address.path != '/ws/chat':
         return
-    socket.on('close', lambda *_: timing.socket_event('close'))
+    def closed(*_):
+        event = timing.socket_event('close')
+        if event is not None and read_diagnostics is not None:
+            task = asyncio.create_task(timing.capture_socket_close(event, read_diagnostics))
+            timing.socket_tasks.add(task)
+            task.add_done_callback(timing.socket_tasks.discard)
+    socket.on('close', closed)
     socket.on('socketerror', lambda *_: timing.socket_event('error'))
     # created หมายถึงobserverเห็นsocket ไม่ใช่หลักฐานว่าhandshake/authสำเร็จ
     timing.socket_event('created')
@@ -183,6 +189,7 @@ class CombatTiming:
         self.socket_lifecycle = []
         self.socket_status = 'UNKNOWN-not-observed'
         self.socket_truncated = False
+        self.socket_tasks = set()
 
     def socket_event(self, kind):
         if kind not in ('created', 'close', 'error') or self.phase == 'complete':
@@ -191,8 +198,35 @@ class CombatTiming:
         if len(self.socket_lifecycle) >= 400:
             self.socket_truncated = True
             return
-        self.socket_lifecycle.append({'kind': kind, 'phase': self.phase,
-            'atMs': round(asyncio.get_running_loop().time()*1000, 2)})
+        event = {'kind': kind, 'phase': self.phase,
+            'atMs': round(asyncio.get_running_loop().time()*1000, 2)}
+        self.socket_lifecycle.append(event)
+        return event
+
+    async def capture_socket_close(self, event, reader):
+        event['detailStatus'] = 'UNKNOWN-not-read'
+        try:
+            data = await asyncio.wait_for(reader(), timeout=2)
+            close = data.get('lastSocketClose') if isinstance(data, dict) else None
+            if not isinstance(close, dict):
+                return
+            code, category, generation = close.get('code'), close.get('category'), close.get('generation')
+            if type(code) is int and 1000 <= code <= 4999:
+                event['code'] = code
+            if category in ('auth-rejected', 'rate-limited', 'policy', 'abnormal', 'normal',
+                            'going-away', 'try-later', 'unknown', 'other'):
+                event['category'] = category
+            if type(generation) is int and 1 <= generation <= 1_000_000:
+                event['closeGeneration'] = generation
+            if data.get('reconnectDelayMs') in (200, 400, 800, 1600, 3200, 5000):
+                event['reconnectDelayMs'] = data['reconnectDelayMs']
+            event['detailStatus'] = 'CAPTURED-safe-close-diagnostics-not-root-cause'
+        except Exception:
+            pass
+
+    async def flush_socket_events(self):
+        if self.socket_tasks:
+            await asyncio.gather(*list(self.socket_tasks), return_exceptions=True)
 
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
@@ -482,6 +516,7 @@ class CombatTiming:
                     parentPosts:p.parentPosts,postStatus:p.postStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
+            await self.flush_socket_events()
 
     def summary(self):
         # ต้องเห็น intent ไปยังมอนตัวเดียวกันก่อน HP authority ลด; HP ของตัวอื่นไม่นับ

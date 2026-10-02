@@ -23,6 +23,35 @@ class FakeCDP:
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_close_diagnostics_only_return_safe_allowlisted_fields(self):
+        probe = CombatTiming()
+        probe.phase = 'combat'
+        event = probe.socket_event('close')
+
+        async def reader():
+            return {'lastSocketClose': {'code':1006,'category':'abnormal','generation':1,
+                    'reason':'never-log-this','url':'https://invalid.example'},
+                    'reconnectDelayMs':200,'token':'never-log-this'}
+
+        await probe.capture_socket_close(event, reader)
+        self.assertEqual(event['code'], 1006)
+        self.assertEqual(event['closeGeneration'], 1)
+        self.assertEqual(event['reconnectDelayMs'], 200)
+        self.assertNotIn('never-log-this', str(probe.summary()))
+        self.assertNotIn('invalid.example', str(probe.summary()))
+
+    async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
+        probe = CombatTiming()
+        event = probe.socket_event('close')
+
+        async def reader():
+            raise RuntimeError('never-log-this')
+
+        await probe.capture_socket_close(event, reader)
+        self.assertEqual(event['kind'], 'close')
+        self.assertEqual(event['detailStatus'], 'UNKNOWN-not-read')
+        self.assertNotIn('never-log-this', str(probe.summary()))
+
     async def test_unobserved_socket_is_unknown_not_zero_faults(self):
         probe = CombatTiming()
         self.assertEqual(probe.summary()['socketLifecycleStatus'], 'UNKNOWN-not-observed')
