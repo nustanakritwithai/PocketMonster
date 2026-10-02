@@ -132,6 +132,10 @@ jobs:
           node tests/v90-pirate-presence-readonly.mjs
       - name: ตรวจระบบ Client ที่เกี่ยวข้อง
         run: npm run check
+      - name: ตรวจ world cadence และ lifecycle รวม transport credit
+        run: |
+          node tests/v90-chat-runtime-world-cadence.mjs
+          node tests/v90-chat-runtime-lifecycle.mjs
       - name: ตรวจการบันทึกคำสั่ง Pirate เดิมผ่านระบบกลาง
         run: |
           node tests/pirate-central-state-client.mjs
