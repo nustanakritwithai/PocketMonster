@@ -28,7 +28,18 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('window.__combat?.effects?.scene', GPU_PROBE_SCRIPT)
         self.assertIn("['onBeforeRender','onAfterRender',4,'color']", GPU_PROBE_SCRIPT)
         self.assertIn("['onBeforeShadow','onAfterShadow',5,'shadow']", GPU_PROBE_SCRIPT)
-        self.assertIn('CAPTURED-color-and-shadow-flags', GPU_PROBE_SCRIPT)
+        self.assertIn('CAPTURED-color-and-shadow-variant', GPU_PROBE_SCRIPT)
+
+    async def test_draw_metadata_is_only_described_on_gpu_call_and_redacts_names(self):
+        self.assertIn('p.drawMaterial=args[index]??null; p.drawObject=this', GPU_PROBE_SCRIPT)
+        self.assertIn('durationMs,material:describeDraw()', GPU_PROBE_SCRIPT)
+        self.assertIn("source='world-portal'", GPU_PROBE_SCRIPT)
+        self.assertIn('geometries.has(g?.type)', GPU_PROBE_SCRIPT)
+        self.assertIn('o?.isInstancedMesh===true', GPU_PROBE_SCRIPT)
+        self.assertIn('o?.isBatchedMesh===true', GPU_PROBE_SCRIPT)
+        self.assertIn('depth<12', GPU_PROBE_SCRIPT)
+        self.assertNotIn('name:ancestor.name', GPU_PROBE_SCRIPT)
+        self.assertNotIn('uuid:', GPU_PROBE_SCRIPT)
 
     async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
         self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
