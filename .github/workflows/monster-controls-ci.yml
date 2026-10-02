@@ -26,6 +26,9 @@ on:
       - 'tests/*monster*control*.mjs'
       - 'tests/monster-command-adapter.mjs'
       - '.github/workflows/monster-controls-ci.yml'
+      - 'tests/monster-authenticated-candidate.py'
+      - 'tests/combat_browser_viewport.py'
+      - 'tests/test_combat_browser_viewport.py'
   workflow_dispatch:
     inputs:
       authenticated_guest:
@@ -95,6 +98,7 @@ jobs:
       - name: ตรวจคำสั่งมอนสเตอร์
         run: |
           python3 tests/test_monster_combat_timing.py
+          python3 tests/test_combat_browser_viewport.py
           node tests/monster-command-adapter.mjs
           node tests/monster-bag-state-provider.mjs
           node tests/pirate-monster-bag-vitals.mjs
