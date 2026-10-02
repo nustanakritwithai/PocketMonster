@@ -41,6 +41,15 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('name:ancestor.name', GPU_PROBE_SCRIPT)
         self.assertNotIn('uuid:', GPU_PROBE_SCRIPT)
 
+    async def test_builtin_shader_parameters_are_bounded_and_never_return_raw_cache_key(self):
+        self.assertIn("parts[0]!=='basic'", GPU_PROBE_SCRIPT)
+        self.assertIn('properties?.has?.(p.drawMaterial)', GPU_PROBE_SCRIPT)
+        self.assertIn('p.portalWarmupVariants.length<4', GPU_PROBE_SCRIPT)
+        self.assertIn('slice(0,12).map(shaderParameters)', GPU_PROBE_SCRIPT)
+        self.assertIn('pointLights:34', GPU_PROBE_SCRIPT)
+        self.assertIn("method==='getProgramInfoLog'", GPU_PROBE_SCRIPT)
+        self.assertNotIn('cacheKey:program.cacheKey', GPU_PROBE_SCRIPT)
+
     async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
         self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
         self.assertIn('p.parentPosts.length<400', GPU_PROBE_SCRIPT)

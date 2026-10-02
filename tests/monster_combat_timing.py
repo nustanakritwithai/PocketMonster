@@ -13,6 +13,24 @@ GPU_PROBE_SCRIPT = r"""() => {
     const canvas=document.querySelector('#app > canvas');
     const gl=canvas?.getContext('webgl2');
     p.drawWrappers=[]; p.gpuDrawStatus='UNKNOWN-no-scene-hooks';
+    p.portalWarmupVariants=[]; const portalVariantSeen=new WeakSet();
+    // ตำแหน่งparameterของbuiltin basicตรงThree r178; คืนเฉพาะตัวเลข/booleanที่อนุญาต
+    // ไม่คืนcacheKeyดิบหรือcustomProgramCacheKeyท้ายข้อความ และไม่เรียกGPUเพิ่ม
+    const shaderParameters=program=>{
+        const parts=typeof program?.cacheKey==='string'?program.cacheKey.split(','):[];
+        if(parts[0]!=='basic'||!['highp','mediump','lowp'].includes(parts[1])||parts.length<53) return null;
+        const fields={fogExp2:29,sizeAttenuation:30,morphTargetsCount:31,morphAttributeCount:32,
+            dirLights:33,pointLights:34,spotLights:35,spotLightMaps:36,hemiLights:37,
+            rectLights:38,dirShadows:39,pointShadows:40,spotShadows:41,
+            spotShadowsWithMaps:42,lightProbes:43,shadowMapType:44,toneMapping:45,
+            clippingPlanes:46,clipIntersection:47,depthPacking:48,flags1:49,flags2:50};
+        const values={};
+        for(const [name,index] of Object.entries(fields)) {
+            const raw=parts[index],n=/^-?\d{1,10}$/.test(raw)?Number(raw):null;
+            values[name]=raw==='true'?true:raw==='false'?false:Number.isSafeInteger(n)?n:null;
+        }
+        return values;
+    };
     // เก็บreferenceเฉพาะระหว่างdraw ไม่สร้างmetadataหลายพันครั้งต่อเฟรม
     // สรุปเมื่อมีGPUcallจริงเท่านั้น; geometry/ancestorใช้รายการอนุญาต ไม่ส่งname/uuid
     const types=new Set(['MeshBasicMaterial','MeshStandardMaterial','MeshPhysicalMaterial',
@@ -50,16 +68,26 @@ GPU_PROBE_SCRIPT = r"""() => {
             if(typeof before!=='function'||typeof after!=='function') continue;
             const wrappedBefore=function(...args) {
                 p.drawMaterial=args[index]??null; p.drawObject=this;
-                p.drawGeometry=args[index-1]??null; p.drawPass=pass;
+                p.drawGeometry=args[index-1]??null; p.drawPass=pass; p.drawRenderer=args[0];
+                if(p.active&&pass==='color'&&!portalVariantSeen.has(this)
+                    &&p.drawMaterial?.type==='MeshBasicMaterial'&&!p.drawMaterial.transparent
+                    &&describeDraw()?.source==='world-portal'&&p.portalWarmupVariants.length<4) {
+                    portalVariantSeen.add(this);
+                    const properties=p.drawRenderer?.properties;
+                    const programs=properties?.has?.(p.drawMaterial)?properties.get(p.drawMaterial).programs:null;
+                    p.portalWarmupVariants.push({phase:p.phase,at:performance.now(),
+                        parameters:programs?[...programs.values()].slice(0,12).map(shaderParameters):[]});
+                }
                 try { return before.apply(this,args); }
                 catch(error) {
                     p.drawMaterial=null; p.drawObject=null; p.drawGeometry=null; p.drawPass=null;
+                    p.drawRenderer=null;
                     throw error;
                 }
             };
             const wrappedAfter=function(...args) {
                 try { return after.apply(this,args); }
-                finally { p.drawMaterial=null; p.drawObject=null; p.drawGeometry=null; p.drawPass=null; }
+                finally { p.drawMaterial=null; p.drawObject=null; p.drawGeometry=null; p.drawPass=null; p.drawRenderer=null; }
             };
             proto[beforeName]=wrappedBefore; proto[afterName]=wrappedAfter;
             p.drawWrappers.push({proto,beforeName,afterName,before,after,wrappedBefore,wrappedAfter});
@@ -83,7 +111,9 @@ GPU_PROBE_SCRIPT = r"""() => {
                     const durationMs=performance.now()-at;
                     if(p.active && p.gpuCalls.length<400)
                         p.gpuCalls.push({phase:p.phase,method,object:id(args[0]),at,
-                            durationMs,material:describeDraw()});
+                            durationMs,material:describeDraw(),
+                            shaderParameters:method==='getProgramInfoLog'
+                                ?shaderParameters(p.drawRenderer?.info?.programs?.find(program=>program.program===args[0])):null});
                 }
             };
             gl[method]=wrapped;
@@ -408,6 +438,7 @@ class CombatTiming:
                     longTasks:p.longTasks,longTaskStatus:p.longTaskStatus,
                     gpuCalls:p.gpuCalls,gpuStatus:p.gpuStatus,
                     gpuDrawStatus:p.gpuDrawStatus,
+                    portalWarmupVariants:p.portalWarmupVariants,
                     parentPosts:p.parentPosts,postStatus:p.postStatus};
             }""")
             await game.screenshot(path=str(out/'timing-final.png'))
