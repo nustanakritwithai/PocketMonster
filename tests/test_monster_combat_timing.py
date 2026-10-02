@@ -23,6 +23,13 @@ class FakeCDP:
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_material_probe_uses_real_scene_not_scoped_effects_and_tracks_shadow(self):
+        self.assertIn('window.__combat?.scene', GPU_PROBE_SCRIPT)
+        self.assertNotIn('window.__combat?.effects?.scene', GPU_PROBE_SCRIPT)
+        self.assertIn("['onBeforeRender','onAfterRender',4,'color']", GPU_PROBE_SCRIPT)
+        self.assertIn("['onBeforeShadow','onAfterShadow',5,'shadow']", GPU_PROBE_SCRIPT)
+        self.assertIn('CAPTURED-color-and-shadow-flags', GPU_PROBE_SCRIPT)
+
     async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
         self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
         self.assertIn('p.parentPosts.length<400', GPU_PROBE_SCRIPT)
