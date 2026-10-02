@@ -19,12 +19,23 @@ GPU_PROBE_SCRIPT = r"""() => {
     const shaderParameters=program=>{
         const parts=typeof program?.cacheKey==='string'?program.cacheKey.split(','):[];
         if(parts[0]!=='basic'||!['highp','mediump','lowp'].includes(parts[1])||parts.length<53) return null;
-        const fields={fogExp2:29,sizeAttenuation:30,morphTargetsCount:31,morphAttributeCount:32,
+        const fields={envMapMode:3,envMapCubeUVHeight:4,mapUv:5,alphaMapUv:6,lightMapUv:7,
+            aoMapUv:8,bumpMapUv:9,normalMapUv:10,displacementMapUv:11,emissiveMapUv:12,
+            metalnessMapUv:13,roughnessMapUv:14,anisotropyMapUv:15,clearcoatMapUv:16,
+            clearcoatNormalMapUv:17,clearcoatRoughnessMapUv:18,iridescenceMapUv:19,
+            iridescenceThicknessMapUv:20,sheenColorMapUv:21,sheenRoughnessMapUv:22,
+            specularMapUv:23,specularColorMapUv:24,specularIntensityMapUv:25,
+            transmissionMapUv:26,thicknessMapUv:27,combine:28,
+            fogExp2:29,sizeAttenuation:30,morphTargetsCount:31,morphAttributeCount:32,
             dirLights:33,pointLights:34,spotLights:35,spotLightMaps:36,hemiLights:37,
             rectLights:38,dirShadows:39,pointShadows:40,spotShadows:41,
             spotShadowsWithMaps:42,lightProbes:43,shadowMapType:44,toneMapping:45,
             clippingPlanes:46,clipIntersection:47,depthPacking:48,flags1:49,flags2:50};
-        const values={};
+        const spaces=new Set(['srgb','srgb-linear','display-p3','display-p3-linear']);
+        const values={programId:Number.isSafeInteger(program.id)?program.id:null,
+            usedTimes:Number.isSafeInteger(program.usedTimes)?program.usedTimes:null,
+            precision:parts[1],outputSpace:spaces.has(parts[2])?parts[2]:'other',
+            rendererSpace:spaces.has(parts[51])?parts[51]:'other'};
         for(const [name,index] of Object.entries(fields)) {
             const raw=parts[index],n=/^-?\d{1,10}$/.test(raw)?Number(raw):null;
             values[name]=raw==='true'?true:raw==='false'?false:Number.isSafeInteger(n)?n:null;

@@ -47,6 +47,9 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('p.portalWarmupVariants.length<4', GPU_PROBE_SCRIPT)
         self.assertIn('slice(0,12).map(shaderParameters)', GPU_PROBE_SCRIPT)
         self.assertIn('pointLights:34', GPU_PROBE_SCRIPT)
+        self.assertIn('spaces.has(parts[2])', GPU_PROBE_SCRIPT)
+        self.assertIn('spaces.has(parts[51])', GPU_PROBE_SCRIPT)
+        self.assertIn('Number.isSafeInteger(program.usedTimes)', GPU_PROBE_SCRIPT)
         self.assertIn("method==='getProgramInfoLog'", GPU_PROBE_SCRIPT)
         self.assertNotIn('cacheKey:program.cacheKey', GPU_PROBE_SCRIPT)
 
