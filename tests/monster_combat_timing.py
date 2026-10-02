@@ -5,7 +5,7 @@ import re
 from urllib.parse import urlsplit
 
 
-def observe_socket_lifecycle(timing, socket, read_diagnostics=None):
+def observe_socket_lifecycle(timing, socket, read_diagnostics=None, page_socket_ordinal=None):
     # อ่าน lifecycle ของsocketเกมเดิม ไม่เปิดconnectionหรือเก็บURL/ข้อความerror
     if timing is None:
         return
@@ -15,16 +15,24 @@ def observe_socket_lifecycle(timing, socket, read_diagnostics=None):
         return
     if address.scheme not in ('ws', 'wss') or address.path != '/ws/chat':
         return
+    alias = timing.new_socket_alias()
+    if alias is None:
+        return
+    def capture(coroutine):
+        task = asyncio.create_task(coroutine)
+        timing.socket_tasks.add(task)
+        task.add_done_callback(timing.socket_tasks.discard)
     def closed(*_):
-        event = timing.socket_event('close')
+        event = timing.socket_event('close', alias)
         if event is not None and read_diagnostics is not None:
-            task = asyncio.create_task(timing.capture_socket_close(event, read_diagnostics))
-            timing.socket_tasks.add(task)
-            task.add_done_callback(timing.socket_tasks.discard)
+            capture(timing.capture_socket_close(event, read_diagnostics))
     socket.on('close', closed)
-    socket.on('socketerror', lambda *_: timing.socket_event('error'))
+    socket.on('socketerror', lambda *_: timing.socket_event('error', alias))
     # created หมายถึงobserverเห็นsocket ไม่ใช่หลักฐานว่าhandshake/authสำเร็จ
-    timing.socket_event('created')
+    event = timing.socket_event('created', alias)
+    if event is not None and read_diagnostics is not None:
+        capture(timing.capture_socket_generation(event, read_diagnostics, page_socket_ordinal))
+    return alias
 
 
 # ใช้เฉพาะQAบนrunner: ส่งคืนผลเดิม/exceptionเดิม ไม่อ่านGLSL/tokenหรือแก้shader
@@ -190,8 +198,21 @@ class CombatTiming:
         self.socket_status = 'UNKNOWN-not-observed'
         self.socket_truncated = False
         self.socket_tasks = set()
+        self.socket_serial = 0
+        self.socket_generations = {}
+        self.wire_sends = []
+        self.wire_truncated = False
 
-    def socket_event(self, kind):
+    def new_socket_alias(self):
+        if self.phase == 'complete':
+            return
+        if self.socket_serial >= 400:
+            self.socket_truncated = True
+            return
+        self.socket_serial += 1
+        return self.socket_serial
+
+    def socket_event(self, kind, socket_alias=None):
         if kind not in ('created', 'close', 'error') or self.phase == 'complete':
             return
         self.socket_status = 'CAPTURED-socket-events-not-connection-acceptance'
@@ -200,8 +221,29 @@ class CombatTiming:
             return
         event = {'kind': kind, 'phase': self.phase,
             'atMs': round(asyncio.get_running_loop().time()*1000, 2)}
+        if type(socket_alias) is int and 1 <= socket_alias <= self.socket_serial:
+            event['socketAlias'] = socket_alias
         self.socket_lifecycle.append(event)
         return event
+
+    async def capture_socket_generation(self, event, reader, page_socket_ordinal):
+        event['generationStatus'] = 'UNKNOWN-not-matched'
+        if type(page_socket_ordinal) is not int or page_socket_ordinal < 1:
+            return
+        try:
+            data = await asyncio.wait_for(reader(), timeout=2)
+            if (not isinstance(data, dict) or type(data.get('socketCreates')) is not int
+                    or data['socketCreates'] != page_socket_ordinal):
+                return
+            generation = data.get('socketGeneration')
+            if type(generation) is not int or not 1 <= generation <= 1_000_000:
+                return
+            # ผูกเฉพาะsocketที่เพิ่งสร้างตรงordinalของpage ไม่เดาว่าaliasเท่ากับgeneration
+            self.socket_generations[event['socketAlias']] = generation
+            event['generation'] = generation
+            event['generationStatus'] = 'CAPTURED-runtime-generation-not-auth-acceptance'
+        except Exception:
+            pass
 
     async def capture_socket_close(self, event, reader):
         event['detailStatus'] = 'UNKNOWN-not-read'
@@ -211,14 +253,21 @@ class CombatTiming:
             if not isinstance(close, dict):
                 return
             code, category, generation = close.get('code'), close.get('category'), close.get('generation')
-            if type(code) is int and 1000 <= code <= 4999:
-                event['code'] = code
-            if category in ('auth-rejected', 'rate-limited', 'policy', 'abnormal', 'normal',
-                            'going-away', 'try-later', 'unknown', 'other'):
-                event['category'] = category
-            if type(generation) is int and 1 <= generation <= 1_000_000:
-                event['closeGeneration'] = generation
-            if data.get('reconnectDelayMs') in (200, 400, 800, 1600, 3200, 5000):
+            if not (type(code) is int and 1000 <= code <= 4999
+                    and category in ('auth-rejected', 'rate-limited', 'policy', 'abnormal', 'normal',
+                                     'going-away', 'try-later', 'unknown', 'other')
+                    and type(generation) is int and 1 <= generation <= 1_000_000):
+                event['detailStatus'] = 'UNKNOWN-malformed-close-diagnostics'
+                return
+            expected = self.socket_generations.get(event.get('socketAlias'))
+            if expected is None:
+                event['detailStatus'] = 'UNKNOWN-generation-not-captured'
+                return
+            if generation != expected:
+                event['detailStatus'] = 'UNKNOWN-generation-mismatch'
+                return
+            event.update(code=code, category=category, closeGeneration=generation)
+            if type(data.get('reconnectDelayMs')) is int and data['reconnectDelayMs'] in (200, 400, 800, 1600, 3200, 5000):
                 event['reconnectDelayMs'] = data['reconnectDelayMs']
             event['detailStatus'] = 'CAPTURED-safe-close-diagnostics-not-root-cause'
         except Exception:
@@ -228,12 +277,53 @@ class CombatTiming:
         if self.socket_tasks:
             await asyncio.gather(*list(self.socket_tasks), return_exceptions=True)
 
+    async def finish_socket_observation(self):
+        # ปิดหน้าต่างก่อนteardown และรอdiagnosticsที่ค้าง แม้scenarioล้มก่อนtiming.run
+        self.phase = 'complete'
+        await self.flush_socket_events()
+        return self.summary()
+
+    def wire_summary(self):
+        rows = []
+        for alias in range(1, self.socket_serial+1):
+            sends = [e for e in self.wire_sends if e['socketAlias'] == alias]
+            row = {'socketAlias': alias, 'sends': len(sends),
+                   'world': sum(e['type'] == 'world-pos' for e in sends),
+                   'combatPrediction': sum(e['type'] == 'combat-prediction' for e in sends),
+                   'otherControl': sum(e['type'] == 'other-control' for e in sends)}
+            for name, events in (
+                    ('worldPeak10s', [e for e in sends if e['type'] == 'world-pos']),
+                    ('controlPeak10s', [e for e in sends if e['type'] != 'world-pos'])):
+                left, peak = 0, 0
+                for right, event in enumerate(events):
+                    while events[left]['atMs'] <= event['atMs']-10000:
+                        left += 1
+                    peak = max(peak, right-left+1)
+                row[name] = peak
+            rows.append(row)
+        return {'status': 'CAPTURED-client-callback-not-server-arrival' if self.socket_serial else 'UNKNOWN-not-observed',
+                'windowMs': 10000, 'serverArrivalGate': 'UNKNOWN',
+                'sockets': rows, 'sends': self.wire_sends, 'truncated': self.wire_truncated}
+
     def record(self, kind, **values):
         if len(self.timeline) < 4000:
             self.timeline.append({'kind': kind, 'phase': self.phase,
                 'atMs': round(asyncio.get_running_loop().time()*1000, 2), **values})
 
-    def sent(self, packet):
+    def sent(self, packet, socket_alias=None):
+        if self.phase == 'complete':
+            return
+        if type(socket_alias) is int and 1 <= socket_alias <= self.socket_serial:
+            kind = 'world-pos' if isinstance(packet, dict) and packet.get('type') == 'world-pos' else (
+                'combat-prediction' if isinstance(packet, dict) and packet.get('schemaVersion') == 'combat-prediction-envelope/v9.1'
+                else 'other-control')
+            if len(self.wire_sends) < 5000:
+                self.wire_sends.append({'socketAlias': socket_alias, 'type': kind, 'phase': self.phase,
+                    'atMs': round(asyncio.get_running_loop().time()*1000, 2)})
+            else:
+                self.wire_truncated = True
+        if not isinstance(packet, dict):
+            return
         if packet.get('type') != 'world-pos':
             return
         for intent in packet.get('monsterIntents') or []:
@@ -539,4 +629,5 @@ class CombatTiming:
                 'socketLifecycleStatus':self.socket_status,
                 'socketLifecycle':self.socket_lifecycle,
                 'socketLifecycleTruncated':self.socket_truncated,
+                'wireObservation':self.wire_summary(),
                 'combatHpChanges':sum(s['hpChanges'] for s in self.samples if s['phase']=='combat')}

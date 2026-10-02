@@ -194,22 +194,27 @@ async def main():
         timing = CombatTiming() if COMBAT_TIMING else None
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
+            socket_ordinal = 0
             def observe_socket(socket):
+                nonlocal socket_ordinal
                 async def socket_diagnostics():
                     return await opened_page.evaluate('''() => {
                         const d=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
-                        return d ? {lastSocketClose:d.lastSocketClose,reconnectDelayMs:d.reconnectDelayMs} : null;
+                        return d ? {lastSocketClose:d.lastSocketClose,reconnectDelayMs:d.reconnectDelayMs,
+                            socketGeneration:d.socketGeneration,socketCreates:d.socketCreates} : null;
                     }''')
-                observe_socket_lifecycle(timing, socket, socket_diagnostics)
+                alias = observe_socket_lifecycle(timing, socket, socket_diagnostics, socket_ordinal+1)
+                if alias is not None:
+                    socket_ordinal += 1
                 def sent(payload):
                     try:
                         packet = json.loads(payload)
-                        if timing:
-                            timing.sent(packet)
-                        if packet.get('type') == 'world-pos':
-                            wire_counts['worldPoseSends'] += 1
                     except (ValueError, TypeError):
-                        pass
+                        packet = None
+                    if timing and alias is not None:
+                        timing.sent(packet, alias)
+                    if isinstance(packet, dict) and packet.get('type') == 'world-pos':
+                        wire_counts['worldPoseSends'] += 1
                 socket.on('framesent', sent)
                 def received(payload):
                     nonlocal wild
@@ -771,7 +776,7 @@ async def main():
                 EVIDENCE['errorCode'] = str(error)
         finally:
             if timing:
-                EVIDENCE['combatTiming'] = timing.summary()
+                EVIDENCE['combatTiming'] = await timing.finish_socket_observation()
             if response_tasks:
                 await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
             if PRODUCTION_LIVE:
@@ -791,6 +796,10 @@ async def main():
                             acceptedSnapshots:d?.acceptedSnapshots,
                             socketReadyState:chat?.socketReadyState,worldPulseActive:chat?.worldPulseActive,
                             chatPaused:chat?.paused,chatStopped:chat?.stopped,
+                            socketGeneration:Number.isSafeInteger(chat?.socketGeneration)?chat.socketGeneration:null,
+                            socketCreates:Number.isSafeInteger(chat?.socketCreates)?chat.socketCreates:null,
+                            combatPredictionSends:Number.isSafeInteger(chat?.combatPredictionSends)?chat.combatPredictionSends:null,
+                            combatAuthorityMessages:Number.isSafeInteger(chat?.combatAuthorityMessages)?chat.combatAuthorityMessages:null,
                             bootState:d?.sceneBootState,controlAvailable:s?.available,pending:c?.pending,
                             failure:/^[A-Z0-9_]{1,64}$/.test(code||'')?code:null};
                     }""")
