@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 const source=path.resolve(process.argv[2]||'.qa/pirate');
-const expected='4133a685bf8064334349add710bc3af4f56be84d';
-const previous='8fe8802c12205607fb1ba54e12915f5382d1db5c';
+const expected='44bb6fcf50d7d857a752300e577c34b71bc57d46';
+const previous='4133a685bf8064334349add710bc3af4f56be84d';
 const actual=execFileSync('git',['-c',`safe.directory=${source.replaceAll('\\','/')}`,'-C',source,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
 assert.equal(actual,expected,'native dependency must be the reviewed Pirate commit');
 // รับ artifact จาก runner ได้โดยไม่ build เกมบน VPS
@@ -20,6 +20,13 @@ const bootstrapPath=path.join(target,'pocket-bootstrap.mjs');
 const bootstrap=fs.readFileSync(bootstrapPath,'utf8');
 assert.match(bootstrap,/await installPirateSaveSandbox\(\);/);
 assert.equal([...bootstrap.matchAll(/await import\('\.\/assets\/index-[^']+\.js'\)/g)].length,1);
+// ป้องกันทับassetชื่อเดิมที่มีbytesต่างกัน: รับเฉพาะเนื้อหาเดิมหรือชื่อhashใหม่
+for(const relative of fs.readdirSync(path.join(dist,'assets'),{recursive:true})) {
+  const incoming=path.join(dist,'assets',relative);
+  const existing=path.join(target,'assets',relative);
+  if(!fs.statSync(incoming).isFile()||!fs.existsSync(existing)) continue;
+  assert.ok(fs.statSync(existing).isFile()&&fs.readFileSync(incoming).equals(fs.readFileSync(existing)),`asset collision: ${relative}`);
+}
 // Keep independent, exact pins in acceptance tests and post-deploy verifier.
 // Only the already-reviewed old digest may be replaced, and all changes are staged
 // with the new bytes in one commit, never by loosening source/hash assertions.
@@ -35,12 +42,12 @@ fs.cpSync(path.join(dist,'assets'),path.join(target,'assets'),{recursive:true});
 fs.writeFileSync(bootstrapPath,bootstrap.replace(/await import\('\.\/assets\/index-[^']+\.js'\)/,`await import('./assets/${entry[1]}')`));
 const indexPath=path.join(target,'index.html');
 const index=fs.readFileSync(indexPath,'utf8');
-assert.match(index,/pocket-bootstrap\.mjs\?v=13/);
-fs.writeFileSync(indexPath,index.replace(/\.\/assets\/vendor-three-[^"']+\.js/,`./assets/${vendor[1]}`).replace('pocket-bootstrap.mjs?v=13','pocket-bootstrap.mjs?v=14'));
+assert.match(index,/pocket-bootstrap\.mjs\?v=14/);
+fs.writeFileSync(indexPath,index.replace(/\.\/assets\/vendor-three-[^"']+\.js/,`./assets/${vendor[1]}`).replace('pocket-bootstrap.mjs?v=14','pocket-bootstrap.mjs?v=15'));
 const sourcePath=path.join(target,'SOURCE.json');
 const provenance=JSON.parse(fs.readFileSync(sourcePath,'utf8'));
 provenance.ref=expected;provenance.commit=expected;
-provenance.pocketPresentation.artifact=`github-actions/ready-hit-${expected.slice(0,8)}`;
+provenance.pocketPresentation.artifact=`github-actions/m1-clock-${expected.slice(0,8)}`;
 provenance.artifactWorkflowRun=Number(process.env.PIRATE_ARTIFACT_WORKFLOW_RUN)||null;
 assert.ok(Number.isSafeInteger(provenance.artifactWorkflowRun) && provenance.artifactWorkflowRun > 0, 'verified source artifact workflow run is required');
 provenance.integrations.originalWorld.candidateOnly=true;

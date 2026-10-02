@@ -27,7 +27,7 @@ const worldCases = Object.freeze([
   Object.freeze({
     world: 'pirate-fruit',
     panel: 'human',
-    runtime: './boot-pirate-fruit-v900.mjs?v=982',
+    runtime: './boot-pirate-fruit-v900.mjs?v=983',
   }),
   Object.freeze({
     world: 'pocket-monster',
