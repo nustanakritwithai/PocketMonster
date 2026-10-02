@@ -1,9 +1,89 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming
+import math
+from monster_combat_timing import CombatTiming, movement_input
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    def vitals(self, revision=1, hp=100, dead=False, respawn=None, generation=1):
+        value = {'contract':'pirate-vitals/1', 'revision':revision, 'hp':hp, 'maxHp':100, 'dead':dead,
+                 'serverTimeMs':10, 'guard':10, 'guardMax':10, 'guardBroken':False,
+                 'hitstunUntil':0, 'energy':10, 'maxEnergy':10, 'mp':10, 'maxMp':10}
+        if respawn is not None:
+            value['respawn'] = {'atRevision':respawn, 'spawnId':'private-spawn', 'islandId':'private-island',
+                               'x':0, 'y':0, 'z':0, 'heading':0}
+        return {'generation':generation, 'vitals':value}
+
+    def two_damage_windows(self, probe):
+        for number, phase in enumerate(('combat', 'reentry')):
+            probe.phase = phase
+            probe.record('socket-intent', target='monster:crab')
+            probe.timeline[-1]['atMs'] = number*2+1
+            probe.record('socket-hp', target='monster:crab', before=70-number*12, hp=58-number*12)
+            probe.timeline[-1]['atMs'] = number*2+2
+
+    async def test_damage_capture_without_life_evidence_is_not_same_life(self):
+        probe = CombatTiming(reentry=True)
+        self.two_damage_windows(probe)
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'SAT')
+        self.assertEqual(probe.summary()['sameLifeReentryGate'], 'UNKNOWN')
+
+    async def test_alive_vitals_required_in_every_reentry_phase(self):
+        probe = CombatTiming(reentry=True)
+        probe.observe_life(self.vitals())
+        probe.life_baseline = dict(probe.vitals)
+        self.two_damage_windows(probe)
+        for phase in ('combat', 'retreat', 'reapproach'):
+            probe.phase = phase
+            probe.observe_life(self.vitals())
+        self.assertEqual(probe.summary()['sameLifeReentryGate'], 'UNKNOWN')
+        probe.phase = 'reentry'
+        probe.observe_life(self.vitals())
+        self.assertEqual(probe.summary()['sameLifeReentryGate'], 'SAT')
+
+    async def test_death_then_alive_cannot_erase_interruption(self):
+        probe = CombatTiming(reentry=True)
+        probe.observe_life(self.vitals())
+        probe.life_baseline = dict(probe.vitals)
+        self.two_damage_windows(probe)
+        probe.observe_life(self.vitals(2, 0, True))
+        probe.observe_life(self.vitals(3))
+        self.assertEqual(probe.life_interruption, 'authoritative-death')
+        self.assertEqual(probe.summary()['sameLifeReentryGate'], 'UNKNOWN')
+        with self.assertRaisesRegex(RuntimeError, 'timing-authoritative-death'):
+            probe.require_same_life()
+
+    async def test_respawn_and_worker_generation_change_interrupt(self):
+        for envelope, reason in ((self.vitals(2, respawn=2), 'authoritative-respawn'),
+                                 (self.vitals(generation=2), 'worker-generation-changed')):
+            probe = CombatTiming(reentry=True)
+            probe.observe_life(self.vitals())
+            probe.life_baseline = dict(probe.vitals)
+            probe.phase = 'retreat'
+            probe.observe_life(envelope)
+            self.assertEqual(probe.life_interruption, reason)
+            self.assertNotIn('private-spawn', str(probe.summary()))
+
+    async def test_stale_and_malformed_vitals_do_not_claim_life_evidence(self):
+        probe = CombatTiming(reentry=True)
+        probe.observe_life(self.vitals(3))
+        probe.life_baseline = dict(probe.vitals)
+        probe.phase = 'combat'
+        probe.observe_life(self.vitals(2, 0, True))
+        self.assertIsNone(probe.life_interruption)
+        for envelope in (self.vitals(4, float('nan')), self.vitals(4, 0, False),
+                         self.vitals(4, respawn=5), {'generation':1}):
+            probe.observe_life(envelope)
+        self.assertEqual(probe.life_events, [])
+        self.assertEqual(probe.life_interruption, 'vitals-evidence-gap')
+
+    async def test_joystick_mapping_uses_current_camera_not_old_basis(self):
+        for yaw in (0, math.pi/2, math.pi, -.7):
+            ix, iz = movement_input(3, 4, yaw)
+            self.assertAlmostEqual(ix*math.cos(yaw)+iz*math.sin(yaw), .6)
+            self.assertAlmostEqual(-ix*math.sin(yaw)+iz*math.cos(yaw), .8)
+        self.assertEqual(movement_input(0, 0, 1), (0, 0))
+
     async def test_capture_requires_damage_to_target_after_intent(self):
         probe = CombatTiming()
         probe.phase = 'combat'
@@ -30,9 +110,50 @@ class TimingTests(unittest.IsolatedAsyncioTestCase):
         probe.sent({'token': 'never-log-this'})
         probe.sent({'type': 'world-pos', 'x': 1, 'z': 2, 'token': 'never-log-this',
                     'monsterIntents': [{'sequence': 9, 'targetActorId': 'monster:starter-crab-1', 'category': 'style'}]})
-        self.assertEqual(len(probe.timeline), 1)
-        self.assertEqual(probe.timeline[0]['sequence'], 9)
+        intents = [e for e in probe.timeline if e['kind'] == 'socket-intent']
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]['sequence'], 9)
         self.assertNotIn('never-log-this', str(probe.summary()))
+
+    async def test_pose_and_socket_lifecycle_are_bounded_without_payloads(self):
+        probe = CombatTiming(reentry=True)
+        probe.phase = 'approach'
+        probe.sent({'type':'world-pos', 'x':1, 'z':2, 'token':'secret', 'username':'private'})
+        self.assertEqual(probe.timeline[0]['kind'], 'socket-pose')
+        for _ in range(300):
+            probe.socket_event('close', 1)
+        self.assertEqual(len(probe.socket_events), 256)
+        self.assertNotIn('secret', str(probe.summary()))
+        self.assertNotIn('private', str(probe.summary()))
+
+    async def test_reentry_needs_two_separate_targeted_damage_windows(self):
+        probe = CombatTiming(reentry=True)
+        probe.phase = 'combat'
+        probe.sent({'type':'world-pos', 'monsterIntents':[{'targetActorId':'monster:crab','sequence':1}]})
+        probe.timeline[-1]['atMs'] = 1
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        probe.timeline[-1]['atMs'] = 2
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+        probe.phase = 'reentry'
+        probe.sent({'type':'world-pos', 'monsterIntents':[{'targetActorId':'monster:crab','sequence':2}]})
+        probe.timeline[-1]['atMs'] = 3
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=58, hp=46)
+        probe.timeline[-1]['atMs'] = 4
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'SAT')
+        probe.stop_reason = 'target-out-of-range'
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+
+    async def test_delayed_first_damage_does_not_prove_reentry(self):
+        probe = CombatTiming(reentry=True)
+        for phase, sequence in [('combat',1), ('reentry',2)]:
+            probe.phase = phase
+            probe.sent({'type':'world-pos','monsterIntents':[{'targetActorId':'monster:crab','sequence':sequence}]})
+        probe.phase = 'settle'
+        probe.record('socket-hp', target='monster:crab', before=70, hp=58)
+        self.assertEqual(probe.summary()['reentryCaptureGate'], 'UNKNOWN')
+        self.assertEqual(probe.summary()['rapidScenario'], 'NOT_RUN')
 
     async def test_replayed_history_is_not_fresh_damage(self):
         probe = CombatTiming()
