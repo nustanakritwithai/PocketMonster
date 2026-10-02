@@ -1,6 +1,7 @@
 """ตรวจเครื่องมือวัด ไม่ถือเป็นผลการต่อสู้จริง."""
 import unittest
-from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT
+import asyncio
+from monster_combat_timing import CombatTiming, GPU_PROBE_SCRIPT, observe_socket_lifecycle, attack_geometry, wire_shape
 
 
 class FakeCDP:
@@ -23,6 +24,330 @@ class FakeCDP:
 
 
 class TimingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_close_diagnostics_only_return_safe_allowlisted_fields(self):
+        probe = CombatTiming()
+        probe.phase = 'combat'
+        alias = probe.new_socket_alias()
+        probe.socket_generations[alias] = 1
+        event = probe.socket_event('close', alias)
+
+        async def reader():
+            return {'lastSocketClose': {'code':1006,'category':'abnormal','generation':1,
+                    'reason':'never-log-this','url':'https://invalid.example'},
+                    'reconnectDelayMs':200,'token':'never-log-this'}
+
+        await probe.capture_socket_close(event, reader)
+        self.assertEqual(event['code'], 1006)
+        self.assertEqual(event['closeGeneration'], 1)
+        self.assertEqual(event['reconnectDelayMs'], 200)
+        self.assertNotIn('never-log-this', str(probe.summary()))
+        self.assertNotIn('invalid.example', str(probe.summary()))
+
+    async def test_malformed_close_details_never_claim_capture(self):
+        for close in ({}, {'code':1006}, {'code':True,'category':'abnormal','generation':1},
+                      {'code':1006,'category':'never-log-this','generation':1},
+                      {'code':1006,'category':'abnormal','generation':'1'}):
+            probe = CombatTiming()
+            alias = probe.new_socket_alias()
+            probe.socket_generations[alias] = 1
+            event = probe.socket_event('close', alias)
+            async def reader():
+                return {'lastSocketClose':close}
+            await probe.capture_socket_close(event, reader)
+            self.assertEqual(event['detailStatus'], 'UNKNOWN-malformed-close-diagnostics')
+            self.assertNotIn('code', event)
+            self.assertNotIn('never-log-this', str(probe.summary()))
+
+    async def test_late_close_reader_does_not_attribute_new_generation(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.socket_generations[alias] = 1
+        event = probe.socket_event('close', alias)
+        async def reader():
+            return {'lastSocketClose':{'code':1008,'category':'rate-limited','generation':2},
+                    'reconnectDelayMs':5000}
+        await probe.capture_socket_close(event, reader)
+        self.assertEqual(event['detailStatus'], 'UNKNOWN-generation-mismatch')
+        self.assertNotIn('code', event)
+        self.assertNotIn('closeGeneration', event)
+
+    async def test_unmatched_creation_generation_stays_unknown(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        event = probe.socket_event('created', alias)
+        async def reader():
+            return {'socketGeneration':2,'socketCreates':2}
+        await probe.capture_socket_generation(event, reader, 1)
+        self.assertEqual(event['generationStatus'], 'UNKNOWN-not-matched')
+        close = probe.socket_event('close', alias)
+        async def closed_reader():
+            return {'lastSocketClose':{'code':1006,'category':'abnormal','generation':2}}
+        await probe.capture_socket_close(close, closed_reader)
+        self.assertEqual(close['detailStatus'], 'UNKNOWN-generation-not-captured')
+
+    async def test_failure_finalization_flushes_queued_close_and_excludes_teardown(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.socket_generations[alias] = 7
+        event = probe.socket_event('close', alias)
+        async def reader():
+            await asyncio.sleep(0)
+            return {'lastSocketClose':{'code':1008,'category':'rate-limited','generation':7},
+                    'reconnectDelayMs':5000}
+        task = asyncio.create_task(probe.capture_socket_close(event, reader))
+        probe.socket_tasks.add(task)
+        summary = await probe.finish_socket_observation()
+        self.assertTrue(task.done())
+        self.assertEqual(summary['socketLifecycle'][0]['code'], 1008)
+        probe.socket_event('close', alias)
+        probe.sent({'type':'world-pos'}, alias)
+        self.assertEqual(len(probe.socket_lifecycle), 1)
+        self.assertEqual(probe.wire_sends, [])
+
+    async def test_socket_aliases_are_local_and_created_generation_is_not_alias(self):
+        class FakeSocket:
+            url = 'wss://invalid.example/ws/chat?token=never-log-this'
+            def __init__(self):
+                self.handlers = {}
+            def on(self, event, handler):
+                self.handlers[event] = handler
+        probe = CombatTiming()
+        socket = FakeSocket()
+        async def reader():
+            return {'socketGeneration':7,'socketCreates':1,
+                    'lastSocketClose':{'code':1006,'category':'abnormal','generation':7}}
+        alias = observe_socket_lifecycle(probe, socket, reader, 1)
+        await probe.flush_socket_events()
+        self.assertEqual(alias, 1)
+        self.assertEqual(probe.socket_generations[alias], 7)
+        socket.handlers['close'](socket)
+        await probe.flush_socket_events()
+        self.assertEqual(probe.socket_lifecycle[-1]['closeGeneration'], 7)
+        self.assertNotIn('never-log-this', str(probe.summary()))
+
+    async def test_wire_observer_only_keeps_type_time_and_local_socket_alias(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        for packet in ({'type':'world-pos','token':'never-log-this'},
+                       {'schemaVersion':'combat-prediction-envelope/v9.1','playerId':'private-player'},
+                       {'type':'private-player','url':'https://invalid.example'}, None, []):
+            probe.sent(packet, alias)
+        wire = probe.summary()['wireObservation']
+        self.assertEqual([e['type'] for e in wire['sends']],
+                         ['world-pos','combat-prediction','other-control','unknown-frame','unknown-frame'])
+        self.assertEqual(wire['sockets'][0]['world'], 1)
+        self.assertEqual(wire['sockets'][0]['combatPrediction'], 1)
+        self.assertEqual(wire['sockets'][0]['otherControl'], 1)
+        self.assertEqual(wire['sockets'][0]['unknownFrames'], 2)
+        self.assertEqual(wire['serverArrivalGate'], 'UNKNOWN')
+        for value in ('never-log-this','private-player','invalid.example'):
+            self.assertNotIn(value, str(wire))
+
+    async def test_wire_peak_window_is_per_socket_and_has_same_open_left_boundary(self):
+        probe = CombatTiming()
+        a, b = probe.new_socket_alias(), probe.new_socket_alias()
+        probe.wire_sends = [{'socketAlias':a,'type':'world-pos','phase':'setup','atMs':i*40}
+                            for i in range(241)]
+        probe.wire_sends += [{'socketAlias':b,'type':'world-pos','phase':'setup','atMs':0},
+                            {'socketAlias':b,'type':'world-pos','phase':'setup','atMs':10000}]
+        probe.wire_sends += [{'socketAlias':a,'type':'combat-prediction','phase':'setup','atMs':i}
+                            for i in range(120)]
+        first, second = probe.summary()['wireObservation']['sockets']
+        self.assertEqual(first['worldPeak10s'], 241)
+        self.assertEqual(first['controlCandidatePeak10s'], 120)
+        self.assertEqual(second['worldPeak10s'], 1)
+
+    async def test_wire_storage_is_bounded_and_unassociated_socket_is_unknown(self):
+        probe = CombatTiming()
+        probe.sent({'token':'never-log-this'}, 1)
+        self.assertEqual(probe.summary()['wireObservation']['status'], 'UNKNOWN-not-observed')
+        alias = probe.new_socket_alias()
+        for _ in range(5010):
+            probe.sent({'type':'world-pos'}, alias)
+        self.assertEqual(len(probe.wire_sends), 5000)
+        self.assertTrue(probe.summary()['wireObservation']['truncated'])
+
+    async def test_attack_geometry_distinguishes_behind_from_within_range(self):
+        before = {'x':0,'z':0,'heading':0}
+        behind = attack_geometry(before, {'x':0,'z':-.5})
+        front = attack_geometry(before, {'x':0,'z':.5})
+        self.assertEqual(behind['distance'], .5)
+        self.assertEqual(behind['facingDot'], -1)
+        self.assertEqual(front['facingDot'], 1)
+        self.assertEqual(before, {'x':0,'z':0,'heading':0})
+
+    async def test_unavailable_aim_is_unknown_not_forward(self):
+        self.assertIsNone(attack_geometry({'x':0,'z':0}, {'x':0,'z':1}))
+        self.assertIsNone(attack_geometry({'x':0,'z':0,'heading':float('nan')}, {'x':0,'z':1}))
+        self.assertIsNone(attack_geometry({'x':True,'z':0,'heading':0}, {'x':0,'z':1}))
+        geometry = attack_geometry({'x':0,'z':0,'heading':0}, {'x':0,'z':0})
+        self.assertEqual(geometry['distance'], 0)
+        self.assertIsNone(geometry['facingDot'])
+
+    async def test_wire_shape_only_counts_root_routing_fields_and_nested_containers(self):
+        shape = wire_shape({'type':'world-pos','visual':{'schemaVersion':1,'events':[]},
+                            'monsterIntents':[{'targetActorId':'private-player'}]})
+        self.assertEqual(shape['rootCombatFieldCount'], 0)
+        self.assertEqual(shape['jsonDepthCapped9'], 3)
+        self.assertEqual(wire_shape({'SCHEMAVERSION':'never-log-this'})['rootCombatFieldCount'], 1)
+        self.assertNotIn('private-player', str(shape))
+        self.assertNotIn('never-log-this', str(wire_shape({'SCHEMAVERSION':'never-log-this'})))
+
+    async def test_wire_shape_depth_and_node_work_are_bounded(self):
+        deep = {}
+        for _ in range(50):
+            deep = {'private-player':deep}
+        self.assertEqual(wire_shape(deep)['jsonDepthCapped9'], 9)
+        wide = {'private-player':[{} for _ in range(1100)]}
+        self.assertEqual(wire_shape(wide)['shapeStatus'], 'UNKNOWN-node-bound')
+        self.assertIsNone(wire_shape(wide)['jsonDepthCapped9'])
+
+    async def test_frame_byte_metadata_preserves_unknown_and_never_keeps_payload(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.sent({'type':'world-pos','token':'never-log-this'}, alias, 1234)
+        probe.sent(None, alias, True)
+        self.assertEqual(probe.wire_sends[0]['frameBytes'], 1234)
+        self.assertIsNone(probe.wire_sends[1]['frameBytes'])
+        self.assertNotIn('never-log-this', str(probe.wire_sends))
+
+    async def test_inbound_metadata_is_numeric_per_socket_and_phase_without_payload(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        probe.received_size(alias, 1000, True, 42)
+        probe.received_size(alias, 2000, True, 51)
+        probe.received_size(alias, 100, False)
+        probe.phase = 'combat'
+        probe.received_size(alias, 1500, True, 8)
+        inbound = probe.summary()['inboundObservation']
+        setup, combat = inbound['socketsByPhase']
+        self.assertEqual(setup['frames'], 3)
+        self.assertEqual(setup['worldSnapshots'], 2)
+        self.assertEqual(setup['totalFrameBytes'], 3100)
+        self.assertEqual(setup['maxFrameBytes'], 2000)
+        self.assertEqual(setup['meanWorldFrameBytes'], 1500)
+        self.assertEqual(setup['maxMessageCount'], 51)
+        self.assertEqual(combat['phase'], 'combat')
+        self.assertEqual(combat['worldSnapshots'], 1)
+        self.assertEqual(inbound['serverSendWaitGate'], 'UNKNOWN')
+
+    async def test_inbound_unknown_size_and_unassociated_socket_are_not_zero_evidence(self):
+        probe = CombatTiming()
+        probe.received_size(1, 100, True, 1)
+        self.assertEqual(probe.summary()['inboundObservation']['status'], 'UNKNOWN-not-observed')
+        alias = probe.new_socket_alias()
+        probe.received_size(alias, True, True, True)
+        row = probe.summary()['inboundObservation']['socketsByPhase'][0]
+        self.assertEqual(row['unknownByteFrames'], 1)
+        self.assertIsNone(row['meanWorldFrameBytes'])
+        self.assertIsNone(row['maxMessageCount'])
+
+    async def test_inbound_bound_and_complete_phase_do_not_retain_late_frames(self):
+        probe = CombatTiming()
+        alias = probe.new_socket_alias()
+        for _ in range(5010):
+            probe.received_size(alias, 10, True, 1)
+        self.assertEqual(probe.summary()['inboundObservation']['frames'], 5000)
+        self.assertTrue(probe.summary()['inboundObservation']['truncated'])
+        probe.phase = 'complete'
+        probe.received_size(alias, 9999, True, 512)
+        self.assertEqual(probe.inbound_frames, 5000)
+
+    async def test_malformed_intent_container_and_target_do_not_break_observer(self):
+        probe = CombatTiming()
+        for intents in (None, {}, 'invalid', [None, 7], [{'targetActorId':123} ]):
+            probe.sent({'type':'world-pos','monsterIntents':intents})
+        self.assertFalse(any(event.get('targeted') for event in probe.timeline))
+        self.assertTrue(all(event.get('target') is None for event in probe.timeline))
+
+    async def test_close_diagnostics_failure_remains_unknown_and_keeps_close(self):
+        probe = CombatTiming()
+        event = probe.socket_event('close')
+
+        async def reader():
+            raise RuntimeError('never-log-this')
+
+        await probe.capture_socket_close(event, reader)
+        self.assertEqual(event['kind'], 'close')
+        self.assertEqual(event['detailStatus'], 'UNKNOWN-not-read')
+        self.assertNotIn('never-log-this', str(probe.summary()))
+
+    async def test_unobserved_socket_is_unknown_not_zero_faults(self):
+        probe = CombatTiming()
+        self.assertEqual(probe.summary()['socketLifecycleStatus'], 'UNKNOWN-not-observed')
+        self.assertEqual(probe.summary()['socketLifecycle'], [])
+
+    async def test_existing_socket_observer_filters_path_and_drops_sensitive_arguments(self):
+        class FakeSocket:
+            def __init__(self, url):
+                self.url = url
+                self.handlers = {}
+
+            def on(self, event, handler):
+                self.handlers[event] = handler
+
+        probe = CombatTiming()
+        other = FakeSocket('wss://invalid.example/other?token=never-log-this')
+        observe_socket_lifecycle(probe, other)
+        self.assertEqual(other.handlers, {})
+        socket = FakeSocket('wss://invalid.example/ws/chat?token=never-log-this')
+        observe_socket_lifecycle(probe, socket)
+        self.assertEqual(set(socket.handlers), {'close', 'socketerror'})
+        probe.phase = 'combat'
+        socket.handlers['socketerror']('private-player never-log-this')
+        socket.handlers['close'](socket)
+        self.assertEqual([e['kind'] for e in probe.summary()['socketLifecycle']],
+                         ['created', 'error', 'close'])
+        self.assertNotIn('never-log-this', str(probe.summary()))
+        self.assertNotIn('invalid.example', str(probe.summary()))
+        self.assertNotIn('private-player', str(probe.summary()))
+        self.assertEqual(probe.summary()['socketLifecycleStatus'],
+                         'CAPTURED-socket-events-not-connection-acceptance')
+
+    async def test_socket_probe_is_bounded_and_ignores_teardown_and_unknown_events(self):
+        probe = CombatTiming()
+        probe.socket_event('untrusted-private-text')
+        self.assertEqual(probe.summary()['socketLifecycleStatus'], 'UNKNOWN-not-observed')
+        probe.phase = 'combat'
+        for _ in range(401):
+            probe.socket_event('error')
+        self.assertEqual(len(probe.socket_lifecycle), 400)
+        self.assertTrue(probe.summary()['socketLifecycleTruncated'])
+        probe.phase = 'complete'
+        before = list(probe.socket_lifecycle)
+        probe.socket_event('close')
+        self.assertEqual(probe.socket_lifecycle, before)
+
+    async def test_material_probe_uses_real_scene_not_scoped_effects_and_tracks_shadow(self):
+        self.assertIn('window.__combat?.scene', GPU_PROBE_SCRIPT)
+        self.assertNotIn('window.__combat?.effects?.scene', GPU_PROBE_SCRIPT)
+        self.assertIn("['onBeforeRender','onAfterRender',4,'color']", GPU_PROBE_SCRIPT)
+        self.assertIn("['onBeforeShadow','onAfterShadow',5,'shadow']", GPU_PROBE_SCRIPT)
+        self.assertIn('CAPTURED-color-and-shadow-variant', GPU_PROBE_SCRIPT)
+
+    async def test_draw_metadata_is_only_described_on_gpu_call_and_redacts_names(self):
+        self.assertIn('p.drawMaterial=args[index]??null; p.drawObject=this', GPU_PROBE_SCRIPT)
+        self.assertIn('durationMs,material:describeDraw()', GPU_PROBE_SCRIPT)
+        self.assertIn("source='world-portal'", GPU_PROBE_SCRIPT)
+        self.assertIn('geometries.has(g?.type)', GPU_PROBE_SCRIPT)
+        self.assertIn('o?.isInstancedMesh===true', GPU_PROBE_SCRIPT)
+        self.assertIn('o?.isBatchedMesh===true', GPU_PROBE_SCRIPT)
+        self.assertIn('depth<12', GPU_PROBE_SCRIPT)
+        self.assertNotIn('name:ancestor.name', GPU_PROBE_SCRIPT)
+        self.assertNotIn('uuid:', GPU_PROBE_SCRIPT)
+
+    async def test_builtin_shader_parameters_are_bounded_and_never_return_raw_cache_key(self):
+        self.assertIn("parts[0]!=='basic'", GPU_PROBE_SCRIPT)
+        self.assertIn('properties?.has?.(p.drawMaterial)', GPU_PROBE_SCRIPT)
+        self.assertIn('p.portalWarmupVariants.length<4', GPU_PROBE_SCRIPT)
+        self.assertIn('slice(0,12).map(shaderParameters)', GPU_PROBE_SCRIPT)
+        self.assertIn('pointLights:34', GPU_PROBE_SCRIPT)
+        self.assertIn('spaces.has(parts[2])', GPU_PROBE_SCRIPT)
+        self.assertIn('spaces.has(parts[51])', GPU_PROBE_SCRIPT)
+        self.assertIn('Number.isSafeInteger(program.usedTimes)', GPU_PROBE_SCRIPT)
+        self.assertIn("method==='getProgramInfoLog'", GPU_PROBE_SCRIPT)
+        self.assertNotIn('cacheKey:program.cacheKey', GPU_PROBE_SCRIPT)
+
     async def test_gpu_probe_is_bounded_numeric_and_does_not_change_shader_inputs(self):
         self.assertIn('p.gpuCalls.length<400', GPU_PROBE_SCRIPT)
         self.assertIn('p.parentPosts.length<400', GPU_PROBE_SCRIPT)

@@ -101,9 +101,72 @@ try {
   assert.equal(route.staleResultRevisions, 1, 'duplicate combat result revisions are observable at the parent ingress');
   assert.equal(route.actorsOmitted, 1, 'omitted actors are observable separately from actors[]');
   assert.equal(route.sampleCount, 2, 'snapshot receive intervals are retained for p95/p99 capture');
+  const originalPerformance = Object.getOwnPropertyDescriptor(globalThis, 'performance');
+  let flowClock = 1000;
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => flowClock } });
+  try {
+    const receiveMetadata = worldFlow => socket.emit('message', { data: JSON.stringify({
+      type: 'world-snapshot', payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [],
+        worldFlow },
+    }) });
+    const receiveFlow = (snapshotSequence, inputReceived) => receiveMetadata({
+      contract: 'world-flow/1', snapshotSequence, inputReceived, inputWindow: 16, snapshotWindow: 8,
+    });
+    const worldFrames = () => socket.sent.filter(frame => frame.type === 'world-pos');
+    const validMetadata = { contract: 'world-flow/1', snapshotSequence: 1, inputReceived: 0, inputWindow: 16, snapshotWindow: 8 };
+    for (const malformed of [null, {}, { ...validMetadata, contract: 'world-flow/2' },
+      { ...validMetadata, snapshotSequence: 0 }, { ...validMetadata, inputReceived: 1 },
+      { ...validMetadata, inputWindow: 32 }, { ...validMetadata, inputReceived: '0' }]) {
+      receiveMetadata(malformed);
+      assert.equal(window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldFlow.supported, false, 'malformed capability cannot enable credit');
+    }
+    receiveFlow(1, 0);
+    assert.equal(window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldFlow.supported, true, 'valid capability negotiates credit');
+    const flowStart = worldFrames().length;
+    for (let tick = 0; tick < 16; tick += 1) { flowClock += 50; pulse.callback(); }
+    assert.equal(worldFrames().length - flowStart, 16, 'input can send only sixteen unacknowledged frames');
+    const heldIntent = { schemaVersion: 1, intentId: 'monster-intent:2:9', zone: 'pirate-fruit',
+      kind: 'melee', category: 'style', forwardX: 0, forwardZ: 1, range: 3, sequence: 9,
+      targetActorId: 'monster:server-crab-1', expectedGeneration: 1, expectedStateSequence: 12 };
+    let heldProviderReads = 0;
+    window.POCKETMONSTER_WORLD_STATE = () => { heldProviderReads += 1; return { zone: 'pirate-fruit', x: 30, z: 2, dir: .5,
+      monsterIntents: [heldIntent],
+      visual: { schemaVersion: 1, sessionId: 'session-a', stateSequence: 100, events: [], projectiles: [] } }; };
+    window.POCKETMONSTER_WORLD_VISUAL_EVENTS([{ ...slash, sequence: 3 }]);
+    receiveFlow(2, 0);
+    flowClock += 50; pulse.callback();
+    assert.equal(worldFrames().length - flowStart, 16, 'backpressure does not create a stale pose backlog');
+    assert.equal(socket.sent.at(-1).type, 'world-flow-ack', 'snapshot acknowledgement still sends while input credit is full');
+    assert.equal(heldProviderReads, 0, 'full credit window cannot consume the provider intent queue');
+    assert.equal(socket.sent.at(-1).worldFlow.inputSequence, 0, 'ACK-only never claims another input');
+    assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 1, 'held visual is not committed before real send');
+    receiveFlow(3, 0);
+    const ackStart = socket.sent.length;
+    flowClock += 50; pulse.callback();
+    assert.equal(socket.sent.length, ackStart, 'ACK-only is bounded below the existing control quota');
+    flowClock += 200; pulse.callback();
+    assert.equal(socket.sent.at(-1).worldFlow.snapshotAcknowledged, 3, 'latest received snapshot is acknowledged');
+    assert.equal(heldProviderReads, 0, 'ACK-only cannot read the gameplay provider');
+    receiveFlow(4, 16);
+    flowClock += 50; pulse.callback();
+    assert.equal(worldFrames().length - flowStart, 17, 'receipt of prior input resumes existing publisher');
+    assert.equal(socket.sent.at(-1).x, 30, 'resume uses latest pose rather than replaying old poses');
+    assert.equal(heldProviderReads, 1, 'provider is read once only after input credit returns');
+    assert.deepEqual(socket.sent.at(-1).monsterIntents[0], heldIntent, 'held attack intent remains unchanged');
+    assert.equal(socket.sent.at(-1).visual.events[0].sequence, 3, 'held visual ships after credit returns');
+    assert.equal(window.POCKETMONSTER_WORLD_VISUAL_QUEUE_DIAGNOSTICS().pending, 0, 'successful send commits visual once');
+    receiveFlow(5, 99999);
+    assert.equal(window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldFlow.inputReceived, 16, 'future receipt cannot release input credit');
+    const healthyStart = worldFrames().length;
+    for (let tick = 0; tick < 20; tick += 1) {
+      receiveFlow(5 + tick, window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldFlow.inputSent);
+      flowClock += 50; pulse.callback();
+    }
+    assert.equal(worldFrames().length - healthyStart, 20, 'healthy credit preserves the original 50ms cadence');
+    assert.equal(window.POCKETMONSTER_CHAT_RUNTIME.diagnostics().worldFlow.peakInputInFlight, 16, 'bounded window never exceeds sixteen inputs');
+  } finally { Object.defineProperty(globalThis, 'performance', originalPerformance); }
   console.log('V9 chat WORLD_STATE 20Hz and visual-envelope guard: PASS');
 } finally {
   globalThis.setInterval = realSetInterval;
   globalThis.clearInterval = realClearInterval;
 }
-

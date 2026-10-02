@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from playwright.async_api import async_playwright
-from monster_combat_timing import CombatTiming
+from monster_combat_timing import CombatTiming, observe_socket_lifecycle
 from combat_browser_viewport import resize_combat_viewport
 
 ROOT = Path('candidate-artifact/dist-pages').resolve()
@@ -194,22 +194,45 @@ async def main():
         timing = CombatTiming() if COMBAT_TIMING else None
         wire_counts = {'worldPoseSends': 0, 'worldSnapshots': 0}
         def observe_page(opened_page):
+            socket_ordinal = 0
             def observe_socket(socket):
+                nonlocal socket_ordinal
+                async def socket_diagnostics():
+                    return await opened_page.evaluate('''() => {
+                        const d=window.POCKETMONSTER_CHAT_RUNTIME?.diagnostics?.();
+                        return d ? {lastSocketClose:d.lastSocketClose,reconnectDelayMs:d.reconnectDelayMs,
+                            socketGeneration:d.socketGeneration,socketCreates:d.socketCreates} : null;
+                    }''')
+                alias = observe_socket_lifecycle(timing, socket, socket_diagnostics, socket_ordinal+1)
+                if alias is not None:
+                    socket_ordinal += 1
                 def sent(payload):
                     try:
                         packet = json.loads(payload)
-                        if timing:
-                            timing.sent(packet)
-                        if packet.get('type') == 'world-pos':
-                            wire_counts['worldPoseSends'] += 1
                     except (ValueError, TypeError):
-                        pass
+                        packet = None
+                    if timing and alias is not None:
+                        size = len(payload.encode('utf-8')) if isinstance(payload, str) else len(payload) if isinstance(payload, bytes) else None
+                        timing.sent(packet, alias, size)
+                    if isinstance(packet, dict) and packet.get('type') == 'world-pos':
+                        wire_counts['worldPoseSends'] += 1
                 socket.on('framesent', sent)
                 def received(payload):
                     nonlocal wild
                     try:
                         packet = json.loads(payload)
+                        if timing and alias is not None:
+                            size = len(payload.encode('utf-8')) if isinstance(payload, str) else len(payload) if isinstance(payload, bytes) else None
+                            is_world = isinstance(packet, dict) and packet.get('type') == 'world-snapshot'
+                            body = packet.get('payload') if is_world else None
+                            envelope = body.get('pirateWorld') if isinstance(body, dict) else None
+                            messages = envelope.get('messages') if isinstance(envelope, dict) else None
+                            timing.received_size(alias, size, is_world, len(messages) if isinstance(messages, list) else None)
+                        if not isinstance(packet, dict):
+                            return
                         world = packet.get('payload', {})
+                        if not isinstance(world, dict):
+                            return
                         if packet.get('type') == 'world-snapshot' and world.get('zone') == 'pirate-fruit':
                             if timing:
                                 timing.receive(world)
@@ -765,7 +788,7 @@ async def main():
                 EVIDENCE['errorCode'] = str(error)
         finally:
             if timing:
-                EVIDENCE['combatTiming'] = timing.summary()
+                EVIDENCE['combatTiming'] = await timing.finish_socket_observation()
             if response_tasks:
                 await asyncio.gather(*tuple(response_tasks), return_exceptions=True)
             if PRODUCTION_LIVE:
@@ -785,6 +808,17 @@ async def main():
                             acceptedSnapshots:d?.acceptedSnapshots,
                             socketReadyState:chat?.socketReadyState,worldPulseActive:chat?.worldPulseActive,
                             chatPaused:chat?.paused,chatStopped:chat?.stopped,
+                            socketGeneration:Number.isSafeInteger(chat?.socketGeneration)?chat.socketGeneration:null,
+                            socketCreates:Number.isSafeInteger(chat?.socketCreates)?chat.socketCreates:null,
+                            combatPredictionSends:Number.isSafeInteger(chat?.combatPredictionSends)?chat.combatPredictionSends:null,
+                            combatAuthorityMessages:Number.isSafeInteger(chat?.combatAuthorityMessages)?chat.combatAuthorityMessages:null,
+                            worldFlow:chat?.worldFlow ? {supported:chat.worldFlow.supported===true,
+                                inputSent:Number.isSafeInteger(chat.worldFlow.inputSent)?chat.worldFlow.inputSent:null,
+                                inputReceived:Number.isSafeInteger(chat.worldFlow.inputReceived)?chat.worldFlow.inputReceived:null,
+                                inputInFlight:Number.isSafeInteger(chat.worldFlow.inputInFlight)?chat.worldFlow.inputInFlight:null,
+                                peakInputInFlight:Number.isSafeInteger(chat.worldFlow.peakInputInFlight)?chat.worldFlow.peakInputInFlight:null,
+                                inputHeld:Number.isSafeInteger(chat.worldFlow.inputHeld)?chat.worldFlow.inputHeld:null,
+                                ackOnlySends:Number.isSafeInteger(chat.worldFlow.ackOnlySends)?chat.worldFlow.ackOnlySends:null} : null,
                             bootState:d?.sceneBootState,controlAvailable:s?.available,pending:c?.pending,
                             failure:/^[A-Z0-9_]{1,64}$/.test(code||'')?code:null};
                     }""")

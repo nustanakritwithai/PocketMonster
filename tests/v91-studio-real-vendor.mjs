@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import * as vendor from '../pirate-fruit-offline/assets/vendor-three-nlAIzLqr.js';
+import * as vendor from '../pirate-fruit-offline/assets/vendor-three-YfRDs8-E.js';
 import {
   threeFromPirateFruitVendor,
   installPirateFruitPocketPresentation,

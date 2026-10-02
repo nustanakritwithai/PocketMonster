@@ -14,6 +14,14 @@ const MAX_SOCKET_MESSAGE_LENGTH = 262_144;
 const MAX_COMBAT_FRAME_BYTES = 32 * 1024;
 const COMBAT_PREDICTION_SCHEMA = 'combat-prediction-envelope/v9.1';
 const COMBAT_AUTHORITY_RESPONSE_SCHEMA = 'combat-authority-response/v9.1.2';
+// เวลาretryเป็นนโยบายtransportเท่านั้น ไม่เปลี่ยน50ms world tickหรือจังหวะโจมตี
+const RECONNECT_DELAYS_MS = Object.freeze([200, 400, 800, 1600, 3200, 5000]);
+const RECONNECT_STABLE_WINDOW_MS = 5000;
+// credit เป็น transport เท่านั้น: เก็บ cadence เดิมเมื่อ ACK เดินหน้า และไม่ส่ง backlog ไม่จำกัด
+const WORLD_FLOW_CONTRACT = 'world-flow/1';
+const WORLD_INPUT_WINDOW = 16;
+const WORLD_SNAPSHOT_WINDOW = 8;
+const WORLD_ACK_ONLY_INTERVAL_MS = 200;
 const TERMINAL_SESSION_REJECTIONS = new Set([
   'AUTHENTICATION_REQUIRED',
   'INVALID_SESSION',
@@ -30,6 +38,10 @@ const state = {
   polling: null,
   worldPulse: null,
   reconnectTimer: null,
+  reconnectAttempt: 0,
+  reconnectDelayMs: null,
+  socketOpenedAtMs: null,
+  lastSocketClose: null,
   worldConnected: false,
   combatConnected: false,
   combatPredictionSends: 0,
@@ -44,6 +56,7 @@ const state = {
   restAbortController: new AbortController(),
   socketCreates: 0,
   socketGeneration: 0,
+  worldFlow: null,
 };
 const combatAuthorityListeners = new Set();
 const combatStatusListeners = new Set();
@@ -434,6 +447,7 @@ function clearTransportTimers() {
   state.polling = null;
   state.worldPulse = null;
   state.reconnectTimer = null;
+  state.reconnectDelayMs = null;
 }
 function closeTransport(reason) {
   clearTransportTimers();
@@ -467,23 +481,50 @@ function connectSocket() {
     if (state.reconnectTimer) {
       clearTimeout(state.reconnectTimer);
       state.reconnectTimer = null;
+      state.reconnectDelayMs = null;
     }
     const socket = new WebSocket(state.config.webSocketUrl);
     state.socket = socket;
     state.socketCreates += 1;
     state.socketGeneration += 1;
+    const flow = { supported: false, inputSent: 0, inputReceived: 0, snapshotReceived: 0,
+      snapshotAckSent: 0, inputHeld: 0, ackOnlySends: 0, peakInputInFlight: 0, lastAckOnlyAt: null };
+    state.worldFlow = flow;
     socket.addEventListener('open', () => {
       if (state.socket !== socket || state.stopped || state.paused) return;
       const openContext = activeRequestContext();
       if (!openContext) return;
+      state.socketOpenedAtMs = performance.now();
       socket.send(JSON.stringify({ token: openContext.token }));
       setCombatConnected(true);
+      const sendAckOnly = () => {
+        if (!flow.supported || flow.snapshotReceived <= flow.snapshotAckSent) return;
+        const now = performance.now();
+        if (flow.lastAckOnlyAt !== null && now - flow.lastAckOnlyAt < WORLD_ACK_ONLY_INTERVAL_MS) return;
+        try {
+          socket.send(JSON.stringify({ type: 'world-flow-ack', worldFlow: {
+            contract: WORLD_FLOW_CONTRACT, inputSequence: 0, snapshotAcknowledged: flow.snapshotReceived } }));
+          flow.snapshotAckSent = flow.snapshotReceived;
+          flow.lastAckOnlyAt = now;
+          flow.ackOnlySends += 1;
+        } catch { setWorldConnected(false); }
+      };
       const sendWorld = () => {
         if (!activeRequestContext()) return;
         if (state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        if (flow.supported && flow.inputSent - flow.inputReceived >= WORLD_INPUT_WINDOW) {
+          flow.inputHeld += 1;
+          // ACK-only ไม่เพิ่ม inputSequence/ไม่ commit visual หรือ consume monster intent
+          // ยังปลด credit ขากลับได้ จึงไม่ deadlock เมื่อสองฝั่งรอ ACK พร้อมกัน
+          sendAckOnly();
+          return;
+        }
         const snapshot = window.POCKETMONSTER_WORLD_STATE?.();
         const frame = buildWorldPosFrame(snapshot);
-        if (!frame) return;
+        if (!frame) { sendAckOnly(); return; }
+        const flowMetadata = flow.supported ? { worldFlow: { contract: WORLD_FLOW_CONTRACT,
+          inputSequence: flow.inputSent + 1, snapshotAcknowledged: flow.snapshotReceived } } : {};
+        const packet = candidate => ({ type: 'world-pos', ...candidate, ...flowMetadata });
         if (lastWorldZone && lastWorldZone !== frame.zone) worldVisualQueue.clear();
         lastWorldZone = frame.zone;
         // Keep pose cadence independent from a pending visual batch.  The
@@ -497,19 +538,24 @@ function connectSocket() {
         const queuedEvents = visualEnvelopeReady ? worldVisualQueue.peek(32, candidate => {
           const candidateFrame = buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: candidate } });
           if (!candidateFrame) return false;
-          return new TextEncoder().encode(JSON.stringify({ type: 'world-pos', ...candidateFrame })).byteLength <= MAX_COMBAT_FRAME_BYTES;
+          return new TextEncoder().encode(JSON.stringify(packet(candidateFrame))).byteLength <= MAX_COMBAT_FRAME_BYTES;
         }) : [];
         const outboundFrame = queuedEvents.length
           ? buildWorldPosFrame({ ...baseFrame, visual: { ...baseFrame.visual, events: queuedEvents } })
           : baseFrame;
         if (!outboundFrame || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
-        const serialized = JSON.stringify({ type: 'world-pos', ...outboundFrame });
-        if (new TextEncoder().encode(serialized).byteLength > MAX_COMBAT_FRAME_BYTES) return;
+        const serialized = JSON.stringify(packet(outboundFrame));
+        if (new TextEncoder().encode(serialized).byteLength > MAX_COMBAT_FRAME_BYTES) { sendAckOnly(); return; }
         try {
           socket.send(serialized);
         } catch {
           setWorldConnected(false);
           return;
+        }
+        if (flow.supported) {
+          flow.inputSent += 1;
+          flow.snapshotAckSent = flow.snapshotReceived;
+          flow.peakInputInFlight = Math.max(flow.peakInputInFlight, flow.inputSent - flow.inputReceived);
         }
         worldVisualQueue.commit(queuedEvents.length, queuedEvents);
       };
@@ -536,10 +582,27 @@ function connectSocket() {
             worldPresenceDiagnostics.recordRejected();
             return;
           }
+          const advertised = message.payload?.worldFlow;
+          if (advertised?.contract === WORLD_FLOW_CONTRACT
+              && advertised.inputWindow === WORLD_INPUT_WINDOW && advertised.snapshotWindow === WORLD_SNAPSHOT_WINDOW
+              && Number.isSafeInteger(advertised.snapshotSequence) && advertised.snapshotSequence > 0
+              && Number.isSafeInteger(advertised.inputReceived) && advertised.inputReceived >= 0
+              && advertised.inputReceived <= flow.inputSent) {
+            flow.supported = true;
+            flow.snapshotReceived = Math.max(flow.snapshotReceived, advertised.snapshotSequence);
+            flow.inputReceived = Math.max(flow.inputReceived, advertised.inputReceived);
+          }
           const filtered = Object.freeze({ ...payload, players: filterRemotePlayers(payload.players, currentSelfPresenceId()) });
           worldPresenceDiagnostics.observeSnapshot(filtered);
           const accepted = window.POCKETMONSTER_WORLD_PRESENCE?.(filtered);
-          if (accepted !== false) setWorldConnected(true);
+          if (accepted !== false) {
+            setWorldConnected(true);
+            // handshakeอย่างเดียวไม่รีเซ็ตbackoff ต้องได้รับsnapshotจริงหลังconnectionเปิดครบช่วงนี้
+            if (state.socketOpenedAtMs !== null
+                && performance.now() - state.socketOpenedAtMs >= RECONNECT_STABLE_WINDOW_MS) {
+              state.reconnectAttempt = 0;
+            }
+          }
         }
       } catch {}
     });
@@ -551,6 +614,18 @@ function connectSocket() {
     });
     socket.addEventListener('close', event => {
       if (state.socket !== socket) return;
+      const code = Number.isSafeInteger(event?.code) && event.code >= 1000 && event.code <= 4999
+        ? event.code : null;
+      const authRejected = code === 1008 && isExplicitSessionRejection(event.reason);
+      const category = authRejected ? 'auth-rejected'
+        : code === 1008 ? normalizeRejectionCode(event.reason) === 'RATE_LIMIT_EXCEEDED' ? 'rate-limited' : 'policy'
+        : code === 1006 ? 'abnormal' : code === 1000 ? 'normal'
+        : code === 1001 ? 'going-away' : code === 1013 ? 'try-later'
+        : code === null ? 'unknown' : 'other';
+      // เก็บเฉพาะenum/code/time/generation ไม่เก็บreasonดิบ,URL,tokenหรือข้อมูลผู้เล่น
+      state.lastSocketClose = Object.freeze({ generation: state.socketGeneration,
+        code, category, atMs: performance.now() });
+      state.socketOpenedAtMs = null;
       state.socket = null;
       setCombatConnected(false);
       setWorldConnected(false);
@@ -558,7 +633,7 @@ function connectSocket() {
         clearInterval(state.worldPulse);
         state.worldPulse = null;
       }
-      if (event?.code === 1008 && isExplicitSessionRejection(event.reason)) {
+      if (authRejected) {
         invalidateSession('session-rejected');
         return;
       }
@@ -572,10 +647,16 @@ function connectSocket() {
 function scheduleReconnect() {
   if (state.stopped || state.paused || state.reconnectTimer || !activeRequestContext()) return;
   if (state.socket && state.socket.readyState !== WebSocket.CLOSED) return;
+  const policyDelay = ['rate-limited', 'policy', 'try-later'].includes(state.lastSocketClose?.category);
+  const delay = policyDelay ? 5000
+    : RECONNECT_DELAYS_MS[Math.min(state.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+  state.reconnectAttempt = Math.min(state.reconnectAttempt + 1, RECONNECT_DELAYS_MS.length);
+  state.reconnectDelayMs = delay;
   state.reconnectTimer = setTimeout(() => {
     state.reconnectTimer = null;
+    state.reconnectDelayMs = null;
     connectSocket();
-  }, 5000);
+  }, delay);
 }
 function suspend() {
   if (state.stopped || state.paused) return;
@@ -691,10 +772,18 @@ const runtime = Object.freeze({
     pollingActive: Boolean(state.polling),
     worldPulseActive: Boolean(state.worldPulse),
     reconnectPending: Boolean(state.reconnectTimer),
+    reconnectAttempt: state.reconnectAttempt,
+    reconnectDelayMs: state.reconnectDelayMs,
+    lastSocketClose: state.lastSocketClose,
     worldConnected: state.worldConnected,
     combatConnected: state.combatConnected,
     combatPredictionSends: state.combatPredictionSends,
     combatAuthorityMessages: state.combatAuthorityMessages,
+    worldFlow: state.worldFlow ? Object.freeze({ supported: state.worldFlow.supported,
+      inputSent: state.worldFlow.inputSent, inputReceived: state.worldFlow.inputReceived,
+      inputInFlight: state.worldFlow.inputSent - state.worldFlow.inputReceived,
+      peakInputInFlight: state.worldFlow.peakInputInFlight, inputHeld: state.worldFlow.inputHeld,
+      ackOnlySends: state.worldFlow.ackOnlySends, snapshotReceived: state.worldFlow.snapshotReceived }) : null,
     stopped: state.stopped,
     paused: state.paused,
     stopReason: state.stopReason,

@@ -17,6 +17,8 @@ if (!scenario) {
     'suspend-pull-resume',
     'suspend-send-resume',
     'closing-resume',
+    'fast-reconnect-and-backoff',
+    'flow-credit-reset',
     'store-auth-rejection-resets',
   ]) {
     const result = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name], { encoding: 'utf8' });
@@ -422,7 +424,7 @@ if (scenario === 'stop-during-config') {
   };
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ messages: [] }) });
   const nativeSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (callback, delay, ...args) => nativeSetTimeout(callback, delay === 5000 ? 0 : delay, ...args);
+  globalThis.setTimeout = (callback, delay, ...args) => nativeSetTimeout(callback, [200, 400, 800, 1600, 3200, 5000].includes(delay) ? 0 : delay, ...args);
   await import(`../chat-runtime.mjs?closing-resume=${Date.now()}`);
   await wait();
   const firstSocket = FakeWebSocket.instances[0];
@@ -438,6 +440,109 @@ if (scenario === 'stop-during-config') {
   assert.equal(FakeWebSocket.instances.length, 2, 'one replacement starts only after the prior socket is fully closed');
   assert.ok(FakeWebSocket.instances.filter(socket => socket.readyState !== FakeWebSocket.CLOSED).length <= 1);
   window.dispatchEvent(new Event('pocketmonster:session-ended'));
+} else if (scenario === 'fast-reconnect-and-backoff') {
+  window.POCKETMONSTER_RUNTIME_CONFIG = {
+    apiBaseUrl: 'https://server.example', webSocketUrl: 'wss://server.example/ws/chat',
+  };
+  globalThis.fetch = async () => reply({ messages: [] });
+  const nativeSetTimeout = globalThis.setTimeout, nativeClearTimeout = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    if (![200, 400, 800, 1600, 3200, 5000].includes(delay)) return nativeSetTimeout(callback, delay, ...args);
+    const timer = { callback, delay, cleared: false };
+    timers.push(timer);
+    return timer;
+  };
+  globalThis.clearTimeout = timer => {
+    if (timers.includes(timer)) timer.cleared = true;
+    else nativeClearTimeout(timer);
+  };
+  let now = 100;
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => now } });
+  await import(`../chat-runtime.mjs?reconnect-backoff=${Date.now()}`);
+  const runtime = window.POCKETMONSTER_CHAT_RUNTIME;
+  let socket = FakeWebSocket.instances[0];
+  const original = socket;
+  for (const delay of [200, 400, 800, 1600, 3200, 5000, 5000]) {
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.emit('open');
+    socket.readyState = FakeWebSocket.CLOSED;
+    socket.emit('close', { code: 1006, reason: 'private-token-and-player' });
+    assert.equal(runtime.diagnostics().reconnectDelayMs, delay);
+    assert.equal(timers.at(-1).delay, delay, 'transient retry starts quickly then backs off with a cap');
+    const count = FakeWebSocket.instances.length;
+    socket.emit('close', { code: 1008, reason: 'Invalid session' });
+    assert.equal(timers.length, count, 'a stale socket cannot schedule a second replacement');
+    timers.at(-1).callback();
+    assert.equal(FakeWebSocket.instances.length, count + 1);
+    socket = FakeWebSocket.instances.at(-1);
+    assert.equal(runtime.diagnostics().reconnectDelayMs, null);
+  }
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.emit('open');
+  assert.equal(runtime.diagnostics().reconnectAttempt, 6, 'open alone cannot reset failure backoff');
+  now += 5001;
+  socket.emit('message', { data: JSON.stringify({ type:'world-snapshot',
+    payload:{zone:'pirate-fruit',generation:1,players:[]} }) });
+  assert.equal(runtime.diagnostics().reconnectAttempt, 0, 'accepted snapshot after a stable window resets backoff');
+  original.emit('close', { code:1008, reason:'Invalid session' });
+  assert.equal(runtime.diagnostics().stopped, false, 'old socket cannot invalidate the current session');
+  socket.readyState = FakeWebSocket.CLOSED;
+  socket.emit('close', { code:1008, reason:'Rate limit exceeded' });
+  assert.equal(runtime.diagnostics().reconnectDelayMs, 5000, 'policy rejection retains the existing slow retry');
+  assert.equal(runtime.diagnostics().lastSocketClose.category, 'rate-limited');
+  assert.equal(runtime.diagnostics().lastSocketClose.code, 1008);
+  assert.equal(runtime.diagnostics().lastSocketClose.generation, FakeWebSocket.instances.length);
+  assert.doesNotMatch(JSON.stringify(runtime.diagnostics()), /private-token-and-player|Rate limit exceeded/);
+  const pending = timers.at(-1);
+  window.dispatchEvent(new Event('pocketmonster:session-ended'));
+  assert.equal(pending.cleared, true, 'logout cancels pending retries');
+  pending.callback();
+  assert.equal(runtime.diagnostics().stopped, true);
+  assert.equal(runtime.diagnostics().hasToken, false);
+  assert.equal(FakeWebSocket.instances.length, 8, 'even a late timer cannot reconnect after logout');
+  globalThis.setTimeout = nativeSetTimeout;
+  globalThis.clearTimeout = nativeClearTimeout;
+} else if (scenario === 'flow-credit-reset') {
+  window.POCKETMONSTER_RUNTIME_CONFIG = {
+    apiBaseUrl: 'https://server.example', webSocketUrl: 'wss://server.example/ws/chat',
+  };
+  globalThis.fetch = async () => reply({ messages: [] });
+  const nativeSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) => nativeSetTimeout(callback, delay === 200 ? 0 : delay, ...args);
+  await import(`../chat-runtime.mjs?flow-reset=${Date.now()}`);
+  const runtime = window.POCKETMONSTER_CHAT_RUNTIME;
+  const message = snapshotSequence => ({ data: JSON.stringify({ type: 'world-snapshot',
+    payload: { zone: 'pirate-fruit', generation: 1, players: [], actors: [], worldFlow: {
+      contract: 'world-flow/1', snapshotSequence, inputReceived: 0, inputWindow: 16, snapshotWindow: 8,
+    } } }) });
+  const first = FakeWebSocket.instances[0];
+  first.readyState = FakeWebSocket.OPEN;
+  first.emit('open');
+  first.emit('message', message(40));
+  assert.equal(runtime.diagnostics().worldFlow.supported, true);
+  first.readyState = FakeWebSocket.CLOSED;
+  first.emit('close', { code: 1006 });
+  await wait();
+  const second = FakeWebSocket.instances.at(-1);
+  assert.notEqual(second, first);
+  assert.deepEqual([runtime.diagnostics().worldFlow.supported, runtime.diagnostics().worldFlow.inputSent,
+    runtime.diagnostics().worldFlow.snapshotReceived], [false, 0, 0], 'replacement socket cannot inherit credit or snapshot ACK');
+  second.readyState = FakeWebSocket.OPEN;
+  second.emit('open');
+  first.emit('message', message(900));
+  first.emit('open');
+  assert.equal(runtime.diagnostics().worldFlow.supported, false, 'stale socket cannot negotiate credit for replacement');
+  second.emit('message', message(2));
+  assert.equal(runtime.diagnostics().worldFlow.snapshotReceived, 2);
+  first.emit('message', message(901));
+  assert.equal(runtime.diagnostics().worldFlow.snapshotReceived, 2, 'stale snapshot cannot advance active ACK');
+  window.dispatchEvent(new Event('pagehide'));
+  window.dispatchEvent(new Event('pageshow'));
+  await wait();
+  assert.equal(runtime.diagnostics().worldFlow.supported, false, 'resume negotiates a fresh transport window');
+  window.dispatchEvent(new Event('pocketmonster:session-ended'));
+  globalThis.setTimeout = nativeSetTimeout;
 } else if (scenario === 'store-auth-rejection-resets') {
   window.POCKETMONSTER_RUNTIME_CONFIG = {
     apiBaseUrl: 'https://server.example',

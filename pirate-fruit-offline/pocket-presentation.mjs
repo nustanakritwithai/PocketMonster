@@ -1,4 +1,4 @@
-import * as pirateFruitThree from './assets/vendor-three-nlAIzLqr.js';
+import * as pirateFruitThree from './assets/vendor-three-YfRDs8-E.js';
 import {
   hookPirateFruitRenderer,
   receivePirateStudioCharacterPackage,
