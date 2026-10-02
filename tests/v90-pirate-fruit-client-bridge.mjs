@@ -353,7 +353,7 @@ assert.doesNotMatch(worldsJs, /world-pirate-fruit-v900/, 'combined worlds do not
 assert.equal(fs.existsSync(new URL('../asset-presentation/scenes/pirate-fruit-world.mjs', import.meta.url)), false, 'Pocket-built pirate island scene file is gone');
 assert.equal(fs.existsSync(new URL('../world-pirate-fruit-v900.mjs', import.meta.url)), false, 'deleted island stage filename stays gone');
 
-assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=31"/, 'offline HTML cache-busts and loads the immediate attack presentation hook');
+assert.match(pirateOfflineHtml, /src="\.\/pocket-presentation\.mjs\?v=32"/, 'offline HTML cache-busts and loads the immediate attack presentation hook');
 assert.match(hookSrc, /pirate-fruit-client-bridge\.mjs\?v=6/, 'offline hook cache-busts the immediate local attack presentation bridge');
 const pirateBundleRef = pirateBootstrap.match(/import\('\.\/(assets\/index-[^']+\.js)'\)/)?.[1];
 assert.ok(pirateBundleRef, 'offline save bootstrap still boots the real Vite client');
@@ -361,7 +361,7 @@ assert.ok(
   pirateOfflineHtml.indexOf('pocket-presentation.mjs') < pirateOfflineHtml.indexOf('pocket-bootstrap.mjs'),
   'Pocket hook is listed before the save bootstrap that imports the Pirate Fruit bundle',
 );
-assert.match(hookSrc, /vendor-three-RYo9rfeI\.js/, 'hook shares the Pirate Fruit vendor Three instance');
+assert.match(hookSrc, /vendor-three-nlAIzLqr\.js/, 'hook shares the Pirate Fruit vendor Three instance');
 assert.match(hookSrc, /hookPirateFruitRenderer/, 'hook installs the Pocket overlay before the client renders');
 
 const pirateBundle = fs.readFileSync(new URL(`../pirate-fruit-offline/${pirateBundleRef}`, import.meta.url), 'utf8');
@@ -392,7 +392,7 @@ for (const id of Object.values(PIRATE_FRUIT_MONSTER_VISUALS)) {
   assert.equal(catalogIds.has(id), true, `mapped monster visual ${id} exists in Pocket catalogs`);
 }
 
-const vendor = await import('../pirate-fruit-offline/assets/vendor-three-RYo9rfeI.js');
+const vendor = await import('../pirate-fruit-offline/assets/vendor-three-nlAIzLqr.js');
 const kit = threeFromPirateFruitVendor(vendor);
 assert.equal(typeof kit.Object3D, 'function');
 assert.equal(typeof kit.Group, 'function');
