@@ -1,4 +1,4 @@
-name: Prepare client patch paired with Server 55
+name: Prepare client patch paired with Server 64
 on:
   pull_request:
     paths:
@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CLIENT_BASE: '169fdd589c038f4c5664e609102073ee462e829d'
-      SERVER_CANDIDATE: '3548e789f506496fca7dfded93c34803d2bf37a2'
+      CLIENT_BASE: '993a3ef8ad62ef5b63eec1497907fd2befd295e3'
+      SERVER_CANDIDATE: '349de5fe4586d52300942feee775fc28ff4449ee'
       MONSTERLIFE_READONLY_ORIGIN: 'https://157.85.96.139'
       MONSTERLIFE_ASSET_BASE_URL: 'https://nustanakritwithai.github.io/PocketMonster/'
       MONSTERLIFE_FIREBASE_AUTH_BRIDGE: 'true'
@@ -69,7 +69,7 @@ jobs:
           assert.notEqual(manifest.buildId,oldManifest.buildId);
           const evidence={clientCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
             clientBase:process.env.CLIENT_BASE,serverCandidate:process.env.SERVER_CANDIDATE,
-            serverCandidateCi:36826048716,buildId:manifest.buildId,files:manifest.files.length,
+            serverCandidateCi:37056405646,buildId:manifest.buildId,files:manifest.files.length,
             changedPublicFiles:delta,metadataGate:'SAT',deployed:false,
             candidateServerStartupGate:'UNKNOWN',productionCombatGate:'UNKNOWN'};
           fs.writeFileSync('paired-release-evidence.json',JSON.stringify(evidence,null,2)+'\n');
@@ -78,7 +78,7 @@ jobs:
       - name: เก็บ candidate เท่านั้น ไม่เผยแพร่ Pages/Firebase/Server
         uses: actions/upload-artifact@v4
         with:
-          name: server55-paired-client-${{ github.event.pull_request.head.sha }}
+          name: server64-paired-client-${{ github.event.pull_request.head.sha }}
           path: |
             dist-pages/
             patch-manifest.json
