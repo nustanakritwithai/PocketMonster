@@ -1,0 +1,60 @@
+name: Publish PocketMonster retirement page
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pocketmonster-production-release
+  cancel-in-progress: false
+
+jobs:
+  pages:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Stage retirement page only
+        run: |
+          mkdir retired-site
+          for file in index.html 404.html v900.html v800.html; do
+            cp retirement/index.html "retired-site/$file"
+          done
+          touch retired-site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: retired-site
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Verify public retirement page
+        run: |
+          curl --fail --silent --show-error https://nustanakritwithai.github.io/PocketMonster/ | grep 'id="pocketmonster-retired"'
+
+  firebase:
+    needs: pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage retirement page only
+        run: |
+          mkdir firebase-launcher
+          for file in index.html 404.html v900.html v800.html; do
+            cp retirement/index.html "firebase-launcher/$file"
+          done
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_POCKETMONSTER_GAME }}'
+          projectId: pocketmonster-game
+          channelId: live
+      - name: Verify public retirement page
+        run: |
+          curl --fail --silent --show-error https://pocketmonster-game.web.app/ | grep 'id="pocketmonster-retired"'
